@@ -1,0 +1,47 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Convenios{% endblock %}
+{% block content %}
+<div class="row mt-4">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Convenios vigentes</div>
+      <div class="card-body table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Organización</th>
+              <th>Desde</th>
+              <th>Hasta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for convenio in convenios %}
+            <tr>
+              <td>{{ convenio.nombre }}</td>
+              <td>{{ convenio.organizacion }}</td>
+              <td>{{ convenio.vigente_desde }}</td>
+              <td>{{ convenio.vigente_hasta|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">Sin convenios.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Nuevo convenio</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button class="btn btn-primary">Guardar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

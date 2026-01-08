@@ -1,0 +1,35 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Notificaciones{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Morosos recientes</h2>
+  <ul class="list-group mb-4">
+    {% for item in morosos %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        {{ item.suscripcion.persona }}
+        <span class="badge text-bg-danger">${{ item.saldo|floatformat:0 }}</span>
+      </li>
+    {% empty %}
+      <li class="list-group-item text-muted">Sin registros.</li>
+    {% endfor %}
+  </ul>
+  <h2>Sesiones sin cerrar</h2>
+  <ul class="list-group mb-4">
+    {% for sesion in sesiones_pendientes %}
+      <li class="list-group-item">
+        {{ sesion }} · {{ sesion.fecha }} <a class="btn btn-sm btn-outline-primary float-end" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Marcar asistencia</a>
+      </li>
+    {% empty %}
+      <li class="list-group-item text-muted">Todas las sesiones están al día.</li>
+    {% endfor %}
+  </ul>
+  <h2>Liquidaciones por emitir</h2>
+  <ul class="list-group">
+    {% for liqui in liquidaciones_pendientes %}
+      <li class="list-group-item">{{ liqui.profesor }} · {{ liqui.periodo_inicio }} - {{ liqui.periodo_fin }}</li>
+    {% empty %}
+      <li class="list-group-item text-muted">Sin liquidaciones pendientes.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

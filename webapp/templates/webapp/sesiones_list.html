@@ -1,0 +1,55 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Sesiones{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Sesiones</h2>
+    <a class="btn btn-primary" href="{% url 'webapp:sesion_create' %}">Nueva sesión</a>
+  </div>
+  <form class="row g-3 mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Disciplina</label>
+      <select name="disciplina" class="form-select" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for disciplina in disciplinas %}
+          <option value="{{ disciplina.id }}" {% if disciplina.id|stringformat:'s' == request.GET.disciplina %}selected{% endif %}>{{ disciplina.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Disciplina</th>
+            <th>Profesor</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sesion in sesiones %}
+          <tr>
+            <td>{{ sesion.fecha }}</td>
+            <td>{{ sesion.disciplina }}</td>
+            <td>{{ sesion.profesor|default:"(sin asignar)" }}</td>
+            <td>{{ sesion.get_estado_display }}</td>
+            <td>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">Detalles</a>
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Asistencia</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">No hay sesiones registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      {% include "webapp/pagination.html" with page_obj=sesiones %}
+    </div>
+  </div>
+</div>
+{% endblock %}

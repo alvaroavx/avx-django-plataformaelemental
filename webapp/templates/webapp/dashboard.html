@@ -1,0 +1,57 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Dashboard · App Elemental{% endblock %}
+{% block content %}
+<div class="row mt-4">
+  <div class="col-md-3">
+    <div class="card text-bg-primary mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Estudiantes</h5>
+        <p class="display-6">{{ total_estudiantes }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-bg-success mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Planes activos</h5>
+        <p class="display-6">{{ total_planes }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-bg-warning mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Liquidaciones pendientes</h5>
+        <p class="display-6">{{ pendientes_liquidacion }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card mb-4">
+  <div class="card-header">Sesiones de hoy</div>
+  <div class="card-body table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Disciplina</th>
+          <th>Profesor</th>
+          <th>Fecha</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sesion in sesiones_hoy %}
+        <tr>
+          <td>{{ sesion.disciplina }}</td>
+          <td>{{ sesion.profesor }}</td>
+          <td>{{ sesion.fecha }}</td>
+          <td><a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Marcar asistencia</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted">Sin sesiones para hoy.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

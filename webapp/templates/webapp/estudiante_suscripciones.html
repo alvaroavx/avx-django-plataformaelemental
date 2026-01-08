@@ -1,0 +1,34 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Suscripciones{% endblock %}
+{% block content %}
+<div class="mt-4 row">
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">Nueva suscripción para {{ persona }}</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button class="btn btn-primary">Guardar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Historial</div>
+      <div class="card-body">
+        <ul class="list-group">
+          {% for suscripcion in suscripciones %}
+            <li class="list-group-item">
+              {{ suscripcion.plan }} · {{ suscripcion.fecha_inicio }} - {{ suscripcion.fecha_fin|default:"vigente" }} · {{ suscripcion.get_estado_display }}
+            </li>
+          {% empty %}
+            <li class="list-group-item text-muted">Sin suscripciones anteriores.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

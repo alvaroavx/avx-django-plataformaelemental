@@ -1,0 +1,41 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Pagos{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Pagos</h2>
+    <a class="btn btn-primary" href="{% url 'webapp:pago_create' %}">Registrar pago</a>
+  </div>
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Persona</th>
+            <th>Monto</th>
+            <th>Método</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pago in pagos %}
+          <tr>
+            <td>{{ pago.fecha_pago }}</td>
+            <td>{{ pago.persona }}</td>
+            <td>${{ pago.monto }}</td>
+            <td>{{ pago.get_metodo_display }}</td>
+            <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:pago_detail' pago.pk %}">Ver</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">Sin pagos registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      {% include "webapp/pagination.html" with page_obj=pagos %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Editar disciplina{% endblock %}
+{% block content %}
+<div class="mt-4 col-lg-6">
+  <div class="card">
+    <div class="card-header">Disciplina</div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Guardar</button>
+        <a class="btn btn-link" href="{% url 'webapp:disciplinas_list' %}">Volver</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

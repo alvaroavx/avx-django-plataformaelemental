@@ -1,0 +1,14 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Auditoría{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Registro de acciones</h2>
+  <div class="list-group">
+    {% for evento in eventos %}
+      <div class="list-group-item">{{ evento }}</div>
+    {% empty %}
+      <div class="list-group-item text-muted">La bitácora se habilitará próximamente.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

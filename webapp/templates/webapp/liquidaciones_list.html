@@ -1,0 +1,38 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Liquidaciones{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Liquidaciones</h2>
+    <a class="btn btn-primary" href="{% url 'webapp:liquidacion_create' %}">Nueva liquidación</a>
+  </div>
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Profesor</th>
+            <th>Período</th>
+            <th>Monto</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for liq in liquidaciones %}
+          <tr>
+            <td>{{ liq.profesor }}</td>
+            <td>{{ liq.periodo_inicio }} - {{ liq.periodo_fin }}</td>
+            <td>${{ liq.monto_total }}</td>
+            <td>{{ liq.get_estado_display }}</td>
+            <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:liquidacion_detail' liq.pk %}">Ver</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">No hay liquidaciones.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

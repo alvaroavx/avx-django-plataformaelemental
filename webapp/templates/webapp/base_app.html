@@ -1,0 +1,51 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}App Elemental{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body { background-color: #f5f5f5; }
+      .app-sidebar { min-height: 100vh; }
+      .quick-actions button { margin-right: 0.25rem; }
+    </style>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'webapp:dashboard' %}">App Elemental</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:sesiones_list' %}">Sesiones</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:asistencia_hoy' %}">Asistencia</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:estudiantes_list' %}">Estudiantes</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:pagos_list' %}">Pagos</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:finanzas_dashboard' %}">Finanzas</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:reportes_dashboard' %}">Reportes</a></li>
+          </ul>
+          <span class="navbar-text text-white">
+            {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}
+          </span>
+        </div>
+      </div>
+    </nav>
+    <div class="container-fluid">
+      {% if messages %}
+        <div class="mt-3">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

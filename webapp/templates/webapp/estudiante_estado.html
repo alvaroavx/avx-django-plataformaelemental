@@ -1,0 +1,41 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Estado estudiante{% endblock %}
+{% block content %}
+<div class="mt-4 row">
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">Estado actual</div>
+      <div class="card-body">
+        <p><strong>Estudiante:</strong> {{ persona }}</p>
+        {% if suscripcion %}
+          <p><strong>Plan:</strong> {{ suscripcion.plan }}</p>
+          <p><strong>Período:</strong> {{ suscripcion.fecha_inicio }} - {{ suscripcion.fecha_fin|default:"vigente" }}</p>
+          <p><strong>Clases asignadas:</strong> {{ clases_asignadas }}</p>
+          <p><strong>Usadas:</strong> {{ clases_usadas }}</p>
+          <p><strong>Sobreconsumo:</strong> {{ clases_sobreconsumo }}</p>
+          <p><strong>Saldo pendiente:</strong> ${{ saldo_pendiente }}</p>
+        {% else %}
+          <p class="text-muted">Sin plan vigente.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Últimos pagos</div>
+      <div class="card-body">
+        <ul class="list-group">
+          {% for pago in pagos %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              {{ pago.fecha_pago }} · {{ pago.metodo }}
+              <span>${{ pago.monto }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item text-muted">Sin pagos recientes.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

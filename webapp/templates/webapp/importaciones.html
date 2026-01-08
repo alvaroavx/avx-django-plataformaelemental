@@ -1,0 +1,18 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Importaciones{% endblock %}
+{% block content %}
+<div class="mt-4 col-lg-6">
+  <div class="card">
+    <div class="card-header">Importar planillas</div>
+    <div class="card-body">
+      <p>Coloca los archivos en la carpeta <code>/data/</code> y ejecuta los siguientes comandos:</p>
+      <ul>
+        {% for comando in comandos %}
+          <li><code>{{ comando }}</code></li>
+        {% endfor %}
+      </ul>
+      <a class="btn btn-outline-secondary" href="{% url 'webapp:importaciones_historial' %}">Ver historial</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

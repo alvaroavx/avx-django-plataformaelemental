@@ -1,0 +1,16 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Registrar pago{% endblock %}
+{% block content %}
+<div class="mt-4 col-lg-6">
+  <div class="card">
+    <div class="card-header">Pago de estudiante</div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary">Guardar</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

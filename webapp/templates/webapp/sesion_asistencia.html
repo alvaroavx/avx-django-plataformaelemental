@@ -1,0 +1,55 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Asistencia sesión{% endblock %}
+{% block content %}
+<div class="mt-4 row">
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header">Registrar asistencia</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button class="btn btn-primary w-100">Agregar</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Resumen</div>
+      <div class="card-body">
+        <p><strong>Disciplina:</strong> {{ sesion.disciplina }}</p>
+        <p><strong>Fecha:</strong> {{ sesion.fecha }}</p>
+        <p><strong>Asistentes:</strong> {{ contador_asistentes }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">Listado</div>
+      <div class="card-body table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Persona</th>
+              <th>Estado</th>
+              <th>Convenio</th>
+              <th>Hora</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asistencia in asistencias %}
+            <tr>
+              <td>{{ asistencia.persona }}</td>
+              <td>{{ asistencia.get_estado_display }}</td>
+              <td>{{ asistencia.convenio|default:"-" }}</td>
+              <td>{{ asistencia.registrada_en|date:"H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted">Aún no hay registros.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
