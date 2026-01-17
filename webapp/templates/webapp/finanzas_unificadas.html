@@ -1,0 +1,83 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Finanzas unificadas{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Pagos de alumnos</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Alumno</th>
+          <th>Monto</th>
+          <th>Método</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pago in pagos %}
+        <tr>
+          <td>{{ pago.fecha_pago }}</td>
+          <td>{{ pago.persona }}</td>
+          <td>${{ pago.monto }}</td>
+          <td>{{ pago.get_metodo_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted">Sin pagos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Pagos a profesores</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Profesor</th>
+          <th>Periodo</th>
+          <th>Bruto</th>
+          <th>Neto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for liq in liquidaciones %}
+        <tr>
+          <td>{{ liq.profesor }}</td>
+          <td>{{ liq.periodo_inicio }} - {{ liq.periodo_fin }}</td>
+          <td>${{ liq.monto_total }}</td>
+          <td>${{ liq.monto_neto }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted">Sin liquidaciones.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Otros movimientos</h2>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Monto</th>
+          <th>Categoría</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mov in movimientos %}
+        <tr>
+          <td>{{ mov.fecha }}</td>
+          <td>{{ mov.get_tipo_display }}</td>
+          <td>${{ mov.monto_total }}</td>
+          <td>{{ mov.get_categoria_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted">Sin movimientos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Asistencias{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="row">
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header">Registrar asistencia rápida</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            {{ asistencia_form.as_p }}
+            <button class="btn btn-primary" name="registrar_asistencia" type="submit">Guardar asistencia</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Registrar pago rápido</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            {{ pago_form.as_p }}
+            <button class="btn btn-success" name="registrar_pago" type="submit">Guardar pago</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <h3>Listado de asistencias</h3>
+      <form class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Disciplina</label>
+          <select name="disciplina" class="form-select">
+            <option value="">Todas</option>
+            {% for disciplina in disciplinas %}
+              <option value="{{ disciplina.id }}" {% if request.GET.disciplina == disciplina.id|stringformat:'s' %}selected{% endif %}>{{ disciplina.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Alumno</label>
+          <select name="persona" class="form-select">
+            <option value="">Todos</option>
+            {% for persona in personas %}
+              <option value="{{ persona.id }}" {% if request.GET.persona == persona.id|stringformat:'s' %}selected{% endif %}>{{ persona }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Mes</label>
+          <select name="mes" class="form-select">
+            <option value="">Todos</option>
+            {% for m in meses %}
+              <option value="{{ m }}" {% if request.GET.mes == m|stringformat:'s' %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-outline-primary">Filtrar</button>
+        </div>
+      </form>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Taller</th>
+              <th>Persona</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for asistencia in asistencias %}
+            <tr>
+              <td>{{ asistencia.sesion.fecha }}</td>
+              <td>{{ asistencia.sesion.disciplina }}</td>
+              <td>{{ asistencia.persona }}</td>
+              <td>{{ asistencia.get_estado_display }}</td>
+              <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_asistencia' asistencia.sesion.pk %}">Ver</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted">Sin asistencias.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "webapp/pagination.html" with page_obj=asistencias %}
+    </div>
+  </div>
+</div>
+{% endblock %}

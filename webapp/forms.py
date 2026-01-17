@@ -1,127 +1,50 @@
 from django import forms
+from django.utils import timezone
 
-from academia.models import BloqueHorario, Disciplina, SesionClase
+from academia.models import Disciplina, SesionClase
 from asistencias.models import Asistencia
-from cobros.models import ConvenioIntercambio, Pago, Plan, Suscripcion
-from cuentas.models import Persona, Rol
-from finanzas.models import LiquidacionProfesor, MovimientoCaja
+from cobros.models import Pago
+from cuentas.models import Persona
 
 
-class DisciplinaForm(forms.ModelForm):
-    class Meta:
-        model = Disciplina
-        fields = ["organizacion", "nombre", "descripcion", "nivel", "activa"]
+class SesionRapidaForm(forms.Form):
+    disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.all(), required=False)
+    disciplina_nombre = forms.CharField(max_length=150, required=False)
+    profesor = forms.ModelChoiceField(queryset=Persona.objects.all(), required=False)
+    profesores = forms.ModelMultipleChoiceField(queryset=Persona.objects.all(), required=False)
+    fecha = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    cupo_maximo = forms.IntegerField(required=False, min_value=1)
+    notas = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
 
 
-class BloqueHorarioForm(forms.ModelForm):
-    class Meta:
-        model = BloqueHorario
-        fields = ["organizacion", "nombre", "dia_semana", "hora_inicio", "hora_fin", "disciplina"]
-
-
-class SesionClaseForm(forms.ModelForm):
-    class Meta:
-        model = SesionClase
-        fields = [
-            "disciplina",
-            "bloque",
-            "profesor",
-            "fecha",
-            "estado",
-            "cupo_maximo",
-            "notas",
-        ]
-        widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class PersonaForm(forms.ModelForm):
-    class Meta:
-        model = Persona
-        fields = [
-            "nombres",
-            "apellidos",
-            "email",
-            "telefono",
-            "identificador",
-            "fecha_nacimiento",
-            "activo",
-        ]
-        widgets = {
-            "fecha_nacimiento": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class PersonaRolForm(forms.ModelForm):
-    class Meta:
-        model = Rol
-        fields = ["nombre", "codigo", "descripcion"]
-
-
-class AsistenciaForm(forms.ModelForm):
+class AsistenciaRapidaForm(forms.ModelForm):
     class Meta:
         model = Asistencia
-        fields = ["persona", "estado", "convenio"]
+        fields = ["persona", "estado"]
 
 
-class PlanForm(forms.ModelForm):
+class AsistenciaSesionForm(forms.ModelForm):
+    sesion = forms.ModelChoiceField(queryset=SesionClase.objects.all(), required=True)
+
     class Meta:
-        model = Plan
-        fields = ["organizacion", "nombre", "descripcion", "precio", "duracion_dias", "clases_por_semana", "activo"]
+        model = Asistencia
+        fields = ["sesion", "persona", "estado"]
 
 
-class SuscripcionForm(forms.ModelForm):
-    class Meta:
-        model = Suscripcion
-        fields = ["persona", "plan", "fecha_inicio", "fecha_fin", "estado", "notas", "convenios"]
-        widgets = {
-            "fecha_inicio": forms.DateInput(attrs={"type": "date"}),
-            "fecha_fin": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class ConvenioForm(forms.ModelForm):
-    class Meta:
-        model = ConvenioIntercambio
-        fields = [
-            "organizacion",
-            "nombre",
-            "descripcion",
-            "descuento_porcentaje",
-            "vigente_desde",
-            "vigente_hasta",
-            "activo",
-        ]
-        widgets = {
-            "vigente_desde": forms.DateInput(attrs={"type": "date"}),
-            "vigente_hasta": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class PagoForm(forms.ModelForm):
+class PagoRapidoForm(forms.ModelForm):
     class Meta:
         model = Pago
-        fields = ["persona", "suscripcion", "documento", "fecha_pago", "monto", "metodo", "referencia", "comprobante"]
+        fields = ["persona", "fecha_pago", "monto", "metodo"]
         widgets = {
             "fecha_pago": forms.DateInput(attrs={"type": "date"}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["fecha_pago"].required = False
+        self.fields["fecha_pago"].initial = timezone.localdate()
+        self.fields["persona"].required = True
 
-class LiquidacionForm(forms.ModelForm):
-    class Meta:
-        model = LiquidacionProfesor
-        fields = ["organizacion", "profesor", "periodo_inicio", "periodo_fin", "observaciones"]
-        widgets = {
-            "periodo_inicio": forms.DateInput(attrs={"type": "date"}),
-            "periodo_fin": forms.DateInput(attrs={"type": "date"}),
-        }
-
-
-class MovimientoCajaForm(forms.ModelForm):
-    class Meta:
-        model = MovimientoCaja
-        fields = ["organizacion", "tipo", "fecha", "monto_total", "afecta_iva", "categoria", "glosa"]
-        widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
-        }
+    def clean_fecha_pago(self):
+        fecha = self.cleaned_data.get("fecha_pago")
+        return fecha or timezone.localdate()

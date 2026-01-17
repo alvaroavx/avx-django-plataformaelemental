@@ -1,57 +1,124 @@
 {% extends "webapp/base_app.html" %}
-{% block title %}Dashboard · App Elemental{% endblock %}
+{% block title %}Panel administrador{% endblock %}
 {% block content %}
-<div class="row mt-4">
-  <div class="col-md-3">
-    <div class="card text-bg-primary mb-3">
-      <div class="card-body">
-        <h5 class="card-title">Estudiantes</h5>
-        <p class="display-6">{{ total_estudiantes }}</p>
+<div class="mt-4">
+  <h2 class="mb-3">Lo urgente</h2>
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card text-bg-danger mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Alumnos sin pago</h5>
+          <p class="display-6">{{ morosos|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-bg-primary mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Asistencias del mes</h5>
+          <p class="display-6">{{ asistencias_mes }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-bg-warning mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Boletas pendientes</h5>
+          <p class="display-6">{{ boletas_pendientes }}</p>
+        </div>
       </div>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card text-bg-success mb-3">
-      <div class="card-body">
-        <h5 class="card-title">Planes activos</h5>
-        <p class="display-6">{{ total_planes }}</p>
-      </div>
+
+  <h2 class="mb-3">Accesos rápidos</h2>
+  <div class="row text-center mb-4">
+    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:sesiones_list' %}">Talleres</a></div>
+    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:estudiantes_list' %}">Estudiantes</a></div>
+    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:profesores_list' %}">Profesores</a></div>
+    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:pagos_list' %}">Pagos</a></div>
+  </div>
+
+  <h2 class="mb-3">Asistencias del mes</h2>
+  <div class="card mb-4">
+    <div class="card-body table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Taller</th>
+            <th>Profesor</th>
+            <th>Asistentes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sesion in sesiones_resumen %}
+          <tr>
+            <td>{{ sesion.fecha }}</td>
+            <td>{{ sesion.disciplina }}</td>
+            <td>{{ sesion.profesor|default:"-" }}</td>
+            <td>{{ sesion.total_asistentes }}</td>
+            <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Ver asistencia</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">Sin registros este mes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}">Ir a asistencias</a>
     </div>
   </div>
-  <div class="col-md-3">
-    <div class="card text-bg-warning mb-3">
-      <div class="card-body">
-        <h5 class="card-title">Liquidaciones pendientes</h5>
-        <p class="display-6">{{ pendientes_liquidacion }}</p>
-      </div>
+
+  <h2 class="mb-3">Finanzas alumnos</h2>
+  <div class="card mb-4">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Alumno</th>
+            <th>Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pago in pagos_recientes %}
+          <tr>
+            <td>{{ pago.fecha_pago }}</td>
+            <td>{{ pago.persona }}</td>
+            <td>${{ pago.monto }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">Sin pagos recientes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
-</div>
-<div class="card mb-4">
-  <div class="card-header">Sesiones de hoy</div>
-  <div class="card-body table-responsive">
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Disciplina</th>
-          <th>Profesor</th>
-          <th>Fecha</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for sesion in sesiones_hoy %}
-        <tr>
-          <td>{{ sesion.disciplina }}</td>
-          <td>{{ sesion.profesor }}</td>
-          <td>{{ sesion.fecha }}</td>
-          <td><a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Marcar asistencia</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="4" class="text-center text-muted">Sin sesiones para hoy.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+  <h2 class="mb-3">Finanzas profesores</h2>
+  <div class="card mb-4">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Profesor</th>
+            <th>Periodo</th>
+            <th>Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for liq in liquidaciones_recientes %}
+          <tr>
+            <td>{{ liq.profesor }}</td>
+            <td>{{ liq.periodo_inicio }} - {{ liq.periodo_fin }}</td>
+            <td>${{ liq.monto_neto }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">Sin liquidaciones recientes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}

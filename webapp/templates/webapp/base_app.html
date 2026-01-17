@@ -22,12 +22,13 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto">
-            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:sesiones_list' %}">Sesiones</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:asistencia_hoy' %}">Asistencia</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:dashboard' %}">Panel</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:sesiones_list' %}">Talleres</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:asistencias_list' %}">Asistencias</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'webapp:estudiantes_list' %}">Estudiantes</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:profesores_list' %}">Profesores</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'webapp:pagos_list' %}">Pagos</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:finanzas_dashboard' %}">Finanzas</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:reportes_dashboard' %}">Reportes</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'webapp:finanzas_unificadas' %}">Finanzas</a></li>
           </ul>
           <span class="navbar-text text-white">
             {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}

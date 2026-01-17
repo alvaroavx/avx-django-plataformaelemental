@@ -84,13 +84,18 @@ class SesionClase(models.Model):
         null=True,
         blank=True,
     )
+    profesores = models.ManyToManyField(
+        "cuentas.Persona",
+        related_name="sesiones_en_equipo",
+        blank=True,
+    )
     fecha = models.DateField()
     estado = models.CharField(
         max_length=20,
         choices=Estado.choices,
         default=Estado.PROGRAMADA,
     )
-    cupo_maximo = models.PositiveIntegerField(default=12)
+    cupo_maximo = models.PositiveIntegerField(null=True, blank=True)
     notas = models.TextField(blank=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 

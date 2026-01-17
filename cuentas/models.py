@@ -5,7 +5,7 @@ from django.db import models
 class Persona(models.Model):
     nombres = models.CharField(max_length=150)
     apellidos = models.CharField(max_length=150)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
     telefono = models.CharField(max_length=50, blank=True)
     identificador = models.CharField(max_length=50, blank=True)
     fecha_nacimiento = models.DateField(null=True, blank=True)
@@ -26,6 +26,10 @@ class Persona(models.Model):
         ordering = ["apellidos", "nombres"]
 
     def __str__(self) -> str:
+        return f"{self.nombres} {self.apellidos}".strip()
+
+    @property
+    def nombre_completo(self) -> str:
         return f"{self.nombres} {self.apellidos}".strip()
 
     @property

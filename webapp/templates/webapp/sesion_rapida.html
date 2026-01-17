@@ -1,0 +1,60 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Sesion rapida{% endblock %}
+{% block content %}
+<div class="mt-4 row">
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Crear sesion rapida</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          {{ sesion_form.as_p }}
+          <button class="btn btn-primary" name="crear_sesion" type="submit">Crear sesion</button>
+        </form>
+      </div>
+    </div>
+    {% if sesion %}
+      <div class="card">
+        <div class="card-header">Agregar asistencia</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="sesion_id" value="{{ sesion.pk }}">
+            {{ asistencia_form.as_p }}
+            <button class="btn btn-success" name="agregar_asistencia" type="submit">Agregar asistencia</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-7">
+    {% if sesion %}
+      <div class="card">
+        <div class="card-header">Asistencias registradas</div>
+        <div class="card-body table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for asistencia in asistencias %}
+                <tr>
+                  <td>{{ asistencia.persona }}</td>
+                  <td>{{ asistencia.get_estado_display }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-center text-muted">Sin asistencias registradas.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="alert alert-info">Crea la sesion para habilitar el registro de asistencia.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

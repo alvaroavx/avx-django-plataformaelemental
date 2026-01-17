@@ -4,7 +4,9 @@
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Sesiones</h2>
-    <a class="btn btn-primary" href="{% url 'webapp:sesion_create' %}">Nueva sesión</a>
+    <div>
+      <a class="btn btn-outline-primary me-2" href="{% url 'webapp:sesion_rapida' %}">Sesion rapida</a>
+    </div>
   </div>
   <form class="row g-3 mb-3">
     <div class="col-md-4">
@@ -34,10 +36,18 @@
           <tr>
             <td>{{ sesion.fecha }}</td>
             <td>{{ sesion.disciplina }}</td>
-            <td>{{ sesion.profesor|default:"(sin asignar)" }}</td>
+            <td>
+              {{ sesion.profesor|default:"(sin asignar)" }}
+              {% if sesion.profesores.all %}
+                <div class="text-muted small">
+                  {% for profe in sesion.profesores.all %}
+                    {{ profe }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </td>
             <td>{{ sesion.get_estado_display }}</td>
             <td>
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">Detalles</a>
               <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Asistencia</a>
             </td>
           </tr>

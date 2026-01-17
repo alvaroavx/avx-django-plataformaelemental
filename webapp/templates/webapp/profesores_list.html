@@ -1,0 +1,45 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Profesores{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Profesores</h2>
+  <form class="row g-3 mb-3">
+    <div class="col-md-6">
+      <label class="form-label">Organización</label>
+      <select name="organizacion" class="form-select">
+        <option value="">Todas</option>
+        {% for org in organizaciones %}
+          <option value="{{ org.id }}" {% if request.GET.organizacion == org.id|stringformat:'s' %}selected{% endif %}>{{ org.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <button class="btn btn-outline-primary">Filtrar</button>
+    </div>
+  </form>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Teléfono</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for profesor in profesores %}
+        <tr>
+          <td>{{ profesor }}</td>
+          <td>{{ profesor.email|default:"-" }}</td>
+          <td>{{ profesor.telefono|default:"-" }}</td>
+          <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' profesor.pk %}">Ver perfil</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted">Sin profesores registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

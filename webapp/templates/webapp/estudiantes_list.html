@@ -3,15 +3,48 @@
 {% block content %}
 <div class="mt-4">
   <h2>Estudiantes</h2>
+  <form class="row g-3 mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Organizacion</label>
+      <select name="organizacion" class="form-select">
+        <option value="">Todas</option>
+        {% for org in organizaciones %}
+          <option value="{{ org.id }}" {% if filtros.organizacion == org.id|stringformat:'s' %}selected{% endif %}>{{ org.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Estado</label>
+      <select name="sin_plan" class="form-select">
+        <option value="">Con plan</option>
+        <option value="1" {% if filtros.sin_plan == "1" %}selected{% endif %}>Sin plan</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Morosos</label>
+      <select name="morosos" class="form-select">
+        <option value="">Todos</option>
+        <option value="1" {% if filtros.morosos == "1" %}selected{% endif %}>Solo morosos</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <button class="btn btn-outline-primary">Filtrar</button>
+    </div>
+  </form>
   <div class="list-group">
     {% for item in estudiantes %}
-      <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{% url 'webapp:estudiante_estado' item.persona.pk %}">
+      <div class="list-group-item d-flex justify-content-between align-items-center">
         <div>
           <strong>{{ item.persona }}</strong><br>
           {% if item.suscripcion %}{{ item.suscripcion.plan }}{% else %}<span class="text-muted">Sin plan vigente</span>{% endif %}
         </div>
-        <span class="badge text-bg-primary">{{ item.clases_usadas }} usadas</span>
-      </a>
+        <div class="text-end">
+          <span class="badge text-bg-primary">{{ item.clases_usadas }} usadas</span>
+          <div class="mt-1">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' item.persona.pk %}">Perfil</a>
+          </div>
+        </div>
+      </div>
     {% empty %}
       <div class="list-group-item text-muted">Sin estudiantes registrados.</div>
     {% endfor %}

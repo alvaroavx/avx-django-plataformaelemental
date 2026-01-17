@@ -14,10 +14,11 @@ class DisciplinaSerializer(serializers.Serializer):
 class SesionSerializer(serializers.ModelSerializer):
     disciplina = serializers.StringRelatedField()
     profesor = serializers.StringRelatedField()
+    profesores = serializers.StringRelatedField(many=True)
 
     class Meta:
         model = SesionClase
-        fields = ["id", "fecha", "disciplina", "profesor", "estado", "cupo_maximo", "notas"]
+        fields = ["id", "fecha", "disciplina", "profesor", "profesores", "estado", "cupo_maximo", "notas"]
 
 
 class AsistenciaSerializer(serializers.ModelSerializer):

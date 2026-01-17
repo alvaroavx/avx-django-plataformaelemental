@@ -8,23 +8,21 @@
       <div class="card-body">
         <p><strong>Nombre:</strong> {{ persona }}</p>
         <p><strong>Email:</strong> {{ persona.email }}</p>
-        <p><strong>Teléfono:</strong> {{ persona.telefono }}</p>
+        <p><strong>Telefono:</strong> {{ persona.telefono }}</p>
         <p><strong>Roles:</strong> {% for pr in roles_asignados %}<span class="badge text-bg-info me-1">{{ pr.rol.nombre }}</span>{% empty %}Sin roles{% endfor %}</p>
-        <a class="btn btn-outline-secondary btn-sm" href="{% url 'webapp:persona_roles' persona.pk %}">Administrar roles</a>
-        <a class="btn btn-outline-secondary btn-sm" href="{% url 'webapp:persona_usuario' persona.pk %}">Usuario acceso</a>
       </div>
     </div>
     <div class="card">
-      <div class="card-header">Últimos pagos</div>
+      <div class="card-header">Ultimos pagos</div>
       <div class="card-body">
         <ul class="list-group">
           {% for pago in pagos %}
             <li class="list-group-item d-flex justify-content-between">
-              {{ pago.fecha_pago }} · {{ pago.metodo }}
+              {{ pago.fecha_pago }} - {{ pago.metodo }}
               <span>${{ pago.monto }}</span>
             </li>
           {% empty %}
-            <li class="list-group-item text-muted">Sin pagos aún.</li>
+            <li class="list-group-item text-muted">Sin pagos aun.</li>
           {% endfor %}
         </ul>
       </div>
@@ -37,7 +35,7 @@
         <ul class="list-group">
           {% for suscripcion in suscripciones %}
             <li class="list-group-item">
-              {{ suscripcion.plan }} · {{ suscripcion.fecha_inicio }} - {{ suscripcion.fecha_fin|default:"actual" }}
+              {{ suscripcion.plan }} - {{ suscripcion.fecha_inicio }} - {{ suscripcion.fecha_fin|default:"actual" }}
             </li>
           {% empty %}
             <li class="list-group-item text-muted">Sin suscripciones.</li>
