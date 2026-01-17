@@ -22,57 +22,83 @@ Plataforma administrativa para Espacio Elementos construida con Django + Django 
 
 El proyecto usa locale `es-cl` y zona horaria `America/Santiago`. Los comprobantes subidos se almacenan en `media/comprobantes/`.
 
-## App Web (/app/) – Bootstrap 5 mobile-first
-- **Dashboard** (`/app/`), **Notificaciones** (`/app/notificaciones/`) y **Ayuda** (`/app/ayuda/`).
-- **Académico**: disciplinas (`/app/disciplinas/`), horarios (`/app/horarios/`), sesiones (`/app/sesiones/`, `/app/sesiones/<id>/`), creación rápida (`/app/sesiones/nueva/`) y checklist móvil de asistencia (`/app/sesiones/<id>/asistencia/`, `/app/asistencia/`, `/app/asistencia/historial/`).
-- **Personas y roles**: listado (`/app/personas/`), ficha (`/app/personas/<id>/`), asignación de roles (`/app/personas/<id>/roles/`) y creación de usuarios (`/app/personas/<id>/usuario/`).
-- **Planes y estudiantes**: catálogo de planes (`/app/planes/`), estudiantes (`/app/estudiantes/`), estado detallado (`/app/estudiantes/<id>/estado/`), suscripciones (`/app/estudiantes/<id>/suscripciones/`) y convenios (`/app/convenios/`).
-- **Pagos y morosos**: pagos (`/app/pagos/`, `/app/pagos/nuevo/`, `/app/pagos/<id>/`) con comprobante opcional, además de `/app/morosos/`.
-- **Liquidaciones**: listado (`/app/liquidaciones/`), generación (`/app/liquidaciones/nueva/`) y detalle (`/app/liquidaciones/<id>/`) con bruto, retención (14.5%) y neto.
-- **Finanzas**: dashboard (`/app/finanzas/`), movimientos (`/app/finanzas/movimientos/`), alta de movimientos (`/app/finanzas/movimientos/nuevo/`), categorías (`/app/finanzas/categorias/`) y resumen mensual (`/app/finanzas/resumen/`).
-- **Reportes**: `/app/reportes/` con ranking de asistencia, métricas y botón de exportación (placeholder en `/app/reportes/exportar/`).
-- **Importaciones y configuración**: `/app/importaciones/`, `/app/importaciones/historial/`, `/app/configuracion/`, `/app/usuarios/`, `/app/auditoria/`.
+## App Web (/app/) - Bootstrap 5 mobile-first
+Esta primera version esta enfocada solo en el perfil ADMIN para carga rapida. La validacion es minima para privilegiar la operacion diaria.
 
-Permisos (via `role_required` + roles en `PersonaRol`):
-- `ADMIN`: acceso total.
-- `STAFF_ASISTENCIA`: sesiones y asistencia.
-- `STAFF_FINANZAS`: pagos, morosos, finanzas y liquidaciones.
-- `PROFESOR`: dashboard simplificado, agenda y checklist móvil.
+Rutas disponibles:
+- **Panel administrador**: `/app/` con alertas, accesos rapidos y resumen mensual.
+- **Talleres / sesiones**: `/app/sesiones/` y creacion rapida en `/app/sesiones/rapida/`.
+- **Asistencia**: `/app/sesiones/<id>/asistencia/` (checklist por sesion) y `/app/asistencias/` (listado + registro rapido).
+- **Personas**: perfil en `/app/personas/<id>/`.
+- **Estudiantes**: `/app/estudiantes/` con filtros por organizacion, morosos y plan.
+- **Profesores**: `/app/profesores/` con acceso al perfil.
+- **Pagos**: `/app/pagos/` (listado). La carga rapida se hace desde `/app/asistencias/`.
+- **Finanzas unificadas**: `/app/finanzas/unificadas/` con pagos alumnos, pagos a profesores y movimientos.
+
+Flujos rapidos recomendados:
+- Crear sesion + asistencia: entra a `/app/sesiones/rapida/` y registra asistentes en el mismo lugar.
+- Registro de asistencia directa: entra a `/app/asistencias/` y usa el formulario "Registrar asistencia".
+- Pago rapido: en `/app/asistencias/`, formulario "Registrar pago".
+
+Notas operativas:
+- La asistencia puede registrarse sin suscripcion activa. El sistema solo informa si existe un plan vigente.
+- El selector de personas para asistencia usa asistentes de los ultimos 3 meses; si no hay, muestra personas activas.
+
+Permisos:
+- `ADMIN`: acceso total al panel y a todas las rutas de `/app/`.
 
 ## API REST
-Autenticación actual: Token Authentication (cabecera `Authorization: Token <token>`).
+Autenticacion actual: Token Authentication (cabecera `Authorization: Token <token>`).
 
-| Endpoint | Método | Descripción |
+| Endpoint | Metodo | Descripcion |
 | --- | --- | --- |
 | `/api/health/` | GET | Estado del servicio. |
-| `/api/auth/login/` | POST | Credenciales → token + datos del usuario. |
+| `/api/auth/login/` | POST | Credenciales -> token + datos del usuario. |
 | `/api/auth/refresh/` | POST | Rota el token actual. |
 | `/api/auth/logout/` | POST | Invalida el token. |
 | `/api/sesiones/` | GET | Lista de sesiones (filtro `?fecha=YYYY-MM-DD`). |
 | `/api/sesiones/<id>/asistencias/` | GET/POST | Consulta o registra asistencias. POST acepta `persona`, `estado`, `convenio`. |
-| `/api/estudiantes/` | GET | Personas con rol estudiante o con suscripción vigente. |
+| `/api/estudiantes/` | GET | Personas con rol estudiante o con suscripcion vigente. |
 | `/api/estudiantes/<id>/estado/` | GET | Plan, clases asignadas/usadas/sobreconsumo y saldo. |
 | `/api/reportes/resumen/` | GET | Totales de sesiones, asistencias, ingresos y egresos. |
 
 ## Importar planillas Excel
 Coloca los archivos en `data/` y ejecuta:
 ```bash
-python manage.py import_inscripciones --archivo "Ficha de inscripción_ Espacio Elementos. (Respuestas).xlsx"
+python manage.py import_inscripciones --archivo "Ficha de inscripcion_ Espacio Elementos. (Respuestas).xlsx"
 python manage.py import_asistencias --archivo "Asistencia Talleres Elementos.xlsx"
 python manage.py import_libro_caja --archivo "Libro Caja Espacio Elementos.xlsx"
 ```
 - Se usa `openpyxl` para leer los libros.
-- Los comandos normalizan los encabezados más comunes, ignoran filas incompletas y reportan duplicados en consola.
+- Los comandos normalizan encabezados comunes, ignoran filas incompletas y reportan duplicados en consola.
+
+## Carga masiva de Personas desde texto
+Puedes importar personas desde un archivo `.txt` con 1 persona por linea usando:
+
+```bash
+python manage.py importar_personas <ruta_al_archivo> --dominio elementos.cl
+```
+
+Opciones:
+- `--dominio`: define el dominio para los correos generados (por defecto `example.com`).
+- `--dry-run`: simula la importacion e imprime los primeros 10 correos generados.
+
+Ejemplo:
+```bash
+python manage.py importar_personas C:\\ruta\\nombres.txt --dominio elementos.cl --dry-run
+```
+
+El correo se genera con la regla `nombres.apellidos@dominio`, sin acentos ni caracteres especiales. Si el email ya existe, se agrega un sufijo numerico (`2`, `3`, etc.). Si una linea solo tiene una palabra, se toma como nombre y se deja el apellido vacio.
 
 ## Pruebas automatizadas
 ```bash
 python manage.py test
 ```
-Incluye pruebas para autenticación, cálculos de planes/liquidaciones, API REST y modelos de finanzas.
+Incluye pruebas para autenticacion, calculos de planes/liquidaciones, API REST y modelos de finanzas.
 
 ## Settings por entorno
-`DJANGO_ENV` define qué módulo se emplea:
-- `dev` (por defecto) → `plataformaelemental.config.dev` (`DEBUG=True`, `ALLOWED_HOSTS=["*"]`).
-- `prod` → `plataformaelemental.config.prod`. Configura `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS` separados por comas.
+`DJANGO_ENV` define que modulo se emplea:
+- `dev` (por defecto) -> `plataformaelemental.config.dev` (`DEBUG=True`, `ALLOWED_HOSTS=["*"]`).
+- `prod` -> `plataformaelemental.config.prod`. Configura `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS` separados por comas.
 
-También puedes forzar el módulo directamente con `DJANGO_SETTINGS_MODULE=plataformaelemental.config.<entorno>`.
+Tambien puedes forzar el modulo directamente con `DJANGO_SETTINGS_MODULE=plataformaelemental.config.<entorno>`.
