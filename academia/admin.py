@@ -26,14 +26,14 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
 
 @admin.register(SesionClase)
 class SesionClaseAdmin(admin.ModelAdmin):
-    list_display = ("disciplina", "fecha", "estado", "profesor", "profesores_extra", "cupo_maximo")
+    list_display = ("disciplina", "fecha", "estado", "profesores_display", "cupo_maximo")
     list_filter = ("estado", "disciplina", ("fecha", admin.DateFieldListFilter))
-    search_fields = ("disciplina__nombre", "profesor__nombres", "profesor__apellidos", "notas")
-    autocomplete_fields = ("disciplina", "bloque", "profesor", "profesores")
-    list_select_related = ("disciplina", "profesor")
+    search_fields = ("disciplina__nombre", "profesores__nombres", "profesores__apellidos", "notas")
+    autocomplete_fields = ("disciplina", "bloque", "profesores")
+    list_select_related = ("disciplina",)
     date_hierarchy = "fecha"
 
-    def profesores_extra(self, obj):
-        return ", ".join([str(persona) for persona in obj.profesores.all()])
+    def profesores_display(self, obj):
+        return obj.profesores_resumen or "-"
 
-    profesores_extra.short_description = "Profesores extra"
+    profesores_display.short_description = "Profesores"

@@ -1,0 +1,55 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Detalle sesion{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="card mb-3">
+    <div class="card-header">Detalle de sesion</div>
+    <div class="card-body">
+      <p><strong>Disciplina:</strong> {{ sesion.disciplina }}</p>
+      <p><strong>Fecha:</strong> {{ sesion.fecha }}</p>
+      <p><strong>Profesores:</strong>
+        {% if sesion.profesores.all %}
+          {% for profe in sesion.profesores.all %}
+            {{ profe }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}
+          -
+        {% endif %}
+      </p>
+      <p><strong>Estado:</strong> {{ sesion.get_estado_display }}</p>
+      {% if sesion.cupo_maximo %}
+        <p><strong>Cupo:</strong> {{ sesion.cupo_maximo }}</p>
+      {% endif %}
+      {% if sesion.notas %}
+        <p><strong>Notas:</strong> {{ sesion.notas }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Asistentes</div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Persona</th>
+            <th>Estado</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asistencia in asistencias %}
+          <tr>
+            <td>{{ asistencia.persona }}</td>
+            <td>{{ asistencia.get_estado_display }}</td>
+            <td>{{ asistencia.registrada_en|date:"H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">Sin asistentes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

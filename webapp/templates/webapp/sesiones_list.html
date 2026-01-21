@@ -26,7 +26,7 @@
           <tr>
             <th>Fecha</th>
             <th>Disciplina</th>
-            <th>Profesor</th>
+            <th>Profesores</th>
             <th>Estado</th>
             <th></th>
           </tr>
@@ -37,13 +37,14 @@
             <td>{{ sesion.fecha }}</td>
             <td>{{ sesion.disciplina }}</td>
             <td>
-              {{ sesion.profesor|default:"(sin asignar)" }}
               {% if sesion.profesores.all %}
                 <div class="text-muted small">
                   {% for profe in sesion.profesores.all %}
                     {{ profe }}{% if not forloop.last %}, {% endif %}
                   {% endfor %}
                 </div>
+              {% else %}
+                <span class="text-muted">(sin asignar)</span>
               {% endif %}
             </td>
             <td>{{ sesion.get_estado_display }}</td>

@@ -33,9 +33,9 @@ class LiquidacionProfesorTests(TestCase):
         )
         self.sesion = SesionClase.objects.create(
             disciplina=self.disciplina,
-            profesor=self.profesor,
             fecha=date(2025, 1, 10),
         )
+        self.sesion.profesores.set([self.profesor])
         Asistencia.objects.create(
             sesion=self.sesion,
             persona=self.estudiante,

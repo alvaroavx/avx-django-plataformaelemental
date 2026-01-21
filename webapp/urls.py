@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("sesiones/", views.sesiones_list, name="sesiones_list"),
     path("sesiones/rapida/", views.sesion_rapida, name="sesion_rapida"),
+    path("sesiones/<int:pk>/", views.sesion_detail, name="sesion_detail"),
     path("sesiones/<int:pk>/asistencia/", views.sesion_asistencia, name="sesion_asistencia"),
     path("asistencias/", views.asistencias_list, name="asistencias_list"),
     path("personas/<int:pk>/", views.persona_detail, name="persona_detail"),

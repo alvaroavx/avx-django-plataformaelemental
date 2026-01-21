@@ -8,6 +8,8 @@
       <div class="card-body">
         <form method="post">
           {% csrf_token %}
+          <label class="form-label" for="profesores_search">Buscar profesor</label>
+          <input id="profesores_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
           {{ sesion_form.as_p }}
           <button class="btn btn-primary" name="crear_sesion" type="submit">Crear sesion</button>
         </form>
@@ -57,4 +59,20 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+  (function () {
+    const input = document.getElementById("profesores_search");
+    const select = document.getElementById("id_profesores");
+    if (!input || !select) return;
+    input.addEventListener("input", function () {
+      const term = input.value.toLowerCase();
+      Array.from(select.options).forEach((opt) => {
+        const text = opt.text.toLowerCase();
+        opt.hidden = term && !text.includes(term);
+      });
+    });
+  })();
+</script>
 {% endblock %}

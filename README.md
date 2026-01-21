@@ -28,7 +28,7 @@ Esta primera version esta enfocada solo en el perfil ADMIN para carga rapida. La
 Rutas disponibles:
 - **Panel administrador**: `/app/` con alertas, accesos rapidos y resumen mensual.
 - **Talleres / sesiones**: `/app/sesiones/` y creacion rapida en `/app/sesiones/rapida/`.
-- **Asistencia**: `/app/sesiones/<id>/asistencia/` (checklist por sesion) y `/app/asistencias/` (listado + registro rapido).
+- **Asistencia**: `/app/asistencias/` (nuevo flujo de alta rapida) y `/app/sesiones/<id>/asistencia/` (checklist por sesion).
 - **Personas**: perfil en `/app/personas/<id>/`.
 - **Estudiantes**: `/app/estudiantes/` con filtros por organizacion, morosos y plan.
 - **Profesores**: `/app/profesores/` con acceso al perfil.
@@ -37,12 +37,19 @@ Rutas disponibles:
 
 Flujos rapidos recomendados:
 - Crear sesion + asistencia: entra a `/app/sesiones/rapida/` y registra asistentes en el mismo lugar.
-- Registro de asistencia directa: entra a `/app/asistencias/` y usa el formulario "Registrar asistencia".
-- Pago rapido: en `/app/asistencias/`, formulario "Registrar pago".
+- Registro masivo de asistencia: entra a `/app/asistencias/`, crea una sesion basica y agrega estudiantes con select multiple.
+- Alta rapida de personas: en `/app/asistencias/` usa la seccion "Nueva persona" (nombre, apellido, telefono). Se asigna rol ESTUDIANTE.
 
 Notas operativas:
-- La asistencia puede registrarse sin suscripcion activa. El sistema solo informa si existe un plan vigente.
-- El selector de personas para asistencia usa asistentes de los ultimos 3 meses; si no hay, muestra personas activas.
+- La asistencia puede registrarse sin suscripcion activa. Los pagos pueden registrarse despues.
+- En sesiones se usa un solo campo de profesores (seleccion multiple).
+- El nombre automatico de sesion se arma como `Disciplina - Fecha`.
+
+## Comando de trabajo Codex
+Comando habitual:
+```bash
+codex resume 019b6a94-f3a0-7cf2-98d1-fed2abe0e70c
+```
 
 Permisos:
 - `ADMIN`: acceso total al panel y a todas las rutas de `/app/`.

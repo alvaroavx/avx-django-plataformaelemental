@@ -77,13 +77,6 @@ class SesionClase(models.Model):
         null=True,
         blank=True,
     )
-    profesor = models.ForeignKey(
-        "cuentas.Persona",
-        on_delete=models.SET_NULL,
-        related_name="sesiones_impartidas",
-        null=True,
-        blank=True,
-    )
     profesores = models.ManyToManyField(
         "cuentas.Persona",
         related_name="sesiones_en_equipo",
@@ -109,3 +102,7 @@ class SesionClase(models.Model):
 
     def __str__(self) -> str:
         return f"{self.disciplina} - {self.fecha}"
+
+    @property
+    def profesores_resumen(self):
+        return ", ".join([str(persona) for persona in self.profesores.all()])

@@ -123,7 +123,7 @@ class AuthenticationViewSet(viewsets.ViewSet):
 
 
 class SesionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = SesionClase.objects.select_related("disciplina", "profesor").order_by("-fecha")
+    queryset = SesionClase.objects.select_related("disciplina").prefetch_related("profesores").order_by("-fecha")
     serializer_class = SesionSerializer
 
     def get_queryset(self):
@@ -159,7 +159,7 @@ class EstudianteViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Persona.objects.filter(
-            Q(roles__rol__codigo="estudiante") | Q(suscripciones__isnull=False)
+            Q(roles__rol__codigo="ESTUDIANTE") | Q(suscripciones__isnull=False)
         ).distinct()
 
     @action(detail=True, methods=["get"], url_path="estado")

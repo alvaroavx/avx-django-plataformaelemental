@@ -2,19 +2,19 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from academia.models import Disciplina, SesionClase
 from asistencias.models import Asistencia
 from cobros.models import DocumentoVenta, Pago, Suscripcion
-from cuentas.models import Persona
+from cuentas.models import Persona, PersonaRol, Rol
 from finanzas.models import LiquidacionProfesor, MovimientoCaja
 from organizaciones.models import Organizacion
 
 from .decorators import role_required
-from .forms import AsistenciaRapidaForm, AsistenciaSesionForm, PagoRapidoForm, SesionRapidaForm
+from .forms import AsistenciaMasivaForm, AsistenciaRapidaForm, AsistenciaSesionForm, PagoRapidoForm, PersonaRapidaForm, SesionBasicaForm, SesionRapidaForm
 from .utils import ROLE_ADMIN
 
 
@@ -41,7 +41,7 @@ def dashboard(request):
     inicio_mes = hoy.replace(day=1)
     sesiones_mes = (
         SesionClase.objects.filter(fecha__gte=inicio_mes)
-        .select_related("disciplina", "profesor")
+        .select_related("disciplina")
         .prefetch_related("profesores")
     )
     sesiones_hoy = sesiones_mes.filter(fecha=hoy)
@@ -77,7 +77,7 @@ def dashboard(request):
 @role_required(ROLE_ADMIN)
 def sesiones_list(request):
     context = _nav_context(request)
-    sesiones = SesionClase.objects.select_related("disciplina", "profesor").prefetch_related("profesores").order_by("-fecha")
+    sesiones = SesionClase.objects.select_related("disciplina").prefetch_related("profesores").order_by("-fecha")
     filtro_disciplina = request.GET.get("disciplina")
     if filtro_disciplina:
         sesiones = sesiones.filter(disciplina_id=filtro_disciplina)
@@ -91,7 +91,7 @@ def sesion_asistencia(request, pk):
     context = _nav_context(request)
     sesion = get_object_or_404(SesionClase.objects.select_related("disciplina"), pk=pk)
     asistencias = Asistencia.objects.filter(sesion=sesion).select_related("persona", "convenio")
-    personas_recientes = _personas_recientes()
+    personas_recientes = Persona.objects.all()
     if request.method == "POST":
         form = AsistenciaRapidaForm(request.POST)
         form.fields["persona"].queryset = personas_recientes
@@ -131,26 +131,22 @@ def sesion_rapida(request):
             form = SesionRapidaForm(request.POST)
             if form.is_valid():
                 disciplina = form.cleaned_data["disciplina"]
-                disciplina_nombre = form.cleaned_data["disciplina_nombre"].strip()
                 if not disciplina:
-                    if not disciplina_nombre:
-                        messages.error(request, "Debes seleccionar o escribir una disciplina.")
-                        return redirect("webapp:sesion_rapida")
-                    organizacion = Organizacion.objects.first()
-                    disciplina, _ = Disciplina.objects.get_or_create(
-                        organizacion=organizacion,
-                        nombre=disciplina_nombre,
-                    )
+                    messages.error(request, "Debes seleccionar una disciplina.")
+                    return redirect("webapp:sesion_rapida")
                 fecha = form.cleaned_data["fecha"] or timezone.localdate()
+                notas = form.cleaned_data["notas"]
+                if not notas:
+                    notas = f"{disciplina.nombre} - {fecha}"
+                profesores = list(form.cleaned_data["profesores"])
                 sesion = SesionClase.objects.create(
                     disciplina=disciplina,
-                    profesor=form.cleaned_data["profesor"],
                     fecha=fecha,
                     cupo_maximo=form.cleaned_data["cupo_maximo"],
-                    notas=form.cleaned_data["notas"],
+                    notas=notas,
                 )
-                if form.cleaned_data["profesores"]:
-                    sesion.profesores.set(form.cleaned_data["profesores"])
+                if profesores:
+                    sesion.profesores.set(profesores)
                 messages.success(request, "Sesion creada. Ahora puedes marcar asistencia.")
                 return redirect(f"{request.path}?sesion_id={sesion.pk}")
         elif "agregar_asistencia" in request.POST and sesion:
@@ -190,7 +186,7 @@ def sesion_rapida(request):
 @role_required(ROLE_ADMIN)
 def estudiantes_list(request):
     context = _nav_context(request)
-    estudiantes = Persona.objects.filter(roles__rol__codigo="estudiante").distinct()
+    estudiantes = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
     organizaciones = Organizacion.objects.all()
     org_id = request.GET.get("organizacion")
     if org_id:
@@ -230,7 +226,7 @@ def profesores_list(request):
     profesores = Persona.objects.filter(roles__rol__codigo="profesor").distinct()
     org_id = request.GET.get("organizacion")
     if org_id:
-        profesores = profesores.filter(sesiones_impartidas__disciplina__organizacion_id=org_id).distinct()
+        profesores = profesores.filter(sesiones_en_equipo__disciplina__organizacion_id=org_id).distinct()
     context["profesores"] = profesores
     context["organizaciones"] = Organizacion.objects.all()
     return render(request, "webapp/profesores_list.html", context)
@@ -254,47 +250,108 @@ def persona_detail(request, pk):
 @role_required(ROLE_ADMIN)
 def asistencias_list(request):
     context = _nav_context(request)
-    asistencias = Asistencia.objects.select_related("sesion", "persona", "sesion__disciplina").order_by("-registrada_en")
-    disciplina_id = request.GET.get("disciplina")
-    persona_id = request.GET.get("persona")
-    mes = request.GET.get("mes")
-    if disciplina_id:
-        asistencias = asistencias.filter(sesion__disciplina_id=disciplina_id)
-    if persona_id:
-        asistencias = asistencias.filter(persona_id=persona_id)
-    if mes:
-        asistencias = asistencias.filter(sesion__fecha__month=mes)
-    asistencia_form = AsistenciaSesionForm()
-    personas_recientes = _personas_recientes()
-    asistencia_form.fields["persona"].queryset = personas_recientes
-    asistencia_form.fields["sesion"].queryset = SesionClase.objects.order_by("-fecha")[:50]
-    pago_form = PagoRapidoForm()
+    sesion_id = request.GET.get("sesion_id")
+    sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()})
+    asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
+    persona_form = PersonaRapidaForm()
+    estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().order_by("apellidos", "nombres")
+    asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
+
     if request.method == "POST":
-        if "registrar_asistencia" in request.POST:
-            asistencia_form = AsistenciaSesionForm(request.POST)
-            asistencia_form.fields["persona"].queryset = personas_recientes
-            asistencia_form.fields["sesion"].queryset = SesionClase.objects.order_by("-fecha")[:50]
+        if "crear_sesion" in request.POST:
+            sesion_form = SesionBasicaForm(request.POST)
+            if sesion_form.is_valid():
+                disciplina = sesion_form.cleaned_data["disciplina"]
+                fecha = sesion_form.cleaned_data["fecha"] or timezone.localdate()
+                profesores = list(sesion_form.cleaned_data["profesores"])
+                notas = f"{disciplina.nombre} - {fecha}"
+                sesion = SesionClase.objects.create(
+                    disciplina=disciplina,
+                    fecha=fecha,
+                    notas=notas,
+                )
+                if profesores:
+                    sesion.profesores.set(profesores)
+                messages.success(request, "Sesion creada. Ahora puedes agregar asistentes.")
+                return redirect(f"{request.path}?sesion_id={sesion.pk}")
+        elif "agregar_persona" in request.POST:
+            persona_form = PersonaRapidaForm(request.POST)
+            if persona_form.is_valid():
+                persona = Persona.objects.create(
+                    nombres=persona_form.cleaned_data["nombres"].strip(),
+                    apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
+                    telefono=persona_form.cleaned_data.get("telefono", "").strip(),
+                )
+                rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
+                organizacion = Organizacion.objects.first()
+                if rol_estudiante and organizacion:
+                    PersonaRol.objects.get_or_create(
+                        persona=persona,
+                        rol=rol_estudiante,
+                        organizacion=organizacion,
+                        defaults={"activo": True},
+                    )
+                    messages.success(request, "Persona creada y asignada como estudiante.")
+                else:
+                    messages.warning(request, "Persona creada, pero no se pudo asignar rol estudiante.")
+                return redirect(request.path)
+        elif "agregar_asistentes" in request.POST:
+            asistencia_form = AsistenciaMasivaForm(request.POST)
+            asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
             if asistencia_form.is_valid():
-                asistencia_form.save()
-                messages.success(request, "Asistencia registrada.")
-                return redirect("webapp:asistencias_list")
-        elif "registrar_pago" in request.POST:
-            pago_form = PagoRapidoForm(request.POST)
-            if pago_form.is_valid():
-                pago_form.save()
-                messages.success(request, "Pago registrado.")
-                return redirect("webapp:asistencias_list")
+                sesion = get_object_or_404(SesionClase, pk=asistencia_form.cleaned_data["sesion_id"])
+                estudiantes = asistencia_form.cleaned_data["estudiantes"]
+                creados = 0
+                for persona in estudiantes:
+                    _, created = Asistencia.objects.get_or_create(
+                        sesion=sesion,
+                        persona=persona,
+                        defaults={"estado": Asistencia.Estado.PRESENTE},
+                    )
+                    if created:
+                        creados += 1
+                messages.success(request, f"Asistencias agregadas: {creados}.")
+                return redirect(f"{request.path}?sesion_id={sesion.pk}")
+
+    sesiones = (
+        SesionClase.objects.select_related("disciplina")
+        .prefetch_related("profesores", "asistencias__persona")
+        .order_by("-fecha")
+    )
+    q = request.GET.get("q")
+    if q:
+        sesiones = sesiones.filter(
+            Q(disciplina__nombre__icontains=q)
+            | Q(profesores__nombres__icontains=q)
+            | Q(profesores__apellidos__icontains=q)
+            | Q(fecha__icontains=q)
+        ).distinct()
+    sesiones_page = Paginator(sesiones, 20).get_page(request.GET.get("page"))
+
     context.update(
         {
-            "asistencias": Paginator(asistencias, 25).get_page(request.GET.get("page")),
-            "disciplinas": Disciplina.objects.all(),
-            "personas": Persona.objects.all(),
-            "meses": list(range(1, 13)),
+            "sesion_form": sesion_form,
             "asistencia_form": asistencia_form,
-            "pago_form": pago_form,
+            "persona_form": persona_form,
+            "sesiones": sesiones_page,
+            "sesion_seleccionada": SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None,
+            "estudiantes_total": estudiantes_qs.count(),
+            "q": q or "",
         }
     )
     return render(request, "webapp/asistencias_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def sesion_detail(request, pk):
+    context = _nav_context(request)
+    sesion = get_object_or_404(
+        SesionClase.objects.select_related("disciplina").prefetch_related("profesores", "asistencias__persona"),
+        pk=pk,
+    )
+    asistencias = sesion.asistencias.select_related("persona").order_by("-registrada_en")
+    context.update({"sesion": sesion, "asistencias": asistencias})
+    return render(request, "webapp/sesion_detail.html", context)
 
 
 @role_required(ROLE_ADMIN)

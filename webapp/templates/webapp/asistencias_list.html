@@ -4,89 +4,152 @@
 <div class="mt-4">
   <div class="row">
     <div class="col-lg-5">
-      <div class="card mb-3">
-        <div class="card-header">Registrar asistencia rápida</div>
-        <div class="card-body">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Nueva persona</span>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">Nueva persona</button>
+        </div>
+        <div class="card-body collapse {% if estudiantes_total == 0 %}show{% endif %}" id="nuevaPersonaForm">
           <form method="post">
             {% csrf_token %}
-            {{ asistencia_form.as_p }}
-            <button class="btn btn-primary" name="registrar_asistencia" type="submit">Guardar asistencia</button>
+            {{ persona_form.as_p }}
+            <button class="btn btn-outline-secondary" name="agregar_persona" type="submit">Guardar persona</button>
           </form>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header">Registrar pago rápido</div>
-        <div class="card-body">
+      <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Nueva sesion</span>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">Nueva sesion</button>
+        </div>
+        <div class="card-body collapse" id="nuevaSesionForm">
           <form method="post">
             {% csrf_token %}
-            {{ pago_form.as_p }}
-            <button class="btn btn-success" name="registrar_pago" type="submit">Guardar pago</button>
+            <label class="form-label" for="profesores_search_basica">Buscar profesor</label>
+            <input id="profesores_search_basica" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+            {{ sesion_form.as_p }}
+            <button class="btn btn-primary" name="crear_sesion" type="submit">Crear sesion</button>
           </form>
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Agregar asistentes</span>
+          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesForm">Agregar asistentes</button>
+        </div>
+        <div class="card-body collapse {% if sesion_seleccionada %}show{% endif %}" id="agregarAsistentesForm">
+          {% if sesion_seleccionada %}
+            <div class="mb-2 text-muted small">
+              Sesion: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
+            </div>
+            <form method="post">
+              {% csrf_token %}
+              {{ asistencia_form.sesion_id }}
+              <label class="form-label" for="estudiantes_search">Buscar estudiante</label>
+              <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+              {{ asistencia_form.estudiantes }}
+              <div class="form-text">Total estudiantes: {{ estudiantes_total }}</div>
+              <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">Agregar asistentes</button>
+            </form>
+          {% else %}
+            <div class="text-muted">Crea o selecciona una sesion para agregar asistentes.</div>
+          {% endif %}
         </div>
       </div>
     </div>
     <div class="col-lg-7">
-      <h3>Listado de asistencias</h3>
-      <form class="row g-3 mb-3">
-        <div class="col-md-4">
-          <label class="form-label">Disciplina</label>
-          <select name="disciplina" class="form-select">
-            <option value="">Todas</option>
-            {% for disciplina in disciplinas %}
-              <option value="{{ disciplina.id }}" {% if request.GET.disciplina == disciplina.id|stringformat:'s' %}selected{% endif %}>{{ disciplina.nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Alumno</label>
-          <select name="persona" class="form-select">
-            <option value="">Todos</option>
-            {% for persona in personas %}
-              <option value="{{ persona.id }}" {% if request.GET.persona == persona.id|stringformat:'s' %}selected{% endif %}>{{ persona }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Mes</label>
-          <select name="mes" class="form-select">
-            <option value="">Todos</option>
-            {% for m in meses %}
-              <option value="{{ m }}" {% if request.GET.mes == m|stringformat:'s' %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-12">
-          <button class="btn btn-outline-primary">Filtrar</button>
-        </div>
-      </form>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h3 class="mb-0">Sesiones registradas</h3>
+        <form class="d-flex" method="get">
+          <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm me-2" placeholder="Buscar sesion">
+          <button class="btn btn-sm btn-outline-primary" type="submit">Buscar</button>
+        </form>
+      </div>
       <div class="table-responsive">
         <table class="table table-sm">
           <thead>
             <tr>
               <th>Fecha</th>
-              <th>Taller</th>
-              <th>Persona</th>
-              <th>Estado</th>
+              <th>Disciplina</th>
+              <th>Profesores</th>
+              <th>Asistentes</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {% for asistencia in asistencias %}
+            {% for sesion in sesiones %}
             <tr>
-              <td>{{ asistencia.sesion.fecha }}</td>
-              <td>{{ asistencia.sesion.disciplina }}</td>
-              <td>{{ asistencia.persona }}</td>
-              <td>{{ asistencia.get_estado_display }}</td>
-              <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_asistencia' asistencia.sesion.pk %}">Ver</a></td>
+              <td>{{ sesion.fecha }}</td>
+              <td>{{ sesion.disciplina }}</td>
+              <td>
+                {% if sesion.profesores.all %}
+                  {% for profe in sesion.profesores.all %}
+                    {{ profe }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ sesion.asistencias.count }}</td>
+              <td>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">Ver</a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">Agregar asistentes</a>
+              </td>
+            </tr>
+            <tr class="table-light">
+              <td colspan="5">
+                <strong>Asistentes:</strong>
+                {% for asistencia in sesion.asistencias.all %}
+                  {{ asistencia.persona }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                  <span class="text-muted">Sin asistentes.</span>
+                {% endfor %}
+              </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="text-center text-muted">Sin asistencias.</td></tr>
+            <tr><td colspan="5" class="text-center text-muted">Sin sesiones registradas.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      {% include "webapp/pagination.html" with page_obj=asistencias %}
+      {% include "webapp/pagination.html" with page_obj=sesiones %}
     </div>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+  (function () {
+    const input = document.getElementById("estudiantes_search");
+    const select = document.getElementById("id_estudiantes");
+    const nuevaPersona = document.getElementById("nuevaPersonaForm");
+    if (!input || !select) return;
+    input.addEventListener("input", function () {
+      const term = input.value.toLowerCase();
+      let visibles = 0;
+      Array.from(select.options).forEach((opt) => {
+        const text = opt.text.toLowerCase();
+        const visible = !term || text.includes(term);
+        opt.hidden = !visible;
+        if (visible) visibles += 1;
+      });
+      if (nuevaPersona && term && visibles === 0 && window.bootstrap) {
+        const collapse = bootstrap.Collapse.getOrCreateInstance(nuevaPersona);
+        collapse.show();
+      }
+    });
+  })();
+  (function () {
+    const input = document.getElementById("profesores_search_basica");
+    const select = document.getElementById("id_profesores_basica");
+    if (!input || !select) return;
+    input.addEventListener("input", function () {
+      const term = input.value.toLowerCase();
+      Array.from(select.options).forEach((opt) => {
+        const text = opt.text.toLowerCase();
+        opt.hidden = term && !text.includes(term);
+      });
+    });
+  })();
+</script>
 {% endblock %}

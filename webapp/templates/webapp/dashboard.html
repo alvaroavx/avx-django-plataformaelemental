@@ -46,7 +46,7 @@
           <tr>
             <th>Fecha</th>
             <th>Taller</th>
-            <th>Profesor</th>
+            <th>Profesores</th>
             <th>Asistentes</th>
             <th></th>
           </tr>
@@ -56,7 +56,15 @@
           <tr>
             <td>{{ sesion.fecha }}</td>
             <td>{{ sesion.disciplina }}</td>
-            <td>{{ sesion.profesor|default:"-" }}</td>
+            <td>
+              {% if sesion.profesores.all %}
+                {% for profe in sesion.profesores.all %}
+                  {{ profe }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td>{{ sesion.total_asistentes }}</td>
             <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Ver asistencia</a></td>
           </tr>

@@ -129,9 +129,9 @@ class ApiDataTests(APITestCase):
         )
         self.sesion = SesionClase.objects.create(
             disciplina=self.disciplina,
-            profesor=self.profesor,
             fecha="2025-01-15",
         )
+        self.sesion.profesores.set([self.profesor])
         self.asistencia = Asistencia.objects.create(
             sesion=self.sesion,
             persona=self.estudiante,

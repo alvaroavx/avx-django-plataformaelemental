@@ -98,7 +98,7 @@ class LiquidacionProfesor(models.Model):
     def calcular_totales(self):
         Asistencia = apps.get_model("asistencias", "Asistencia")
         asistencias_qs = Asistencia.objects.filter(
-            models.Q(sesion__profesor=self.profesor) | models.Q(sesion__profesores=self.profesor),
+            models.Q(sesion__profesores=self.profesor),
             sesion__fecha__gte=self.periodo_inicio,
             sesion__fecha__lte=self.periodo_fin,
             sesion__disciplina__organizacion=self.organizacion,
