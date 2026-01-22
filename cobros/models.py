@@ -78,6 +78,9 @@ class Suscripcion(models.Model):
     )
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField(null=True, blank=True)
+    monto_pactado = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    descuento_monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     estado = models.CharField(
         max_length=20,
         choices=Estado.choices,
@@ -129,13 +132,23 @@ class Suscripcion(models.Model):
             | models.Q(suscripcion=self)
             | models.Q(documento__suscripcion=self)
         ).distinct()
+        pagos_qs = pagos_qs.exclude(tipo=Pago.Tipo.CLASE)
         return sum(
             (pago.monto for pago in pagos_qs),
             Decimal("0"),
         )
 
+    def monto_objetivo(self):
+        base = self.monto_pactado if self.monto_pactado is not None else self.plan.precio
+        if self.descuento_porcentaje:
+            descuento = (base * (Decimal(self.descuento_porcentaje) / Decimal("100"))).quantize(Decimal("0.01"))
+        else:
+            descuento = Decimal(self.descuento_monto or 0)
+        total = base - descuento
+        return total if total > 0 else Decimal("0")
+
     def saldo_pendiente(self):
-        saldo = self.plan.precio - self.pagos_registrados()
+        saldo = self.monto_objetivo() - self.pagos_registrados()
         return saldo if saldo > 0 else Decimal("0")
 
 
@@ -178,6 +191,11 @@ class DocumentoVenta(models.Model):
 
 
 class Pago(models.Model):
+    class Tipo(models.TextChoices):
+        SUSCRIPCION = "suscripcion", "Suscripcion"
+        CLASE = "clase", "Clase"
+        OTRO = "otro", "Otro"
+
     class Metodo(models.TextChoices):
         EFECTIVO = "efectivo", "Efectivo"
         TRANSFERENCIA = "transferencia", "Transferencia"
@@ -197,6 +215,13 @@ class Pago(models.Model):
         null=True,
         blank=True,
     )
+    sesion = models.ForeignKey(
+        "academia.SesionClase",
+        on_delete=models.SET_NULL,
+        related_name="pagos",
+        null=True,
+        blank=True,
+    )
     documento = models.ForeignKey(
         DocumentoVenta,
         on_delete=models.CASCADE,
@@ -204,6 +229,7 @@ class Pago(models.Model):
         null=True,
         blank=True,
     )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.SUSCRIPCION)
     fecha_pago = models.DateField()
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     metodo = models.CharField(max_length=20, choices=Metodo.choices)

@@ -5,7 +5,7 @@
   <h2>Profesores</h2>
   <form class="row g-3 mb-3">
     <div class="col-md-6">
-      <label class="form-label">Organización</label>
+      <label class="form-label">Organizacion</label>
       <select name="organizacion" class="form-select">
         <option value="">Todas</option>
         {% for org in organizaciones %}
@@ -22,21 +22,44 @@
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Email</th>
-          <th>Teléfono</th>
+          <th>Disciplinas</th>
+          <th>Ganado</th>
+          <th>Alumnos unicos mes</th>
+          <th>Asistencias mes</th>
+          <th>Sesiones realizadas</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        {% for profesor in profesores %}
+        {% for item in profesores %}
         <tr>
-          <td>{{ profesor }}</td>
-          <td>{{ profesor.email|default:"-" }}</td>
-          <td>{{ profesor.telefono|default:"-" }}</td>
-          <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' profesor.pk %}">Ver perfil</a></td>
+          <td>
+            <a href="{% url 'webapp:persona_detail' item.persona.pk %}">{{ item.persona }}</a>
+            {% for rol in item.persona.roles.all %}
+              {% if rol.rol.codigo == "PROFESOR" %}
+                <span class="badge text-bg-light ms-1">{{ rol.organizacion.nombre }}</span>
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td>
+            {% for disciplina in item.disciplinas %}
+              <span class="badge text-bg-primary">{{ disciplina.nombre }}</span>
+            {% empty %}
+              <span class="text-muted">-</span>
+            {% endfor %}
+          </td>
+          <td>${{ item.ganado_total }}</td>
+          <td>{{ item.alumnos_unicos_mes }}</td>
+          <td>{{ item.asistencias_mes }}</td>
+          <td>{{ item.sesiones_mes }}</td>
+          <td class="d-none d-md-table-cell">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' item.persona.pk %}">
+              <i class="bi bi-person-badge"></i><span class="d-none d-md-inline ms-1">Ver perfil</span>
+            </a>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="text-center text-muted">Sin profesores registrados.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">Sin profesores registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>

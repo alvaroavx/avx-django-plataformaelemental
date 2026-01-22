@@ -10,7 +10,7 @@ from cuentas.models import Persona
 class SesionRapidaForm(forms.Form):
     disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.all(), required=True)
     profesores = forms.ModelMultipleChoiceField(
-        queryset=Persona.objects.all(),
+        queryset=Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
         required=False,
         widget=forms.SelectMultiple(attrs={"id": "id_profesores", "class": "form-select"}),
     )
@@ -23,7 +23,7 @@ class SesionBasicaForm(forms.Form):
     disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.all(), required=True)
     fecha = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
     profesores = forms.ModelMultipleChoiceField(
-        queryset=Persona.objects.all(),
+        queryset=Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
         required=False,
         widget=forms.SelectMultiple(attrs={"id": "id_profesores_basica", "class": "form-select"}),
     )
@@ -61,7 +61,7 @@ class AsistenciaSesionForm(forms.ModelForm):
 class PagoRapidoForm(forms.ModelForm):
     class Meta:
         model = Pago
-        fields = ["persona", "fecha_pago", "monto", "metodo"]
+        fields = ["persona", "fecha_pago", "monto", "metodo", "tipo", "sesion"]
         widgets = {
             "fecha_pago": forms.DateInput(attrs={"type": "date"}),
         }

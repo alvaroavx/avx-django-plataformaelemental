@@ -1,48 +1,400 @@
 {% extends "webapp/base_app.html" %}
-{% block title %}Ficha de persona{% endblock %}
+{% block title %}Perfil persona{% endblock %}
 {% block content %}
-<div class="mt-4 row">
-  <div class="col-lg-6">
-    <div class="card mb-3">
-      <div class="card-header">Datos</div>
-      <div class="card-body">
-        <p><strong>Nombre:</strong> {{ persona }}</p>
-        <p><strong>Email:</strong> {{ persona.email }}</p>
-        <p><strong>Telefono:</strong> {{ persona.telefono }}</p>
-        <p><strong>Roles:</strong> {% for pr in roles_asignados %}<span class="badge text-bg-info me-1">{{ pr.rol.nombre }}</span>{% empty %}Sin roles{% endfor %}</p>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">Ultimos pagos</div>
-      <div class="card-body">
-        <ul class="list-group">
-          {% for pago in pagos %}
-            <li class="list-group-item d-flex justify-content-between">
-              {{ pago.fecha_pago }} - {{ pago.metodo }}
-              <span>${{ pago.monto }}</span>
-            </li>
-          {% empty %}
-            <li class="list-group-item text-muted">Sin pagos aun.</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
+<div class="mt-4">
+  <div class="mb-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
+      <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atras</span>
+    </a>
   </div>
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header">Suscripciones</div>
-      <div class="card-body">
-        <ul class="list-group">
-          {% for suscripcion in suscripciones %}
-            <li class="list-group-item">
-              {{ suscripcion.plan }} - {{ suscripcion.fecha_inicio }} - {{ suscripcion.fecha_fin|default:"actual" }}
-            </li>
-          {% empty %}
-            <li class="list-group-item text-muted">Sin suscripciones.</li>
-          {% endfor %}
-        </ul>
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <div class="card mb-3">
+        <div class="card-header">Datos</div>
+        <div class="card-body">
+          <div class="h5 mb-1">{{ persona }}</div>
+          <div class="text-muted small">{{ persona.email|default:"-" }}</div>
+          <div class="text-muted small">{{ persona.telefono|default:"-" }}</div>
+          <div class="mt-2">
+            {% for pr in roles_asignados %}
+              <span class="badge text-bg-light me-1">{{ pr.rol.nombre }} · {{ pr.organizacion.nombre }}</span>
+            {% empty %}
+              <span class="text-muted">Sin roles</span>
+            {% endfor %}
+          </div>
+        </div>
       </div>
+      {% if es_estudiante %}
+      <div class="card">
+        <div class="card-header">Resumen Estudiante</div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <span>Asistencias mes</span>
+            <strong>{{ asistencias_mes }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>Pagos mes</span>
+            <strong>{{ pagos_mes }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>Pagos clase</span>
+            <strong>{{ pagos_clase_mes }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>Pendientes</span>
+            <strong>{{ pagos_pendientes_mes }}</strong>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% if es_profesor %}
+      <div class="card mt-3">
+        <div class="card-header">Resumen Profesor</div>
+        <div class="card-body">
+          {% for item in resumen_profesor %}
+            <div class="mb-2">
+              <div class="fw-semibold">{{ item.organizacion.nombre }}</div>
+              <div class="d-flex justify-content-between small">
+                <span>Sesiones realizadas</span>
+                <strong>{{ item.sesiones }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small">
+                <span>Alumnos distintos</span>
+                <strong>{{ item.alumnos }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small">
+                <span>Asistencias</span>
+                <strong>{{ item.asistencias }}</strong>
+              </div>
+            </div>
+          {% empty %}
+            <div class="text-muted">Sin datos.</div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="col-lg-9">
+      {% if es_estudiante %}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Asistencias</span>
+        </div>
+        <div class="card-body table-responsive">
+          {% if asistencias %}
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <label class="form-label">Disciplina</label>
+              <select id="filtro-asistencia-disciplina" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                {% for d in disciplinas_asistidas %}
+                  <option value="{{ d }}">{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Estado</label>
+              <select id="filtro-asistencia-estado" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for value, label in asistencia_estados %}
+                  <option value="{{ label }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Pago</label>
+              <select id="filtro-asistencia-pago" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="Pagado">Pagado</option>
+                <option value="Pendiente">Pendiente</option>
+              </select>
+            </div>
+          </div>
+          {% endif %}
+          {% if asistencias %}
+          <table id="tabla-asistencias" class="table table-sm">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Disciplina</th>
+                <th>Estado</th>
+                <th>Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in asistencias %}
+              <tr>
+                <td>{{ item.asistencia.sesion.fecha|date:"d/m/Y" }}</td>
+                <td>
+                  <a href="{% url 'webapp:sesion_detail' item.asistencia.sesion.pk %}">
+                    {{ item.asistencia.sesion.disciplina }}
+                  </a>
+                </td>
+                <td>{{ item.asistencia.get_estado_display }}</td>
+                <td>
+                  {% if item.pagado %}
+                    <span class="badge text-bg-success">Pagado</span>
+                  {% else %}
+                    <span class="badge text-bg-warning">Pendiente</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <div class="text-muted">Sin asistencias.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Suscripciones</div>
+        <div class="card-body table-responsive">
+          {% if suscripciones %}
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <label class="form-label">Plan</label>
+              <select id="filtro-suscripcion-plan" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for p in planes_persona %}
+                  <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Estado</label>
+              <select id="filtro-suscripcion-estado" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for value, label in suscripcion_estados %}
+                  <option value="{{ label }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% endif %}
+          {% if suscripciones %}
+          <table id="tabla-suscripciones" class="table table-sm">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th>Estado</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for suscripcion in suscripciones %}
+              <tr>
+                <td>{{ suscripcion.plan }}</td>
+                <td>{{ suscripcion.fecha_inicio|date:"d/m/Y" }}</td>
+                <td>{{ suscripcion.fecha_fin|default:"-" }}</td>
+                <td>{{ suscripcion.get_estado_display }}</td>
+                <td>${{ suscripcion.monto_objetivo }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <div class="text-muted">Sin suscripciones.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Pagos</div>
+        <div class="card-body table-responsive">
+          {% if pagos %}
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <label class="form-label">Tipo</label>
+              <select id="filtro-pago-tipo" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for value, label in pago_tipos %}
+                  <option value="{{ label }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Metodo</label>
+              <select id="filtro-pago-metodo" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                {% for value, label in pago_metodos %}
+                  <option value="{{ label }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          {% endif %}
+          {% if pagos %}
+          <table id="tabla-pagos" class="table table-sm">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Sesion</th>
+                <th>Monto</th>
+                <th>Metodo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pago in pagos %}
+              <tr>
+                <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+                <td>{{ pago.get_tipo_display }}</td>
+                <td>{% if pago.sesion %}{{ pago.sesion.disciplina }} - {{ pago.sesion.fecha|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                <td>${{ pago.monto }}</td>
+                <td>{{ pago.get_metodo_display }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <div class="text-muted">Sin pagos.</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if es_profesor %}
+      <div class="card mb-3">
+        <div class="card-header">Sesiones realizadas</div>
+        <div class="card-body table-responsive">
+          {% if sesiones_realizadas %}
+          <table id="tabla-sesiones-profesor" class="table table-sm">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Organizacion</th>
+                <th>Disciplina</th>
+                <th>Asistentes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sesion in sesiones_realizadas %}
+              <tr>
+                <td>{{ sesion.fecha|date:"d/m/Y" }}</td>
+                <td>{{ sesion.disciplina.organizacion.nombre }}</td>
+                <td>
+                  <a href="{% url 'webapp:sesion_detail' sesion.pk %}">{{ sesion.disciplina }}</a>
+                </td>
+                <td>{{ sesion.asistencias.count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <div class="text-muted">Sin sesiones realizadas.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Finanzas</div>
+        <div class="card-body table-responsive">
+          {% if liquidaciones %}
+          <table id="tabla-finanzas-profesor" class="table table-sm">
+            <thead>
+              <tr>
+                <th>Periodo</th>
+                <th>Organizacion</th>
+                <th>Bruto</th>
+                <th>Neto</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for liq in liquidaciones %}
+              <tr>
+                <td>{{ liq.periodo_inicio|date:"d/m/Y" }} - {{ liq.periodo_fin|date:"d/m/Y" }}</td>
+                <td>{{ liq.organizacion.nombre }}</td>
+                <td>${{ liq.monto_total }}</td>
+                <td>${{ liq.monto_neto }}</td>
+                <td>{{ liq.get_estado_display }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+            <div class="text-muted">Sin liquidaciones registradas.</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  (function () {
+    if (!window.jQuery) return;
+    const opts = {
+      paging: true,
+      pageLength: 10,
+      stateSave: true,
+      searching: false,
+      language: {
+        lengthMenu: "Mostrar _MENU_",
+        info: "Mostrando _START_ a _END_ de _TOTAL_",
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+        emptyTable: "Sin registros",
+      },
+    };
+    const dtAsistencias = jQuery("#tabla-asistencias").length ? jQuery("#tabla-asistencias").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
+    const dtSuscripciones = jQuery("#tabla-suscripciones").length ? jQuery("#tabla-suscripciones").DataTable({ ...opts, order: [[1, "desc"]] }) : null;
+    const dtPagos = jQuery("#tabla-pagos").length ? jQuery("#tabla-pagos").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
+    const dtSesionesProf = jQuery("#tabla-sesiones-profesor").length ? jQuery("#tabla-sesiones-profesor").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
+    const dtFinanzasProf = jQuery("#tabla-finanzas-profesor").length ? jQuery("#tabla-finanzas-profesor").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
+
+    const filtroAsisDisc = document.getElementById("filtro-asistencia-disciplina");
+    const filtroAsisEstado = document.getElementById("filtro-asistencia-estado");
+    const filtroAsisPago = document.getElementById("filtro-asistencia-pago");
+    if (dtAsistencias && filtroAsisDisc) {
+      filtroAsisDisc.addEventListener("change", function () {
+        dtAsistencias.column(1).search(this.value).draw();
+      });
+    }
+    if (dtAsistencias && filtroAsisEstado) {
+      filtroAsisEstado.addEventListener("change", function () {
+        dtAsistencias.column(2).search(this.value).draw();
+      });
+    }
+    if (dtAsistencias && filtroAsisPago) {
+      filtroAsisPago.addEventListener("change", function () {
+        dtAsistencias.column(3).search(this.value).draw();
+      });
+    }
+
+    const filtroPlan = document.getElementById("filtro-suscripcion-plan");
+    const filtroEstado = document.getElementById("filtro-suscripcion-estado");
+    if (dtSuscripciones && filtroPlan) {
+      filtroPlan.addEventListener("change", function () {
+        dtSuscripciones.column(0).search(this.value).draw();
+      });
+    }
+    if (dtSuscripciones && filtroEstado) {
+      filtroEstado.addEventListener("change", function () {
+        dtSuscripciones.column(3).search(this.value).draw();
+      });
+    }
+
+    const filtroTipo = document.getElementById("filtro-pago-tipo");
+    const filtroMetodo = document.getElementById("filtro-pago-metodo");
+    if (dtPagos && filtroTipo) {
+      filtroTipo.addEventListener("change", function () {
+        dtPagos.column(1).search(this.value).draw();
+      });
+    }
+    if (dtPagos && filtroMetodo) {
+      filtroMetodo.addEventListener("change", function () {
+        dtPagos.column(4).search(this.value).draw();
+      });
+    }
+  })();
+</script>
 {% endblock %}

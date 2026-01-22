@@ -2,21 +2,20 @@
 {% block title %}Panel administrador{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <h2 class="mb-3">Lo urgente</h2>
   <div class="row">
+    <div class="col-md-4">
+      <div class="card text-bg-primary mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Asistencias de {{ nombre_mes }}</h5>
+          <p class="display-6">{{ asistencias_mes }}</p>
+        </div>
+      </div>
+    </div>
     <div class="col-md-4">
       <div class="card text-bg-danger mb-3">
         <div class="card-body">
           <h5 class="card-title">Alumnos sin pago</h5>
           <p class="display-6">{{ morosos|length }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card text-bg-primary mb-3">
-        <div class="card-body">
-          <h5 class="card-title">Asistencias del mes</h5>
-          <p class="display-6">{{ asistencias_mes }}</p>
         </div>
       </div>
     </div>
@@ -30,15 +29,30 @@
     </div>
   </div>
 
-  <h2 class="mb-3">Accesos rápidos</h2>
   <div class="row text-center mb-4">
-    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:sesiones_list' %}">Talleres</a></div>
-    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:estudiantes_list' %}">Estudiantes</a></div>
-    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:profesores_list' %}">Profesores</a></div>
-    <div class="col-md-3 mb-2"><a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:pagos_list' %}">Pagos</a></div>
+    <div class="col-md-3 mb-2">
+      <a class="btn btn-lg btn-outline-success w-100" href="{% url 'webapp:asistencias_list' %}">
+        <i class="bi bi-clipboard-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistencia</span>
+      </a>
+    </div>
+    <div class="col-md-3 mb-2">
+      <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:sesiones_list' %}">
+        <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Sesiones</span>
+      </a>
+    </div>
+    <div class="col-md-3 mb-2">
+      <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:estudiantes_list' %}">
+        <i class="bi bi-people"></i><span class="d-none d-md-inline ms-1">Estudiantes</span>
+      </a>
+    </div>
+    <div class="col-md-3 mb-2">
+      <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:pagos_list' %}">
+        <i class="bi bi-cash"></i><span class="d-none d-md-inline ms-1">Pagos</span>
+      </a>
+    </div>
   </div>
 
-  <h2 class="mb-3">Asistencias del mes</h2>
+  <h2 class="mb-3">Asistencias de {{ nombre_mes }}</h2>
   <div class="card mb-4">
     <div class="card-body table-responsive">
       <table class="table">
@@ -66,14 +80,20 @@
               {% endif %}
             </td>
             <td>{{ sesion.total_asistentes }}</td>
-            <td><a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Ver asistencia</a></td>
+            <td>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">
+                <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesion</span>
+              </a>
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="5" class="text-center text-muted">Sin registros este mes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}">Ir a asistencias</a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}">
+        <i class="bi bi-clipboard-check"></i><span class="d-none d-md-inline ms-1">Ir a asistencias</span>
+      </a>
     </div>
   </div>
 

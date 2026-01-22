@@ -2,52 +2,152 @@
 {% block title %}Estudiantes{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <h2>Estudiantes</h2>
-  <form class="row g-3 mb-3">
-    <div class="col-md-4">
-      <label class="form-label">Organizacion</label>
-      <select name="organizacion" class="form-select">
-        <option value="">Todas</option>
-        {% for org in organizaciones %}
-          <option value="{{ org.id }}" {% if filtros.organizacion == org.id|stringformat:'s' %}selected{% endif %}>{{ org.nombre }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">Estado</label>
-      <select name="sin_plan" class="form-select">
-        <option value="">Con plan</option>
-        <option value="1" {% if filtros.sin_plan == "1" %}selected{% endif %}>Sin plan</option>
-      </select>
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">Morosos</label>
-      <select name="morosos" class="form-select">
-        <option value="">Todos</option>
-        <option value="1" {% if filtros.morosos == "1" %}selected{% endif %}>Solo morosos</option>
-      </select>
-    </div>
-    <div class="col-12">
-      <button class="btn btn-outline-primary">Filtrar</button>
-    </div>
-  </form>
-  <div class="list-group">
-    {% for item in estudiantes %}
-      <div class="list-group-item d-flex justify-content-between align-items-center">
-        <div>
-          <strong>{{ item.persona }}</strong><br>
-          {% if item.suscripcion %}{{ item.suscripcion.plan }}{% else %}<span class="text-muted">Sin plan vigente</span>{% endif %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Estudiantes</h2>
+  </div>
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Organizacion</label>
+          <select id="filtro-organizacion" class="form-select">
+            <option value="">Todas</option>
+            {% for org in organizaciones %}
+              <option value="{{ org.nombre }}">{{ org.nombre }}</option>
+            {% endfor %}
+          </select>
         </div>
-        <div class="text-end">
-          <span class="badge text-bg-primary">{{ item.clases_usadas }} usadas</span>
-          <div class="mt-1">
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' item.persona.pk %}">Perfil</a>
-          </div>
+        <div class="col-md-3">
+          <label class="form-label">Estado plan</label>
+          <select id="filtro-plan" class="form-select">
+            <option value="">Todos</option>
+            <option value="Sin plan">Sin plan</option>
+            <option value="Con plan">Con plan</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Morosos</label>
+          <select id="filtro-moroso" class="form-select">
+            <option value="">Todos</option>
+            <option value="Moroso">Morosos</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <button id="limpiar-filtros-estudiantes" class="btn btn-outline-secondary btn-sm" type="button">
+            <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar filtros</span>
+          </button>
         </div>
       </div>
-    {% empty %}
-      <div class="list-group-item text-muted">Sin estudiantes registrados.</div>
-    {% endfor %}
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table id="tabla-estudiantes" class="table table-sm">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Plan</th>
+          <th>Clases usadas</th>
+          <th>Saldo</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in estudiantes %}
+        <tr>
+          <td>
+            {{ item.persona }}
+            {% for rol in item.persona.roles.all %}
+              {% if rol.rol.codigo == "ESTUDIANTE" %}
+                <span class="badge text-bg-light ms-1">{{ rol.organizacion.nombre }}</span>
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td>
+            {% if item.suscripcion %}
+              {{ item.suscripcion.plan }}
+            {% else %}
+              Sin plan
+            {% endif %}
+          </td>
+          <td>{{ item.clases_usadas }}</td>
+          <td>${{ item.saldo_pendiente }}</td>
+          <td>
+            {% if item.saldo_pendiente|floatformat:0 > 0 %}
+              <span class="badge text-bg-warning">Moroso</span>
+            {% else %}
+              <span class="badge text-bg-success">Al dia</span>
+            {% endif %}
+          </td>
+          <td>
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' item.persona.pk %}">
+              <i class="bi bi-person"></i><span class="d-none d-md-inline ms-1">Perfil</span>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  (function () {
+    const table = document.getElementById("tabla-estudiantes");
+    if (!table || !window.jQuery) return;
+    const dt = jQuery(table).DataTable({
+      paging: true,
+      pageLength: 25,
+      order: [[1, "asc"]],
+      stateSave: true,
+      language: {
+        search: "Buscar",
+        lengthMenu: "Mostrar _MENU_",
+        info: "Mostrando _START_ a _END_ de _TOTAL_",
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+      },
+    });
+
+    const filtroOrganizacion = document.getElementById("filtro-organizacion");
+    const filtroPlan = document.getElementById("filtro-plan");
+    const filtroMoroso = document.getElementById("filtro-moroso");
+    const limpiar = document.getElementById("limpiar-filtros-estudiantes");
+
+    if (filtroOrganizacion) {
+      filtroOrganizacion.value = dt.column(0).search() || "";
+      filtroOrganizacion.addEventListener("change", function () {
+        dt.column(0).search(this.value).draw();
+      });
+    }
+    if (filtroPlan) {
+      filtroPlan.value = dt.column(1).search() || "";
+      filtroPlan.addEventListener("change", function () {
+        dt.column(1).search(this.value).draw();
+      });
+    }
+    if (filtroMoroso) {
+      filtroMoroso.value = dt.column(4).search() || "";
+      filtroMoroso.addEventListener("change", function () {
+        dt.column(4).search(this.value).draw();
+      });
+    }
+    if (limpiar) {
+      limpiar.addEventListener("click", function () {
+        if (filtroOrganizacion) filtroOrganizacion.value = "";
+        if (filtroPlan) filtroPlan.value = "";
+        if (filtroMoroso) filtroMoroso.value = "";
+        dt.columns().search("").draw();
+      });
+    }
+  })();
+</script>
 {% endblock %}

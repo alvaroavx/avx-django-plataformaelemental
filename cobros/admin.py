@@ -21,7 +21,7 @@ class ConvenioIntercambioAdmin(admin.ModelAdmin):
 
 @admin.register(Suscripcion)
 class SuscripcionAdmin(admin.ModelAdmin):
-    list_display = ("persona", "plan", "estado", "fecha_inicio", "fecha_fin", "clases_asignadas", "clases_usadas")
+    list_display = ("persona", "plan", "estado", "fecha_inicio", "fecha_fin", "monto_objetivo", "clases_asignadas", "clases_usadas")
     list_filter = ("estado", "plan__organizacion", ("fecha_inicio", admin.DateFieldListFilter))
     search_fields = ("persona__nombres", "persona__apellidos", "plan__nombre")
     filter_horizontal = ("convenios",)
@@ -41,8 +41,8 @@ class DocumentoVentaAdmin(admin.ModelAdmin):
 
 @admin.register(Pago)
 class PagoAdmin(admin.ModelAdmin):
-    list_display = ("persona", "suscripcion", "documento", "monto", "fecha_pago", "metodo")
-    list_filter = ("metodo", ("fecha_pago", admin.DateFieldListFilter))
+    list_display = ("persona", "suscripcion", "sesion", "tipo", "documento", "monto", "fecha_pago", "metodo")
+    list_filter = ("tipo", "metodo", ("fecha_pago", admin.DateFieldListFilter))
     search_fields = ("documento__numero", "referencia", "persona__nombres", "persona__apellidos")
-    autocomplete_fields = ("documento", "persona", "suscripcion")
-    list_select_related = ("documento", "persona", "suscripcion")
+    autocomplete_fields = ("documento", "persona", "suscripcion", "sesion")
+    list_select_related = ("documento", "persona", "suscripcion", "sesion")

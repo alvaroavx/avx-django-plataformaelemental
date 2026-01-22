@@ -2,50 +2,101 @@
 {% block title %}Detalle sesion{% endblock %}
 {% block content %}
 <div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
+        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atras</span>
+      </a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:sesiones_list' %}">
+        <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
+      </a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
+        <i class="bi bi-clipboard-check"></i><span class="d-none d-md-inline ms-1">Ir a asistencias</span>
+      </a>
+    </div>
+  </div>
   <div class="card mb-3">
-    <div class="card-header">Detalle de sesion</div>
     <div class="card-body">
-      <p><strong>Disciplina:</strong> {{ sesion.disciplina }}</p>
-      <p><strong>Fecha:</strong> {{ sesion.fecha }}</p>
-      <p><strong>Profesores:</strong>
-        {% if sesion.profesores.all %}
-          {% for profe in sesion.profesores.all %}
-            {{ profe }}{% if not forloop.last %}, {% endif %}
-          {% endfor %}
-        {% else %}
-          -
-        {% endif %}
-      </p>
-      <p><strong>Estado:</strong> {{ sesion.get_estado_display }}</p>
-      {% if sesion.cupo_maximo %}
-        <p><strong>Cupo:</strong> {{ sesion.cupo_maximo }}</p>
-      {% endif %}
+      <div class="row g-3 align-items-center">
+        <div class="col-md-4">
+          <div class="h5 mb-1">{{ sesion.disciplina }}</div>
+          <div class="text-muted">{{ sesion.fecha|date:"d/m/Y" }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="fw-semibold">Profesores</div>
+          <div>
+            {% if sesion.profesores.all %}
+              {% for profe in sesion.profesores.all %}
+                {{ profe }}{% if not forloop.last %}, {% endif %}
+              {% endfor %}
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-md-4 text-md-end">
+          {% if sesion.estado == "programada" %}
+            <span class="badge text-bg-info">Programada</span>
+          {% elif sesion.estado == "completada" %}
+            <span class="badge text-bg-success">Completada</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Cancelada</span>
+          {% endif %}
+          {% if sesion.cupo_maximo %}
+            <div class="text-muted small mt-1">Cupo {{ sesion.cupo_maximo }}</div>
+          {% endif %}
+        </div>
+      </div>
       {% if sesion.notas %}
-        <p><strong>Notas:</strong> {{ sesion.notas }}</p>
+        <div class="mt-3 text-muted">{{ sesion.notas }}</div>
       {% endif %}
+      <div class="row mt-3">
+        <div class="col-md-4">
+          <div class="fw-semibold">Asistentes</div>
+          <div class="display-6">{{ total_asistentes }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="fw-semibold">Pagos</div>
+          <div class="display-6">{{ pagos }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="fw-semibold">No pagos</div>
+          <div class="display-6">{{ no_pagos }}</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-header">Asistentes</div>
+    <div class="card-header">Listado de asistentes</div>
     <div class="card-body table-responsive">
       <table class="table table-sm">
         <thead>
           <tr>
             <th>Persona</th>
             <th>Estado</th>
+            <th>Pago</th>
             <th>Hora</th>
           </tr>
         </thead>
         <tbody>
-          {% for asistencia in asistencias %}
+          {% for item in asistencias %}
           <tr>
-            <td>{{ asistencia.persona }}</td>
-            <td>{{ asistencia.get_estado_display }}</td>
-            <td>{{ asistencia.registrada_en|date:"H:i" }}</td>
+            <td>
+              <a href="{% url 'webapp:persona_detail' item.asistencia.persona.pk %}">{{ item.asistencia.persona }}</a>
+            </td>
+            <td>{{ item.asistencia.get_estado_display }}</td>
+            <td>
+              {% if item.pagado %}
+                <span class="badge text-bg-success">Pagado</span>
+              {% else %}
+                <span class="badge text-bg-warning">Pendiente</span>
+              {% endif %}
+            </td>
+            <td>{{ item.asistencia.registrada_en|date:"H:i" }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="3" class="text-center text-muted">Sin asistentes.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted">Sin asistentes.</td></tr>
           {% endfor %}
         </tbody>
       </table>

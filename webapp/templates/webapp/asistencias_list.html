@@ -3,39 +3,74 @@
 {% block content %}
 <div class="mt-4">
   <div class="row">
-    <div class="col-lg-5">
-      <div class="card">
+    <div class="col-lg-3">
+      <div class="card mt-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Nueva persona</span>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">Nueva persona</button>
+          <span>Nueva sesion</span>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">
+            <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesion</span>
+          </button>
         </div>
-        <div class="card-body collapse {% if estudiantes_total == 0 %}show{% endif %}" id="nuevaPersonaForm">
+        <div class="card-body collapse" id="nuevaSesionForm">
           <form method="post">
             {% csrf_token %}
-            {{ persona_form.as_p }}
-            <button class="btn btn-outline-secondary" name="agregar_persona" type="submit">Guardar persona</button>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label" for="id_disciplina">Disciplina</label>
+                {{ sesion_form.disciplina }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="id_fecha">Fecha</label>
+                {{ sesion_form.fecha }}
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="profesores_search_basica">Buscar profesor</label>
+                <input id="profesores_search_basica" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+                {{ sesion_form.profesores }}
+              </div>
+            </div>
+            <button class="btn btn-primary" name="crear_sesion" type="submit">
+              <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesion</span>
+            </button>
           </form>
         </div>
       </div>
       <div class="card mt-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Nueva sesion</span>
-          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">Nueva sesion</button>
+          <span>Nueva persona</span>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">
+            <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
+          </button>
         </div>
-        <div class="card-body collapse" id="nuevaSesionForm">
+        <div class="card-body collapse {% if estudiantes_total == 0 %}show{% endif %}" id="nuevaPersonaForm">
           <form method="post">
             {% csrf_token %}
-            <label class="form-label" for="profesores_search_basica">Buscar profesor</label>
-            <input id="profesores_search_basica" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
-            {{ sesion_form.as_p }}
-            <button class="btn btn-primary" name="crear_sesion" type="submit">Crear sesion</button>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label" for="id_nombres">Nombres</label>
+                {{ persona_form.nombres }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="id_apellidos">Apellidos</label>
+                {{ persona_form.apellidos }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="id_telefono">Telefono</label>
+                {{ persona_form.telefono }}
+              </div>
+            </div>
+            <button class="btn btn-outline-secondary" name="agregar_persona" type="submit">
+              <i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Guardar persona</span>
+            </button>
           </form>
         </div>
       </div>
       <div class="card mt-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Agregar asistentes</span>
-          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesForm">Agregar asistentes</button>
+          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesForm">
+            <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+          </button>
         </div>
         <div class="card-body collapse {% if sesion_seleccionada %}show{% endif %}" id="agregarAsistentesForm">
           {% if sesion_seleccionada %}
@@ -49,7 +84,39 @@
               <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
               {{ asistencia_form.estudiantes }}
               <div class="form-text">Total estudiantes: {{ estudiantes_total }}</div>
-              <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">Agregar asistentes</button>
+              <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">
+                <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+              </button>
+            </form>
+            <hr>
+            <form method="post">
+              {% csrf_token %}
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label" for="id_persona">Alumno</label>
+                  {{ pago_form.persona }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="id_sesion">Sesion</label>
+                  {{ pago_form.sesion }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="id_fecha_pago">Fecha pago</label>
+                  {{ pago_form.fecha_pago }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="id_monto">Monto</label>
+                  {{ pago_form.monto }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="id_metodo">Metodo</label>
+                  {{ pago_form.metodo }}
+                </div>
+                {{ pago_form.tipo.as_hidden }}
+              </div>
+              <button class="btn btn-outline-primary mt-2" name="registrar_pago_clase" type="submit">
+                <i class="bi bi-cash-coin"></i><span class="d-none d-md-inline ms-1">Registrar pago por clase</span>
+              </button>
             </form>
           {% else %}
             <div class="text-muted">Crea o selecciona una sesion para agregar asistentes.</div>
@@ -57,67 +124,138 @@
         </div>
       </div>
     </div>
-    <div class="col-lg-7">
+    <div class="col-lg-9">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h3 class="mb-0">Sesiones registradas</h3>
-        <form class="d-flex" method="get">
-          <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm me-2" placeholder="Buscar sesion">
-          <button class="btn btn-sm btn-outline-primary" type="submit">Buscar</button>
-        </form>
+      </div>
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label">Organizacion</label>
+              <select id="filtro-organizacion" class="form-select">
+                <option value="">Todas</option>
+                {% for org in organizaciones %}
+                  <option value="{{ org.nombre }}">{{ org.nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Disciplina</label>
+              <select id="filtro-disciplina" class="form-select">
+                <option value="">Todas</option>
+                {% for disciplina in disciplinas %}
+                  <option value="{{ disciplina.nombre }}">{{ disciplina.nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Profesor</label>
+              <select id="filtro-profesor" class="form-select">
+                <option value="">Todos</option>
+                {% for profesor in profesores %}
+                  <option value="{{ profesor }}">{{ profesor }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha</label>
+              <input id="filtro-fecha" class="form-control" type="date">
+            </div>
+            <div class="col-12">
+              <button id="limpiar-filtros" class="btn btn-outline-secondary btn-sm" type="button">
+                <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar filtros</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm">
+        <table id="tabla-sesiones" class="table table-sm">
           <thead>
             <tr>
-              <th>Fecha</th>
+              <th>Organizacion</th>
               <th>Disciplina</th>
               <th>Profesores</th>
+              <th>Fecha</th>
+              <th>Estado</th>
               <th>Asistentes</th>
+              <th>Pagos</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {% for sesion in sesiones %}
+            {% for item in sesiones %}
             <tr>
-              <td>{{ sesion.fecha }}</td>
-              <td>{{ sesion.disciplina }}</td>
+              <td>{{ item.sesion.disciplina.organizacion.nombre }}</td>
+              <td>{{ item.sesion.disciplina }}</td>
               <td>
-                {% if sesion.profesores.all %}
-                  {% for profe in sesion.profesores.all %}
+                {% if item.sesion.profesores.all %}
+                  {% for profe in item.sesion.profesores.all %}
                     {{ profe }}{% if not forloop.last %}, {% endif %}
                   {% endfor %}
                 {% else %}
                   -
                 {% endif %}
               </td>
-              <td>{{ sesion.asistencias.count }}</td>
+              <td>{{ item.sesion.fecha|date:"d/m/Y" }}</td>
               <td>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">Ver</a>
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">Agregar asistentes</a>
+                {% if item.sesion.estado == "programada" %}
+                  <span class="badge text-bg-info">Programada</span>
+                {% elif item.sesion.estado == "completada" %}
+                  <span class="badge text-bg-success">Completada</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Cancelada</span>
+                {% endif %}
               </td>
-            </tr>
-            <tr class="table-light">
-              <td colspan="5">
-                <strong>Asistentes:</strong>
-                {% for asistencia in sesion.asistencias.all %}
-                  {{ asistencia.persona }}{% if not forloop.last %}, {% endif %}
-                {% empty %}
-                  <span class="text-muted">Sin asistentes.</span>
-                {% endfor %}
+              <td>{{ item.total_asistentes }}</td>
+              <td>{{ item.pagos }} / {{ item.no_pagos }}</td>
+              <td>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' item.sesion.pk %}">
+                  <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver</span>
+                </a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ item.sesion.pk }}">
+                  <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+                </a>
+                <form method="post" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="sesion_id" value="{{ item.sesion.pk }}">
+                  <select name="estado" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                    {% for value, label in item.sesion.Estado.choices %}
+                      <option value="{{ value }}" {% if value == item.sesion.estado %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="hidden" name="cambiar_estado" value="1">
+                </form>
+                <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#asistentes-{{ item.sesion.pk }}">
+                  <i class="bi bi-list-ul"></i><span class="d-none d-md-inline ms-1">Asistentes</span>
+                </button>
+                <div class="collapse mt-2" id="asistentes-{{ item.sesion.pk }}">
+                  <div class="small text-muted">
+                    {% for asistencia in item.sesion.asistencias.all %}
+                      {{ asistencia.persona }}{% if not forloop.last %}, {% endif %}
+                    {% empty %}
+                      <span class="text-muted">Sin asistentes.</span>
+                    {% endfor %}
+                  </div>
+                </div>
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="text-center text-muted">Sin sesiones registradas.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted">Sin sesiones registradas.</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      {% include "webapp/pagination.html" with page_obj=sesiones %}
     </div>
   </div>
 </div>
 {% endblock %}
 {% block extra_js %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
     const input = document.getElementById("estudiantes_search");
@@ -150,6 +288,74 @@
         opt.hidden = term && !text.includes(term);
       });
     });
+  })();
+  (function () {
+    const table = document.getElementById("tabla-sesiones");
+    if (!table || !window.jQuery) return;
+    const dt = jQuery(table).DataTable({
+      paging: true,
+      pageLength: 20,
+      order: [[2, "desc"]],
+      stateSave: true,
+      language: {
+        search: "Buscar",
+        lengthMenu: "Mostrar _MENU_",
+        info: "Mostrando _START_ a _END_ de _TOTAL_",
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+      },
+    });
+
+    const filtroOrganizacion = document.getElementById("filtro-organizacion");
+    const filtroDisciplina = document.getElementById("filtro-disciplina");
+    const filtroProfesor = document.getElementById("filtro-profesor");
+    const filtroFecha = document.getElementById("filtro-fecha");
+    const limpiarFiltros = document.getElementById("limpiar-filtros");
+
+    if (filtroOrganizacion) {
+      filtroOrganizacion.value = dt.column(0).search() || "";
+      filtroOrganizacion.addEventListener("change", function () {
+        dt.column(0).search(this.value).draw();
+      });
+    }
+    if (filtroDisciplina) {
+      filtroDisciplina.value = dt.column(1).search() || "";
+      filtroDisciplina.addEventListener("change", function () {
+        dt.column(1).search(this.value).draw();
+      });
+    }
+    if (filtroProfesor) {
+      filtroProfesor.value = dt.column(2).search() || "";
+      filtroProfesor.addEventListener("change", function () {
+        dt.column(2).search(this.value).draw();
+      });
+    }
+    if (filtroFecha) {
+      const savedDate = dt.column(3).search();
+      if (savedDate && savedDate.includes("/")) {
+        const parts = savedDate.split("/");
+        filtroFecha.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      filtroFecha.addEventListener("change", function () {
+        const val = this.value;
+        if (!val) {
+          dt.column(3).search("").draw();
+          return;
+        }
+        const parts = val.split("-");
+        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        dt.column(3).search(formatted).draw();
+      });
+    }
+    if (limpiarFiltros) {
+      limpiarFiltros.addEventListener("click", function () {
+        if (filtroOrganizacion) filtroOrganizacion.value = "";
+        if (filtroDisciplina) filtroDisciplina.value = "";
+        if (filtroProfesor) filtroProfesor.value = "";
+        if (filtroFecha) filtroFecha.value = "";
+        dt.columns().search("").draw();
+      });
+    }
   })();
 </script>
 {% endblock %}

@@ -3,64 +3,63 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Sesiones</h2>
-    <div>
-      <a class="btn btn-outline-primary me-2" href="{% url 'webapp:sesion_rapida' %}">Sesion rapida</a>
-    </div>
+    <h2>Sesiones - {{ mes_actual|date:"F Y" }}</h2>
+    <a class="btn btn-outline-primary" href="{% url 'webapp:sesion_rapida' %}">
+      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesion</span>
+    </a>
   </div>
-  <form class="row g-3 mb-3">
-    <div class="col-md-4">
-      <label class="form-label">Disciplina</label>
-      <select name="disciplina" class="form-select" onchange="this.form.submit()">
-        <option value="">Todas</option>
-        {% for disciplina in disciplinas %}
-          <option value="{{ disciplina.id }}" {% if disciplina.id|stringformat:'s' == request.GET.disciplina %}selected{% endif %}>{{ disciplina.nombre }}</option>
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-3">
+      <label class="form-label">Año</label>
+      <select name="year" class="form-select" onchange="this.form.submit()">
+        {% for y in years %}
+          <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Mes</label>
+      <select name="month" class="form-select" onchange="this.form.submit()">
+        {% for m in months %}
+          <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}</option>
         {% endfor %}
       </select>
     </div>
   </form>
-  <div class="card">
-    <div class="card-body table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Disciplina</th>
-            <th>Profesores</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for sesion in sesiones %}
-          <tr>
-            <td>{{ sesion.fecha }}</td>
-            <td>{{ sesion.disciplina }}</td>
-            <td>
-              {% if sesion.profesores.all %}
-                <div class="text-muted small">
-                  {% for profe in sesion.profesores.all %}
-                    {{ profe }}{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                </div>
-              {% else %}
-                <span class="text-muted">(sin asignar)</span>
-              {% endif %}
-            </td>
-            <td>{{ sesion.get_estado_display }}</td>
-            <td>
-              <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_asistencia' sesion.pk %}">Asistencia</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">No hay sesiones registradas.</td></tr>
+  <div class="table-responsive">
+    <table class="table table-bordered align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Lunes</th>
+          <th>Martes</th>
+          <th>Miercoles</th>
+          <th>Jueves</th>
+          <th>Viernes</th>
+          <th>Sabado</th>
+          <th>Domingo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for semana in semanas %}
+        <tr style="height: 140px;">
+          {% for dia in semana %}
+          <td class="position-relative {% if not dia.en_mes %}bg-light text-muted{% endif %}">
+            <div class="position-absolute top-0 start-0 m-2 fw-bold fs-6">{{ dia.fecha|date:"d" }}</div>
+            <div class="pt-4">
+            {% for sesion in dia.sesiones %}
+              <div class="mb-2">
+                <a class="badge text-bg-primary text-decoration-none" href="{% url 'webapp:sesion_detail' sesion.pk %}">{{ sesion.disciplina }}</a>
+              </div>
+            {% empty %}
+              <div class="text-muted small">Sin sesiones</div>
+            {% endfor %}
+            </div>
+          </td>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="card-footer">
-      {% include "webapp/pagination.html" with page_obj=sesiones %}
-    </div>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

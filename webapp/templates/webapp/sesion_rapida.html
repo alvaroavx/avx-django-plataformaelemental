@@ -11,7 +11,9 @@
           <label class="form-label" for="profesores_search">Buscar profesor</label>
           <input id="profesores_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
           {{ sesion_form.as_p }}
-          <button class="btn btn-primary" name="crear_sesion" type="submit">Crear sesion</button>
+          <button class="btn btn-primary" name="crear_sesion" type="submit">
+            <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesion</span>
+          </button>
         </form>
       </div>
     </div>
@@ -23,7 +25,9 @@
             {% csrf_token %}
             <input type="hidden" name="sesion_id" value="{{ sesion.pk }}">
             {{ asistencia_form.as_p }}
-            <button class="btn btn-success" name="agregar_asistencia" type="submit">Agregar asistencia</button>
+            <button class="btn btn-success" name="agregar_asistencia" type="submit">
+              <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar asistencia</span>
+            </button>
           </form>
         </div>
       </div>
