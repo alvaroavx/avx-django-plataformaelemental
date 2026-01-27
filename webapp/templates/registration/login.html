@@ -1,22 +1,155 @@
 {% extends "webapp/base_app.html" %}
 {% block title %}Ingresar{% endblock %}
+{% block extra_head %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@300;500;700&family=Manrope:wght@300;400;600;700&display=swap');
+  .login-hero {
+    background:
+      radial-gradient(circle at 20% 20%, rgba(246, 242, 236, 0.9), rgba(255, 255, 255, 0.95)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 248, 248, 0.85));
+    position: relative;
+    overflow: hidden;
+  }
+  .login-hero::before,
+  .login-hero::after {
+    content: "";
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    opacity: 0.12;
+    filter: blur(2px);
+  }
+  .login-hero::before {
+    top: -80px;
+    right: -80px;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 120, 80, 0.6), rgba(255, 120, 80, 0.05));
+  }
+  .login-hero::after {
+    bottom: -90px;
+    left: -60px;
+    background: radial-gradient(circle at 30% 30%, rgba(90, 150, 120, 0.6), rgba(90, 150, 120, 0.05));
+  }
+  .login-card {
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+    background: rgba(255, 255, 255, 0.96);
+  }
+  .login-badge {
+    background: #111;
+    color: #fff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    display: inline-block;
+    font-family: "Manrope", sans-serif;
+  }
+  .login-title {
+    font-size: clamp(2rem, 3vw, 2.75rem);
+    font-weight: 700;
+    font-family: "Fraunces", serif;
+  }
+  .login-subtitle {
+    font-size: 1.05rem;
+    color: #6c757d;
+    font-family: "Manrope", sans-serif;
+  }
+  .login-body {
+    font-family: "Manrope", sans-serif;
+  }
+  .element-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    margin-top: 2rem;
+  }
+  .element-card {
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    background: rgba(255, 255, 255, 0.8);
+  }
+  .element-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: #6c757d;
+  }
+  .element-name {
+    font-family: "Fraunces", serif;
+    font-size: 1.05rem;
+    margin: 0.2rem 0 0.1rem;
+  }
+  .element-desc {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin: 0;
+  }
+</style>
+{% endblock %}
 {% block content %}
-<div class="container py-5" style="max-width: 420px;">
-  <h2 class="mb-3">Ingresar</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    <div class="mb-3">
-      <label class="form-label" for="id_username">Usuario</label>
-      {{ form.username }}
+<div class="login-hero py-5 login-body">
+  <div class="container">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-6">
+        <span class="login-badge">Espacio Elementos</span>
+        <h1 class="login-title mt-3 mb-3">Plataforma de gestión</h1>
+        <p class="lead login-subtitle">
+          Bienvenidos a la plataforma de gestión Elemental, un espacio pensado para la gestión de todo lo
+          que sucede en Espacio Elementos, ya sea deporte, cultura, movimiento y comunidad.
+        </p>
+        <p class="text-muted">
+          No es solo gimnasio ni solo centro cultural. Es una casa de movimiento, personas y
+          proyectos con impacto local. Aquí vienes a mejorar tu cuerpo y a la vez a compartir,
+          pertenecer y participar.
+        </p>
+        <p class="text-muted mb-0">
+          Esta plataforma sostiene esa experiencia con una gestión clara, humana y enfocada en lo esencial.
+        </p>
+        <div class="element-grid">
+          <div class="element-card">
+            <div class="element-name">Tierra</div>
+            <p class="element-desc">Enraíza fuerte: desde la base nace todo.</p>
+          </div>
+          <div class="element-card">
+            <div class="element-name">Agua</div>
+            <p class="element-desc">Fluye, adapta y vuelve a intentarlo.</p>
+          </div>
+          <div class="element-card">
+            <div class="element-name">Aire</div>
+            <p class="element-desc">Respira y expándete: lo liviano también es poderoso.</p>
+          </div>
+          <div class="element-card">
+            <div class="element-name">Fuego</div>
+            <p class="element-desc">Enciende tu energía: hoy te atreves un poco más.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card login-card p-4">
+          <h2 class="mb-3">Ingresar</h2>
+          <p class="text-muted mb-4">Accede para administrar clases, asistentes y pagos.</p>
+          <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <div class="mb-3">
+              <label class="form-label" for="id_username">Usuario</label>
+              {{ form.username }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="id_password">Contraseña</label>
+              {{ form.password }}
+            </div>
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="bi bi-box-arrow-in-right"></i><span class="d-none d-md-inline ms-1">Ingresar</span>
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
-    <div class="mb-3">
-      <label class="form-label" for="id_password">Contraseña</label>
-      {{ form.password }}
-    </div>
-    <button class="btn btn-primary w-100" type="submit">
-      <i class="bi bi-box-arrow-in-right"></i><span class="d-none d-md-inline ms-1">Ingresar</span>
-    </button>
-  </form>
+  </div>
 </div>
 {% endblock %}

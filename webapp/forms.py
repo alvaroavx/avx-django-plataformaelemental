@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
 from django.utils import timezone
 
 from academia.models import Disciplina, SesionClase
@@ -75,3 +76,14 @@ class PagoRapidoForm(forms.ModelForm):
     def clean_fecha_pago(self):
         fecha = self.cleaned_data.get("fecha_pago")
         return fecha or timezone.localdate()
+
+
+class CustomLoginForm(AuthenticationForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].widget.attrs.update(
+            {"class": "form-control", "placeholder": "usuario"}
+        )
+        self.fields["password"].widget.attrs.update(
+            {"class": "form-control", "placeholder": "••••••••"}
+        )

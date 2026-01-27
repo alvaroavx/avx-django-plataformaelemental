@@ -20,6 +20,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from django.views.generic import RedirectView
+
+from webapp.forms import CustomLoginForm
 from django.utils.translation import gettext_lazy as _
 
 admin.site.site_header = _("Administración Plataforma Elemental")
@@ -29,7 +31,15 @@ admin.site.index_title = _("Gestión de operaciones")
 urlpatterns = [
     path("", RedirectView.as_view(url="/app/", permanent=False)),
     path("admin/", admin.site.urls),
-    path("accounts/login/", auth_views.LoginView.as_view(), name="login"),
+    path(
+        "accounts/login/",
+        auth_views.LoginView.as_view(
+            extra_context={"hide_nav": True},
+            authentication_form=CustomLoginForm,
+            template_name="registration/login.html",
+        ),
+        name="login",
+    ),
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += [
