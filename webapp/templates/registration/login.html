@@ -1,0 +1,22 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Ingresar{% endblock %}
+{% block content %}
+<div class="container py-5" style="max-width: 420px;">
+  <h2 class="mb-3">Ingresar</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="mb-3">
+      <label class="form-label" for="id_username">Usuario</label>
+      {{ form.username }}
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="id_password">Contraseña</label>
+      {{ form.password }}
+    </div>
+    <button class="btn btn-primary w-100" type="submit">
+      <i class="bi bi-box-arrow-in-right"></i><span class="d-none d-md-inline ms-1">Ingresar</span>
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -18,7 +18,10 @@ Plataforma administrativa para Espacio Elementos construida con Django + Django 
    python manage.py runserver
    ```
    - Django Admin: `http://127.0.0.1:8000/admin/`
+   - Login: `http://127.0.0.1:8000/accounts/login/`
    - App Web: `http://127.0.0.1:8000/app/`
+
+La ruta `/` redirige automaticamente a `/app/`. El login redirige a `/app/` y el logout vuelve a `/accounts/login/`.
 
 El proyecto usa locale `es-cl` y zona horaria `America/Santiago`. Los comprobantes subidos se almacenan en `media/comprobantes/`.
 
@@ -44,6 +47,10 @@ Notas operativas:
 - La asistencia puede registrarse sin suscripcion activa. Los pagos pueden registrarse despues.
 - En sesiones se usa un solo campo de profesores (seleccion multiple).
 - El nombre automatico de sesion se arma como `Disciplina - Fecha`.
+- La UI usa Bootstrap 5, Bootstrap Icons y DataTables via CDN (no requiere dependencias extra en `requirements.txt`).
+
+## Variables de entorno (dev)
+Si quieres un punto de partida rapido, puedes copiar `.env.dev` y ajustar `DJANGO_SECRET_KEY`.
 
 ## Comando de trabajo Codex
 Comando habitual:

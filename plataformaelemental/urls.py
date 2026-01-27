@@ -15,9 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
+from django.views.generic import RedirectView
 from django.utils.translation import gettext_lazy as _
 
 admin.site.site_header = _("Administración Plataforma Elemental")
@@ -25,7 +27,9 @@ admin.site.site_title = _("Panel de control")
 admin.site.index_title = _("Gestión de operaciones")
 
 urlpatterns = [
+    path("", RedirectView.as_view(url="/app/", permanent=False)),
     path("admin/", admin.site.urls),
+    path("accounts/login/", auth_views.LoginView.as_view(), name="login"),
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += [
