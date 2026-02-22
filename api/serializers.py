@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from academia.models import SesionClase
 from asistencias.models import Asistencia
-from cobros.models import Suscripcion
 from cuentas.models import Persona
 
 
@@ -43,15 +42,8 @@ class EstudianteSerializer(serializers.ModelSerializer):
 class EstadoEstudianteSerializer(serializers.Serializer):
     persona = EstudianteSerializer()
     plan = serializers.CharField()
-    clases_asignadas = serializers.IntegerField()
+    clases_total = serializers.IntegerField()
     clases_usadas = serializers.IntegerField()
-    clases_sobreconsumo = serializers.IntegerField()
-    saldo_pendiente = serializers.DecimalField(max_digits=12, decimal_places=2)
+    clases_restantes = serializers.IntegerField()
+    pendientes = serializers.IntegerField()
 
-
-class SuscripcionSerializer(serializers.ModelSerializer):
-    plan = serializers.StringRelatedField()
-
-    class Meta:
-        model = Suscripcion
-        fields = ["id", "plan", "fecha_inicio", "fecha_fin", "estado"]

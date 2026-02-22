@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from academia.models import SesionClase
 from asistencias.models import Asistencia
-from cobros.models import Suscripcion
+from cobros.models import Pago
 from cuentas.models import Persona
 from finanzas.models import MovimientoCaja
 
@@ -151,6 +151,11 @@ class SesionViewSet(viewsets.ReadOnlyModelViewSet):
             persona=persona,
             defaults=payload,
         )
+        if asistencia.pago_plan_id is None:
+            pago_plan = Pago.asignar_plan_para_asistencia(persona, sesion.fecha)
+            if pago_plan:
+                asistencia.pago_plan = pago_plan
+                asistencia.save(update_fields=["pago_plan"])
         return Response(AsistenciaSerializer(asistencia).data, status=status.HTTP_201_CREATED)
 
 
@@ -159,22 +164,40 @@ class EstudianteViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return Persona.objects.filter(
-            Q(roles__rol__codigo="ESTUDIANTE") | Q(suscripciones__isnull=False)
+            Q(roles__rol__codigo="ESTUDIANTE") | Q(pagos__plan__isnull=False)
         ).distinct()
 
     @action(detail=True, methods=["get"], url_path="estado")
     def estado(self, request, pk=None):
         persona = self.get_object()
-        suscripcion = persona.suscripciones.order_by("-fecha_inicio").first()
-        if not suscripcion:
-            return Response({"detail": "Sin suscripción"}, status=status.HTTP_404_NOT_FOUND)
+        hoy = timezone.localdate()
+        pagos_plan = list(
+            persona.pagos.filter(tipo=Pago.Tipo.PLAN)
+            .select_related("plan")
+            .filter(plan__isnull=False)
+            .order_by("-fecha_pago")
+        )
+        pago_activo = next((p for p in pagos_plan if p.vigente_en(hoy)), None)
+        if not pago_activo:
+            return Response({"detail": "Sin pago de plan vigente"}, status=status.HTTP_404_NOT_FOUND)
+        asistencias = Asistencia.objects.filter(persona=persona, sesion__fecha__gte=pago_activo.fecha_pago)
+        pagos_clase_ids = set(
+            Pago.objects.filter(
+                persona=persona,
+                tipo=Pago.Tipo.CLASE,
+                sesion__fecha__gte=pago_activo.fecha_pago,
+            ).values_list("sesion_id", flat=True)
+        )
+        pendientes = asistencias.filter(pago_plan__isnull=True).exclude(
+            sesion_id__in=pagos_clase_ids
+        ).count()
         data = {
             "persona": EstudianteSerializer(persona).data,
-            "plan": str(suscripcion.plan),
-            "clases_asignadas": suscripcion.clases_asignadas(),
-            "clases_usadas": suscripcion.clases_usadas(),
-            "clases_sobreconsumo": suscripcion.clases_sobreconsumo(),
-            "saldo_pendiente": suscripcion.saldo_pendiente(),
+            "plan": str(pago_activo.plan),
+            "clases_total": pago_activo.clases_total or 0,
+            "clases_usadas": pago_activo.clases_usadas or 0,
+            "clases_restantes": pago_activo.clases_restantes(),
+            "pendientes": pendientes,
         }
         serializer = EstadoEstudianteSerializer(data)
         return Response(serializer.data)

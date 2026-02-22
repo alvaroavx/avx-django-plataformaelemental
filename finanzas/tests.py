@@ -56,9 +56,9 @@ class LiquidacionProfesorTests(TestCase):
         )
         total_asistencias = liquidacion.calcular_totales()
         self.assertEqual(total_asistencias, 1)
-        self.assertEqual(liquidacion.monto_total, Decimal("5000"))
-        self.assertAlmostEqual(liquidacion.monto_retencion, Decimal("725.0"))
-        self.assertAlmostEqual(liquidacion.monto_neto, Decimal("4275.0"))
+        self.assertEqual(liquidacion.monto_total, Decimal("3800.00"))
+        self.assertAlmostEqual(liquidacion.monto_retencion, Decimal("551.00"))
+        self.assertAlmostEqual(liquidacion.monto_neto, Decimal("3249.00"))
 
 
 class MovimientoCajaTests(TestCase):

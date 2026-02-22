@@ -1,7 +1,6 @@
 import math
+from datetime import timedelta
 from decimal import Decimal
-
-from django.apps import apps
 from django.db import models
 from django.utils import timezone
 
@@ -17,6 +16,7 @@ class Plan(models.Model):
     precio = models.DecimalField(max_digits=10, decimal_places=2)
     duracion_dias = models.PositiveIntegerField(default=30)
     clases_por_semana = models.PositiveIntegerField(default=1)
+    clases_por_mes = models.PositiveIntegerField(default=4)
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
@@ -55,103 +55,6 @@ class ConvenioIntercambio(models.Model):
         return self.nombre
 
 
-class Suscripcion(models.Model):
-    class Estado(models.TextChoices):
-        ACTIVA = "activa", "Activa"
-        CONGELADA = "congelada", "Congelada"
-        FINALIZADA = "finalizada", "Finalizada"
-
-    persona = models.ForeignKey(
-        "cuentas.Persona",
-        on_delete=models.CASCADE,
-        related_name="suscripciones",
-    )
-    plan = models.ForeignKey(
-        Plan,
-        on_delete=models.PROTECT,
-        related_name="suscripciones",
-    )
-    convenios = models.ManyToManyField(
-        ConvenioIntercambio,
-        blank=True,
-        related_name="suscripciones",
-    )
-    fecha_inicio = models.DateField()
-    fecha_fin = models.DateField(null=True, blank=True)
-    monto_pactado = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    descuento_monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    estado = models.CharField(
-        max_length=20,
-        choices=Estado.choices,
-        default=Estado.ACTIVA,
-    )
-    notas = models.TextField(blank=True)
-    creada_en = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "Suscripcion"
-        verbose_name_plural = "Suscripciones"
-        ordering = ["-fecha_inicio"]
-
-    def __str__(self) -> str:
-        return f"{self.persona} - {self.plan}"
-
-    def _fecha_fin_real(self):
-        return self.fecha_fin or timezone.now().date()
-
-    def dias_periodo(self):
-        delta = (self._fecha_fin_real() - self.fecha_inicio).days + 1
-        return max(1, delta)
-
-    def clases_asignadas(self):
-        return self.plan.clases_asignadas_para_periodo(self.dias_periodo())
-
-    def asistencias_periodo(self):
-        Asistencia = apps.get_model("asistencias", "Asistencia")
-        return Asistencia.objects.filter(
-            persona=self.persona,
-            sesion__fecha__gte=self.fecha_inicio,
-            sesion__fecha__lte=self._fecha_fin_real(),
-        )
-
-    def clases_usadas(self):
-        return self.asistencias_periodo().filter(convenio__isnull=True).count()
-
-    def clases_disponibles(self):
-        return max(0, self.clases_asignadas() - self.clases_usadas())
-
-    def clases_sobreconsumo(self):
-        excedente = self.clases_usadas() - self.clases_asignadas()
-        return max(0, excedente)
-
-    def pagos_registrados(self):
-        Pago = apps.get_model("cobros", "Pago")
-        pagos_qs = Pago.objects.filter(
-            models.Q(persona=self.persona)
-            | models.Q(suscripcion=self)
-            | models.Q(documento__suscripcion=self)
-        ).distinct()
-        pagos_qs = pagos_qs.exclude(tipo=Pago.Tipo.CLASE)
-        return sum(
-            (pago.monto for pago in pagos_qs),
-            Decimal("0"),
-        )
-
-    def monto_objetivo(self):
-        base = self.monto_pactado if self.monto_pactado is not None else self.plan.precio
-        if self.descuento_porcentaje:
-            descuento = (base * (Decimal(self.descuento_porcentaje) / Decimal("100"))).quantize(Decimal("0.01"))
-        else:
-            descuento = Decimal(self.descuento_monto or 0)
-        total = base - descuento
-        return total if total > 0 else Decimal("0")
-
-    def saldo_pendiente(self):
-        saldo = self.monto_objetivo() - self.pagos_registrados()
-        return saldo if saldo > 0 else Decimal("0")
-
-
 class DocumentoVenta(models.Model):
     class Estado(models.TextChoices):
         BORRADOR = "borrador", "Borrador"
@@ -163,13 +66,6 @@ class DocumentoVenta(models.Model):
         "organizaciones.Organizacion",
         on_delete=models.CASCADE,
         related_name="documentos_venta",
-    )
-    suscripcion = models.ForeignKey(
-        Suscripcion,
-        on_delete=models.SET_NULL,
-        related_name="documentos",
-        null=True,
-        blank=True,
     )
     numero = models.CharField(max_length=50)
     fecha_emision = models.DateField()
@@ -192,7 +88,7 @@ class DocumentoVenta(models.Model):
 
 class Pago(models.Model):
     class Tipo(models.TextChoices):
-        SUSCRIPCION = "suscripcion", "Suscripcion"
+        PLAN = "plan", "Plan"
         CLASE = "clase", "Clase"
         OTRO = "otro", "Otro"
 
@@ -208,8 +104,8 @@ class Pago(models.Model):
         null=True,
         blank=True,
     )
-    suscripcion = models.ForeignKey(
-        Suscripcion,
+    plan = models.ForeignKey(
+        Plan,
         on_delete=models.SET_NULL,
         related_name="pagos",
         null=True,
@@ -229,8 +125,18 @@ class Pago(models.Model):
         null=True,
         blank=True,
     )
-    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.SUSCRIPCION)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.PLAN)
     fecha_pago = models.DateField()
+    paid_at = models.DateTimeField(default=timezone.now)
+    ciclo_start = models.DateTimeField(null=True, blank=True)
+    ciclo_end = models.DateTimeField(null=True, blank=True)
+    carryover_approved = models.BooleanField(default=False)
+    freeze_days = models.PositiveIntegerField(default=0)
+    valido_hasta = models.DateField(null=True, blank=True)
+    clases_total = models.PositiveIntegerField(null=True, blank=True)
+    clases_usadas = models.PositiveIntegerField(default=0)
+    precio_lista_referencia = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    tarifa_clase_personalizada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     metodo = models.CharField(max_length=20, choices=Metodo.choices)
     referencia = models.CharField(max_length=100, blank=True)
@@ -244,3 +150,116 @@ class Pago(models.Model):
 
     def __str__(self) -> str:
         return f"{self.monto} - {self.persona or self.documento}"
+
+    def es_plan(self):
+        return self.tipo == self.Tipo.PLAN
+
+    def clases_restantes(self):
+        if not self.es_plan() and self.tipo != self.Tipo.CLASE:
+            return 0
+        total = self.clases_total or 0
+        return max(0, total - (self.clases_usadas or 0))
+
+    def vigente_en(self, fecha=None):
+        if not self.es_plan() and self.tipo != self.Tipo.CLASE:
+            return False
+        fecha = fecha or timezone.localdate()
+        if self.valido_hasta:
+            return self.fecha_pago <= fecha <= self.valido_hasta
+        return self.fecha_pago <= fecha
+
+    def save(self, *args, **kwargs):
+        if self.es_plan() or self.tipo == self.Tipo.CLASE:
+            if not self.paid_at:
+                self.paid_at = timezone.now()
+            if self.es_plan() and not self.precio_lista_referencia and self.plan:
+                self.precio_lista_referencia = self.plan.precio
+            if self.tipo == self.Tipo.CLASE and not self.precio_lista_referencia:
+                self.precio_lista_referencia = Decimal("9000")
+            if not self.ciclo_start:
+                self.ciclo_start = self.paid_at
+            if not self.ciclo_end and self.ciclo_start:
+                dias = self.plan.duracion_dias if self.plan and self.plan.duracion_dias else 30
+                dias += self.freeze_days or 0
+                self.ciclo_end = self.ciclo_start + timedelta(days=dias)
+            if not self.valido_hasta and self.fecha_pago:
+                dias = self.plan.duracion_dias if self.plan and self.plan.duracion_dias else 30
+                dias += self.freeze_days or 0
+                self.valido_hasta = self.fecha_pago + timedelta(days=dias)
+            if self.clases_total is None:
+                if self.es_plan() and self.plan:
+                    self.clases_total = self.plan.clases_por_mes
+                elif self.tipo == self.Tipo.CLASE:
+                    self.clases_total = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def asignar_plan_para_asistencia(cls, persona, fecha):
+        from .services import imputar_asistencia
+
+        asistencia = (
+            persona.asistencias.filter(sesion__fecha=fecha)
+            .select_related("sesion", "sesion__disciplina")
+            .order_by("-id")
+            .first()
+        )
+        if asistencia:
+            imputar_asistencia(asistencia)
+            return asistencia.pago_plan
+        pagos_qs = (
+            cls.objects.filter(
+                persona=persona,
+                tipo__in=[cls.Tipo.PLAN, cls.Tipo.CLASE],
+                fecha_pago__lte=fecha,
+            )
+            .exclude(valido_hasta__lt=fecha)
+            .order_by("fecha_pago", "id")
+        )
+        for pago in pagos_qs:
+            if pago.clases_restantes() > 0:
+                pago.clases_usadas = (pago.clases_usadas or 0) + 1
+                pago.save(update_fields=["clases_usadas"])
+                return pago
+        return None
+
+
+class CondicionCobroPersona(models.Model):
+    class Tipo(models.TextChoices):
+        NORMAL = "normal", "Normal"
+        CLASE_ESPECIAL = "clase_especial", "Clase especial"
+        BECA = "beca", "Beca"
+
+    persona = models.ForeignKey(
+        "cuentas.Persona",
+        on_delete=models.CASCADE,
+        related_name="condiciones_cobro",
+    )
+    organizacion = models.ForeignKey(
+        "organizaciones.Organizacion",
+        on_delete=models.CASCADE,
+        related_name="condiciones_cobro_persona",
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.NORMAL)
+    tarifa_clase_especial = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    vigente_desde = models.DateField()
+    vigente_hasta = models.DateField(null=True, blank=True)
+    activo = models.BooleanField(default=True)
+    observaciones = models.CharField(max_length=255, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Condicion de cobro persona"
+        verbose_name_plural = "Condiciones de cobro persona"
+        ordering = ["-vigente_desde", "-id"]
+
+    def __str__(self):
+        return f"{self.persona} - {self.get_tipo_display()} ({self.organizacion})"
+
+    def vigente_en(self, fecha):
+        if not self.activo:
+            return False
+        if self.vigente_desde and fecha < self.vigente_desde:
+            return False
+        if self.vigente_hasta and fecha > self.vigente_hasta:
+            return False
+        return True

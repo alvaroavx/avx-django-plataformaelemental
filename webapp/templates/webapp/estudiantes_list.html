@@ -7,6 +7,7 @@
   </div>
   <div class="card mb-3">
     <div class="card-body">
+      <div id="buscador-estudiantes" class="mb-3"></div>
       <div class="row g-2">
         <div class="col-md-3">
           <label class="form-label">Organizacion</label>
@@ -48,7 +49,8 @@
           <th>Nombre</th>
           <th>Plan</th>
           <th>Clases usadas</th>
-          <th>Saldo</th>
+          <th>Clases restantes</th>
+          <th>Pendientes</th>
           <th>Estado</th>
           <th></th>
         </tr>
@@ -57,7 +59,7 @@
         {% for item in estudiantes %}
         <tr>
           <td>
-            {{ item.persona }}
+            <a href="{% url 'webapp:persona_detail' item.persona.pk %}">{{ item.persona }}</a>
             {% for rol in item.persona.roles.all %}
               {% if rol.rol.codigo == "ESTUDIANTE" %}
                 <span class="badge text-bg-light ms-1">{{ rol.organizacion.nombre }}</span>
@@ -65,16 +67,17 @@
             {% endfor %}
           </td>
           <td>
-            {% if item.suscripcion %}
-              {{ item.suscripcion.plan }}
+            {% if item.plan_pago %}
+              {{ item.plan_pago.plan }}
             {% else %}
               Sin plan
             {% endif %}
           </td>
           <td>{{ item.clases_usadas }}</td>
-          <td>${{ item.saldo_pendiente }}</td>
+          <td>{{ item.clases_restantes }}</td>
+          <td>{{ item.pendientes }}</td>
           <td>
-            {% if item.saldo_pendiente|floatformat:0 > 0 %}
+            {% if item.pendientes|floatformat:0 > 0 %}
               <span class="badge text-bg-warning">Moroso</span>
             {% else %}
               <span class="badge text-bg-success">Al dia</span>
@@ -87,7 +90,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -108,6 +111,7 @@
       pageLength: 25,
       order: [[1, "asc"]],
       stateSave: true,
+      dom: "<'row'<'col-12'f>>rt<'row'<'col-12 col-md-6'i><'col-12 col-md-6'p>>",
       language: {
         search: "Buscar",
         lengthMenu: "Mostrar _MENU_",
@@ -116,6 +120,17 @@
         zeroRecords: "Sin registros",
       },
     });
+    const buscador = document.getElementById("buscador-estudiantes");
+    if (buscador) {
+      const filtro = table.closest(".dataTables_wrapper").querySelector(".dataTables_filter");
+      if (filtro) {
+        filtro.classList.add("mb-0");
+        filtro.querySelector("label").classList.add("w-100");
+        filtro.querySelector("input").classList.add("form-control");
+        filtro.querySelector("input").setAttribute("placeholder", "Buscar estudiante");
+        buscador.appendChild(filtro);
+      }
+    }
 
     const filtroOrganizacion = document.getElementById("filtro-organizacion");
     const filtroPlan = document.getElementById("filtro-plan");
@@ -129,15 +144,28 @@
       });
     }
     if (filtroPlan) {
-      filtroPlan.value = dt.column(1).search() || "";
+      const planSearch = dt.column(1).search() || "";
+      if (planSearch === "^(?!Sin plan$).*$") {
+        filtroPlan.value = "Con plan";
+      } else if (planSearch === "^Sin plan$") {
+        filtroPlan.value = "Sin plan";
+      } else {
+        filtroPlan.value = "";
+      }
       filtroPlan.addEventListener("change", function () {
-        dt.column(1).search(this.value).draw();
+        if (this.value === "Con plan") {
+          dt.column(1).search("^(?!Sin plan$).*$", true, false).draw();
+        } else if (this.value === "Sin plan") {
+          dt.column(1).search("^Sin plan$", true, false).draw();
+        } else {
+          dt.column(1).search("").draw();
+        }
       });
     }
     if (filtroMoroso) {
-      filtroMoroso.value = dt.column(4).search() || "";
+      filtroMoroso.value = dt.column(5).search() || "";
       filtroMoroso.addEventListener("change", function () {
-        dt.column(4).search(this.value).draw();
+        dt.column(5).search(this.value).draw();
       });
     }
     if (limpiar) {

@@ -1,5 +1,5 @@
 {% extends "webapp/base_app.html" %}
-{% block title %}Perfil persona{% endblock %}
+{% block title %}Perfil {{ persona }}{% endblock %}
 {% block content %}
 <div class="mt-4">
   <div class="mb-2">
@@ -149,55 +149,116 @@
       </div>
 
       <div class="card mb-3">
-        <div class="card-header">Suscripciones</div>
-        <div class="card-body table-responsive">
-          {% if suscripciones %}
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Gestion de pagos</span>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#gestionPagos" id="btn-gestion-pagos">
+            <i class="bi bi-chevron-down"></i><span class="d-none d-md-inline ms-1" id="texto-gestion-pagos">Mostrar</span>
+          </button>
+        </div>
+        <div class="card-body table-responsive collapse" id="gestionPagos">
+          <form method="post" class="row g-2 mb-3" id="form-pago-plan">
+            {% csrf_token %}
+            <div class="col-md-4">
+              <label class="form-label">Tipo</label>
+              {{ pago_persona_form.tipo }}
+            </div>
+            <div class="col-md-2" data-field="plan-only">
+              <label class="form-label">Plan</label>
+              <select name="plan" class="form-select" id="id_plan_pago">
+                <option value="">-</option>
+                {% with plan_seleccionado=pago_persona_form.plan.value|default_if_none:'' %}
+                {% for plan in planes_persona_qs %}
+                  <option value="{{ plan.id }}"
+                          {% if plan_seleccionado == plan.id|stringformat:"s" %}selected{% endif %}
+                          data-precio="{{ plan.precio }}"
+                          data-clases="{{ plan.clases_por_mes }}"
+                          data-duracion="{{ plan.duracion_dias }}">
+                    {{ plan.nombre }}
+                  </option>
+                {% endfor %}
+                {% endwith %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Fecha pago</label>
+              {{ pago_persona_form.fecha_pago }}
+            </div>
+            <div class="col-md-2" data-field="plan-or-class">
+              <label class="form-label">Válido hasta</label>
+              <input type="text" class="form-control" id="pago_valido_hasta" readonly>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Monto</label>
+              {{ pago_persona_form.monto }}
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Método</label>
+              {{ pago_persona_form.metodo }}
+            </div>
+            <div class="col-md-2" data-field="plan-or-class">
+              <label class="form-label">Clases</label>
+              {{ pago_persona_form.clases_total }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Referencia</label>
+              {{ pago_persona_form.referencia }}
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary btn-sm" name="registrar_pago_persona" type="submit">
+                <i class="bi bi-plus-circle"></i><span class="d-none d-md-inline ms-1">Registrar pago</span>
+              </button>
+            </div>
+          </form>
+          {% if pagos_plan %}
           <div class="row g-2 mb-2">
             <div class="col-md-4">
               <label class="form-label">Plan</label>
-              <select id="filtro-suscripcion-plan" class="form-select form-select-sm">
+              <select id="filtro-plan-pago" class="form-select form-select-sm">
                 <option value="">Todos</option>
                 {% for p in planes_persona %}
                   <option value="{{ p }}">{{ p }}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Estado</label>
-              <select id="filtro-suscripcion-estado" class="form-select form-select-sm">
-                <option value="">Todos</option>
-                {% for value, label in suscripcion_estados %}
-                  <option value="{{ label }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
           </div>
           {% endif %}
-          {% if suscripciones %}
-          <table id="tabla-suscripciones" class="table table-sm">
+          {% if pagos_plan %}
+          <table id="tabla-pagos-plan" class="table table-sm">
             <thead>
               <tr>
                 <th>Plan</th>
-                <th>Inicio</th>
-                <th>Fin</th>
-                <th>Estado</th>
+                <th>Fecha pago</th>
+                <th>Válido hasta</th>
+                <th>Clases total</th>
+                <th>Usadas</th>
+                <th>Restantes</th>
                 <th>Monto</th>
+                <th>Estado</th>
               </tr>
             </thead>
             <tbody>
-              {% for suscripcion in suscripciones %}
+              {% for pago in pagos_plan %}
               <tr>
-                <td>{{ suscripcion.plan }}</td>
-                <td>{{ suscripcion.fecha_inicio|date:"d/m/Y" }}</td>
-                <td>{{ suscripcion.fecha_fin|default:"-" }}</td>
-                <td>{{ suscripcion.get_estado_display }}</td>
-                <td>${{ suscripcion.monto_objetivo }}</td>
+                <td>{{ pago.plan }}</td>
+                <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+                <td>{{ pago.valido_hasta|date:"d/m/Y" }}</td>
+                <td>{{ pago.clases_total }}</td>
+                <td>{{ pago.clases_usadas }}</td>
+                <td>{{ pago.clases_restantes }}</td>
+                <td>${{ pago.monto }}</td>
+                <td>
+                  {% if pago.vigente_en %}
+                    <span class="badge bg-success">Vigente</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Vencido</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
           {% else %}
-            <div class="text-muted">Sin suscripciones.</div>
+            <div class="text-muted">Sin pagos de plan.</div>
           {% endif %}
         </div>
       </div>
@@ -233,9 +294,11 @@
               <tr>
                 <th>Fecha</th>
                 <th>Tipo</th>
+                <th>Plan</th>
                 <th>Sesion</th>
                 <th>Monto</th>
                 <th>Metodo</th>
+                <th>Válido hasta</th>
               </tr>
             </thead>
             <tbody>
@@ -243,9 +306,11 @@
               <tr>
                 <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
                 <td>{{ pago.get_tipo_display }}</td>
+                <td>{{ pago.plan|default:"-" }}</td>
                 <td>{% if pago.sesion %}{{ pago.sesion.disciplina }} - {{ pago.sesion.fecha|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                 <td>${{ pago.monto }}</td>
                 <td>{{ pago.get_metodo_display }}</td>
+                <td>{% if pago.valido_hasta %}{{ pago.valido_hasta|date:"d/m/Y" }}{% else %}-{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -267,7 +332,10 @@
                 <th>Fecha</th>
                 <th>Organizacion</th>
                 <th>Disciplina</th>
+                <th>Estado</th>
                 <th>Asistentes</th>
+                <th class="d-none d-md-table-cell">Listado asistentes</th>
+                <th class="d-none d-md-table-cell">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -278,7 +346,41 @@
                 <td>
                   <a href="{% url 'webapp:sesion_detail' sesion.pk %}">{{ sesion.disciplina }}</a>
                 </td>
+                <td>
+                  {% if sesion.estado == "COMPLETADA" %}
+                    <span class="badge bg-success">Completada</span>
+                  {% elif sesion.estado == "CANCELADA" %}
+                    <span class="badge bg-danger">Cancelada</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Programada</span>
+                  {% endif %}
+                </td>
                 <td>{{ sesion.asistencias.count }}</td>
+                <td class="d-none d-md-table-cell">
+                  {% for asistencia in sesion.asistencias.all %}
+                    {{ asistencia.persona }}{% if not forloop.last %}, {% endif %}
+                  {% empty %}
+                    <span class="text-muted">Sin asistentes.</span>
+                  {% endfor %}
+                </td>
+                <td class="d-none d-md-table-cell">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'webapp:sesion_detail' sesion.pk %}">
+                    <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesión</span>
+                  </a>
+                  <a class="btn btn-sm btn-outline-success" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
+                    <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+                  </a>
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="sesion_id" value="{{ sesion.pk }}">
+                    <select name="estado" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                      {% for value, label in sesion.Estado.choices %}
+                        <option value="{{ value }}" {% if value == sesion.estado %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="hidden" name="cambiar_estado" value="1">
+                  </form>
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -346,7 +448,7 @@
       },
     };
     const dtAsistencias = jQuery("#tabla-asistencias").length ? jQuery("#tabla-asistencias").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
-    const dtSuscripciones = jQuery("#tabla-suscripciones").length ? jQuery("#tabla-suscripciones").DataTable({ ...opts, order: [[1, "desc"]] }) : null;
+    const dtPagosPlan = jQuery("#tabla-pagos-plan").length ? jQuery("#tabla-pagos-plan").DataTable({ ...opts, order: [[1, "desc"]] }) : null;
     const dtPagos = jQuery("#tabla-pagos").length ? jQuery("#tabla-pagos").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
     const dtSesionesProf = jQuery("#tabla-sesiones-profesor").length ? jQuery("#tabla-sesiones-profesor").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
     const dtFinanzasProf = jQuery("#tabla-finanzas-profesor").length ? jQuery("#tabla-finanzas-profesor").DataTable({ ...opts, order: [[0, "desc"]] }) : null;
@@ -370,16 +472,10 @@
       });
     }
 
-    const filtroPlan = document.getElementById("filtro-suscripcion-plan");
-    const filtroEstado = document.getElementById("filtro-suscripcion-estado");
-    if (dtSuscripciones && filtroPlan) {
-      filtroPlan.addEventListener("change", function () {
-        dtSuscripciones.column(0).search(this.value).draw();
-      });
-    }
-    if (dtSuscripciones && filtroEstado) {
-      filtroEstado.addEventListener("change", function () {
-        dtSuscripciones.column(3).search(this.value).draw();
+    const filtroPlanPago = document.getElementById("filtro-plan-pago");
+    if (dtPagosPlan && filtroPlanPago) {
+      filtroPlanPago.addEventListener("change", function () {
+        dtPagosPlan.column(0).search(this.value).draw();
       });
     }
 
@@ -392,7 +488,90 @@
     }
     if (dtPagos && filtroMetodo) {
       filtroMetodo.addEventListener("change", function () {
-        dtPagos.column(4).search(this.value).draw();
+        dtPagos.column(5).search(this.value).draw();
+      });
+    }
+
+    const planForm = document.getElementById("form-pago-plan");
+    if (planForm) {
+      const planSelect = planForm.querySelector("#id_plan_pago");
+      const montoInput = planForm.querySelector("[name='monto']");
+      const clasesInput = planForm.querySelector("[name='clases_total']");
+      const fechaInput = planForm.querySelector("[name='fecha_pago']");
+      const tipoSelect = planForm.querySelector("[name='tipo']");
+      const vencimientoInput = planForm.querySelector("#pago_valido_hasta");
+      const planOnly = planForm.querySelectorAll("[data-field='plan-only']");
+      const planOrClass = planForm.querySelectorAll("[data-field='plan-or-class']");
+      const sumarDias = (fechaStr, dias) => {
+        if (!fechaStr) return "";
+        const parts = fechaStr.split("-");
+        if (parts.length !== 3) return "";
+        const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        date.setDate(date.getDate() + Number(dias || 30));
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        return `${dd}/${mm}/${date.getFullYear()}`;
+      };
+      const setValores = () => {
+        if (!planSelect) return;
+        const option = planSelect.options[planSelect.selectedIndex];
+        const tipo = tipoSelect ? tipoSelect.value : "";
+        if (tipo === "clase") {
+          planOnly.forEach((el) => (el.style.display = "none"));
+          planOrClass.forEach((el) => (el.style.display = ""));
+          if (clasesInput) clasesInput.value = 1;
+          if (vencimientoInput) vencimientoInput.value = sumarDias(fechaInput ? fechaInput.value : "", 30);
+          return;
+        }
+        if (tipo === "otro") {
+          planOnly.forEach((el) => (el.style.display = "none"));
+          planOrClass.forEach((el) => (el.style.display = "none"));
+          if (vencimientoInput) vencimientoInput.value = "";
+          return;
+        }
+        planOnly.forEach((el) => (el.style.display = ""));
+        planOrClass.forEach((el) => (el.style.display = ""));
+        if (!option) return;
+        if (montoInput && option.dataset.precio) {
+          const raw = option.dataset.precio.trim();
+          const normalized = raw.replace(/\./g, "").replace(",", ".");
+          montoInput.value = normalized;
+        }
+        if (clasesInput && option.dataset.clases) clasesInput.value = option.dataset.clases;
+        if (vencimientoInput && fechaInput) {
+          const dias = option.dataset.duracion || 30;
+          vencimientoInput.value = sumarDias(fechaInput.value, dias);
+        }
+      };
+      if (planSelect) {
+        planSelect.addEventListener("change", setValores);
+        setValores();
+      }
+      if (fechaInput) {
+        fechaInput.addEventListener("change", setValores);
+      }
+      if (tipoSelect) {
+        tipoSelect.addEventListener("change", setValores);
+      }
+    }
+
+    const gestionPagos = document.getElementById("gestionPagos");
+    const btnGestion = document.getElementById("btn-gestion-pagos");
+    const textoGestion = document.getElementById("texto-gestion-pagos");
+    if (gestionPagos && btnGestion) {
+      const key = `gestionPagos-${window.location.pathname}`;
+      const estado = localStorage.getItem(key);
+      if (estado === "open") {
+        new bootstrap.Collapse(gestionPagos, { toggle: true });
+        if (textoGestion) textoGestion.textContent = "Ocultar";
+      }
+      gestionPagos.addEventListener("shown.bs.collapse", function () {
+        localStorage.setItem(key, "open");
+        if (textoGestion) textoGestion.textContent = "Ocultar";
+      });
+      gestionPagos.addEventListener("hidden.bs.collapse", function () {
+        localStorage.setItem(key, "closed");
+        if (textoGestion) textoGestion.textContent = "Mostrar";
       });
     }
   })();

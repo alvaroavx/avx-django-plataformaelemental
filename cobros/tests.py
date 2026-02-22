@@ -5,12 +5,13 @@ from django.test import TestCase
 
 from academia.models import Disciplina, SesionClase
 from asistencias.models import Asistencia
-from cobros.models import ConvenioIntercambio, Pago, Plan, Suscripcion
+from cobros.models import Pago, Plan
+from cobros.services import aplicar_pago_a_deudas
 from cuentas.models import Persona
 from organizaciones.models import Organizacion
 
 
-class SuscripcionClasesTests(TestCase):
+class PagoPlanClasesTests(TestCase):
     def setUp(self):
         self.organizacion = Organizacion.objects.create(
             nombre="Espacio Elementos",
@@ -24,58 +25,76 @@ class SuscripcionClasesTests(TestCase):
         )
         self.plan = Plan.objects.create(
             organizacion=self.organizacion,
-            nombre="Plan 2 clases",
+            nombre="Plan 4 clases",
             precio=Decimal("50000"),
-            duracion_dias=28,
-            clases_por_semana=2,
+            duracion_dias=30,
+            clases_por_semana=1,
+            clases_por_mes=4,
         )
         self.disciplina = Disciplina.objects.create(
             organizacion=self.organizacion,
             nombre="Lyra",
         )
-        self.suscripcion = Suscripcion.objects.create(
-            persona=self.persona,
-            plan=self.plan,
-            fecha_inicio=date.today() - timedelta(days=14),
-            fecha_fin=date.today() + timedelta(days=14),
-        )
-        self.convenio = ConvenioIntercambio.objects.create(
-            organizacion=self.organizacion,
-            nombre="Yoga Exchange",
-            descuento_porcentaje=Decimal("100.0"),
-            vigente_desde=date.today() - timedelta(days=30),
-        )
 
-    def _crear_sesion_y_asistencia(self, fecha, con_convenio=False):
+    def _crear_sesion_y_asistencia(self, fecha):
         sesion = SesionClase.objects.create(
             disciplina=self.disciplina,
             fecha=fecha,
         )
-        Asistencia.objects.create(
+        asistencia = Asistencia.objects.create(
             sesion=sesion,
             persona=self.persona,
-            convenio=self.convenio if con_convenio else None,
         )
+        return asistencia
 
-    def test_calculo_clases_asignadas_y_usadas(self):
-        # 4 semanas aprox => 8 clases asignadas
-        for offset in range(3):
-            self._crear_sesion_y_asistencia(date.today() - timedelta(days=offset))
-        # convenios no consumen saldo
-        self._crear_sesion_y_asistencia(date.today() - timedelta(days=5), con_convenio=True)
-
-        self.assertGreater(self.suscripcion.clases_asignadas(), 0)
-        self.assertEqual(self.suscripcion.clases_usadas(), 3)
-        self.assertEqual(self.suscripcion.clases_disponibles(), self.suscripcion.clases_asignadas() - 3)
-        self.assertEqual(self.suscripcion.clases_sobreconsumo(), 0)
-
-    def test_saldo_pendiente_considera_pagos(self):
-        Pago.objects.create(
+    def test_pago_plan_consumo_clases(self):
+        pago = Pago.objects.create(
             persona=self.persona,
-            suscripcion=self.suscripcion,
+            tipo=Pago.Tipo.PLAN,
+            plan=self.plan,
             fecha_pago=date.today(),
-            monto=Decimal("20000"),
+            monto=Decimal("50000"),
             metodo=Pago.Metodo.TRANSFERENCIA,
         )
-        saldo = self.suscripcion.saldo_pendiente()
-        self.assertEqual(saldo, Decimal("30000"))
+        asistencia = self._crear_sesion_y_asistencia(date.today())
+        pago.refresh_from_db()
+        self.assertEqual(pago.clases_total, 4)
+        self.assertEqual(pago.clases_usadas, 1)
+        self.assertEqual(pago.clases_restantes(), 3)
+        asistencia.refresh_from_db()
+        self.assertEqual(asistencia.estado_cobro, Asistencia.EstadoCobro.CUBIERTA)
+
+    def test_pago_plan_caducado_no_aplica(self):
+        Pago.objects.create(
+            persona=self.persona,
+            tipo=Pago.Tipo.PLAN,
+            plan=self.plan,
+            fecha_pago=date.today() - timedelta(days=40),
+            monto=Decimal("50000"),
+            metodo=Pago.Metodo.TRANSFERENCIA,
+        )
+        asistencia = self._crear_sesion_y_asistencia(date.today())
+        asistencia.refresh_from_db()
+        self.assertEqual(asistencia.estado_cobro, Asistencia.EstadoCobro.DEUDA)
+
+    def test_pago_posterior_cubre_deuda_fifo(self):
+        sesion_1 = SesionClase.objects.create(disciplina=self.disciplina, fecha=date.today() - timedelta(days=2))
+        sesion_2 = SesionClase.objects.create(disciplina=self.disciplina, fecha=date.today() - timedelta(days=1))
+        asistencia_1 = Asistencia.objects.create(sesion=sesion_1, persona=self.persona)
+        asistencia_2 = Asistencia.objects.create(sesion=sesion_2, persona=self.persona)
+        pago = Pago.objects.create(
+            persona=self.persona,
+            tipo=Pago.Tipo.PLAN,
+            plan=self.plan,
+            fecha_pago=date.today(),
+            monto=Decimal("50000"),
+            metodo=Pago.Metodo.TRANSFERENCIA,
+            clases_total=1,
+        )
+        aplicadas = aplicar_pago_a_deudas(self.persona, pago, lookback_days=90)
+        self.assertEqual(aplicadas, 1)
+
+        asistencia_1.refresh_from_db()
+        asistencia_2.refresh_from_db()
+        self.assertEqual(asistencia_1.estado_cobro, Asistencia.EstadoCobro.CUBIERTA)
+        self.assertEqual(asistencia_2.estado_cobro, Asistencia.EstadoCobro.DEUDA)

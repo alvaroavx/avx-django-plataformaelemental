@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from cobros.models import Plan, Suscripcion
+from cobros.models import Pago, Plan
 from cuentas.models import Persona
 from organizaciones.models import Organizacion
 
@@ -71,12 +71,19 @@ class Command(BaseCommand):
                         precio=0,
                         duracion_dias=30,
                         clases_por_semana=1,
+                        clases_por_mes=4,
                     )
-                fecha_inicio = data.get("Fecha de inicio") or timezone.localdate()
-                Suscripcion.objects.get_or_create(
+                fecha_pago = data.get("Fecha de inicio") or timezone.localdate()
+                Pago.objects.get_or_create(
                     persona=persona,
                     plan=plan,
-                    fecha_inicio=fecha_inicio,
-                    defaults={"fecha_fin": fecha_inicio, "estado": Suscripcion.Estado.ACTIVA},
+                    tipo=Pago.Tipo.PLAN,
+                    fecha_pago=fecha_pago,
+                    defaults={
+                        "monto": 0,
+                        "metodo": Pago.Metodo.EFECTIVO,
+                        "referencia": "ImportaciÃ³n inscripciones",
+                        "clases_total": plan.clases_por_mes,
+                    },
                 )
         self.stdout.write(f"Personas creadas: {creados}, actualizadas: {actualizados}")

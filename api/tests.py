@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -6,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from academia.models import Disciplina, SesionClase
 from asistencias.models import Asistencia
-from cobros.models import Plan, Suscripcion
+from cobros.models import Pago, Plan
 from cuentas.models import Persona
 from finanzas.models import MovimientoCaja
 from organizaciones.models import Organizacion
@@ -116,12 +117,15 @@ class ApiDataTests(APITestCase):
             precio=10000,
             duracion_dias=30,
             clases_por_semana=1,
+            clases_por_mes=4,
         )
-        self.suscripcion = Suscripcion.objects.create(
+        Pago.objects.create(
             persona=self.estudiante,
             plan=self.plan,
-            fecha_inicio="2025-01-01",
-            fecha_fin="2025-01-30",
+            tipo=Pago.Tipo.PLAN,
+            fecha_pago=timezone.localdate(),
+            monto=10000,
+            metodo=Pago.Metodo.TRANSFERENCIA,
         )
         self.disciplina = Disciplina.objects.create(
             organizacion=self.organizacion,
@@ -165,7 +169,7 @@ class ApiDataTests(APITestCase):
     def test_estado_estudiante(self):
         response = self.client.get(f"/api/estudiantes/{self.estudiante.pk}/estado/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("clases_asignadas", response.data)
+        self.assertIn("clases_total", response.data)
 
     def test_reporte_resumen(self):
         response = self.client.get("/api/reportes/resumen/")

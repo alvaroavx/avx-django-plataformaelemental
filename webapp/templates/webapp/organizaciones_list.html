@@ -1,0 +1,27 @@
+{% extends "webapp/base_app.html" %}
+{% block title %}Organizaciones{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2 class="mb-3">Organizaciones</h2>
+  <div class="row g-3">
+    {% for org in organizaciones %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h5 class="card-title">{{ org.nombre }}</h5>
+            <p class="card-text text-muted mb-1">{{ org.razon_social|default:"-" }}</p>
+            <p class="mb-1"><strong>RUT:</strong> {{ org.rut }}</p>
+            <p class="mb-1"><strong>Email:</strong> {{ org.email_contacto|default:"-" }}</p>
+            <p class="mb-1"><strong>Teléfono:</strong> {{ org.telefono_contacto|default:"-" }}</p>
+            <p class="mb-0"><strong>Dirección:</strong> {{ org.direccion|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-light border">Sin organizaciones registradas.</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

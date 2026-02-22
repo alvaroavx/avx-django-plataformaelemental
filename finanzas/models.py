@@ -5,7 +5,7 @@ from django.db import models
 
 IVA_RATE = Decimal("0.19")
 RETENCION_PROFESOR = Decimal("0.145")
-TARIFA_DEFECTO = Decimal("3743")
+TARIFA_DEFECTO = Decimal("3800")
 
 
 class TarifaPagoProfesor(models.Model):
@@ -97,23 +97,20 @@ class LiquidacionProfesor(models.Model):
 
     def calcular_totales(self):
         Asistencia = apps.get_model("asistencias", "Asistencia")
+        from cobros.services import factor_pago_profesor_asistencia
+
         asistencias_qs = Asistencia.objects.filter(
             models.Q(sesion__profesores=self.profesor),
             sesion__fecha__gte=self.periodo_inicio,
             sesion__fecha__lte=self.periodo_fin,
             sesion__disciplina__organizacion=self.organizacion,
-        ).select_related("sesion__disciplina").distinct()
+        ).select_related("sesion__disciplina", "pago_plan").distinct()
         total_asistencias = asistencias_qs.count()
-        primera_sesion = asistencias_qs.first()
-        tarifa = None
-        if primera_sesion:
-            tarifa = TarifaPagoProfesor.obtener_tarifa_para_fecha(
-                self.organizacion,
-                primera_sesion.sesion.disciplina,
-                primera_sesion.sesion.fecha,
-            )
-        monto_por_asistente = tarifa.monto_por_sesion if tarifa else TARIFA_DEFECTO
-        bruto = (monto_por_asistente * Decimal(total_asistencias)).quantize(Decimal("0.01"))
+        bruto = Decimal("0.00")
+        for asistencia in asistencias_qs:
+            factor = factor_pago_profesor_asistencia(asistencia)
+            bruto += (TARIFA_DEFECTO * Decimal(factor))
+        bruto = bruto.quantize(Decimal("0.01"))
         retencion = (bruto * RETENCION_PROFESOR).quantize(Decimal("0.01"))
         neto = (bruto - retencion).quantize(Decimal("0.01"))
         self.monto_total = bruto

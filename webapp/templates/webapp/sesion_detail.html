@@ -13,6 +13,9 @@
       <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
         <i class="bi bi-clipboard-check"></i><span class="d-none d-md-inline ms-1">Ir a asistencias</span>
       </a>
+      <a class="btn btn-outline-success btn-sm" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
+        <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+      </a>
     </div>
   </div>
   <div class="card mb-3">
@@ -42,6 +45,15 @@
           {% else %}
             <span class="badge text-bg-secondary">Cancelada</span>
           {% endif %}
+          <form method="post" class="mt-2">
+            {% csrf_token %}
+            <select name="estado" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+              {% for value, label in sesion.Estado.choices %}
+                <option value="{{ value }}" {% if value == sesion.estado %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="cambiar_estado" value="1">
+          </form>
           {% if sesion.cupo_maximo %}
             <div class="text-muted small mt-1">Cupo {{ sesion.cupo_maximo }}</div>
           {% endif %}

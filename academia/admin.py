@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from cuentas.models import Persona
+
 from .models import BloqueHorario, Disciplina, SesionClase
 
 
@@ -32,6 +34,15 @@ class SesionClaseAdmin(admin.ModelAdmin):
     autocomplete_fields = ("disciplina", "bloque", "profesores")
     list_select_related = ("disciplina",)
     date_hierarchy = "fecha"
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "profesores":
+            kwargs["queryset"] = (
+                Persona.objects.filter(roles__rol__codigo="PROFESOR")
+                .distinct()
+                .order_by("apellidos", "nombres")
+            )
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def profesores_display(self, obj):
         return obj.profesores_resumen or "-"

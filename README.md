@@ -30,24 +30,37 @@ Esta primera version esta enfocada solo en el perfil ADMIN para carga rapida. La
 
 Rutas disponibles:
 - **Panel administrador**: `/app/` con alertas, accesos rapidos y resumen mensual.
-- **Talleres / sesiones**: `/app/sesiones/` y creacion rapida en `/app/sesiones/rapida/`.
-- **Asistencia**: `/app/asistencias/` (nuevo flujo de alta rapida) y `/app/sesiones/<id>/asistencia/` (checklist por sesion).
+- **Talleres / sesiones**: `/app/sesiones/` (calendario mensual y detalle por sesion).
+- **Asistencia**: `/app/asistencias/` (nuevo flujo de alta rapida).
 - **Personas**: perfil en `/app/personas/<id>/`.
 - **Estudiantes**: `/app/estudiantes/` con filtros por organizacion, morosos y plan.
 - **Profesores**: `/app/profesores/` con acceso al perfil.
-- **Pagos**: `/app/pagos/` (listado). La carga rapida se hace desde `/app/asistencias/`.
+- **Pagos**: `/app/pagos/` (listado). La carga se hace desde el perfil de la persona o desde finanzas.
 - **Finanzas unificadas**: `/app/finanzas/unificadas/` con pagos alumnos, pagos a profesores y movimientos.
 
 Flujos rapidos recomendados:
-- Crear sesion + asistencia: entra a `/app/sesiones/rapida/` y registra asistentes en el mismo lugar.
-- Registro masivo de asistencia: entra a `/app/asistencias/`, crea una sesion basica y agrega estudiantes con select multiple.
+- Crear sesion + asistencia: entra a `/app/asistencias/`, crea una sesion basica y agrega estudiantes con select multiple.
 - Alta rapida de personas: en `/app/asistencias/` usa la seccion "Nueva persona" (nombre, apellido, telefono). Se asigna rol ESTUDIANTE.
 
 Notas operativas:
-- La asistencia puede registrarse sin suscripcion activa. Los pagos pueden registrarse despues.
+- La asistencia puede registrarse sin pago previo. Los pagos pueden registrarse despues.
 - En sesiones se usa un solo campo de profesores (seleccion multiple).
 - El nombre automatico de sesion se arma como `Disciplina - Fecha`.
 - La UI usa Bootstrap 5, Bootstrap Icons y DataTables via CDN (no requiere dependencias extra en `requirements.txt`).
+
+## Flujo de pagos (nuevo)
+El concepto principal es el **Pago**. Hay pagos por **plan** y pagos por **clase**:
+ - **Pago plan**: crea un banco de clases para el alumno.
+  - Se registra con **fecha de pago**, **plan** y **monto**.
+  - El banco dura **plan.duracion_dias** desde la fecha de pago (no necesariamente mes calendario).
+  - Cada asistencia consume 1 clase del banco mientras esté vigente.
+  - Si el banco expira, las clases no usadas caducan.
+- **Pago clase**: paga una sesión puntual (puede registrarse antes o después de la asistencia).
+- **Pendientes**: si una asistencia no tiene banco vigente ni pago clase, queda pendiente.
+
+En `/app/personas/<id>/` puedes:
+- Registrar un **pago de plan** (y ver su banco de clases).
+- Registrar otros pagos (plan/clase/otro).
 
 ## Variables de entorno (dev)
 Si quieres un punto de partida rapido, puedes copiar `.env.dev` y ajustar `DJANGO_SECRET_KEY`.
@@ -62,7 +75,7 @@ Permisos:
 - `ADMIN`: acceso total al panel y a todas las rutas de `/app/`.
 
 ## API REST
-Autenticacion actual: Token Authentication (cabecera `Authorization: Token <token>`).
+Autenticacion actual: Session Authentication y Token Authentication.
 
 | Endpoint | Metodo | Descripcion |
 | --- | --- | --- |
@@ -72,8 +85,8 @@ Autenticacion actual: Token Authentication (cabecera `Authorization: Token <toke
 | `/api/auth/logout/` | POST | Invalida el token. |
 | `/api/sesiones/` | GET | Lista de sesiones (filtro `?fecha=YYYY-MM-DD`). |
 | `/api/sesiones/<id>/asistencias/` | GET/POST | Consulta o registra asistencias. POST acepta `persona`, `estado`, `convenio`. |
-| `/api/estudiantes/` | GET | Personas con rol estudiante o con suscripcion vigente. |
-| `/api/estudiantes/<id>/estado/` | GET | Plan, clases asignadas/usadas/sobreconsumo y saldo. |
+| `/api/estudiantes/` | GET | Personas con rol estudiante o con pagos de plan. |
+| `/api/estudiantes/<id>/estado/` | GET | Plan vigente, clases totales/usadas/restantes y pendientes. |
 | `/api/reportes/resumen/` | GET | Totales de sesiones, asistencias, ingresos y egresos. |
 
 ## Importar planillas Excel
