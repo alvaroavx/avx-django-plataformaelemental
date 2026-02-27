@@ -1,6 +1,5 @@
 from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
-from django.db.models import Sum, Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
@@ -8,11 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from academia.models import SesionClase
-from asistencias.models import Asistencia
-from cobros.models import Pago
-from cuentas.models import Persona
-from finanzas.models import MovimientoCaja
+from database.models import Asistencia, Persona, SesionClase
 
 from .serializers import (
     AsistenciaCreateSerializer,
@@ -151,11 +146,6 @@ class SesionViewSet(viewsets.ReadOnlyModelViewSet):
             persona=persona,
             defaults=payload,
         )
-        if asistencia.pago_plan_id is None:
-            pago_plan = Pago.asignar_plan_para_asistencia(persona, sesion.fecha)
-            if pago_plan:
-                asistencia.pago_plan = pago_plan
-                asistencia.save(update_fields=["pago_plan"])
         return Response(AsistenciaSerializer(asistencia).data, status=status.HTTP_201_CREATED)
 
 
@@ -163,41 +153,21 @@ class EstudianteViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = EstudianteSerializer
 
     def get_queryset(self):
-        return Persona.objects.filter(
-            Q(roles__rol__codigo="ESTUDIANTE") | Q(pagos__plan__isnull=False)
-        ).distinct()
+        return Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
 
     @action(detail=True, methods=["get"], url_path="estado")
     def estado(self, request, pk=None):
         persona = self.get_object()
-        hoy = timezone.localdate()
-        pagos_plan = list(
-            persona.pagos.filter(tipo=Pago.Tipo.PLAN)
-            .select_related("plan")
-            .filter(plan__isnull=False)
-            .order_by("-fecha_pago")
-        )
-        pago_activo = next((p for p in pagos_plan if p.vigente_en(hoy)), None)
-        if not pago_activo:
-            return Response({"detail": "Sin pago de plan vigente"}, status=status.HTTP_404_NOT_FOUND)
-        asistencias = Asistencia.objects.filter(persona=persona, sesion__fecha__gte=pago_activo.fecha_pago)
-        pagos_clase_ids = set(
-            Pago.objects.filter(
-                persona=persona,
-                tipo=Pago.Tipo.CLASE,
-                sesion__fecha__gte=pago_activo.fecha_pago,
-            ).values_list("sesion_id", flat=True)
-        )
-        pendientes = asistencias.filter(pago_plan__isnull=True).exclude(
-            sesion_id__in=pagos_clase_ids
-        ).count()
+        asistencias = Asistencia.objects.filter(persona=persona).select_related("sesion").order_by("-sesion__fecha")
+        ultima_asistencia = asistencias.first()
         data = {
             "persona": EstudianteSerializer(persona).data,
-            "plan": str(pago_activo.plan),
-            "clases_total": pago_activo.clases_total or 0,
-            "clases_usadas": pago_activo.clases_usadas or 0,
-            "clases_restantes": pago_activo.clases_restantes(),
-            "pendientes": pendientes,
+            "asistencias_total": asistencias.count(),
+            "asistencias_mes": asistencias.filter(
+                sesion__fecha__month=timezone.localdate().month,
+                sesion__fecha__year=timezone.localdate().year,
+            ).count(),
+            "ultima_asistencia": ultima_asistencia.sesion.fecha if ultima_asistencia else None,
         }
         serializer = EstadoEstudianteSerializer(data)
         return Response(serializer.data)
@@ -207,13 +177,11 @@ class ReporteResumenView(APIView):
     def get(self, request):
         total_sesiones = SesionClase.objects.count()
         total_asistencias = Asistencia.objects.count()
-        ingresos = MovimientoCaja.objects.filter(tipo=MovimientoCaja.Tipo.INGRESO).aggregate(total=Sum("monto_total"))["total"] or 0
-        egresos = MovimientoCaja.objects.filter(tipo=MovimientoCaja.Tipo.EGRESO).aggregate(total=Sum("monto_total"))["total"] or 0
+        total_estudiantes = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().count()
         return Response(
             {
                 "total_sesiones": total_sesiones,
                 "total_asistencias": total_asistencias,
-                "ingresos": ingresos,
-                "egresos": egresos,
+                "total_estudiantes": total_estudiantes,
             }
         )

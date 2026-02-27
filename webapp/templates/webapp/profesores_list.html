@@ -26,7 +26,6 @@
           <th>Alumnos unicos</th>
           <th>Sesiones realizadas</th>
           <th>Total asistencias del mes</th>
-          <th>Total ganado</th>
           <th></th>
         </tr>
       </thead>
@@ -47,13 +46,6 @@
           <td>{{ item.alumnos_unicos_mes }}</td>
           <td>{{ item.sesiones_mes }}</td>
           <td>{{ item.asistencias_mes }}</td>
-          <td>
-            {% if item.ganado_total_fmt %}
-              ${{ item.ganado_total_fmt }}
-            {% else %}
-              -
-            {% endif %}
-          </td>
           <td class="d-none d-md-table-cell">
             <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:persona_detail' item.persona.pk %}">
               <i class="bi bi-person-badge"></i><span class="d-none d-md-inline ms-1">Ver perfil</span>
@@ -61,7 +53,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center text-muted">Sin profesores registrados.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">Sin profesores registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>

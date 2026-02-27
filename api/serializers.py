@@ -1,9 +1,6 @@
 from rest_framework import serializers
 
-from academia.models import SesionClase
-from asistencias.models import Asistencia
-from cuentas.models import Persona
-
+from database.models import Asistencia, Persona, SesionClase
 
 class DisciplinaSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -30,7 +27,7 @@ class AsistenciaSerializer(serializers.ModelSerializer):
 class AsistenciaCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asistencia
-        fields = ["persona", "estado", "convenio"]
+        fields = ["persona", "estado"]
 
 
 class EstudianteSerializer(serializers.ModelSerializer):
@@ -41,9 +38,6 @@ class EstudianteSerializer(serializers.ModelSerializer):
 
 class EstadoEstudianteSerializer(serializers.Serializer):
     persona = EstudianteSerializer()
-    plan = serializers.CharField()
-    clases_total = serializers.IntegerField()
-    clases_usadas = serializers.IntegerField()
-    clases_restantes = serializers.IntegerField()
-    pendientes = serializers.IntegerField()
-
+    asistencias_total = serializers.IntegerField()
+    asistencias_mes = serializers.IntegerField()
+    ultima_asistencia = serializers.DateField(allow_null=True)

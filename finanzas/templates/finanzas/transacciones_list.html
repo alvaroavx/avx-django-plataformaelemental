@@ -1,0 +1,66 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Transacciones{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2>Transacciones</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar CSV</a>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">Nueva transaccion</div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row g-2">
+          {% for field in form %}
+            <div class="col-md-4">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary mt-2" type="submit">Guardar transaccion</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Organizacion</th>
+            <th>Tipo</th>
+            <th>Categoria</th>
+            <th>Monto</th>
+            <th>Descripcion</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transacciones %}
+          <tr>
+            <td>{{ t.fecha|date:"d/m/Y" }}</td>
+            <td>{{ t.organizacion.nombre }}</td>
+            <td>{{ t.get_tipo_display }}</td>
+            <td>{{ t.categoria.nombre }}</td>
+            <td>{{ t.monto|clp }}</td>
+            <td>{{ t.descripcion|default:"-" }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_edit' t.pk %}?{{ request.GET.urlencode }}">Editar</a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:transaccion_delete' t.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted">Sin transacciones.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

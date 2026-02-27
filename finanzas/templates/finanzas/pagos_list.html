@@ -1,0 +1,218 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Pagos{% endblock %}
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2>Pagos</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar CSV</a>
+  </div>
+
+  <div class="card mb-3">
+    <button
+      class="card-header btn text-start w-100 border-0 rounded-0"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#registrarPagoCollapse"
+      aria-expanded="{% if form.errors %}true{% else %}false{% endif %}"
+      aria-controls="registrarPagoCollapse"
+    >
+      Registrar pago
+    </button>
+    <div id="registrarPagoCollapse" class="collapse{% if form.errors %} show{% endif %}">
+      <div class="card-body">
+        <form method="post" action="{% url 'finanzas:pagos_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+          {% csrf_token %}
+          <div class="row g-2">
+            {% for field in form %}
+              <div
+                class="col-md-4{% if field.name == 'numero_comprobante' and form.metodo_pago.value != 'transferencia' %} d-none{% endif %}"
+                data-field-name="{{ field.name }}"
+              >
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary mt-2" type="submit">Guardar pago</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-0 rounded-bottom-0 border-bottom-0">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">
+        <input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">
+        <input type="hidden" name="organizacion" value="{{ organizacion_id }}">
+        <div class="col-md-4">
+          <label class="form-label">Buscar alumno</label>
+          <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Nombre o apellido">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Metodo</label>
+          <select name="metodo" class="form-select">
+            <option value="">Todos</option>
+            {% for value, label in metodos_pago %}
+              <option value="{{ value }}" {% if metodo == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card rounded-top-0">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Alumno</th>
+            <th>Organizacion</th>
+            <th>Plan</th>
+            <th>Total</th>
+            <th>Clases</th>
+            <th>Saldo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pago in pagos %}
+          <tr>
+            <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+            <td>{{ pago.persona }}</td>
+            <td>{{ pago.organizacion.nombre }}</td>
+            <td>{{ pago.plan|default:"-" }}</td>
+            <td>{{ pago.monto_total|clp }}</td>
+            <td>{{ pago.clases_asignadas }}</td>
+            <td>{{ pago.saldo_clases }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_edit' pago.pk %}?{{ request.GET.urlencode }}">Editar</a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted">Sin pagos registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+  (function () {
+    const personaSelect = document.getElementById("id_persona");
+    const organizacionSelect = document.getElementById("id_organizacion");
+    if (personaSelect && organizacionSelect && typeof TomSelect !== "undefined") {
+      const opcionesBase = Array.from(personaSelect.options).map((option) => ({
+        value: option.value,
+        text: option.text,
+        orgs: (option.dataset.orgs || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      }));
+
+      const tom = new TomSelect(personaSelect, {
+        create: false,
+        allowEmptyOption: true,
+        maxOptions: 2000,
+        placeholder: "Selecciona una organizacion primero",
+      });
+
+      function filtrarPersonas(mantenerSeleccion) {
+        const orgId = organizacionSelect.value;
+        const valorActual = mantenerSeleccion ? tom.getValue() : "";
+        tom.clearOptions();
+        const opcionesFiltradas = opcionesBase.filter((option) => {
+          if (!option.value) return true;
+          if (!orgId) return false;
+          return option.orgs.includes(orgId);
+        });
+        opcionesFiltradas.forEach((option) => {
+          tom.addOption({ value: option.value, text: option.text });
+        });
+        tom.refreshOptions(false);
+        const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
+        tom.setValue(seleccionValida ? valorActual : "", true);
+
+        if (!orgId) {
+          tom.disable();
+          tom.settings.placeholder = "Selecciona una organizacion primero";
+        } else {
+          tom.enable();
+          tom.settings.placeholder = "Buscar estudiante...";
+        }
+        tom.inputState();
+      }
+
+      filtrarPersonas(true);
+      organizacionSelect.addEventListener("change", function () {
+        filtrarPersonas(false);
+      });
+    }
+
+    const planSelect = document.getElementById("id_plan");
+    const montoReferenciaInput = document.getElementById("id_monto_referencia");
+    const clasesAsignadasInput = document.getElementById("id_clases_asignadas");
+    if (planSelect && montoReferenciaInput && clasesAsignadasInput) {
+      function cargarDatosDesdePlan(forzar) {
+        const opcion = planSelect.options[planSelect.selectedIndex];
+        if (!opcion || !opcion.value) return;
+        const precio = opcion.dataset.precio;
+        const numClases = opcion.dataset.numClases;
+        if (!precio && !numClases) return;
+
+        const valorActual = (montoReferenciaInput.value || "").trim();
+        const valorActualNumero = Number(valorActual);
+        const estaVacioOCero = !valorActual || Number.isNaN(valorActualNumero) || valorActualNumero === 0;
+        if (precio && (forzar || estaVacioOCero)) {
+          montoReferenciaInput.value = precio;
+        }
+
+        const clasesActual = (clasesAsignadasInput.value || "").trim();
+        const clasesActualNumero = Number(clasesActual);
+        const clasesVaciasOCero = !clasesActual || Number.isNaN(clasesActualNumero) || clasesActualNumero === 0;
+        if (numClases && (forzar || clasesVaciasOCero)) {
+          clasesAsignadasInput.value = numClases;
+        }
+      }
+
+      cargarDatosDesdePlan(false);
+      planSelect.addEventListener("change", function () {
+        if (!planSelect.value) return;
+        cargarDatosDesdePlan(true);
+      });
+    }
+
+    const metodoPagoSelect = document.getElementById("id_metodo_pago");
+    const numeroComprobanteInput = document.getElementById("id_numero_comprobante");
+    const numeroComprobanteContainer = document.querySelector('[data-field-name="numero_comprobante"]');
+    if (metodoPagoSelect && numeroComprobanteInput && numeroComprobanteContainer) {
+      function toggleNumeroComprobante() {
+        const esTransferencia = metodoPagoSelect.value === "transferencia";
+        numeroComprobanteContainer.classList.toggle("d-none", !esTransferencia);
+        numeroComprobanteInput.required = esTransferencia;
+        if (!esTransferencia) {
+          numeroComprobanteInput.value = "";
+        }
+      }
+
+      toggleNumeroComprobante();
+      metodoPagoSelect.addEventListener("change", toggleNumeroComprobante);
+    }
+  })();
+</script>
+{% endblock %}

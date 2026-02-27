@@ -1,0 +1,142 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Dashboard Finanzas{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Dashboard financiero</h2>
+    <div>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar pagos CSV</a>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar transacciones CSV</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-3">
+      <div class="card text-bg-success">
+        <div class="card-body">
+          <div class="card-title">Ingresos</div>
+          <div class="display-6">{{ ingresos_totales|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-danger">
+        <div class="card-body">
+          <div class="card-title">Egresos</div>
+          <div class="display-6">{{ egresos_totales|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-primary">
+        <div class="card-body">
+          <div class="card-title">Balance</div>
+          <div class="display-6">{{ balance|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-warning">
+        <div class="card-body">
+          <div class="card-title">IVA debito</div>
+          <div class="display-6">{{ iva_debito|clp }}</div>
+          <div class="small">Exentos: {{ ingresos_exentos|clp }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">Pagos recientes</div>
+        <div class="card-body table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Alumno</th>
+                <th>Organizacion</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in pagos_recientes %}
+              <tr>
+                <td>{{ p.fecha_pago|date:"d/m/Y" }}</td>
+                <td>{{ p.persona }}</td>
+                <td>{{ p.organizacion.nombre }}</td>
+                <td>{{ p.monto_total|clp }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted text-center">Sin pagos.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer text-end">
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'finanzas:pagos_list' %}?{{ request.GET.urlencode }}">
+            Ver todos los pagos del periodo
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">Transacciones recientes</div>
+        <div class="card-body table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Categoria</th>
+                <th>Tipo</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in transacciones_recientes %}
+              <tr>
+                <td>{{ t.fecha|date:"d/m/Y" }}</td>
+                <td>{{ t.categoria.nombre }}</td>
+                <td>{{ t.get_tipo_display }}</td>
+                <td>{{ t.monto|clp }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted text-center">Sin transacciones.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">Consolidado por categoria</div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Tipo</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in categorias_totales %}
+          <tr>
+            <td>{{ item.categoria__nombre }}</td>
+            <td>{{ item.categoria__tipo }}</td>
+            <td>{{ item.total|clp }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-muted text-center">Sin datos en el periodo.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

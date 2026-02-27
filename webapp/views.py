@@ -2,28 +2,21 @@ from datetime import timedelta
 import calendar
 
 from django.contrib import messages
-from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.formats import date_format
 
-from academia.models import Disciplina, SesionClase
-from asistencias.models import Asistencia
-from cobros.models import DocumentoVenta, Pago, Plan
-from cobros.services import aplicar_pago_a_deudas, indicadores_deuda, recalcular_ciclo_pago
-from cuentas.models import Persona, PersonaRol, Rol
-from finanzas.models import LiquidacionProfesor, MovimientoCaja
-from organizaciones.models import Organizacion
+from database.models import Asistencia, Disciplina, Organizacion, Persona, PersonaRol, Rol, SesionClase
 
 from .decorators import role_required
 from .forms import (
     AsistenciaMasivaForm,
-    PagoPersonaForm,
     PersonaRapidaForm,
     SesionBasicaForm,
 )
 from .utils import ROLE_ADMIN
+from finanzas.services import resumen_financiero_estudiante
 
 
 def _nav_context(request):
@@ -77,64 +70,25 @@ def dashboard(request):
     )
     if organizacion:
         sesiones_mes = sesiones_mes.filter(disciplina__organizacion=organizacion)
-    sesiones_hoy = sesiones_mes.filter(fecha=timezone.localdate())
+    sesiones_realizadas_mes = sesiones_mes.filter(estado=SesionClase.Estado.COMPLETADA).count()
     asistencias_mes_qs = Asistencia.objects.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
     if organizacion:
         asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion=organizacion)
-    asistencias_mes = asistencias_mes_qs.count()
-    boletas_qs = DocumentoVenta.objects.exclude(estado=DocumentoVenta.Estado.PAGADO)
+    asistentes_ids_qs = asistencias_mes_qs.values_list("persona_id", flat=True).distinct()
+    estudiantes_activos_mes = asistentes_ids_qs.count()
+    estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
     if organizacion:
-        boletas_qs = boletas_qs.filter(organizacion=organizacion)
-    boletas_pendientes = boletas_qs.count()
-    morosos = []
-    estudiantes = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
-    for estudiante in estudiantes:
-        asistencias_est = Asistencia.objects.filter(
-            persona=estudiante,
-            sesion__fecha__gte=inicio_mes,
-            sesion__fecha__lte=fin_mes,
-            estado_cobro=Asistencia.EstadoCobro.DEUDA,
-        )
-        if organizacion:
-            asistencias_est = asistencias_est.filter(sesion__disciplina__organizacion=organizacion)
-        if not asistencias_est.exists():
-            continue
-        morosos.append({"persona": estudiante, "pendientes": asistencias_est.count()})
-        if len(morosos) == 5:
-            break
-    sesiones_resumen = (
-        sesiones_mes.annotate(total_asistentes=Count("asistencias"))
-        .order_by("-fecha")[:10]
-    )
-    pagos_recientes_qs = (
-        Pago.objects.select_related("persona")
-        .filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes)
-        .order_by("-fecha_pago")
-    )
-    if organizacion:
-        pagos_recientes_qs = pagos_recientes_qs.filter(
-            Q(plan__organizacion=organizacion)
-            | Q(sesion__disciplina__organizacion=organizacion)
-            | Q(documento__organizacion=organizacion)
-        )
-    pagos_recientes = pagos_recientes_qs[:5]
-    liquidaciones_qs = (
-        LiquidacionProfesor.objects.select_related("profesor")
-        .filter(periodo_inicio__lte=fin_mes, periodo_fin__gte=inicio_mes)
-        .order_by("-periodo_inicio")
-    )
-    if organizacion:
-        liquidaciones_qs = liquidaciones_qs.filter(organizacion=organizacion)
-    liquidaciones_recientes = liquidaciones_qs[:5]
+        estudiantes_qs = estudiantes_qs.filter(roles__organizacion=organizacion).distinct()
+    estudiantes_sin_asistencia = estudiantes_qs.exclude(id__in=asistentes_ids_qs).order_by("apellidos", "nombres")[:5]
+    sesiones_resumen = sesiones_mes.annotate(total_asistentes=Count("asistencias")).order_by("-fecha")[:10]
     context.update(
         {
-            "sesiones_hoy": sesiones_hoy,
-            "morosos": morosos,
-            "asistencias_mes": asistencias_mes,
-            "boletas_pendientes": boletas_pendientes,
+            "sesiones_hoy": sesiones_mes.filter(fecha=timezone.localdate()),
+            "asistencias_mes": asistencias_mes_qs.count(),
+            "estudiantes_activos_mes": estudiantes_activos_mes,
+            "sesiones_realizadas_mes": sesiones_realizadas_mes,
+            "estudiantes_sin_asistencia": estudiantes_sin_asistencia,
             "sesiones_resumen": sesiones_resumen,
-            "pagos_recientes": pagos_recientes,
-            "liquidaciones_recientes": liquidaciones_recientes,
             "nombre_mes": nombre_mes,
         }
     )
@@ -146,6 +100,15 @@ def sesiones_list(request):
     """Monthly calendar view of sessions."""
     context = _nav_context(request)
     organizacion = _organizacion_desde_request(request)
+    badge_palette = [
+        "text-bg-primary",
+        "text-bg-success",
+        "text-bg-danger",
+        "text-bg-warning",
+        "text-bg-info",
+        "text-bg-secondary",
+        "text-bg-dark",
+    ]
     inicio_periodo, _ = _periodo(request)
     year = inicio_periodo.year
     month = inicio_periodo.month
@@ -163,7 +126,13 @@ def sesiones_list(request):
         sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
     sesiones_por_fecha = {}
     for sesion in sesiones_qs:
-        sesiones_por_fecha.setdefault(sesion.fecha, []).append(sesion)
+        badge_class = badge_palette[sesion.disciplina_id % len(badge_palette)]
+        sesiones_por_fecha.setdefault(sesion.fecha, []).append(
+            {
+                "sesion": sesion,
+                "badge_class": badge_class,
+            }
+        )
     semanas = []
     for semana in semanas_raw:
         dias = []
@@ -187,54 +156,48 @@ def sesiones_list(request):
 
 @role_required(ROLE_ADMIN)
 def estudiantes_list(request):
-    """Student list with payment/attendance status for selected period."""
+    """Student list with attendance status for selected period."""
     context = _nav_context(request)
-    context["hide_periodo"] = True
-    hoy = timezone.localdate()
     inicio_mes, fin_mes = _periodo(request)
-    estudiantes = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().prefetch_related("roles__organizacion", "roles__rol")
-    organizaciones = Organizacion.objects.all()
+    estudiantes = (
+        Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
+        .distinct()
+        .prefetch_related("roles__organizacion", "roles__rol")
+    )
     org_id = request.GET.get("organizacion")
     if org_id:
-        estudiantes = estudiantes.filter(
-            Q(roles__organizacion_id=org_id) | Q(pagos__plan__organizacion_id=org_id)
-        ).distinct()
-    if request.GET.get("sin_plan") == "1":
-        estudiantes = estudiantes.exclude(pagos__tipo=Pago.Tipo.PLAN)
-    if request.GET.get("morosos") == "1":
-        estudiantes = [
-            persona
-            for persona in estudiantes
-            if Asistencia.objects.filter(
-                persona=persona,
-                sesion__fecha__gte=inicio_mes,
-                sesion__fecha__lte=fin_mes,
-                estado_cobro=Asistencia.EstadoCobro.DEUDA,
-            ).exists()
-        ]
+        estudiantes = estudiantes.filter(roles__organizacion_id=org_id).distinct()
+
     contexto = []
     for persona in estudiantes:
-        pagos_plan = list(
-            persona.pagos.filter(tipo=Pago.Tipo.PLAN).select_related("plan").order_by("-fecha_pago")
+        asistencias_mes_qs = Asistencia.objects.filter(
+            persona=persona,
+            sesion__fecha__gte=inicio_mes,
+            sesion__fecha__lte=fin_mes,
         )
-        plan_activo = next((p for p in pagos_plan if p.vigente_en(hoy)), None)
-        asistencias_mes = Asistencia.objects.filter(persona=persona, sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
-        pendientes = asistencias_mes.filter(estado_cobro=Asistencia.EstadoCobro.DEUDA).count()
+        if org_id:
+            asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion_id=org_id)
+        asistencias_mes = asistencias_mes_qs.count()
+        ultima_asistencia = (
+            Asistencia.objects.filter(persona=persona)
+            .select_related("sesion")
+            .order_by("-sesion__fecha")
+            .first()
+        )
         contexto.append(
             {
                 "persona": persona,
-                "plan_pago": plan_activo,
-                "clases_usadas": plan_activo.clases_usadas if plan_activo else 0,
-                "clases_restantes": plan_activo.clases_restantes() if plan_activo else 0,
-                "pendientes": pendientes,
+                "asistencias_mes": asistencias_mes,
+                "ultima_asistencia": ultima_asistencia.sesion.fecha if ultima_asistencia else None,
+                "activo_mes": asistencias_mes > 0,
             }
         )
+    if request.GET.get("sin_asistencia") == "1":
+        contexto = [item for item in contexto if not item["activo_mes"]]
     context["estudiantes"] = contexto
-    context["organizaciones"] = organizaciones
     context["filtros"] = {
         "organizacion": org_id,
-        "sin_plan": request.GET.get("sin_plan"),
-        "morosos": request.GET.get("morosos"),
+        "sin_asistencia": request.GET.get("sin_asistencia"),
     }
     return render(request, "webapp/estudiantes_list.html", context)
 
@@ -272,8 +235,6 @@ def profesores_list(request):
                 sesiones__profesores=profesor,
                 organizacion=organizacion,
             ).distinct().order_by("nombre")
-            ganado_total = asistencias_mes * 3743 if organizacion.nombre == "Espacio Elementos" else 0
-            ganado_total_fmt = f"{ganado_total:,}".replace(",", ".") if ganado_total else ""
             profesores_data.append(
                 {
                     "persona": profesor,
@@ -282,8 +243,6 @@ def profesores_list(request):
                     "asistencias_mes": asistencias_mes,
                     "sesiones_mes": sesiones_mes,
                     "disciplinas": disciplinas_qs,
-                    "ganado_total": ganado_total,
-                    "ganado_total_fmt": ganado_total_fmt,
                 }
             )
     profesores_data.sort(key=lambda item: (item["persona"].apellidos or "", item["persona"].nombres or "", item["organizacion"].nombre or ""))
@@ -294,106 +253,41 @@ def profesores_list(request):
 
 @role_required(ROLE_ADMIN)
 def persona_detail(request, pk):
-    """Student/teacher profile with period-aware attendance and payments."""
+    """Student/teacher profile with period-aware attendance details."""
     context = _nav_context(request)
     organizacion_filtro = _organizacion_desde_request(request)
     persona = get_object_or_404(Persona, pk=pk)
     roles_codigos = set(persona.roles.values_list("rol__codigo", flat=True))
     es_estudiante = "ESTUDIANTE" in roles_codigos
     es_profesor = "PROFESOR" in roles_codigos
-    hoy = timezone.localdate()
     inicio_mes, fin_mes = _periodo(request)
-    organizaciones_persona = Organizacion.objects.filter(persona_roles__persona=persona).distinct()
-    if not organizaciones_persona.exists():
-        organizaciones_persona = Organizacion.objects.all()
-
-    planes_persona_qs = Plan.objects.filter(
-        organizacion__in=organizaciones_persona,
-        activo=True,
-    ).distinct()
-    pago_persona_form = PagoPersonaForm(plan_queryset=planes_persona_qs)
 
     if request.method == "POST":
-        if "cambiar_estado" in request.POST:
-            sesion_id_post = request.POST.get("sesion_id")
-            estado = request.POST.get("estado")
-            if sesion_id_post and estado in dict(SesionClase.Estado.choices):
-                sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
-                sesion.estado = estado
-                sesion.save(update_fields=["estado"])
-                messages.success(request, "Estado de sesion actualizado.")
-                return redirect("webapp:persona_detail", pk=persona.pk)
-        elif "registrar_pago_persona" in request.POST:
-            pago_persona_form = PagoPersonaForm(
-                request.POST,
-                plan_queryset=planes_persona_qs,
-            )
-            if pago_persona_form.is_valid():
-                pago = pago_persona_form.save(commit=False)
-                pago.persona = persona
-                if pago.tipo == Pago.Tipo.PLAN and not pago.plan:
-                    messages.error(request, "Debes seleccionar un plan para este pago.")
-                    return redirect("webapp:persona_detail", pk=persona.pk)
-                if pago.tipo == Pago.Tipo.CLASE and not pago.clases_total:
-                    pago.clases_total = 1
-                if pago.tipo == Pago.Tipo.PLAN and not pago.clases_total:
-                    pago.clases_total = pago.plan.clases_por_mes if pago.plan else 0
-                pago.save()
-                recalcular_ciclo_pago(pago)
-                aplicadas = aplicar_pago_a_deudas(persona, pago)
-                messages.success(request, "Pago registrado.")
-                if aplicadas:
-                    messages.info(request, f"Asistencias de deuda cubiertas: {aplicadas}.")
-                return redirect("webapp:persona_detail", pk=persona.pk)
+        sesion_id_post = request.POST.get("sesion_id")
+        estado = request.POST.get("estado")
+        if sesion_id_post and estado in dict(SesionClase.Estado.choices):
+            sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
+            sesion.estado = estado
+            sesion.save(update_fields=["estado"])
+            messages.success(request, "Estado de sesion actualizado.")
+            return redirect("webapp:persona_detail", pk=persona.pk)
+
     asistencias_qs = persona.asistencias.select_related("sesion", "sesion__disciplina").order_by("-registrada_en")
-    pagos_qs = persona.pagos.select_related("sesion", "plan").order_by("-fecha_pago")
     asistencias_periodo = asistencias_qs.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
-    pagos_periodo = pagos_qs.filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes)
-    pagos_plan_qs = pagos_periodo.filter(
-        tipo=Pago.Tipo.PLAN,
-        plan__isnull=False,
-    )
     disciplinas_asistidas = sorted({a.sesion.disciplina.nombre for a in asistencias_qs})
-    planes_persona = sorted({str(p.plan) for p in pagos_plan_qs if p.plan})
-    asistencias_rows = []
-    for asistencia in asistencias_periodo:
-        asistencias_rows.append(
-            {
-                "asistencia": asistencia,
-                "pagado": asistencia.estado_cobro == Asistencia.EstadoCobro.CUBIERTA,
-            }
-        )
+    finanzas_resumen = resumen_financiero_estudiante(persona, organizacion_filtro) if es_estudiante else None
     context.update(
         {
             "persona": persona,
-            "roles_asignados": persona.roles.select_related("rol"),
-            "pagos_plan": pagos_plan_qs,
-            "pagos": pagos_periodo,
-            "asistencias": asistencias_rows,
+            "roles_asignados": persona.roles.select_related("rol", "organizacion"),
+            "asistencias": asistencias_periodo,
             "es_estudiante": es_estudiante,
             "es_profesor": es_profesor,
-            "asistencias_mes": asistencias_qs.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes).count(),
-            "pagos_mes": pagos_periodo.count(),
-            "pagos_clase_mes": pagos_periodo.filter(
-                tipo=Pago.Tipo.CLASE, sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes
-            ).count(),
+            "asistencias_mes": asistencias_periodo.count(),
             "disciplinas_asistidas": disciplinas_asistidas,
-            "planes_persona": planes_persona,
             "asistencia_estados": Asistencia.Estado.choices,
-            "pago_tipos": Pago.Tipo.choices,
-            "pago_metodos": Pago.Metodo.choices,
-            "pago_persona_form": pago_persona_form,
-            "organizaciones_persona": organizaciones_persona,
-            "planes_persona_qs": planes_persona_qs,
+            "finanzas_resumen": finanzas_resumen,
         }
-    )
-    context["pagos_pendientes_mes"] = (
-        Asistencia.objects.filter(
-            persona=persona,
-            sesion__fecha__gte=inicio_mes,
-            sesion__fecha__lte=fin_mes,
-            estado_cobro=Asistencia.EstadoCobro.DEUDA,
-        ).count()
     )
     if es_profesor:
         sesiones_realizadas = SesionClase.objects.filter(
@@ -405,16 +299,17 @@ def persona_detail(request, pk):
             sesiones_realizadas = sesiones_realizadas.filter(disciplina__organizacion=organizacion_filtro)
         asistencias_prof = Asistencia.objects.filter(
             sesion__profesores=persona,
+            sesion__fecha__gte=inicio_mes,
+            sesion__fecha__lte=fin_mes,
         ).select_related("sesion__disciplina", "sesion__disciplina__organizacion")
         if organizacion_filtro:
             asistencias_prof = asistencias_prof.filter(sesion__disciplina__organizacion=organizacion_filtro)
         sesiones_resumen_qs = sesiones_realizadas
-        asistencias_prof_resumen_qs = asistencias_prof.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
         resumen_por_org = []
         organizaciones_resumen = [organizacion_filtro] if organizacion_filtro else Organizacion.objects.all()
         for org in organizaciones_resumen:
             sesiones_org = sesiones_resumen_qs.filter(disciplina__organizacion=org)
-            asistencias_org = asistencias_prof_resumen_qs.filter(sesion__disciplina__organizacion=org)
+            asistencias_org = asistencias_prof.filter(sesion__disciplina__organizacion=org)
             if not sesiones_org.exists() and not asistencias_org.exists():
                 continue
             resumen_por_org.append(
@@ -425,14 +320,10 @@ def persona_detail(request, pk):
                     "asistencias": asistencias_org.count(),
                 }
             )
-        liquidaciones = LiquidacionProfesor.objects.filter(profesor=persona).select_related("organizacion").order_by("-periodo_inicio")
-        if organizacion_filtro:
-            liquidaciones = liquidaciones.filter(organizacion=organizacion_filtro)
         context.update(
             {
                 "sesiones_realizadas": sesiones_realizadas,
                 "resumen_profesor": resumen_por_org,
-                "liquidaciones": liquidaciones,
             }
         )
     return render(request, "webapp/persona_detail.html", context)
@@ -475,7 +366,7 @@ def asistencias_list(request):
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
                 messages.success(request, "Estado de sesion actualizado.")
-                return redirect(request.path)
+                return redirect(request.get_full_path())
         elif "agregar_persona" in request.POST:
             persona_form = PersonaRapidaForm(request.POST)
             if persona_form.is_valid():
@@ -485,12 +376,12 @@ def asistencias_list(request):
                     telefono=persona_form.cleaned_data.get("telefono", "").strip(),
                 )
                 rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
-                organizacion = Organizacion.objects.first()
-                if rol_estudiante and organizacion:
+                organizacion_base = Organizacion.objects.first()
+                if rol_estudiante and organizacion_base:
                     PersonaRol.objects.get_or_create(
                         persona=persona,
                         rol=rol_estudiante,
-                        organizacion=organizacion,
+                        organizacion=organizacion_base,
                         defaults={"activo": True},
                     )
                     messages.success(request, "Persona creada y asignada como estudiante.")
@@ -502,7 +393,7 @@ def asistencias_list(request):
             asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
             if asistencia_form.is_valid():
                 sesion = get_object_or_404(SesionClase, pk=asistencia_form.cleaned_data["sesion_id"])
-                estudiantes = asistencia_form.cleaned_data["estudiantes"]
+                estudiantes = list(asistencia_form.cleaned_data["estudiantes"])
                 creados = 0
                 for persona in estudiantes:
                     _, created = Asistencia.objects.get_or_create(
@@ -512,6 +403,9 @@ def asistencias_list(request):
                     )
                     if created:
                         creados += 1
+                if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+                    sesion.estado = SesionClase.Estado.COMPLETADA
+                    sesion.save(update_fields=["estado"])
                 messages.success(request, f"Asistencias agregadas: {creados}.")
                 return redirect(f"{request.path}?sesion_id={sesion.pk}")
 
@@ -534,18 +428,12 @@ def asistencias_list(request):
         sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
     sesiones_list = []
     for sesion in sesiones_qs:
-        total_asistentes = sesion.asistencias.count()
-        pagos = sesion.asistencias.filter(estado_cobro=Asistencia.EstadoCobro.CUBIERTA).count()
-        no_pagos = total_asistentes - pagos
         sesiones_list.append(
             {
                 "sesion": sesion,
-                "total_asistentes": total_asistentes,
-                "pagos": pagos,
-                "no_pagos": no_pagos,
+                "total_asistentes": sesion.asistencias.count(),
             }
         )
-    sesiones_page = sesiones_list
 
     context.update(
         {
@@ -553,7 +441,7 @@ def asistencias_list(request):
             "asistencia_form": asistencia_form,
             "persona_form": persona_form,
             "open_nueva_sesion": request.GET.get("open") == "nueva_sesion",
-            "sesiones": sesiones_page,
+            "sesiones": sesiones_list,
             "sesion_seleccionada": SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None,
             "estudiantes_total": estudiantes_qs.count(),
             "estudiantes_total_mes": estudiantes_total_mes,
@@ -562,96 +450,64 @@ def asistencias_list(request):
             "organizaciones": Organizacion.objects.all(),
         }
     )
-    context["deuda_indicadores"] = indicadores_deuda(inicio_mes, fin_mes, organizacion)
     return render(request, "webapp/asistencias_list.html", context)
 
 
 @role_required(ROLE_ADMIN)
 def sesion_detail(request, pk):
-    """Session detail and per-student payment state."""
+    """Session detail and attendee state."""
     context = _nav_context(request)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
-        SesionClase.objects.select_related("disciplina").prefetch_related("profesores", "asistencias__persona"),
+        SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
         pk=pk,
     )
-    if request.method == "POST" and "cambiar_estado" in request.POST:
-        estado = request.POST.get("estado")
-        if estado in dict(SesionClase.Estado.choices):
-            sesion.estado = estado
-            sesion.save(update_fields=["estado"])
-            messages.success(request, "Estado de sesion actualizado.")
-            return redirect("webapp:sesion_detail", pk=sesion.pk)
-    asistencias = sesion.asistencias.select_related("persona").order_by("-registrada_en")
-    total_asistentes = asistencias.count()
-    pagos = asistencias.filter(estado_cobro=Asistencia.EstadoCobro.CUBIERTA).count()
-    no_pagos = total_asistentes - pagos
-    asistencias_rows = []
-    for asistencia in asistencias:
-        asistencias_rows.append(
-            {
-                "asistencia": asistencia,
-                "pagado": asistencia.estado_cobro == Asistencia.EstadoCobro.CUBIERTA,
-            }
+    estudiantes_qs = (
+        Persona.objects.filter(
+            roles__rol__codigo="ESTUDIANTE",
+            roles__organizacion=sesion.disciplina.organizacion,
         )
+        .distinct()
+        .order_by("apellidos", "nombres")
+    )
+    if request.method == "POST":
+        if "cambiar_estado" in request.POST:
+            estado = request.POST.get("estado")
+            if estado in dict(SesionClase.Estado.choices):
+                sesion.estado = estado
+                sesion.save(update_fields=["estado"])
+                messages.success(request, "Estado de sesion actualizado.")
+                return redirect("webapp:sesion_detail", pk=sesion.pk)
+        elif "agregar_asistentes" in request.POST:
+            estudiantes_ids = request.POST.getlist("estudiantes")
+            estudiantes = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
+            creados = 0
+            for persona in estudiantes:
+                _, created = Asistencia.objects.get_or_create(
+                    sesion=sesion,
+                    persona=persona,
+                    defaults={"estado": Asistencia.Estado.PRESENTE},
+                )
+                if created:
+                    creados += 1
+            if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+                sesion.estado = SesionClase.Estado.COMPLETADA
+                sesion.save(update_fields=["estado"])
+            messages.success(request, f"Asistencias agregadas: {creados}.")
+            return redirect("webapp:sesion_detail", pk=sesion.pk)
+
+    asistencias = sesion.asistencias.select_related("persona").order_by("-registrada_en")
+    asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
     context.update(
         {
             "sesion": sesion,
-            "asistencias": asistencias_rows,
-            "total_asistentes": total_asistentes,
-            "pagos": pagos,
-            "no_pagos": no_pagos,
+            "asistencias": asistencias,
+            "total_asistentes": asistencias.count(),
+            "estudiantes": estudiantes_qs,
+            "asistentes_ids": asistentes_ids,
         }
     )
     return render(request, "webapp/sesion_detail.html", context)
-
-
-@role_required(ROLE_ADMIN)
-def pagos_list(request):
-    """Paginated payment list filtered by global period and organization."""
-    context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
-    organizacion = _organizacion_desde_request(request)
-    pagos = (
-        Pago.objects.select_related("persona", "plan", "sesion")
-        .filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes)
-        .order_by("-fecha_pago")
-    )
-    if organizacion:
-        pagos = pagos.filter(
-            Q(plan__organizacion=organizacion)
-            | Q(sesion__disciplina__organizacion=organizacion)
-            | Q(documento__organizacion=organizacion)
-        )
-    context["pagos"] = Paginator(pagos, 25).get_page(request.GET.get("page"))
-    return render(request, "webapp/pagos_list.html", context)
-
-
-@role_required(ROLE_ADMIN)
-def finanzas_unificadas(request):
-    """Unified financial view for the selected month."""
-    context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
-    organizacion = _organizacion_desde_request(request)
-    pagos = Pago.objects.select_related("persona").filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes).order_by("-fecha_pago")
-    liquidaciones = LiquidacionProfesor.objects.select_related("profesor").filter(periodo_inicio__lte=fin_mes, periodo_fin__gte=inicio_mes).order_by("-periodo_inicio")
-    movimientos = MovimientoCaja.objects.filter(fecha__gte=inicio_mes, fecha__lte=fin_mes).order_by("-fecha")
-    if organizacion:
-        pagos = pagos.filter(
-            Q(plan__organizacion=organizacion)
-            | Q(sesion__disciplina__organizacion=organizacion)
-            | Q(documento__organizacion=organizacion)
-        )
-        liquidaciones = liquidaciones.filter(organizacion=organizacion)
-        movimientos = movimientos.filter(organizacion=organizacion)
-    context.update(
-        {
-            "pagos": pagos[:20],
-            "liquidaciones": liquidaciones[:20],
-            "movimientos": movimientos[:20],
-        }
-    )
-    return render(request, "webapp/finanzas_unificadas.html", context)
 
 
 @role_required(ROLE_ADMIN)

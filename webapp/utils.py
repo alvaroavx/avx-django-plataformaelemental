@@ -1,10 +1,9 @@
 from django.core.exceptions import PermissionDenied
 
-from cuentas.models import Persona, PersonaRol
+from database.models import Persona, PersonaRol
 
 ROLE_ADMIN = "admin"
 ROLE_STAFF_ASISTENCIA = "staff_asistencia"
-ROLE_STAFF_FINANZAS = "staff_finanzas"
 ROLE_PROFESOR = "profesor"
 ROLE_ESTUDIANTE = "estudiante"
 

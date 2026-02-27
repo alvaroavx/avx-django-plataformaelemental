@@ -13,6 +13,4 @@ urlpatterns = [
     path("estudiantes/", views.estudiantes_list, name="estudiantes_list"),
     path("profesores/", views.profesores_list, name="profesores_list"),
     path("organizaciones/", views.organizaciones_list, name="organizaciones_list"),
-    path("pagos/", views.pagos_list, name="pagos_list"),
-    path("finanzas/unificadas/", views.finanzas_unificadas, name="finanzas_unificadas"),
 ]

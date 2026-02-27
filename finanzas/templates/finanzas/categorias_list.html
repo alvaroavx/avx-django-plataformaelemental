@@ -1,0 +1,55 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% block title %}Categorias{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Categorias</h2>
+  <div class="card mb-3">
+    <div class="card-header">Nueva categoria</div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-2">
+          {% for field in form %}
+            <div class="col-md-4">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary mt-2" type="submit">Crear categoria</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Activa</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in categorias %}
+          <tr>
+            <td>{{ c.nombre }}</td>
+            <td>{{ c.get_tipo_display }}</td>
+            <td>{% if c.activa %}Si{% else %}No{% endif %}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:categoria_edit' c.pk %}?{{ request.GET.urlencode }}">Editar</a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:categoria_delete' c.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted">Sin categorias.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

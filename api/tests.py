@@ -1,17 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from academia.models import Disciplina, SesionClase
-from asistencias.models import Asistencia
-from cobros.models import Pago, Plan
-from cuentas.models import Persona
-from finanzas.models import MovimientoCaja
-from organizaciones.models import Organizacion
-
+from database.models import Asistencia, Disciplina, Organizacion, Persona, PersonaRol, Rol, SesionClase
 
 class HealthEndpointTests(APITestCase):
     def test_health_returns_ok(self):
@@ -111,21 +104,12 @@ class ApiDataTests(APITestCase):
             apellidos="Demo",
             email="alumno@example.com",
         )
-        self.plan = Plan.objects.create(
-            organizacion=self.organizacion,
-            nombre="Plan Demo",
-            precio=10000,
-            duracion_dias=30,
-            clases_por_semana=1,
-            clases_por_mes=4,
-        )
-        Pago.objects.create(
+        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
             persona=self.estudiante,
-            plan=self.plan,
-            tipo=Pago.Tipo.PLAN,
-            fecha_pago=timezone.localdate(),
-            monto=10000,
-            metodo=Pago.Metodo.TRANSFERENCIA,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
         )
         self.disciplina = Disciplina.objects.create(
             organizacion=self.organizacion,
@@ -136,18 +120,9 @@ class ApiDataTests(APITestCase):
             fecha="2025-01-15",
         )
         self.sesion.profesores.set([self.profesor])
-        self.asistencia = Asistencia.objects.create(
+        Asistencia.objects.create(
             sesion=self.sesion,
             persona=self.estudiante,
-        )
-        MovimientoCaja.objects.create(
-            organizacion=self.organizacion,
-            tipo=MovimientoCaja.Tipo.INGRESO,
-            fecha="2025-01-20",
-            monto_total=10000,
-            afecta_iva=False,
-            categoria=MovimientoCaja.Categoria.TALLERES,
-            glosa="Pago demo",
         )
         User = get_user_model()
         self.user = User.objects.create_user(username="apiuser", password="123456")
@@ -169,7 +144,7 @@ class ApiDataTests(APITestCase):
     def test_estado_estudiante(self):
         response = self.client.get(f"/api/estudiantes/{self.estudiante.pk}/estado/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("clases_total", response.data)
+        self.assertIn("asistencias_total", response.data)
 
     def test_reporte_resumen(self):
         response = self.client.get("/api/reportes/resumen/")

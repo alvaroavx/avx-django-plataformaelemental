@@ -1,0 +1,17 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="card border-danger">
+    <div class="card-header text-bg-danger">{{ title }}</div>
+    <div class="card-body">
+      <p>¿Seguro que quieres eliminar <strong>{{ obj }}</strong>?</p>
+      <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger" type="submit">Eliminar</button>
+        <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancelar</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

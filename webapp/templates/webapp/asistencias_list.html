@@ -154,7 +154,6 @@
               <th>Estado</th>
               <th>Asistentes</th>
               <th>Total</th>
-              <th>Pagos</th>
               <th></th>
             </tr>
           </thead>
@@ -194,7 +193,6 @@
                 {% endfor %}
               </td>
               <td>{{ item.total_asistentes }}</td>
-              <td>{{ item.pagos }} / {{ item.no_pagos }}</td>
               <td>
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' item.sesion.pk %}" title="Ver">
                   <i class="bi bi-eye"></i>
@@ -215,7 +213,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="8" class="text-center text-muted">Sin sesiones registradas.</td></tr>
+            <tr><td colspan="7" class="text-center text-muted">Sin sesiones registradas.</td></tr>
             {% endfor %}
           </tbody>
         </table>

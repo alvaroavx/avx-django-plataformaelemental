@@ -38,14 +38,10 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "rest_framework",
     "rest_framework.authtoken",
-    "cuentas",
-    "organizaciones",
-    "academia",
-    "asistencias",
-    "cobros",
-    "finanzas",
+    "database",
     "api",
     "webapp",
+    "finanzas.apps.FinanzasConfig",
 ]
 
 MIDDLEWARE = [

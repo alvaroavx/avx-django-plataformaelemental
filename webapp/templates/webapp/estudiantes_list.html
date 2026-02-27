@@ -9,31 +9,15 @@
     <div class="card-body">
       <div id="buscador-estudiantes" class="mb-3"></div>
       <div class="row g-2">
-        <div class="col-md-3">
-          <label class="form-label">Organizacion</label>
-          <select id="filtro-organizacion" class="form-select">
-            <option value="">Todas</option>
-            {% for org in organizaciones %}
-              <option value="{{ org.nombre }}">{{ org.nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Estado plan</label>
-          <select id="filtro-plan" class="form-select">
+        <div class="col-md-8">
+          <label class="form-label">Actividad</label>
+          <select id="filtro-actividad" class="form-select">
             <option value="">Todos</option>
-            <option value="Sin plan">Sin plan</option>
-            <option value="Con plan">Con plan</option>
+            <option value="Activo">Activos</option>
+            <option value="Sin asistencia">Sin asistencia</option>
           </select>
         </div>
-        <div class="col-md-3">
-          <label class="form-label">Morosos</label>
-          <select id="filtro-moroso" class="form-select">
-            <option value="">Todos</option>
-            <option value="Moroso">Morosos</option>
-          </select>
-        </div>
-        <div class="col-md-3 d-flex align-items-end">
+        <div class="col-md-4 d-flex align-items-end">
           <button id="limpiar-filtros-estudiantes" class="btn btn-outline-secondary btn-sm" type="button">
             <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar filtros</span>
           </button>
@@ -47,10 +31,8 @@
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Plan</th>
-          <th>Clases usadas</th>
-          <th>Clases restantes</th>
-          <th>Pendientes</th>
+          <th>Asistencias mes</th>
+          <th>Ultima asistencia</th>
           <th>Estado</th>
           <th></th>
         </tr>
@@ -66,21 +48,13 @@
               {% endif %}
             {% endfor %}
           </td>
+          <td data-order="{{ item.asistencias_mes }}">{{ item.asistencias_mes }}</td>
+          <td>{% if item.ultima_asistencia %}{{ item.ultima_asistencia|date:"d/m/Y" }}{% else %}-{% endif %}</td>
           <td>
-            {% if item.plan_pago %}
-              {{ item.plan_pago.plan }}
+            {% if item.activo_mes %}
+              <span class="badge text-bg-success">Activo</span>
             {% else %}
-              Sin plan
-            {% endif %}
-          </td>
-          <td>{{ item.clases_usadas }}</td>
-          <td>{{ item.clases_restantes }}</td>
-          <td>{{ item.pendientes }}</td>
-          <td>
-            {% if item.pendientes|floatformat:0 > 0 %}
-              <span class="badge text-bg-warning">Moroso</span>
-            {% else %}
-              <span class="badge text-bg-success">Al dia</span>
+              <span class="badge text-bg-warning">Sin asistencia</span>
             {% endif %}
           </td>
           <td>
@@ -90,7 +64,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -109,7 +83,10 @@
     const dt = jQuery(table).DataTable({
       paging: true,
       pageLength: 25,
-      order: [[1, "asc"]],
+      order: [[0, "asc"]],
+      columnDefs: [
+        { targets: 1, type: "num" },
+      ],
       stateSave: true,
       dom: "<'row'<'col-12'f>>rt<'row'<'col-12 col-md-6'i><'col-12 col-md-6'p>>",
       language: {
@@ -132,47 +109,18 @@
       }
     }
 
-    const filtroOrganizacion = document.getElementById("filtro-organizacion");
-    const filtroPlan = document.getElementById("filtro-plan");
-    const filtroMoroso = document.getElementById("filtro-moroso");
+    const filtroActividad = document.getElementById("filtro-actividad");
     const limpiar = document.getElementById("limpiar-filtros-estudiantes");
 
-    if (filtroOrganizacion) {
-      filtroOrganizacion.value = dt.column(0).search() || "";
-      filtroOrganizacion.addEventListener("change", function () {
-        dt.column(0).search(this.value).draw();
-      });
-    }
-    if (filtroPlan) {
-      const planSearch = dt.column(1).search() || "";
-      if (planSearch === "^(?!Sin plan$).*$") {
-        filtroPlan.value = "Con plan";
-      } else if (planSearch === "^Sin plan$") {
-        filtroPlan.value = "Sin plan";
-      } else {
-        filtroPlan.value = "";
-      }
-      filtroPlan.addEventListener("change", function () {
-        if (this.value === "Con plan") {
-          dt.column(1).search("^(?!Sin plan$).*$", true, false).draw();
-        } else if (this.value === "Sin plan") {
-          dt.column(1).search("^Sin plan$", true, false).draw();
-        } else {
-          dt.column(1).search("").draw();
-        }
-      });
-    }
-    if (filtroMoroso) {
-      filtroMoroso.value = dt.column(5).search() || "";
-      filtroMoroso.addEventListener("change", function () {
-        dt.column(5).search(this.value).draw();
+    if (filtroActividad) {
+      filtroActividad.value = dt.column(3).search() || "";
+      filtroActividad.addEventListener("change", function () {
+        dt.column(3).search(this.value).draw();
       });
     }
     if (limpiar) {
       limpiar.addEventListener("click", function () {
-        if (filtroOrganizacion) filtroOrganizacion.value = "";
-        if (filtroPlan) filtroPlan.value = "";
-        if (filtroMoroso) filtroMoroso.value = "";
+        if (filtroActividad) filtroActividad.value = "";
         dt.columns().search("").draw();
       });
     }

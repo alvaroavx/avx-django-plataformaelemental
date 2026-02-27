@@ -1,0 +1,33 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Reporte por categorias{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Consolidado por categorias</h2>
+  <div class="text-muted mb-2">Periodo: {{ inicio_mes|date:"d/m/Y" }} - {{ fin_mes|date:"d/m/Y" }}</div>
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Tipo</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in consolidado %}
+          <tr>
+            <td>{{ row.categoria__nombre }}</td>
+            <td>{{ row.categoria__tipo|title }}</td>
+            <td>{{ row.total|clp }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted">Sin datos en el periodo seleccionado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -12,47 +12,42 @@
       </div>
     </div>
     <div class="col-md-4">
-      <div class="card text-bg-danger mb-3">
+      <div class="card text-bg-success mb-3">
         <div class="card-body">
-          <h5 class="card-title">Alumnos sin pago</h5>
-          <p class="display-6">{{ morosos|length }}</p>
+          <h5 class="card-title">Estudiantes activos</h5>
+          <p class="display-6">{{ estudiantes_activos_mes }}</p>
         </div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card text-bg-warning mb-3">
         <div class="card-body">
-          <h5 class="card-title">Boletas pendientes</h5>
-          <p class="display-6">{{ boletas_pendientes }}</p>
+          <h5 class="card-title">Sesiones realizadas</h5>
+          <p class="display-6">{{ sesiones_realizadas_mes }}</p>
         </div>
       </div>
     </div>
   </div>
 
   <div class="row text-center mb-4">
-    <div class="col-md-3 mb-2">
+    <div class="col-md-4 mb-2">
       <a class="btn btn-lg btn-outline-success w-100" href="{% url 'webapp:asistencias_list' %}">
         <i class="bi bi-clipboard-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistencia</span>
       </a>
     </div>
-    <div class="col-md-3 mb-2">
+    <div class="col-md-4 mb-2">
       <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:sesiones_list' %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Sesiones</span>
       </a>
     </div>
-    <div class="col-md-3 mb-2">
+    <div class="col-md-4 mb-2">
       <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:estudiantes_list' %}">
         <i class="bi bi-people"></i><span class="d-none d-md-inline ms-1">Estudiantes</span>
       </a>
     </div>
-    <div class="col-md-3 mb-2">
-      <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'webapp:pagos_list' %}">
-        <i class="bi bi-cash"></i><span class="d-none d-md-inline ms-1">Pagos</span>
-      </a>
-    </div>
   </div>
 
-  <h2 class="mb-3">Asistencias de {{ nombre_mes }}</h2>
+  <h2 class="mb-3">Sesiones de {{ nombre_mes }}</h2>
   <div class="card mb-4">
     <div class="card-body table-responsive">
       <table class="table">
@@ -61,6 +56,7 @@
             <th>Fecha</th>
             <th>Taller</th>
             <th>Profesores</th>
+            <th>Estado</th>
             <th>Asistentes</th>
             <th></th>
           </tr>
@@ -79,6 +75,17 @@
                 -
               {% endif %}
             </td>
+            <td>
+              {% if sesion.estado == "programada" %}
+                <span class="badge text-bg-info">Programada</span>
+              {% elif sesion.estado == "completada" %}
+                <span class="badge text-bg-success">Completada</span>
+              {% elif sesion.estado == "cancelada" %}
+                <span class="badge text-bg-danger">Cancelada</span>
+              {% else %}
+                <span class="badge text-bg-secondary">{{ sesion.get_estado_display }}</span>
+              {% endif %}
+            </td>
             <td>{{ sesion.total_asistentes }}</td>
             <td>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'webapp:sesion_detail' sesion.pk %}">
@@ -87,65 +94,23 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">Sin registros este mes.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}">
-        <i class="bi bi-clipboard-check"></i><span class="d-none d-md-inline ms-1">Ir a asistencias</span>
-      </a>
-    </div>
-  </div>
-
-  <h2 class="mb-3">Finanzas alumnos</h2>
-  <div class="card mb-4">
-    <div class="card-body table-responsive">
-      <table class="table table-sm">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Alumno</th>
-            <th>Monto</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for pago in pagos_recientes %}
-          <tr>
-            <td>{{ pago.fecha_pago }}</td>
-            <td>{{ pago.persona }}</td>
-            <td>${{ pago.monto }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="3" class="text-center text-muted">Sin pagos recientes.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">Sin registros este mes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 
-  <h2 class="mb-3">Finanzas profesores</h2>
+  <h2 class="mb-3">Estudiantes sin asistencia</h2>
   <div class="card mb-4">
-    <div class="card-body table-responsive">
-      <table class="table table-sm">
-        <thead>
-          <tr>
-            <th>Profesor</th>
-            <th>Periodo</th>
-            <th>Neto</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for liq in liquidaciones_recientes %}
-          <tr>
-            <td>{{ liq.profesor }}</td>
-            <td>{{ liq.periodo_inicio }} - {{ liq.periodo_fin }}</td>
-            <td>${{ liq.monto_neto }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="3" class="text-center text-muted">Sin liquidaciones recientes.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card-body">
+      <ul class="mb-0">
+        {% for persona in estudiantes_sin_asistencia %}
+          <li><a href="{% url 'webapp:persona_detail' persona.pk %}">{{ persona }}</a></li>
+        {% empty %}
+          <li class="text-muted">Sin pendientes.</li>
+        {% endfor %}
+      </ul>
     </div>
   </div>
 </div>

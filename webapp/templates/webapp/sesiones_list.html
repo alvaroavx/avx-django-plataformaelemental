@@ -28,9 +28,14 @@
           <td class="position-relative {% if not dia.en_mes %}bg-light text-muted{% endif %}">
             <div class="position-absolute top-0 start-0 m-2 fw-bold fs-6">{{ dia.fecha|date:"d" }}</div>
             <div class="pt-4">
-            {% for sesion in dia.sesiones %}
-              <div class="mb-2">
-                <a class="badge text-bg-primary text-decoration-none" href="{% url 'webapp:sesion_detail' sesion.pk %}">{{ sesion.disciplina }}</a>
+            {% for item in dia.sesiones %}
+              <div class="mb-2 p-2 bg-white border rounded">
+                <a class="badge {{ item.badge_class }} text-decoration-none mb-1 d-inline-block" href="{% url 'webapp:sesion_detail' item.sesion.pk %}">
+                  {{ item.sesion.disciplina }}
+                </a>
+                <a class="small text-muted text-decoration-none d-block" href="{% url 'webapp:sesion_detail' item.sesion.pk %}">
+                  asistentes: {{ item.sesion.asistencias.count }}
+                </a>
               </div>
             {% empty %}
               <div class="text-muted small">Sin sesiones</div>

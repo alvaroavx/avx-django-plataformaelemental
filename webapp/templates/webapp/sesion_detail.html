@@ -10,12 +10,6 @@
       <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:sesiones_list' %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
       </a>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
-        <i class="bi bi-clipboard-check"></i><span class="d-none d-md-inline ms-1">Ir a asistencias</span>
-      </a>
-      <a class="btn btn-outline-success btn-sm" href="{% url 'webapp:asistencias_list' %}?sesion_id={{ sesion.pk }}">
-        <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-      </a>
     </div>
   </div>
   <div class="card mb-3">
@@ -63,23 +57,55 @@
         <div class="mt-3 text-muted">{{ sesion.notas }}</div>
       {% endif %}
       <div class="row mt-3">
-        <div class="col-md-4">
+        <div class="col-md-12">
           <div class="fw-semibold">Asistentes</div>
           <div class="display-6">{{ total_asistentes }}</div>
-        </div>
-        <div class="col-md-4">
-          <div class="fw-semibold">Pagos</div>
-          <div class="display-6">{{ pagos }}</div>
-        </div>
-        <div class="col-md-4">
-          <div class="fw-semibold">No pagos</div>
-          <div class="display-6">{{ no_pagos }}</div>
         </div>
       </div>
     </div>
   </div>
 
   <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Agregar asistentes</span>
+      <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesSesionForm">
+        <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+      </button>
+    </div>
+    <div class="card-body collapse" id="agregarAsistentesSesionForm">
+      <form method="post">
+        {% csrf_token %}
+        <label class="form-label" for="estudiantes_search_detalle">Buscar estudiante</label>
+        <input id="estudiantes_search_detalle" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+        <div class="d-flex gap-2 mb-2">
+          <button id="seleccionar_visibles_detalle" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
+          <button id="limpiar_seleccion_detalle" class="btn btn-sm btn-outline-secondary" type="button">Limpiar seleccion</button>
+        </div>
+        <div class="border rounded p-2" style="max-height: 320px; overflow-y: auto;">
+          {% for estudiante in estudiantes %}
+            <div class="form-check mb-1 estudiante-opcion-detalle" data-text="{{ estudiante }}">
+              <input
+                class="form-check-input estudiante-check-detalle"
+                type="checkbox"
+                name="estudiantes"
+                value="{{ estudiante.pk }}"
+                id="estudiante_detalle_{{ estudiante.pk }}"
+                {% if estudiante.pk in asistentes_ids %}checked{% endif %}
+              >
+              <label class="form-check-label" for="estudiante_detalle_{{ estudiante.pk }}">{{ estudiante }}</label>
+            </div>
+          {% empty %}
+            <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">
+          <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar seleccionados</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
     <div class="card-header">Listado de asistentes</div>
     <div class="card-body table-responsive">
       <table class="table table-sm">
@@ -87,32 +113,72 @@
           <tr>
             <th>Persona</th>
             <th>Estado</th>
-            <th>Pago</th>
             <th>Hora</th>
           </tr>
         </thead>
         <tbody>
           {% for item in asistencias %}
           <tr>
-            <td>
-              <a href="{% url 'webapp:persona_detail' item.asistencia.persona.pk %}">{{ item.asistencia.persona }}</a>
-            </td>
-            <td>{{ item.asistencia.get_estado_display }}</td>
-            <td>
-              {% if item.pagado %}
-                <span class="badge text-bg-success">Pagado</span>
-              {% else %}
-                <span class="badge text-bg-warning">Pendiente</span>
-              {% endif %}
-            </td>
-            <td>{{ item.asistencia.registrada_en|date:"H:i" }}</td>
+            <td><a href="{% url 'webapp:persona_detail' item.persona.pk %}">{{ item.persona }}</a></td>
+            <td>{{ item.get_estado_display }}</td>
+            <td>{{ item.registrada_en|date:"H:i" }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="4" class="text-center text-muted">Sin asistentes.</td></tr>
+          <tr><td colspan="3" class="text-center text-muted">Sin asistentes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+  (function () {
+    const normalizeText = (value) =>
+      (value || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const input = document.getElementById("estudiantes_search_detalle");
+    const selectVisibleBtn = document.getElementById("seleccionar_visibles_detalle");
+    const clearBtn = document.getElementById("limpiar_seleccion_detalle");
+    const rows = Array.from(document.querySelectorAll(".estudiante-opcion-detalle"));
+
+    if (!rows.length) return;
+
+    const aplicarFiltro = function () {
+      const term = normalizeText(input ? input.value : "");
+      rows.forEach((row) => {
+        const text = normalizeText(row.dataset.text || "");
+        row.style.display = !term || text.includes(term) ? "" : "none";
+      });
+    };
+
+    if (input) {
+      input.addEventListener("input", aplicarFiltro);
+    }
+
+    if (selectVisibleBtn) {
+      selectVisibleBtn.addEventListener("click", function () {
+        rows.forEach((row) => {
+          if (row.style.display === "none") return;
+          const check = row.querySelector(".estudiante-check-detalle");
+          if (check) check.checked = true;
+        });
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        rows.forEach((row) => {
+          const check = row.querySelector(".estudiante-check-detalle");
+          if (check) check.checked = false;
+        });
+      });
+    }
+  })();
+</script>
 {% endblock %}

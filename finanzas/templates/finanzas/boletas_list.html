@@ -1,0 +1,60 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Boletas y facturas{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Boletas y facturas</h2>
+  <div class="card mb-3">
+    <div class="card-header">Registrar boleta/factura</div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="row g-2">
+          {% for field in form %}
+            <div class="col-md-4">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary mt-2" type="submit">Guardar boleta/factura</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Organizacion</th>
+            <th>Tipo</th>
+            <th>Folio</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in boletas %}
+          <tr>
+            <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
+            <td>{{ item.organizacion.nombre }}</td>
+            <td>{{ item.get_tipo_display }}</td>
+            <td>{{ item.folio }}</td>
+            <td>{{ item.monto_total|clp }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:boleta_edit' item.pk %}?{{ request.GET.urlencode }}">Editar</a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:boleta_delete' item.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">Sin boletas/facturas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

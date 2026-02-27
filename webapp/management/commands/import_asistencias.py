@@ -4,11 +4,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from openpyxl import load_workbook
 
-from academia.models import Disciplina, SesionClase
-from asistencias.models import Asistencia
-from cuentas.models import Persona
-from organizaciones.models import Organizacion
-
+from database.models import Asistencia, Disciplina, Organizacion, Persona, SesionClase
 
 class Command(BaseCommand):
     help = "Importa asistencias históricas desde planilla Excel."
