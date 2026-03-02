@@ -1,4 +1,4 @@
-"""
+﻿"""
 Base settings shared by all execution environments.
 """
 
@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "database",
     "api",
-    "webapp",
+    "asistencias.apps.AsistenciasConfig",
+    "personas.apps.PersonasConfig",
     "finanzas.apps.FinanzasConfig",
 ]
 
@@ -66,7 +67,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "webapp.context_processors.periodo_context",
+                "asistencias.context_processors.periodo_context",
             ],
         },
     },
@@ -111,7 +112,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/app/"
+LOGIN_REDIRECT_URL = "/asistencias/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 REST_FRAMEWORK = {
@@ -127,3 +128,4 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
 }
+

@@ -1,4 +1,4 @@
-# avx-django-plataformaelemental
+﻿# avx-django-plataformaelemental
 Plataforma administrativa para Espacio Elementos, construida con Django + Django REST Framework.
 
 ## Puesta en marcha
@@ -28,26 +28,26 @@ Plataforma administrativa para Espacio Elementos, construida con Django + Django
 Accesos:
 - Admin Django: `http://127.0.0.1:8000/admin/`
 - Login: `http://127.0.0.1:8000/accounts/login/`
-- App Web: `http://127.0.0.1:8000/app/`
+- App Asistencias: `http://127.0.0.1:8000/asistencias/`
 
-La ruta `/` redirige a `/app/`. El login redirige a `/app/` y el logout vuelve a `/accounts/login/`.
+La ruta `/` redirige a `/asistencias/`. El login redirige a `/asistencias/` y el logout vuelve a `/accounts/login/`. La ruta antigua `/app/` queda como redireccion.
 
-## App Web (/app/)
+## App Asistencias (/asistencias/)
 Enfocada en operacion administrativa y asistencia academica.
 
 Rutas disponibles:
-- Panel administrador: `/app/`
-- Talleres/sesiones: `/app/sesiones/`
-- Asistencias: `/app/asistencias/`
-- Perfil de persona: `/app/personas/<id>/`
-- Estudiantes: `/app/estudiantes/`
-- Profesores: `/app/profesores/`
-- Organizaciones: `/app/organizaciones/`
+- Panel administrador: `/asistencias/`
+- Talleres/sesiones: `/asistencias/sesiones/`
+- Asistencias: `/asistencias/asistencias/`
+- Perfil de persona: `/asistencias/personas/<id>/`
+- Estudiantes: `/asistencias/estudiantes/`
+- Profesores: `/asistencias/profesores/`
+- Organizaciones: `/asistencias/organizaciones/`
 
 Flujos rapidos:
-- Crear sesion y cargar asistentes desde `/app/asistencias/`.
-- Alta rapida de persona en `/app/asistencias/` (se asigna rol ESTUDIANTE cuando aplica).
-- Revision de asistencia por persona en `/app/personas/<id>/`.
+- Crear sesion y cargar asistentes desde `/asistencias/asistencias/`.
+- Alta rapida de persona en `/asistencias/asistencias/` (se asigna rol ESTUDIANTE cuando aplica).
+- Revision de asistencia por persona en `/asistencias/personas/<id>/`.
 
 ## Variables de entorno (dev)
 Si quieres un punto de partida rapido, puedes copiar `.env.dev` y ajustar `DJANGO_SECRET_KEY`.
@@ -101,3 +101,4 @@ python manage.py test
 
 Tambien puedes forzar el modulo con:
 `DJANGO_SETTINGS_MODULE=plataformaelemental.config.<entorno>`.
+

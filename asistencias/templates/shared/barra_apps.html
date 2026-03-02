@@ -1,0 +1,23 @@
+﻿<div class="bg-white border-bottom">
+  <div class="container-fluid py-1 d-flex gap-3 align-items-center">
+    <a
+      class="link-secondary text-decoration-none small"
+      href="{% url 'asistencias:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+    >
+      app asistencias
+    </a>
+    <a
+      class="link-secondary text-decoration-none small"
+      href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+    >
+      app finanzas
+    </a>
+    <a
+      class="link-secondary text-decoration-none small"
+      href="{% url 'personas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+    >
+      app personas
+    </a>
+  </div>
+</div>
+

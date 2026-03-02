@@ -1,4 +1,4 @@
-# PLATAFORMA - Informe tecnico
+﻿# PLATAFORMA - Informe tecnico
 
 ## 1. Objetivo del informe
 Este documento resume el estado tecnico actual de la plataforma Django de Espacio Elementos:
@@ -29,7 +29,7 @@ Validacion tecnica:
 - `organizaciones`: organizaciones base.
 - `academia`: disciplinas y sesiones.
 - `asistencias`: registro de asistencia por sesion/persona.
-- `webapp`: vistas HTML de operacion.
+- `asistencias`: vistas HTML de operacion.
 - `api`: endpoints DRF.
 
 ## 4. Mejoras aplicadas recientemente
@@ -49,17 +49,17 @@ Validacion tecnica:
 - Propagacion de filtros en navegacion principal.
 
 ### 4.3 Cobertura funcional por vistas
-- Dashboard (`/app/`) con resumen mensual operativo.
-- Sesiones (`/app/sesiones/`) con calendario y detalle.
-- Asistencias (`/app/asistencias/`) para carga rapida de operacion diaria.
-- Personas (`/app/personas/<id>/`) con historial de asistencias y resumen de actividad.
+- Dashboard (`/asistencias/`) con resumen mensual operativo.
+- Sesiones (`/asistencias/sesiones/`) con calendario y detalle.
+- Asistencias (`/asistencias/asistencias/`) para carga rapida de operacion diaria.
+- Personas (`/asistencias/personas/<id>/`) con historial de asistencias y resumen de actividad.
 - Estudiantes y profesores con filtros por organizacion.
 
 ## 5. Funcionalidades vigentes
 
 ### 5.1 Autenticacion y acceso
 - Login en `/accounts/login/`.
-- Redireccion principal a `/app/`.
+- Redireccion principal a `/asistencias/`.
 - Navegacion protegida para usuarios autenticados.
 
 ### 5.2 Operacion academica
@@ -105,3 +105,5 @@ Validacion tecnica:
 ## 9. Conclusiones
 La plataforma esta estable y orientada a administracion academica y asistencia.
 La base tecnica es adecuada para seguir evolucionando con mas control de calidad automatizado.
+
+

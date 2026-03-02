@@ -1,0 +1,207 @@
+﻿{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Detalle de pago{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Detalle de pago</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
+        <i class="bi bi-arrow-left"></i><span class="ms-1">Volver</span>
+      </a>
+      <a class="btn btn-sm btn-primary" href="{% url 'finanzas:pago_edit' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+        <i class="bi bi-pencil"></i><span class="ms-1">Editar pago</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header">Informacion del pago</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="small text-muted">Alumno</div>
+              <div class="fw-semibold d-flex align-items-center gap-2">
+                <span>{{ pago.persona }}</span>
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  href="{% url 'personas:persona_detail' pago.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+                  title="Ver en personas"
+                >
+                  <i class="bi bi-person-vcard"></i>
+                </a>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Organizacion</div>
+              <div class="fw-semibold">{{ pago.organizacion.nombre }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Fecha de pago</div>
+              <div>{{ pago.fecha_pago|date:"d/m/Y" }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Metodo</div>
+              <div>{{ pago.get_metodo_pago_display }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Comprobante</div>
+              <div>{{ pago.numero_comprobante|default:"-" }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Plan</div>
+              <div>{{ pago.plan|default:"-" }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Boleta</div>
+              <div>{{ pago.boleta|default:"-" }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Clases asignadas</div>
+              <div>{{ pago.clases_asignadas }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Monto referencia</div>
+              <div>{{ pago.monto_referencia|clp }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Monto neto</div>
+              <div>{{ pago.monto_neto|clp }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">IVA</div>
+              <div>{{ pago.monto_iva|clp }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Monto total</div>
+              <div class="fw-semibold">{{ pago.monto_total|clp }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Clases consumidas</div>
+              <div>{{ consumos_consumidos }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Saldo clases</div>
+              <div>{{ saldo_clases }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Aplica IVA</div>
+              <div>{% if pago.aplica_iva %}Si{% else %}No{% endif %}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Monto incluye IVA</div>
+              <div>{% if pago.monto_incluye_iva %}Si{% else %}No{% endif %}</div>
+            </div>
+            <div class="col-12">
+              <div class="small text-muted">Observaciones</div>
+              <div>{{ pago.observaciones|default:"-" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Creado</div>
+              <div>{{ pago.creado_en|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Actualizado</div>
+              <div>{{ pago.actualizado_en|date:"d/m/Y H:i" }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header">Relacionado al pago</div>
+        <div class="card-body">
+          {% if pago.plan %}
+          <div class="mb-3">
+            <div class="fw-semibold">Plan</div>
+            <div class="small text-muted">{{ pago.plan.nombre }}</div>
+            <div class="small">Precio: {{ pago.plan.precio|clp }}</div>
+            <div class="small">Clases: {{ pago.plan.num_clases }}</div>
+          </div>
+          {% endif %}
+
+          {% if pago.boleta %}
+          <div class="mb-3">
+            <div class="fw-semibold">Boleta o factura</div>
+            <div class="small">{{ pago.boleta.get_tipo_display }} #{{ pago.boleta.folio }}</div>
+            <div class="small">Fecha: {{ pago.boleta.fecha_emision|date:"d/m/Y" }}</div>
+            <div class="small">Cliente: {{ pago.boleta.cliente|default:"-" }}</div>
+            <div class="small">Total: {{ pago.boleta.monto_total|clp }}</div>
+            <div class="d-flex gap-2 mt-2">
+              {% if pago.boleta.archivo %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ pago.boleta.archivo.url }}" target="_blank">Archivo</a>
+              {% endif %}
+              {% if pago.boleta.enlace_sii %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ pago.boleta.enlace_sii }}" target="_blank">SII</a>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if not pago.plan and not pago.boleta and not consumos %}
+          <div class="text-muted">No hay relaciones adicionales para este pago.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">Clases imputadas al pago</div>
+    <div class="card-body">
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="small text-muted">Consumidas</div>
+          <div class="fw-semibold">{{ consumos_consumidos }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Pendientes</div>
+          <div class="fw-semibold">{{ consumos_pendientes }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-muted">Deuda</div>
+          <div class="fw-semibold">{{ consumos_deuda }}</div>
+        </div>
+      </div>
+
+      {% if consumos %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Fecha clase</th>
+              <th>Disciplina</th>
+              <th>Organizacion</th>
+              <th>Estado</th>
+              <th>Sesion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in consumos %}
+            <tr>
+              <td>{{ item.clase_fecha|date:"d/m/Y" }}</td>
+              <td>{{ item.asistencia.sesion.disciplina.nombre }}</td>
+              <td>{{ item.asistencia.sesion.disciplina.organizacion.nombre }}</td>
+              <td>{{ item.get_estado_display }}</td>
+              <td>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.asistencia.sesion.pk %}">
+                  <i class="bi bi-eye"></i><span class="ms-1">Ver sesion</span>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-muted">Este pago aun no tiene clases imputadas.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

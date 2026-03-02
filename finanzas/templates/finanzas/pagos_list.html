@@ -3,6 +3,7 @@
 {% block title %}Pagos{% endblock %}
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 {% endblock %}
 {% block content %}
 <div class="mt-4">
@@ -72,7 +73,8 @@
 
   <div class="card rounded-top-0">
     <div class="card-body table-responsive">
-      <table class="table table-sm">
+      {% if pagos %}
+      <table id="tabla-pagos" class="table table-sm">
         <thead>
           <tr>
             <th>Fecha</th>
@@ -88,29 +90,34 @@
         <tbody>
           {% for pago in pagos %}
           <tr>
-            <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+            <td data-order="{{ pago.fecha_pago|date:'Ymd' }}">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
             <td>{{ pago.persona }}</td>
             <td>{{ pago.organizacion.nombre }}</td>
             <td>{{ pago.plan|default:"-" }}</td>
-            <td>{{ pago.monto_total|clp }}</td>
-            <td>{{ pago.clases_asignadas }}</td>
-            <td>{{ pago.saldo_clases }}</td>
+            <td data-order="{{ pago.monto_total }}">{{ pago.monto_total|clp }}</td>
+            <td data-order="{{ pago.clases_asignadas }}">{{ pago.clases_asignadas }}</td>
+            <td data-order="{{ pago.saldo_clases }}">{{ pago.saldo_clases }}</td>
             <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">Detalle</a>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_edit' pago.pk %}?{{ request.GET.urlencode }}">Editar</a>
               <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
             </td>
           </tr>
-          {% empty %}
-          <tr><td colspan="8" class="text-center text-muted">Sin pagos registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
+      {% else %}
+      <div class="text-center text-muted">Sin pagos registrados.</div>
+      {% endif %}
     </div>
   </div>
 </div>
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
     const personaSelect = document.getElementById("id_persona");
@@ -212,6 +219,27 @@
 
       toggleNumeroComprobante();
       metodoPagoSelect.addEventListener("change", toggleNumeroComprobante);
+    }
+
+    if (window.jQuery && jQuery("#tabla-pagos").length) {
+      jQuery("#tabla-pagos").DataTable({
+        paging: true,
+        pageLength: 25,
+        searching: false,
+        info: true,
+        stateSave: true,
+        order: [[0, "desc"]],
+        columnDefs: [
+          { orderable: false, targets: 7 },
+        ],
+        language: {
+          lengthMenu: "Mostrar _MENU_",
+          info: "Mostrando _START_ a _END_ de _TOTAL_",
+          paginate: { previous: "Anterior", next: "Siguiente" },
+          zeroRecords: "Sin registros",
+          emptyTable: "Sin registros",
+        },
+      });
     }
   })();
 </script>

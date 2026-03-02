@@ -1,0 +1,183 @@
+{% extends "personas/base_personas.html" %}
+{% load finanzas_format %}
+{% block title %}Dashboard Personas{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>CRM de personas</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">
+        Ver listado completo
+      </a>
+      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_create' %}?{{ request.GET.urlencode }}">
+        Nueva persona
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-3">
+      <div class="card text-bg-primary">
+        <div class="card-body">
+          <div class="small text-uppercase">Personas</div>
+          <div class="display-6">{{ total_personas }}</div>
+          <div class="small">Activas: {{ personas_activas }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-success">
+        <div class="card-body">
+          <div class="small text-uppercase">Relacion comercial</div>
+          <div class="display-6">{{ pagos_registrados }}</div>
+          <div class="small">Pagado: {{ monto_pagado_total|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-warning">
+        <div class="card-body">
+          <div class="small text-uppercase">Seguimiento academico</div>
+          <div class="display-6">{{ personas_con_asistencia }}</div>
+          <div class="small">Con asistencia en periodo</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-danger">
+        <div class="card-body">
+          <div class="small text-uppercase">Alertas CRM</div>
+          <div class="display-6">{{ personas_con_deuda_total }}</div>
+          <div class="small">Deuda clases: {{ deuda_total_clases }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="small text-muted">Estudiantes</div>
+          <div class="h3 mb-0">{{ estudiantes_total }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="small text-muted">Profesores</div>
+          <div class="h3 mb-0">{{ profesores_total }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="small text-muted">Con acceso al sistema</div>
+          <div class="h3 mb-0">{{ personas_con_usuario }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="small text-muted">Sin datos de contacto</div>
+          <div class="h3 mb-0">{{ personas_sin_contacto|length }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Personas con deuda</div>
+        <div class="card-body">
+          {% for item in personas_con_deuda %}
+          <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+            <div>
+              <a class="fw-semibold text-decoration-none" href="{% url 'personas:persona_detail' item.pk %}?{{ request.GET.urlencode }}">{{ item }}</a>
+              <div class="small text-muted">Pagos: {{ item.pagos_periodo }} · Asistencias: {{ item.asistencias_periodo }}</div>
+            </div>
+            <span class="badge text-bg-danger">{{ item.deuda_periodo }}</span>
+          </div>
+          {% empty %}
+          <div class="text-muted">Sin deuda en el periodo.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Personas nuevas</div>
+        <div class="card-body">
+          {% for item in personas_nuevas %}
+          <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+            <div>
+              <a class="fw-semibold text-decoration-none" href="{% url 'personas:persona_detail' item.pk %}?{{ request.GET.urlencode }}">{{ item }}</a>
+              <div class="small text-muted">{{ item.email|default:"Sin email" }}</div>
+            </div>
+            <span class="small text-muted">{{ item.creado_en|date:"d/m/Y" }}</span>
+          </div>
+          {% empty %}
+          <div class="text-muted">Sin registros.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Sin contacto</div>
+        <div class="card-body">
+          {% for item in personas_sin_contacto %}
+          <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+            <div>
+              <a class="fw-semibold text-decoration-none" href="{% url 'personas:persona_detail' item.pk %}?{{ request.GET.urlencode }}">{{ item }}</a>
+              <div class="small text-muted">Telefono y email incompletos</div>
+            </div>
+            <span class="badge text-bg-secondary">{% if item.user_id %}con usuario{% else %}sin usuario{% endif %}</span>
+          </div>
+          {% empty %}
+          <div class="text-muted">No hay alertas de contacto.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">Pagos recientes</div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Persona</th>
+            <th>Organizacion</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pago in pagos_recientes %}
+          <tr>
+            <td>{{ pago.fecha_pago|date:"d/m/Y" }}</td>
+            <td><a href="{% url 'personas:persona_detail' pago.persona.pk %}?{{ request.GET.urlencode }}">{{ pago.persona }}</a></td>
+            <td>{{ pago.organizacion.nombre }}</td>
+            <td>{{ pago.monto_total|clp }}</td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' pago.pk %}?{{ request.GET.urlencode }}">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">Sin pagos recientes.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+﻿{% extends "asistencias/base_app.html" %}
+{% block title %}Profesores{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h2>Profesores</h2>
+  <form class="row g-3 mb-3" id="filtro-profesores-form">
+    <input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">
+    <input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">
+    <div class="col-md-6">
+      <label class="form-label">Organizacion</label>
+      <select name="organizacion" class="form-select" id="filtro-organizacion">
+        <option value="">Todas</option>
+        {% for org in organizaciones %}
+          <option value="{{ org.id }}" {% if request.GET.organizacion == org.id|stringformat:'s' %}selected{% endif %}>{{ org.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Organizacion</th>
+          <th>Disciplinas</th>
+          <th>Alumnos unicos</th>
+          <th>Sesiones realizadas</th>
+          <th>Total asistencias del mes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in profesores %}
+        <tr>
+          <td>
+            <a href="{% url 'asistencias:persona_detail' item.persona.pk %}">{{ item.persona }}</a>
+          </td>
+          <td><span class="badge text-bg-light">{{ item.organizacion.nombre }}</span></td>
+          <td>
+            {% for disciplina in item.disciplinas %}
+              <span class="badge text-bg-primary">{{ disciplina.nombre }}</span>
+            {% empty %}
+              <span class="text-muted">-</span>
+            {% endfor %}
+          </td>
+          <td>{{ item.alumnos_unicos_mes }}</td>
+          <td>{{ item.sesiones_mes }}</td>
+          <td>{{ item.asistencias_mes }}</td>
+          <td class="d-none d-md-table-cell">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:persona_detail' item.persona.pk %}">
+              <i class="bi bi-person-badge"></i><span class="d-none d-md-inline ms-1">Ver perfil</span>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted">Sin profesores registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  const filtroOrg = document.getElementById("filtro-organizacion");
+  const filtroForm = document.getElementById("filtro-profesores-form");
+  if (filtroOrg && filtroForm) {
+    filtroOrg.addEventListener("change", () => filtroForm.submit());
+  }
+</script>
+{% endblock %}
+

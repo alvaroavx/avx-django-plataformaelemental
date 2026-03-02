@@ -1,0 +1,75 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}Editar {{ persona_obj }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Editar perfil</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:persona_detail' persona_obj.pk %}?{{ request.GET.urlencode }}">Volver al perfil</a>
+  </div>
+
+  <div class="card">
+    <div class="card-header">{{ persona_obj }}</div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="guardar_persona">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Nombres</label>{{ form.nombres }}{% if form.nombres.errors %}<div class="text-danger small">{{ form.nombres.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Apellidos</label>{{ form.apellidos }}{% if form.apellidos.errors %}<div class="text-danger small">{{ form.apellidos.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Email</label>{{ form.email }}{% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Telefono</label>{{ form.telefono }}{% if form.telefono.errors %}<div class="text-danger small">{{ form.telefono.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Identificador</label>{{ form.identificador }}{% if form.identificador.errors %}<div class="text-danger small">{{ form.identificador.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Fecha nacimiento</label>{{ form.fecha_nacimiento }}{% if form.fecha_nacimiento.errors %}<div class="text-danger small">{{ form.fecha_nacimiento.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-8"><label class="form-label">Usuario vinculado</label>{{ form.user }}{% if form.user.errors %}<div class="text-danger small">{{ form.user.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check mb-2">
+              {{ form.activo }}
+              <label class="form-check-label" for="{{ form.activo.id_for_label }}">Persona activa</label>
+            </div>
+            {% if form.activo.errors %}<div class="text-danger small">{{ form.activo.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        {% if form.non_field_errors %}<div class="text-danger small mt-2">{{ form.non_field_errors|join:", " }}</div>{% endif %}
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-primary" type="submit">Guardar cambios</button>
+          <a class="btn btn-outline-secondary" href="{% url 'personas:persona_detail' persona_obj.pk %}?{{ request.GET.urlencode }}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">Roles y organizaciones</div>
+    <div class="card-body">
+      <form method="post" class="row g-3 mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="agregar_rol">
+        <div class="col-md-5"><label class="form-label">Rol</label>{{ rol_form.rol }}</div>
+        <div class="col-md-5"><label class="form-label">Organizacion</label>{{ rol_form.organizacion }}</div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Agregar</button></div>
+      </form>
+
+      {% for item in roles_asignados %}
+      <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+        <div>
+          <div class="fw-semibold">{{ item.rol.nombre }}</div>
+          <div class="small text-muted">{{ item.organizacion.nombre }}</div>
+        </div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="toggle_rol">
+          <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
+          {% if item.activo %}
+          <button class="btn btn-sm btn-outline-danger" type="submit">Desactivar</button>
+          {% else %}
+          <button class="btn btn-sm btn-outline-success" type="submit">Activar</button>
+          {% endif %}
+        </form>
+      </div>
+      {% empty %}
+      <div class="text-muted">Sin roles asignados.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

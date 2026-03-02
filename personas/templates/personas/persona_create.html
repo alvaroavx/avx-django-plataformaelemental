@@ -1,0 +1,61 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}Nueva persona{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Nueva persona</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">Volver al listado</a>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">Datos de la persona</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Nombres</label>{{ form.nombres }}{% if form.nombres.errors %}<div class="text-danger small">{{ form.nombres.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Apellidos</label>{{ form.apellidos }}{% if form.apellidos.errors %}<div class="text-danger small">{{ form.apellidos.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Email</label>{{ form.email }}{% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Telefono</label>{{ form.telefono }}{% if form.telefono.errors %}<div class="text-danger small">{{ form.telefono.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Identificador</label>{{ form.identificador }}{% if form.identificador.errors %}<div class="text-danger small">{{ form.identificador.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Fecha nacimiento</label>{{ form.fecha_nacimiento }}{% if form.fecha_nacimiento.errors %}<div class="text-danger small">{{ form.fecha_nacimiento.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-8"><label class="form-label">Usuario vinculado</label>{{ form.user }}{% if form.user.errors %}<div class="text-danger small">{{ form.user.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check mb-2">
+                  {{ form.activo }}
+                  <label class="form-check-label" for="{{ form.activo.id_for_label }}">Persona activa</label>
+                </div>
+              </div>
+            </div>
+
+            <hr>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Rol inicial</label>{{ rol_form.rol }}{% if rol_form.rol.errors %}<div class="text-danger small">{{ rol_form.rol.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-6"><label class="form-label">Organizacion inicial</label>{{ rol_form.organizacion }}{% if rol_form.organizacion.errors %}<div class="text-danger small">{{ rol_form.organizacion.errors|join:", " }}</div>{% endif %}</div>
+            </div>
+
+            {% if form.non_field_errors %}<div class="text-danger small mt-2">{{ form.non_field_errors|join:", " }}</div>{% endif %}
+            {% if rol_form.non_field_errors %}<div class="text-danger small mt-2">{{ rol_form.non_field_errors|join:", " }}</div>{% endif %}
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-primary" type="submit">Crear persona</button>
+              <a class="btn btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">Cancelar</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">Uso</div>
+        <div class="card-body">
+          <div class="small text-muted">
+            Puedes crear la persona con un rol inicial y luego completar mas roles u organizaciones desde su perfil CRM.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

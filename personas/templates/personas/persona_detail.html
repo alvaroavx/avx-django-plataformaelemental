@@ -1,0 +1,263 @@
+﻿{% extends "personas/base_personas.html" %}
+{% load finanzas_format %}
+{% block title %}Perfil {{ persona_obj }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-0">{{ persona_obj }}</h2>
+      <div class="text-muted small">Perfil CRM consolidado</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">Volver al listado</a>
+      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_edit' persona_obj.pk %}?{{ request.GET.urlencode }}">Editar perfil</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">Datos personales</div>
+        <div class="card-body">
+          <div class="mb-2"><span class="small text-muted d-block">Nombre</span>{{ persona_obj }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Email</span>{{ persona_obj.email|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Telefono</span>{{ persona_obj.telefono|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Identificador</span>{{ persona_obj.identificador|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Nacimiento</span>{% if persona_obj.fecha_nacimiento %}{{ persona_obj.fecha_nacimiento|date:"d/m/Y" }}{% else %}-{% endif %}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Estado</span>{% if persona_obj.activo %}<span class="badge text-bg-success">Activa</span>{% else %}<span class="badge text-bg-secondary">Inactiva</span>{% endif %}</div>
+          <div class="mb-0"><span class="small text-muted d-block">Creado</span>{{ persona_obj.creado_en|date:"d/m/Y H:i" }}</div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Acceso al sistema</div>
+        <div class="card-body">
+          {% if persona_obj.user %}
+            <div class="mb-2"><span class="small text-muted d-block">Usuario</span>{{ persona_obj.user.username }}</div>
+            <div class="mb-2"><span class="small text-muted d-block">Email usuario</span>{{ persona_obj.user.email|default:"-" }}</div>
+            <div class="mb-2"><span class="small text-muted d-block">Staff</span>{% if persona_obj.user.is_staff %}Si{% else %}No{% endif %}</div>
+            <div class="mb-0"><span class="small text-muted d-block">Ultimo acceso</span>{% if persona_obj.user.last_login %}{{ persona_obj.user.last_login|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+          {% else %}
+            <div class="text-muted">Sin usuario vinculado.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Roles y organizaciones</div>
+        <div class="card-body">
+          <form method="post" class="row g-2 mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="agregar_rol">
+            <div class="col-md-5">
+              <label class="form-label small">Rol</label>
+              {{ rol_form.rol }}
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small">Organizacion</label>
+              {{ rol_form.organizacion }}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-sm btn-outline-primary w-100" type="submit">Agregar</button>
+            </div>
+          </form>
+          {% for item in roles_asignados %}
+            <div class="border-bottom pb-2 mb-2">
+              <div class="fw-semibold">
+                {{ item.rol.nombre }}
+                {% if item.activo %}
+                <span class="badge text-bg-success">Activo</span>
+                {% else %}
+                <span class="badge text-bg-secondary">Inactivo</span>
+                {% endif %}
+              </div>
+              <div class="small text-muted">{{ item.organizacion.nombre }}</div>
+              <div class="small">Asignado: {{ item.asignado_en|date:"d/m/Y" }}</div>
+              <form method="post" class="mt-2">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="toggle_rol">
+                <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
+                {% if item.activo %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Desactivar</button>
+                {% else %}
+                <button class="btn btn-sm btn-outline-success" type="submit">Activar</button>
+                {% endif %}
+              </form>
+            </div>
+          {% empty %}
+            <div class="text-muted">Sin roles asignados.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="card"><div class="card-body"><div class="small text-muted">Asistencias</div><div class="h3 mb-0">{{ asistencias|length }}</div></div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card"><div class="card-body"><div class="small text-muted">Pagos</div><div class="h3 mb-0">{{ pagos|length }}</div></div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card"><div class="card-body"><div class="small text-muted">Monto pagado</div><div class="h5 mb-0">{{ monto_pagado|clp }}</div></div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card"><div class="card-body"><div class="small text-muted">Deuda</div><div class="h3 mb-0">{{ consumos_deuda }}</div></div></div>
+        </div>
+      </div>
+
+      {% if finanzas_resumen %}
+      <div class="card mb-3">
+        <div class="card-header">Resumen financiero del estudiante</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3"><span class="small text-muted d-block">Clases pagadas</span><strong>{{ finanzas_resumen.clases_pagadas }}</strong></div>
+            <div class="col-md-3"><span class="small text-muted d-block">Consumidas</span><strong>{{ finanzas_resumen.clases_consumidas }}</strong></div>
+            <div class="col-md-3"><span class="small text-muted d-block">Saldo</span><strong>{{ finanzas_resumen.saldo_clases }}</strong></div>
+            <div class="col-md-3"><span class="small text-muted d-block">Deuda pendiente</span><strong>{{ finanzas_resumen.deuda_pendiente }}</strong></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card mb-3">
+        <div class="card-header">Asistencias del periodo</div>
+        <div class="card-body table-responsive">
+          {% if asistencias %}
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th></tr></thead>
+            <tbody>
+              {% for item in asistencias %}
+              <tr>
+                <td>{{ item.sesion.fecha|date:"d/m/Y" }}</td>
+                <td><a href="{% url 'asistencias:sesion_detail' item.sesion.pk %}">{{ item.sesion.disciplina.nombre }}</a></td>
+                <td>{{ item.sesion.disciplina.organizacion.nombre }}</td>
+                <td>{{ item.get_estado_display }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-muted">Sin asistencias en el periodo.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Pagos del periodo</div>
+        <div class="card-body table-responsive">
+          {% if pagos %}
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Fecha</th><th>Organizacion</th><th>Plan</th><th>Total</th><th>Saldo</th><th></th></tr></thead>
+            <tbody>
+              {% for item in pagos %}
+              <tr>
+                <td>{{ item.fecha_pago|date:"d/m/Y" }}</td>
+                <td>{{ item.organizacion.nombre }}</td>
+                <td>{{ item.plan|default:"-" }}</td>
+                <td>{{ item.monto_total|clp }}</td>
+                <td>{{ item.saldo_clases }}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Detalle</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-muted">Sin pagos en el periodo.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Consumos financieros</div>
+        <div class="card-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-4"><span class="small text-muted d-block">Consumidos</span><strong>{{ consumos_consumidos }}</strong></div>
+            <div class="col-md-4"><span class="small text-muted d-block">Pendientes</span><strong>{{ consumos_pendientes }}</strong></div>
+            <div class="col-md-4"><span class="small text-muted d-block">Deuda</span><strong>{{ consumos_deuda }}</strong></div>
+          </div>
+          {% if consumos %}
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>Fecha clase</th><th>Disciplina</th><th>Estado</th><th>Pago</th></tr></thead>
+              <tbody>
+                {% for item in consumos %}
+                <tr>
+                  <td>{{ item.clase_fecha|date:"d/m/Y" }}</td>
+                  <td>{{ item.asistencia.sesion.disciplina.nombre }}</td>
+                  <td>{{ item.get_estado_display }}</td>
+                  <td>
+                    {% if item.pago_id %}
+                      <a href="{% url 'finanzas:pago_detail' item.pago_id %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Ver pago</a>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted">Sin consumos financieros.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Boletas relacionadas</div>
+        <div class="card-body table-responsive">
+          {% if boletas %}
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Folio</th><th>Total</th><th></th></tr></thead>
+            <tbody>
+              {% for item in boletas %}
+              <tr>
+                <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
+                <td>{{ item.get_tipo_display }}</td>
+                <td>{{ item.folio }}</td>
+                <td>{{ item.monto_total|clp }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:boleta_edit' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                    Ver boleta
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-muted">Sin boletas relacionadas en el periodo.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Sesiones como profesor</div>
+        <div class="card-body table-responsive">
+          {% if sesiones_profesor %}
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th><th>Asistentes</th></tr></thead>
+            <tbody>
+              {% for item in sesiones_profesor %}
+              <tr>
+                <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                <td><a href="{% url 'asistencias:sesion_detail' item.pk %}">{{ item.disciplina.nombre }}</a></td>
+                <td>{{ item.disciplina.organizacion.nombre }}</td>
+                <td>{{ item.get_estado_display }}</td>
+                <td>{{ item.asistencias.count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-muted">Sin sesiones como profesor en el periodo.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

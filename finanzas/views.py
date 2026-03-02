@@ -1,13 +1,13 @@
-import csv
+﻿import csv
 
 from django.contrib import messages
-from django.db.models import Q, Sum
+from django.db.models import Prefetch, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from database.models import Category, Invoice, Organizacion, Payment, PaymentPlan, Transaction
-from webapp.views import _nav_context, _organizacion_desde_request, _periodo
+from database.models import AttendanceConsumption, Category, Invoice, Organizacion, Payment, PaymentPlan, Transaction
+from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
 
 from .decorators import admin_finanzas_required
 from .forms import CategoryForm, InvoiceForm, PaymentForm, PaymentPlanForm, TransactionForm
@@ -177,6 +177,40 @@ def pago_edit(request, pk):
         "finanzas/form_page.html",
         {"form": form, "title": "Editar pago", "back_url": _url_with_query(request, "finanzas:pagos_list")},
     )
+
+
+@admin_finanzas_required
+def pago_detail(request, pk):
+    context = _base_context(request)
+    pago = get_object_or_404(
+        Payment.objects.select_related("persona", "organizacion", "plan", "boleta").prefetch_related(
+            Prefetch(
+                "consumos",
+                queryset=AttendanceConsumption.objects.select_related(
+                    "asistencia__sesion__disciplina",
+                    "asistencia__sesion__disciplina__organizacion",
+                ).order_by("-clase_fecha", "-id"),
+            )
+        ),
+        pk=pk,
+    )
+    consumos = list(pago.consumos.all())
+    consumos_consumidos = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.CONSUMIDO)
+    consumos_pendientes = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.PENDIENTE)
+    consumos_deuda = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.DEUDA)
+    saldo_clases = pago.clases_asignadas - consumos_consumidos
+    context.update(
+        {
+            "pago": pago,
+            "consumos": consumos,
+            "consumos_consumidos": consumos_consumidos,
+            "consumos_pendientes": consumos_pendientes,
+            "consumos_deuda": consumos_deuda,
+            "saldo_clases": saldo_clases,
+            "back_url": request.META.get("HTTP_REFERER") or _url_with_query(request, "finanzas:pagos_list"),
+        }
+    )
+    return render(request, "finanzas/pago_detail.html", context)
 
 
 @admin_finanzas_required
@@ -412,3 +446,4 @@ def export_transacciones_csv(request):
     return response
 
 # Create your views here.
+

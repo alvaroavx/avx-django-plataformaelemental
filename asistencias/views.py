@@ -1,0 +1,546 @@
+﻿from datetime import timedelta
+import calendar
+
+from django.contrib import messages
+from django.db.models import Count, ExpressionWrapper, F, IntegerField, Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.formats import date_format
+
+from database.models import AttendanceConsumption, Asistencia, Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
+
+from .decorators import role_required
+from .forms import (
+    AsistenciaMasivaForm,
+    PersonaRapidaForm,
+    SesionBasicaForm,
+)
+from .utils import ROLE_ADMIN
+from finanzas.services import resumen_financiero_estudiante
+
+
+def _nav_context(request):
+    """Common navbar context for authenticated asistencias views."""
+    persona = getattr(request.user, "persona", None)
+    roles = []
+    if persona:
+        roles = list(persona.roles.filter(activo=True).values_list("rol__codigo", flat=True))
+    return {"persona": persona, "roles_usuario": roles}
+
+
+def _periodo(request):
+    """Resolve the active month range from query params."""
+    hoy = timezone.localdate()
+    try:
+        anio = int(request.GET.get("periodo_anio", hoy.year))
+    except (TypeError, ValueError):
+        anio = hoy.year
+    try:
+        mes = int(request.GET.get("periodo_mes", hoy.month))
+    except (TypeError, ValueError):
+        mes = hoy.month
+    if mes < 1 or mes > 12:
+        mes = hoy.month
+    if anio < 2000 or anio > 2100:
+        anio = hoy.year
+    inicio = hoy.replace(year=anio, month=mes, day=1)
+    fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    return inicio, fin
+
+
+def _organizacion_desde_request(request):
+    """Return selected organization from global filter, or None."""
+    org_id = request.GET.get("organizacion")
+    if not org_id:
+        return None
+    return Organizacion.objects.filter(pk=org_id).first()
+
+
+@role_required(ROLE_ADMIN)
+def dashboard(request):
+    """Main admin dashboard with period/org-aware operational metrics."""
+    context = _nav_context(request)
+    inicio_mes, fin_mes = _periodo(request)
+    organizacion = _organizacion_desde_request(request)
+    nombre_mes = date_format(inicio_mes, "F")
+    sesiones_mes = (
+        SesionClase.objects.filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+        .select_related("disciplina")
+        .prefetch_related("profesores")
+    )
+    if organizacion:
+        sesiones_mes = sesiones_mes.filter(disciplina__organizacion=organizacion)
+    sesiones_realizadas_mes = sesiones_mes.filter(estado=SesionClase.Estado.COMPLETADA).count()
+    asistencias_mes_qs = Asistencia.objects.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
+    if organizacion:
+        asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion=organizacion)
+    asistentes_ids_qs = asistencias_mes_qs.values_list("persona_id", flat=True).distinct()
+    estudiantes_activos_mes = asistentes_ids_qs.count()
+    estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
+    if organizacion:
+        estudiantes_qs = estudiantes_qs.filter(roles__organizacion=organizacion).distinct()
+    estudiantes_sin_asistencia = estudiantes_qs.exclude(id__in=asistentes_ids_qs).order_by("apellidos", "nombres")[:5]
+    sesiones_resumen = sesiones_mes.annotate(total_asistentes=Count("asistencias")).order_by("-fecha")[:10]
+    context.update(
+        {
+            "sesiones_hoy": sesiones_mes.filter(fecha=timezone.localdate()),
+            "asistencias_mes": asistencias_mes_qs.count(),
+            "estudiantes_activos_mes": estudiantes_activos_mes,
+            "sesiones_realizadas_mes": sesiones_realizadas_mes,
+            "estudiantes_sin_asistencia": estudiantes_sin_asistencia,
+            "sesiones_resumen": sesiones_resumen,
+            "nombre_mes": nombre_mes,
+        }
+    )
+    return render(request, "asistencias/dashboard.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def sesiones_list(request):
+    """Monthly calendar view of sessions."""
+    context = _nav_context(request)
+    organizacion = _organizacion_desde_request(request)
+    badge_palette = [
+        "text-bg-primary",
+        "text-bg-success",
+        "text-bg-danger",
+        "text-bg-warning",
+        "text-bg-info",
+        "text-bg-secondary",
+        "text-bg-dark",
+    ]
+    inicio_periodo, _ = _periodo(request)
+    year = inicio_periodo.year
+    month = inicio_periodo.month
+    cal = calendar.Calendar(firstweekday=calendar.MONDAY)
+    semanas_raw = cal.monthdatescalendar(year, month)
+    inicio_mes = inicio_periodo.replace(day=1)
+    fin_mes = (inicio_mes.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    sesiones_qs = (
+        SesionClase.objects.select_related("disciplina")
+        .prefetch_related("profesores")
+        .filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+        .order_by("fecha")
+    )
+    if organizacion:
+        sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
+    sesiones_por_fecha = {}
+    for sesion in sesiones_qs:
+        badge_class = badge_palette[sesion.disciplina_id % len(badge_palette)]
+        sesiones_por_fecha.setdefault(sesion.fecha, []).append(
+            {
+                "sesion": sesion,
+                "badge_class": badge_class,
+            }
+        )
+    semanas = []
+    for semana in semanas_raw:
+        dias = []
+        for dia in semana:
+            dias.append(
+                {
+                    "fecha": dia,
+                    "en_mes": dia.month == month,
+                    "sesiones": sesiones_por_fecha.get(dia, []),
+                }
+            )
+        semanas.append(dias)
+    context.update(
+        {
+            "semanas": semanas,
+            "mes_actual": inicio_mes,
+        }
+    )
+    return render(request, "asistencias/sesiones_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def estudiantes_list(request):
+    """Student list with attendance status for selected period."""
+    context = _nav_context(request)
+    inicio_mes, fin_mes = _periodo(request)
+    estudiantes = (
+        Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
+        .distinct()
+        .prefetch_related("roles__organizacion", "roles__rol")
+    )
+    org_id = request.GET.get("organizacion")
+    if org_id:
+        estudiantes = estudiantes.filter(roles__organizacion_id=org_id).distinct()
+
+    contexto = []
+    for persona in estudiantes:
+        asistencias_mes_qs = Asistencia.objects.filter(
+            persona=persona,
+            sesion__fecha__gte=inicio_mes,
+            sesion__fecha__lte=fin_mes,
+        )
+        if org_id:
+            asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion_id=org_id)
+        asistencias_mes = asistencias_mes_qs.count()
+        ultima_asistencia = (
+            Asistencia.objects.filter(persona=persona)
+            .select_related("sesion")
+            .order_by("-sesion__fecha")
+            .first()
+        )
+        contexto.append(
+            {
+                "persona": persona,
+                "asistencias_mes": asistencias_mes,
+                "ultima_asistencia": ultima_asistencia.sesion.fecha if ultima_asistencia else None,
+                "activo_mes": asistencias_mes > 0,
+            }
+        )
+    if request.GET.get("sin_asistencia") == "1":
+        contexto = [item for item in contexto if not item["activo_mes"]]
+    context["estudiantes"] = contexto
+    context["filtros"] = {
+        "organizacion": org_id,
+        "sin_asistencia": request.GET.get("sin_asistencia"),
+    }
+    return render(request, "asistencias/estudiantes_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def profesores_list(request):
+    """Teacher list aggregated by organization and selected period."""
+    context = _nav_context(request)
+    profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
+    org_id = request.GET.get("organizacion")
+    inicio_mes, fin_mes = _periodo(request)
+    profesores_data = []
+    for profesor in profesores:
+        organizaciones_prof = profesor.roles.filter(rol__codigo="PROFESOR").select_related("organizacion")
+        if org_id:
+            organizaciones_prof = organizaciones_prof.filter(organizacion_id=org_id)
+        for rol_prof in organizaciones_prof:
+            organizacion = rol_prof.organizacion
+            asistencias_qs = Asistencia.objects.filter(
+                sesion__fecha__gte=inicio_mes,
+                sesion__fecha__lte=fin_mes,
+                sesion__profesores=profesor,
+                sesion__disciplina__organizacion=organizacion,
+            )
+            alumnos_unicos_mes = asistencias_qs.values("persona_id").distinct().count()
+            asistencias_mes = asistencias_qs.count()
+            sesiones_mes = SesionClase.objects.filter(
+                fecha__gte=inicio_mes,
+                fecha__lte=fin_mes,
+                profesores=profesor,
+                disciplina__organizacion=organizacion,
+                estado=SesionClase.Estado.COMPLETADA,
+            ).distinct().count()
+            disciplinas_qs = Disciplina.objects.filter(
+                sesiones__profesores=profesor,
+                organizacion=organizacion,
+            ).distinct().order_by("nombre")
+            profesores_data.append(
+                {
+                    "persona": profesor,
+                    "organizacion": organizacion,
+                    "alumnos_unicos_mes": alumnos_unicos_mes,
+                    "asistencias_mes": asistencias_mes,
+                    "sesiones_mes": sesiones_mes,
+                    "disciplinas": disciplinas_qs,
+                }
+            )
+    profesores_data.sort(key=lambda item: (item["persona"].apellidos or "", item["persona"].nombres or "", item["organizacion"].nombre or ""))
+    context["profesores"] = profesores_data
+    context["organizaciones"] = Organizacion.objects.all()
+    return render(request, "asistencias/profesores_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def persona_detail(request, pk):
+    """Student/teacher profile with period-aware attendance details."""
+    context = _nav_context(request)
+    organizacion_filtro = _organizacion_desde_request(request)
+    persona = get_object_or_404(Persona, pk=pk)
+    roles_codigos = set(persona.roles.values_list("rol__codigo", flat=True))
+    es_estudiante = "ESTUDIANTE" in roles_codigos
+    es_profesor = "PROFESOR" in roles_codigos
+    inicio_mes, fin_mes = _periodo(request)
+
+    if request.method == "POST":
+        sesion_id_post = request.POST.get("sesion_id")
+        estado = request.POST.get("estado")
+        if sesion_id_post and estado in dict(SesionClase.Estado.choices):
+            sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
+            sesion.estado = estado
+            sesion.save(update_fields=["estado"])
+            messages.success(request, "Estado de sesion actualizado.")
+            return redirect("asistencias:persona_detail", pk=persona.pk)
+
+    asistencias_qs = persona.asistencias.select_related("sesion", "sesion__disciplina").order_by("-registrada_en")
+    asistencias_periodo = asistencias_qs.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
+    disciplinas_asistidas = sorted({a.sesion.disciplina.nombre for a in asistencias_qs})
+    finanzas_resumen = resumen_financiero_estudiante(persona, organizacion_filtro) if es_estudiante else None
+    context.update(
+        {
+            "persona": persona,
+            "roles_asignados": persona.roles.select_related("rol", "organizacion"),
+            "asistencias": asistencias_periodo,
+            "es_estudiante": es_estudiante,
+            "es_profesor": es_profesor,
+            "asistencias_mes": asistencias_periodo.count(),
+            "disciplinas_asistidas": disciplinas_asistidas,
+            "asistencia_estados": Asistencia.Estado.choices,
+            "finanzas_resumen": finanzas_resumen,
+        }
+    )
+    if es_estudiante:
+        pagos_estudiante = (
+            Payment.objects.filter(
+                persona=persona,
+                fecha_pago__gte=inicio_mes,
+                fecha_pago__lte=fin_mes,
+            )
+            .select_related("organizacion", "plan", "boleta")
+            .annotate(
+                clases_consumidas_total=Count(
+                    "consumos",
+                    filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
+                    distinct=True,
+                )
+            )
+            .annotate(
+                saldo_clases_total=ExpressionWrapper(
+                    F("clases_asignadas") - F("clases_consumidas_total"),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-fecha_pago", "-id")
+        )
+        if organizacion_filtro:
+            pagos_estudiante = pagos_estudiante.filter(organizacion=organizacion_filtro)
+        context["pagos_estudiante"] = pagos_estudiante
+    if es_profesor:
+        sesiones_realizadas = SesionClase.objects.filter(
+            profesores=persona,
+            fecha__gte=inicio_mes,
+            fecha__lte=fin_mes,
+        ).select_related("disciplina", "disciplina__organizacion").order_by("-fecha")
+        if organizacion_filtro:
+            sesiones_realizadas = sesiones_realizadas.filter(disciplina__organizacion=organizacion_filtro)
+        asistencias_prof = Asistencia.objects.filter(
+            sesion__profesores=persona,
+            sesion__fecha__gte=inicio_mes,
+            sesion__fecha__lte=fin_mes,
+        ).select_related("sesion__disciplina", "sesion__disciplina__organizacion")
+        if organizacion_filtro:
+            asistencias_prof = asistencias_prof.filter(sesion__disciplina__organizacion=organizacion_filtro)
+        sesiones_resumen_qs = sesiones_realizadas
+        resumen_por_org = []
+        organizaciones_resumen = [organizacion_filtro] if organizacion_filtro else Organizacion.objects.all()
+        for org in organizaciones_resumen:
+            sesiones_org = sesiones_resumen_qs.filter(disciplina__organizacion=org)
+            asistencias_org = asistencias_prof.filter(sesion__disciplina__organizacion=org)
+            if not sesiones_org.exists() and not asistencias_org.exists():
+                continue
+            resumen_por_org.append(
+                {
+                    "organizacion": org,
+                    "sesiones": sesiones_org.count(),
+                    "alumnos": asistencias_org.values("persona_id").distinct().count(),
+                    "asistencias": asistencias_org.count(),
+                }
+            )
+        context.update(
+            {
+                "sesiones_realizadas": sesiones_realizadas,
+                "resumen_profesor": resumen_por_org,
+            }
+        )
+    return render(request, "asistencias/persona_detail.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def asistencias_list(request):
+    """Operational attendance page: quick session creation and bulk marking."""
+    context = _nav_context(request)
+    sesion_id = request.GET.get("sesion_id")
+    organizacion = _organizacion_desde_request(request)
+    sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()})
+    asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
+    persona_form = PersonaRapidaForm()
+    estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().order_by("apellidos", "nombres")
+    asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
+
+    if request.method == "POST":
+        if "crear_sesion" in request.POST:
+            sesion_form = SesionBasicaForm(request.POST)
+            if sesion_form.is_valid():
+                disciplina = sesion_form.cleaned_data["disciplina"]
+                fecha = sesion_form.cleaned_data["fecha"] or timezone.localdate()
+                profesores = list(sesion_form.cleaned_data["profesores"])
+                notas = f"{disciplina.nombre} - {fecha}"
+                sesion = SesionClase.objects.create(
+                    disciplina=disciplina,
+                    fecha=fecha,
+                    notas=notas,
+                )
+                if profesores:
+                    sesion.profesores.set(profesores)
+                messages.success(request, "Sesion creada. Ahora puedes agregar asistentes.")
+                return redirect(f"{request.path}?sesion_id={sesion.pk}")
+        elif "cambiar_estado" in request.POST:
+            sesion_id_post = request.POST.get("sesion_id")
+            estado = request.POST.get("estado")
+            if sesion_id_post and estado in dict(SesionClase.Estado.choices):
+                sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
+                sesion.estado = estado
+                sesion.save(update_fields=["estado"])
+                messages.success(request, "Estado de sesion actualizado.")
+                return redirect(request.get_full_path())
+        elif "agregar_persona" in request.POST:
+            persona_form = PersonaRapidaForm(request.POST)
+            if persona_form.is_valid():
+                persona = Persona.objects.create(
+                    nombres=persona_form.cleaned_data["nombres"].strip(),
+                    apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
+                    telefono=persona_form.cleaned_data.get("telefono", "").strip(),
+                )
+                rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
+                organizacion_base = Organizacion.objects.first()
+                if rol_estudiante and organizacion_base:
+                    PersonaRol.objects.get_or_create(
+                        persona=persona,
+                        rol=rol_estudiante,
+                        organizacion=organizacion_base,
+                        defaults={"activo": True},
+                    )
+                    messages.success(request, "Persona creada y asignada como estudiante.")
+                else:
+                    messages.warning(request, "Persona creada, pero no se pudo asignar rol estudiante.")
+                return redirect(request.path)
+        elif "agregar_asistentes" in request.POST:
+            asistencia_form = AsistenciaMasivaForm(request.POST)
+            asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
+            if asistencia_form.is_valid():
+                sesion = get_object_or_404(SesionClase, pk=asistencia_form.cleaned_data["sesion_id"])
+                estudiantes = list(asistencia_form.cleaned_data["estudiantes"])
+                creados = 0
+                for persona in estudiantes:
+                    _, created = Asistencia.objects.get_or_create(
+                        sesion=sesion,
+                        persona=persona,
+                        defaults={"estado": Asistencia.Estado.PRESENTE},
+                    )
+                    if created:
+                        creados += 1
+                if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+                    sesion.estado = SesionClase.Estado.COMPLETADA
+                    sesion.save(update_fields=["estado"])
+                messages.success(request, f"Asistencias agregadas: {creados}.")
+                return redirect(f"{request.path}?sesion_id={sesion.pk}")
+
+    inicio_mes, fin_mes = _periodo(request)
+    estudiantes_mes_qs = Persona.objects.filter(
+        roles__rol__codigo="ESTUDIANTE",
+        asistencias__sesion__fecha__gte=inicio_mes,
+        asistencias__sesion__fecha__lte=fin_mes,
+    )
+    if organizacion:
+        estudiantes_mes_qs = estudiantes_mes_qs.filter(asistencias__sesion__disciplina__organizacion=organizacion)
+    estudiantes_total_mes = estudiantes_mes_qs.distinct().count()
+    sesiones_qs = (
+        SesionClase.objects.select_related("disciplina")
+        .prefetch_related("profesores", "asistencias__persona")
+        .filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+        .order_by("-fecha")
+    )
+    if organizacion:
+        sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
+    sesiones_list = []
+    for sesion in sesiones_qs:
+        sesiones_list.append(
+            {
+                "sesion": sesion,
+                "total_asistentes": sesion.asistencias.count(),
+            }
+        )
+
+    context.update(
+        {
+            "sesion_form": sesion_form,
+            "asistencia_form": asistencia_form,
+            "persona_form": persona_form,
+            "open_nueva_sesion": request.GET.get("open") == "nueva_sesion",
+            "sesiones": sesiones_list,
+            "sesion_seleccionada": SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None,
+            "estudiantes_total": estudiantes_qs.count(),
+            "estudiantes_total_mes": estudiantes_total_mes,
+            "disciplinas": Disciplina.objects.filter(organizacion=organizacion) if organizacion else Disciplina.objects.all(),
+            "profesores": Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
+            "organizaciones": Organizacion.objects.all(),
+        }
+    )
+    return render(request, "asistencias/asistencias_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def sesion_detail(request, pk):
+    """Session detail and attendee state."""
+    context = _nav_context(request)
+    context["hide_periodo"] = True
+    sesion = get_object_or_404(
+        SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
+        pk=pk,
+    )
+    estudiantes_qs = (
+        Persona.objects.filter(
+            roles__rol__codigo="ESTUDIANTE",
+            roles__organizacion=sesion.disciplina.organizacion,
+        )
+        .distinct()
+        .order_by("apellidos", "nombres")
+    )
+    if request.method == "POST":
+        if "cambiar_estado" in request.POST:
+            estado = request.POST.get("estado")
+            if estado in dict(SesionClase.Estado.choices):
+                sesion.estado = estado
+                sesion.save(update_fields=["estado"])
+                messages.success(request, "Estado de sesion actualizado.")
+                return redirect("asistencias:sesion_detail", pk=sesion.pk)
+        elif "agregar_asistentes" in request.POST:
+            estudiantes_ids = request.POST.getlist("estudiantes")
+            estudiantes = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
+            creados = 0
+            for persona in estudiantes:
+                _, created = Asistencia.objects.get_or_create(
+                    sesion=sesion,
+                    persona=persona,
+                    defaults={"estado": Asistencia.Estado.PRESENTE},
+                )
+                if created:
+                    creados += 1
+            if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+                sesion.estado = SesionClase.Estado.COMPLETADA
+                sesion.save(update_fields=["estado"])
+            messages.success(request, f"Asistencias agregadas: {creados}.")
+            return redirect("asistencias:sesion_detail", pk=sesion.pk)
+
+    asistencias = sesion.asistencias.select_related("persona").order_by("-registrada_en")
+    asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
+    context.update(
+        {
+            "sesion": sesion,
+            "asistencias": asistencias,
+            "total_asistentes": asistencias.count(),
+            "estudiantes": estudiantes_qs,
+            "asistentes_ids": asistentes_ids,
+        }
+    )
+    return render(request, "asistencias/sesion_detail.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def organizaciones_list(request):
+    """Organization cards and base data."""
+    context = _nav_context(request)
+    context["hide_periodo"] = True
+    context["organizaciones"] = Organizacion.objects.all().order_by("nombre")
+    return render(request, "asistencias/organizaciones_list.html", context)
+

@@ -1,0 +1,169 @@
+{% extends "personas/base_personas.html" %}
+{% load finanzas_format %}
+{% block title %}Listado de Personas{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Listado CRM de personas</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:dashboard' %}?{{ request.GET.urlencode }}">Volver al dashboard</a>
+      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_create' %}?{{ request.GET.urlencode }}">Nueva persona</a>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">
+        <input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">
+        <input type="hidden" name="organizacion" value="{{ organizacion_id }}">
+        <div class="col-md-4">
+          <label class="form-label">Buscar</label>
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nombre, email, telefono o identificador">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Rol</label>
+          <select name="rol" class="form-select">
+            <option value="">Todos</option>
+            {% for item in roles_disponibles %}
+              <option value="{{ item.codigo }}" {% if rol == item.codigo %}selected{% endif %}>{{ item.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select">
+            <option value="">Todos</option>
+            <option value="activas" {% if estado == "activas" %}selected{% endif %}>Activas</option>
+            <option value="inactivas" {% if estado == "inactivas" %}selected{% endif %}>Inactivas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Usuario</label>
+          <select name="con_usuario" class="form-select">
+            <option value="">Todos</option>
+            <option value="si" {% if con_usuario == "si" %}selected{% endif %}>Con usuario</option>
+            <option value="no" {% if con_usuario == "no" %}selected{% endif %}>Sin usuario</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Deuda</label>
+          <select name="con_deuda" class="form-select">
+            <option value="">Todos</option>
+            <option value="si" {% if con_deuda == "si" %}selected{% endif %}>Con deuda</option>
+            <option value="no" {% if con_deuda == "no" %}selected{% endif %}>Sin deuda</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+          <a class="btn btn-outline-secondary" href="{% url 'personas:personas_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Limpiar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if personas %}
+  <div class="card">
+    <div class="card-body table-responsive">
+      <table id="tabla-personas" class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Persona</th>
+            <th>Roles</th>
+            <th>Contacto</th>
+            <th>Usuario</th>
+            <th>Asistencias</th>
+            <th>Pagos</th>
+            <th>Monto</th>
+            <th>Deuda</th>
+            <th>Ultima asistencia</th>
+            <th>Ultimo pago</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in personas %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ item }}</div>
+              <div class="small text-muted">{{ item.identificador|default:"Sin identificador" }}</div>
+            </td>
+            <td>
+              {% for rol_asignado in item.roles.all %}
+                <div class="small">{{ rol_asignado.rol.nombre }} · {{ rol_asignado.organizacion.nombre }}</div>
+              {% empty %}
+                <span class="text-muted small">Sin roles</span>
+              {% endfor %}
+            </td>
+            <td>
+              <div class="small">{{ item.email|default:"Sin email" }}</div>
+              <div class="small text-muted">{{ item.telefono|default:"Sin telefono" }}</div>
+            </td>
+            <td>
+              {% if item.user_id %}
+                <div>{{ item.user.username }}</div>
+              {% else %}
+                <span class="text-muted">Sin usuario</span>
+              {% endif %}
+            </td>
+            <td data-order="{{ item.asistencias_periodo }}">{{ item.asistencias_periodo }}</td>
+            <td data-order="{{ item.pagos_periodo }}">{{ item.pagos_periodo }}</td>
+            <td data-order="{{ item.monto_pagado_periodo }}">{{ item.monto_pagado_periodo|clp }}</td>
+            <td data-order="{{ item.deuda_periodo }}">{{ item.deuda_periodo }}</td>
+            <td data-order="{% if item.ultima_asistencia %}{{ item.ultima_asistencia|date:'Ymd' }}{% else %}0{% endif %}">
+              {% if item.ultima_asistencia %}{{ item.ultima_asistencia|date:"d/m/Y" }}{% else %}-{% endif %}
+            </td>
+            <td data-order="{% if item.ultimo_pago %}{{ item.ultimo_pago|date:'Ymd' }}{% else %}0{% endif %}">
+              {% if item.ultimo_pago %}{{ item.ultimo_pago|date:"d/m/Y" }}{% else %}-{% endif %}
+            </td>
+            <td>
+              {% if item.activo %}
+                <span class="badge text-bg-success">Activa</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactiva</span>
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:persona_detail' item.pk %}?{{ request.GET.urlencode }}">Perfil</a>
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'personas:persona_edit' item.pk %}?{{ request.GET.urlencode }}">Editar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-light border text-muted mb-0">Sin personas para los filtros seleccionados.</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  (function () {
+    if (!window.jQuery || !jQuery("#tabla-personas").length) return;
+    jQuery("#tabla-personas").DataTable({
+      paging: true,
+      pageLength: 25,
+      searching: false,
+      stateSave: true,
+      order: [[0, "asc"]],
+      columnDefs: [{ orderable: false, targets: 11 }],
+      language: {
+        lengthMenu: "Mostrar _MENU_",
+        info: "Mostrando _START_ a _END_ de _TOTAL_",
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+        emptyTable: "Sin registros",
+      },
+    });
+  })();
+</script>
+{% endblock %}

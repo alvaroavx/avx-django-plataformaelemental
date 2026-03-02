@@ -1,4 +1,4 @@
-"""
+﻿"""
 URL configuration for plataformaelemental project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
@@ -21,15 +21,15 @@ from django.conf.urls.static import static
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from webapp.forms import CustomLoginForm
+from asistencias.forms import CustomLoginForm
 from django.utils.translation import gettext_lazy as _
 
-admin.site.site_header = _("Administración Plataforma Elemental")
+admin.site.site_header = _("AdministraciÃ³n Plataforma Elemental")
 admin.site.site_title = _("Panel de control")
-admin.site.index_title = _("Gestión de operaciones")
+admin.site.index_title = _("GestiÃ³n de operaciones")
 
 urlpatterns = [
-    path("", RedirectView.as_view(url="/app/", permanent=False)),
+    path("", RedirectView.as_view(url="/asistencias/", permanent=False)),
     path("admin/", admin.site.urls),
     path(
         "accounts/login/",
@@ -43,6 +43,9 @@ urlpatterns = [
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += [
-    path("app/", include("webapp.urls")),
+    path("app/", RedirectView.as_view(url="/asistencias/", permanent=False)),
+    path("asistencias/", include("asistencias.urls")),
+    path("personas/", include("personas.urls")),
     path("finanzas/", include("finanzas.urls")),
 ]
+
