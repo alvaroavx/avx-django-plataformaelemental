@@ -1,0 +1,91 @@
+{% extends "asistencias/base_app.html" %}
+{% block title %}{% if modo_formulario == "editar" %}Editar disciplina{% else %}Nueva disciplina{% endif %}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+      {% if modo_formulario == "editar" %}
+        Editar disciplina
+      {% else %}
+        Nueva disciplina
+      {% endif %}
+    </h2>
+    <a
+      class="btn btn-sm btn-outline-secondary"
+      href="{% url 'asistencias:disciplinas_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+    >
+      Volver al listado
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.organizacion.id_for_label }}">Organizacion</label>
+            {{ form.organizacion }}
+            {% for error in form.organizacion.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre</label>
+            {{ form.nombre }}
+            {% for error in form.nombre.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.nivel.id_for_label }}">Nivel</label>
+            {{ form.nivel }}
+            {% for error in form.nivel.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-md-12">
+            <label class="form-label" for="{{ form.descripcion.id_for_label }}">Descripcion</label>
+            {{ form.descripcion }}
+            {% for error in form.descripcion.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-md-12">
+            <div class="form-check">
+              {{ form.activa }}
+              <label class="form-check-label" for="{{ form.activa.id_for_label }}">
+                Disciplina activa
+              </label>
+            </div>
+            {% for error in form.activa.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button class="btn btn-primary" type="submit">
+            {% if modo_formulario == "editar" %}Guardar cambios{% else %}Crear disciplina{% endif %}
+          </button>
+          <a
+            class="btn btn-outline-secondary"
+            href="{% url 'asistencias:disciplinas_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+          >
+            Cancelar
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

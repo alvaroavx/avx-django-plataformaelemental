@@ -1,4 +1,4 @@
-﻿{% load static %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -45,13 +45,13 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav me-auto">
-            <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Panel</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Calendario</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Asistencias</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:estudiantes_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Estudiantes</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:profesores_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Profesores</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:disciplinas_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Disciplinas</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:organizaciones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Organizaciones</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Finanzas</a></li>
           </ul>
           <span class="navbar-text text-white">
             {{ request.user.get_username }}{% if persona %} Â· {{ persona.nombres }}{% endif %}
@@ -73,7 +73,7 @@
             </select>
           </div>
           <div class="col-6 col-md-2">
-            <label class="form-label small mb-1">AÃ±o</label>
+            <label class="form-label small mb-1">Año</label>
             <select name="periodo_anio" class="form-select form-select-sm">
               {% for y in periodo_anios %}
                 <option value="{{ y }}" {% if periodo_anio == y %}selected{% endif %}>{{ y }}</option>
@@ -86,7 +86,7 @@
             </button>
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label small mb-1">OrganizaciÃ³n</label>
+            <label class="form-label small mb-1">Organización</label>
             <select name="organizacion" class="form-select form-select-sm" onchange="this.form.submit()">
               <option value="">Todas</option>
               {% for org in organizaciones_global %}
@@ -129,4 +129,3 @@
     {% block extra_js %}{% endblock %}
   </body>
 </html>
-

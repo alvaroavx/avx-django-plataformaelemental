@@ -1,22 +1,65 @@
-﻿<div class="bg-white border-bottom">
-  <div class="container-fluid py-1 d-flex gap-3 align-items-center">
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap");
+
+  .barra-apps {
+    background: #959ca3;
+  }
+
+  .barra-apps-links {
+    display: flex;
+    gap: 1.35rem;
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .barra-apps-link {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    font-family: "Orbitron", "Consolas", sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: #eef2f7;
+    transition: color 0.15s ease-in-out;
+  }
+
+  .barra-apps-link:first-child {
+    margin-left: 0.95rem;
+  }
+
+  .barra-apps-link:hover {
+    color: #ffffff;
+  }
+
+  .barra-apps-link.activa {
+    background: #212529;
+    color: #f8f9fa;
+    font-weight: 700;
+    border-radius: 0;
+  }
+</style>
+
+<div class="barra-apps">
+  <div class="container-fluid barra-apps-links">
     <a
-      class="link-secondary text-decoration-none small"
+      class="barra-apps-link {% if request.resolver_match.namespace == 'asistencias' %}activa{% endif %}"
       href="{% url 'asistencias:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
     >
-      app asistencias
+      ASISTENCIAS
     </a>
     <a
-      class="link-secondary text-decoration-none small"
+      class="barra-apps-link {% if request.resolver_match.namespace == 'finanzas' %}activa{% endif %}"
       href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
     >
-      app finanzas
+      FINANZAS
     </a>
     <a
-      class="link-secondary text-decoration-none small"
+      class="barra-apps-link {% if request.resolver_match.namespace == 'personas' %}activa{% endif %}"
       href="{% url 'personas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
     >
-      app personas
+      PERSONAS
     </a>
   </div>
 </div>

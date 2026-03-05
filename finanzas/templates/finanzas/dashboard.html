@@ -4,7 +4,7 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Dashboard financiero</h2>
+    <h2>Dashboard Financiero</h2>
     <div>
       <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar pagos CSV</a>
       <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar transacciones CSV</a>

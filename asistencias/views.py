@@ -4,6 +4,7 @@ import calendar
 from django.contrib import messages
 from django.db.models import Count, ExpressionWrapper, F, IntegerField, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import date_format
 
@@ -12,6 +13,7 @@ from database.models import AttendanceConsumption, Asistencia, Disciplina, Organ
 from .decorators import role_required
 from .forms import (
     AsistenciaMasivaForm,
+    DisciplinaForm,
     PersonaRapidaForm,
     SesionBasicaForm,
 )
@@ -54,6 +56,13 @@ def _organizacion_desde_request(request):
     if not org_id:
         return None
     return Organizacion.objects.filter(pk=org_id).first()
+
+
+def _url_con_filtros(request, nombre_url, **kwargs):
+    """Build URL preserving current querystring filters."""
+    url = reverse(nombre_url, kwargs=kwargs or None)
+    query = request.GET.urlencode()
+    return f"{url}?{query}" if query else url
 
 
 @role_required(ROLE_ADMIN)
@@ -249,6 +258,147 @@ def profesores_list(request):
     context["profesores"] = profesores_data
     context["organizaciones"] = Organizacion.objects.all()
     return render(request, "asistencias/profesores_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def disciplinas_list(request):
+    """Disciplines overview with period-based operational summary."""
+    context = _nav_context(request)
+    inicio_mes, fin_mes = _periodo(request)
+    organizacion = _organizacion_desde_request(request)
+
+    disciplinas_qs = Disciplina.objects.select_related("organizacion")
+    if organizacion:
+        disciplinas_qs = disciplinas_qs.filter(organizacion=organizacion)
+
+    disciplinas = disciplinas_qs.annotate(
+        sesiones_periodo=Count(
+            "sesiones",
+            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            distinct=True,
+        ),
+        sesiones_realizadas=Count(
+            "sesiones",
+            filter=Q(
+                sesiones__fecha__gte=inicio_mes,
+                sesiones__fecha__lte=fin_mes,
+                sesiones__estado=SesionClase.Estado.COMPLETADA,
+            ),
+            distinct=True,
+        ),
+        asistencias_periodo=Count(
+            "sesiones__asistencias",
+            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            distinct=True,
+        ),
+        estudiantes_unicos=Count(
+            "sesiones__asistencias__persona",
+            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            distinct=True,
+        ),
+    ).order_by("organizacion__nombre", "nombre", "nivel")
+
+    context.update(
+        {
+            "disciplinas": disciplinas,
+            "inicio_mes": inicio_mes,
+            "fin_mes": fin_mes,
+            "organizacion_seleccionada": organizacion,
+        }
+    )
+    return render(request, "asistencias/disciplinas_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def disciplina_detail(request, pk):
+    """Discipline detail with session and attendance metrics by period."""
+    context = _nav_context(request)
+    inicio_mes, fin_mes = _periodo(request)
+    disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
+
+    sesiones = (
+        SesionClase.objects.filter(
+            disciplina=disciplina,
+            fecha__gte=inicio_mes,
+            fecha__lte=fin_mes,
+        )
+        .prefetch_related("profesores")
+        .annotate(
+            total_asistentes=Count("asistencias"),
+            presentes=Count("asistencias", filter=Q(asistencias__estado=Asistencia.Estado.PRESENTE)),
+            ausentes=Count("asistencias", filter=Q(asistencias__estado=Asistencia.Estado.AUSENTE)),
+            justificadas=Count("asistencias", filter=Q(asistencias__estado=Asistencia.Estado.JUSTIFICADA)),
+        )
+        .order_by("-fecha")
+    )
+
+    asistencias_qs = Asistencia.objects.filter(
+        sesion__disciplina=disciplina,
+        sesion__fecha__gte=inicio_mes,
+        sesion__fecha__lte=fin_mes,
+    )
+    resumen = {
+        "sesiones_total": sesiones.count(),
+        "sesiones_realizadas": sesiones.filter(estado=SesionClase.Estado.COMPLETADA).count(),
+        "asistencias_total": asistencias_qs.count(),
+        "estudiantes_unicos": asistencias_qs.values("persona_id").distinct().count(),
+    }
+
+    context.update(
+        {
+            "disciplina": disciplina,
+            "sesiones": sesiones,
+            "resumen": resumen,
+            "inicio_mes": inicio_mes,
+            "fin_mes": fin_mes,
+        }
+    )
+    return render(request, "asistencias/disciplina_detail.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def disciplina_create(request):
+    """Create discipline."""
+    context = _nav_context(request)
+    initial = {}
+    if request.GET.get("organizacion"):
+        initial["organizacion"] = request.GET.get("organizacion")
+
+    form = DisciplinaForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        disciplina = form.save()
+        messages.success(request, "Disciplina creada correctamente.")
+        return redirect(_url_con_filtros(request, "asistencias:disciplina_detail", pk=disciplina.pk))
+
+    context.update(
+        {
+            "form": form,
+            "modo_formulario": "crear",
+        }
+    )
+    return render(request, "asistencias/disciplina_form.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def disciplina_edit(request, pk):
+    """Edit existing discipline."""
+    context = _nav_context(request)
+    disciplina = get_object_or_404(Disciplina, pk=pk)
+    form = DisciplinaForm(request.POST or None, instance=disciplina)
+
+    if request.method == "POST" and form.is_valid():
+        disciplina = form.save()
+        messages.success(request, "Disciplina actualizada correctamente.")
+        return redirect(_url_con_filtros(request, "asistencias:disciplina_detail", pk=disciplina.pk))
+
+    context.update(
+        {
+            "form": form,
+            "disciplina": disciplina,
+            "modo_formulario": "editar",
+        }
+    )
+    return render(request, "asistencias/disciplina_form.html", context)
 
 
 @role_required(ROLE_ADMIN)

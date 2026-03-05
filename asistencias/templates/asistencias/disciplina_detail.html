@@ -1,0 +1,155 @@
+{% extends "asistencias/base_app.html" %}
+{% block title %}Detalle disciplina{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h2 class="mb-1">{{ disciplina.nombre }}</h2>
+      <div class="text-muted">
+        {{ disciplina.organizacion.nombre }}{% if disciplina.nivel %} - {{ disciplina.nivel }}{% endif %}
+      </div>
+      <small class="text-muted">
+        Periodo {{ inicio_mes|date:"d/m/Y" }} al {{ fin_mes|date:"d/m/Y" }}
+      </small>
+    </div>
+    <div class="d-flex gap-2">
+      <a
+        class="btn btn-sm btn-outline-secondary"
+        href="{% url 'asistencias:disciplinas_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+      >
+        Volver al listado
+      </a>
+      <a
+        class="btn btn-sm btn-outline-primary"
+        href="{% url 'asistencias:disciplina_edit' disciplina.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+      >
+        Editar disciplina
+      </a>
+      <a
+        class="btn btn-sm btn-primary"
+        href="{% url 'asistencias:disciplina_create' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+      >
+        Nueva disciplina
+      </a>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="small text-muted">Estado</div>
+          {% if disciplina.activa %}
+            <span class="badge text-bg-success">Activa</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Inactiva</span>
+          {% endif %}
+        </div>
+        <div class="col-md-9">
+          <div class="small text-muted">Descripcion</div>
+          <div>{{ disciplina.descripcion|default:"Sin descripcion." }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card text-bg-primary">
+        <div class="card-body">
+          <div class="small">Sesiones del periodo</div>
+          <div class="display-6">{{ resumen.sesiones_total }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-success">
+        <div class="card-body">
+          <div class="small">Sesiones realizadas</div>
+          <div class="display-6">{{ resumen.sesiones_realizadas }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-info">
+        <div class="card-body">
+          <div class="small">Asistencias</div>
+          <div class="display-6">{{ resumen.asistencias_total }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-bg-dark">
+        <div class="card-body">
+          <div class="small">Estudiantes unicos</div>
+          <div class="display-6">{{ resumen.estudiantes_unicos }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Sesiones de la disciplina</span>
+      <small class="text-muted">Cada fila permite ver la sesion en detalle</small>
+    </div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th>Profesores</th>
+            <th>Asistencias</th>
+            <th>Presentes</th>
+            <th>Ausentes</th>
+            <th>Justificadas</th>
+            <th class="text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sesion in sesiones %}
+          <tr>
+            <td>{{ sesion.fecha|date:"d/m/Y" }}</td>
+            <td>
+              {% if sesion.estado == "completada" %}
+                <span class="badge text-bg-success">Completada</span>
+              {% elif sesion.estado == "cancelada" %}
+                <span class="badge text-bg-danger">Cancelada</span>
+              {% else %}
+                <span class="badge text-bg-info">Programada</span>
+              {% endif %}
+            </td>
+            <td>
+              {% for profesor in sesion.profesores.all %}
+                {{ profesor }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                <span class="text-muted">Sin profesores</span>
+              {% endfor %}
+            </td>
+            <td>{{ sesion.total_asistentes }}</td>
+            <td>{{ sesion.presentes }}</td>
+            <td>{{ sesion.ausentes }}</td>
+            <td>{{ sesion.justificadas }}</td>
+            <td class="text-end">
+              <a
+                class="btn btn-sm btn-outline-secondary"
+                href="{% url 'asistencias:sesion_detail' sesion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+              >
+                Ver sesion
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">
+              No hay sesiones en el periodo seleccionado.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

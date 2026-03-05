@@ -3,6 +3,26 @@ from django.contrib.auth.forms import AuthenticationForm
 
 from database.models import Disciplina, Persona
 
+
+class DisciplinaForm(forms.ModelForm):
+    class Meta:
+        model = Disciplina
+        fields = ["organizacion", "nombre", "nivel", "descripcion", "activa"]
+        widgets = {
+            "organizacion": forms.Select(attrs={"class": "form-select"}),
+            "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombre de disciplina"}),
+            "nivel": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nivel (opcional)"}),
+            "descripcion": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Descripcion breve de la disciplina",
+                }
+            ),
+            "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
 class SesionBasicaForm(forms.Form):
     disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.all(), required=True)
     fecha = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))

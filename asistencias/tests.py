@@ -141,3 +141,78 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["sesiones_realizadas_mes"], 1)
 
+    def test_disciplinas_list_muestra_resumen_operativo(self):
+        sesion_realizada = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-02-27",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        otro_estudiante = Persona.objects.create(
+            nombres="Luis",
+            apellidos="Rojas",
+            email="luis2@example.com",
+        )
+        rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=otro_estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        Asistencia.objects.create(sesion=sesion_realizada, persona=self.estudiante)
+        Asistencia.objects.create(sesion=sesion_realizada, persona=otro_estudiante)
+
+        response = self.client.get(
+            reverse("asistencias:disciplinas_list"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        disciplina = response.context["disciplinas"].get(pk=self.disciplina.pk)
+        self.assertEqual(disciplina.sesiones_realizadas, 1)
+        self.assertEqual(disciplina.sesiones_periodo, 2)
+        self.assertEqual(disciplina.asistencias_periodo, 3)
+        self.assertEqual(disciplina.estudiantes_unicos, 2)
+
+    def test_disciplina_create_redirige_a_detalle_con_filtros(self):
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
+        url = f"{reverse('asistencias:disciplina_create')}?{query}"
+
+        response = self.client.post(
+            url,
+            {
+                "organizacion": self.organizacion.pk,
+                "nombre": "Contemporaneo",
+                "nivel": "Intermedio",
+                "descripcion": "Taller de danza contemporanea",
+                "activa": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        nueva = Disciplina.objects.get(nombre="Contemporaneo")
+        self.assertEqual(
+            response.url,
+            f"{reverse('asistencias:disciplina_detail', kwargs={'pk': nueva.pk})}?{query}",
+        )
+
+    def test_disciplina_edit_actualiza_nombre(self):
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
+        url = f"{reverse('asistencias:disciplina_edit', kwargs={'pk': self.disciplina.pk})}?{query}"
+
+        response = self.client.post(
+            url,
+            {
+                "organizacion": self.organizacion.pk,
+                "nombre": "Flexibilidad avanzada",
+                "nivel": "",
+                "descripcion": "Actualizada",
+                "activa": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.disciplina.refresh_from_db()
+        self.assertEqual(self.disciplina.nombre, "Flexibilidad avanzada")
+
