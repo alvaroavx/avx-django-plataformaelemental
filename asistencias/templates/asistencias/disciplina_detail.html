@@ -9,7 +9,7 @@
         {{ disciplina.organizacion.nombre }}{% if disciplina.nivel %} - {{ disciplina.nivel }}{% endif %}
       </div>
       <small class="text-muted">
-        Periodo {{ inicio_mes|date:"d/m/Y" }} al {{ fin_mes|date:"d/m/Y" }}
+        Período {{ inicio_mes|date:"d/m/Y" }} al {{ fin_mes|date:"d/m/Y" }}
       </small>
     </div>
     <div class="d-flex gap-2">
@@ -46,8 +46,8 @@
           {% endif %}
         </div>
         <div class="col-md-9">
-          <div class="small text-muted">Descripcion</div>
-          <div>{{ disciplina.descripcion|default:"Sin descripcion." }}</div>
+          <div class="small text-muted">Descripción</div>
+          <div>{{ disciplina.descripcion|default:"Sin descripción." }}</div>
         </div>
       </div>
     </div>
@@ -57,7 +57,7 @@
     <div class="col-md-3">
       <div class="card text-bg-primary">
         <div class="card-body">
-          <div class="small">Sesiones del periodo</div>
+          <div class="small">Sesiones del período</div>
           <div class="display-6">{{ resumen.sesiones_total }}</div>
         </div>
       </div>
@@ -81,7 +81,7 @@
     <div class="col-md-3">
       <div class="card text-bg-dark">
         <div class="card-body">
-          <div class="small">Estudiantes unicos</div>
+          <div class="small">Estudiantes únicos</div>
           <div class="display-6">{{ resumen.estudiantes_unicos }}</div>
         </div>
       </div>
@@ -91,7 +91,7 @@
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span>Sesiones de la disciplina</span>
-      <small class="text-muted">Cada fila permite ver la sesion en detalle</small>
+      <small class="text-muted">Cada fila permite ver la sesión en detalle</small>
     </div>
     <div class="card-body table-responsive">
       <table class="table table-sm align-middle mb-0">
@@ -136,14 +136,14 @@
                 class="btn btn-sm btn-outline-secondary"
                 href="{% url 'asistencias:sesion_detail' sesion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
               >
-                Ver sesion
+                Ver sesión
               </a>
             </td>
           </tr>
           {% empty %}
           <tr>
             <td colspan="8" class="text-center text-muted py-4">
-              No hay sesiones en el periodo seleccionado.
+              No hay sesiones en el período seleccionado.
             </td>
           </tr>
           {% endfor %}

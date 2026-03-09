@@ -16,7 +16,7 @@ class DisciplinaForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "rows": 4,
-                    "placeholder": "Descripcion breve de la disciplina",
+                    "placeholder": "Descripción breve de la disciplina",
                 }
             ),
             "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),

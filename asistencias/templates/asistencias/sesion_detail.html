@@ -1,11 +1,11 @@
-﻿{% extends "asistencias/base_app.html" %}
-{% block title %}Detalle sesion{% endblock %}
+{% extends "asistencias/base_app.html" %}
+{% block title %}Detalle sesión{% endblock %}
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
-        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atras</span>
+        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
       </a>
       <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
@@ -79,7 +79,7 @@
         <input id="estudiantes_search_detalle" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
         <div class="d-flex gap-2 mb-2">
           <button id="seleccionar_visibles_detalle" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
-          <button id="limpiar_seleccion_detalle" class="btn btn-sm btn-outline-secondary" type="button">Limpiar seleccion</button>
+          <button id="limpiar_seleccion_detalle" class="btn btn-sm btn-outline-secondary" type="button">Limpiar selección</button>
         </div>
         <div class="border rounded p-2" style="max-height: 320px; overflow-y: auto;">
           {% for estudiante in estudiantes %}
@@ -182,4 +182,3 @@
   })();
 </script>
 {% endblock %}
-

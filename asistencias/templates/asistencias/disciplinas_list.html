@@ -6,7 +6,7 @@
     <div>
       <h2 class="mb-0">Disciplinas</h2>
       <small class="text-muted">
-        Resumen del periodo {{ inicio_mes|date:"d/m/Y" }} al {{ fin_mes|date:"d/m/Y" }}.
+        Resumen del período {{ inicio_mes|date:"d/m/Y" }} al {{ fin_mes|date:"d/m/Y" }}.
       </small>
     </div>
     <a
@@ -23,12 +23,12 @@
         <thead>
           <tr>
             <th>Disciplina</th>
-            <th>Organizacion</th>
+            <th>Organización</th>
             <th>Nivel</th>
             <th>Estado</th>
             <th>Sesiones realizadas</th>
             <th>Asistencias</th>
-            <th>Estudiantes unicos</th>
+            <th>Estudiantes únicos</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -37,7 +37,7 @@
           <tr>
             <td>
               <div class="fw-semibold">{{ disciplina.nombre }}</div>
-              <div class="small text-muted">{{ disciplina.descripcion|default:"Sin descripcion"|truncatechars:90 }}</div>
+              <div class="small text-muted">{{ disciplina.descripcion|default:"Sin descripción"|truncatechars:90 }}</div>
             </td>
             <td>{{ disciplina.organizacion.nombre }}</td>
             <td>{{ disciplina.nivel|default:"-" }}</td>

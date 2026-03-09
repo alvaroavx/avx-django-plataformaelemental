@@ -1,4 +1,4 @@
-﻿from datetime import timedelta
+from datetime import timedelta
 import calendar
 
 from django.contrib import messages
@@ -22,7 +22,7 @@ from finanzas.services import resumen_financiero_estudiante
 
 
 def _nav_context(request):
-    """Common navbar context for authenticated asistencias views."""
+    """Contexto base de navegación para vistas autenticadas de asistencias."""
     persona = getattr(request.user, "persona", None)
     roles = []
     if persona:
@@ -31,7 +31,7 @@ def _nav_context(request):
 
 
 def _periodo(request):
-    """Resolve the active month range from query params."""
+    """Resuelve el rango mensual activo desde los parámetros de consulta."""
     hoy = timezone.localdate()
     try:
         anio = int(request.GET.get("periodo_anio", hoy.year))
@@ -51,7 +51,7 @@ def _periodo(request):
 
 
 def _organizacion_desde_request(request):
-    """Return selected organization from global filter, or None."""
+    """Retorna la organización seleccionada desde el filtro global, o `None`."""
     org_id = request.GET.get("organizacion")
     if not org_id:
         return None
@@ -59,7 +59,7 @@ def _organizacion_desde_request(request):
 
 
 def _url_con_filtros(request, nombre_url, **kwargs):
-    """Build URL preserving current querystring filters."""
+    """Construye una URL manteniendo los filtros actuales del querystring."""
     url = reverse(nombre_url, kwargs=kwargs or None)
     query = request.GET.urlencode()
     return f"{url}?{query}" if query else url
@@ -67,7 +67,7 @@ def _url_con_filtros(request, nombre_url, **kwargs):
 
 @role_required(ROLE_ADMIN)
 def dashboard(request):
-    """Main admin dashboard with period/org-aware operational metrics."""
+    """Panel principal con métricas operativas según período y organización."""
     context = _nav_context(request)
     inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
@@ -106,7 +106,7 @@ def dashboard(request):
 
 @role_required(ROLE_ADMIN)
 def sesiones_list(request):
-    """Monthly calendar view of sessions."""
+    """Vista calendario mensual de sesiones."""
     context = _nav_context(request)
     organizacion = _organizacion_desde_request(request)
     badge_palette = [
@@ -165,7 +165,7 @@ def sesiones_list(request):
 
 @role_required(ROLE_ADMIN)
 def estudiantes_list(request):
-    """Student list with attendance status for selected period."""
+    """Listado de estudiantes con estado de asistencia del período seleccionado."""
     context = _nav_context(request)
     inicio_mes, fin_mes = _periodo(request)
     estudiantes = (
@@ -213,7 +213,7 @@ def estudiantes_list(request):
 
 @role_required(ROLE_ADMIN)
 def profesores_list(request):
-    """Teacher list aggregated by organization and selected period."""
+    """Listado de profesores agrupado por organización y período seleccionado."""
     context = _nav_context(request)
     profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
     org_id = request.GET.get("organizacion")
@@ -262,7 +262,7 @@ def profesores_list(request):
 
 @role_required(ROLE_ADMIN)
 def disciplinas_list(request):
-    """Disciplines overview with period-based operational summary."""
+    """Resumen de disciplinas con métricas operativas del período."""
     context = _nav_context(request)
     inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
@@ -311,7 +311,7 @@ def disciplinas_list(request):
 
 @role_required(ROLE_ADMIN)
 def disciplina_detail(request, pk):
-    """Discipline detail with session and attendance metrics by period."""
+    """Detalle de disciplina con métricas de sesiones y asistencias por período."""
     context = _nav_context(request)
     inicio_mes, fin_mes = _periodo(request)
     disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
@@ -358,7 +358,7 @@ def disciplina_detail(request, pk):
 
 @role_required(ROLE_ADMIN)
 def disciplina_create(request):
-    """Create discipline."""
+    """Crea una disciplina."""
     context = _nav_context(request)
     initial = {}
     if request.GET.get("organizacion"):
@@ -381,7 +381,7 @@ def disciplina_create(request):
 
 @role_required(ROLE_ADMIN)
 def disciplina_edit(request, pk):
-    """Edit existing discipline."""
+    """Edita una disciplina existente."""
     context = _nav_context(request)
     disciplina = get_object_or_404(Disciplina, pk=pk)
     form = DisciplinaForm(request.POST or None, instance=disciplina)
@@ -403,7 +403,7 @@ def disciplina_edit(request, pk):
 
 @role_required(ROLE_ADMIN)
 def persona_detail(request, pk):
-    """Student/teacher profile with period-aware attendance details."""
+    """Perfil de estudiante o profesor con detalle de asistencias por período."""
     context = _nav_context(request)
     organizacion_filtro = _organizacion_desde_request(request)
     persona = get_object_or_404(Persona, pk=pk)
@@ -419,7 +419,7 @@ def persona_detail(request, pk):
             sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
             sesion.estado = estado
             sesion.save(update_fields=["estado"])
-            messages.success(request, "Estado de sesion actualizado.")
+            messages.success(request, "Estado de la sesión actualizado.")
             return redirect("asistencias:persona_detail", pk=persona.pk)
 
     asistencias_qs = persona.asistencias.select_related("sesion", "sesion__disciplina").order_by("-registrada_en")
@@ -507,7 +507,7 @@ def persona_detail(request, pk):
 
 @role_required(ROLE_ADMIN)
 def asistencias_list(request):
-    """Operational attendance page: quick session creation and bulk marking."""
+    """Pantalla operativa para crear sesiones y registrar asistencias en bloque."""
     context = _nav_context(request)
     sesion_id = request.GET.get("sesion_id")
     organizacion = _organizacion_desde_request(request)
@@ -532,7 +532,7 @@ def asistencias_list(request):
                 )
                 if profesores:
                     sesion.profesores.set(profesores)
-                messages.success(request, "Sesion creada. Ahora puedes agregar asistentes.")
+                messages.success(request, "Sesión creada. Ahora puedes agregar asistentes.")
                 return redirect(f"{request.path}?sesion_id={sesion.pk}")
         elif "cambiar_estado" in request.POST:
             sesion_id_post = request.POST.get("sesion_id")
@@ -541,7 +541,7 @@ def asistencias_list(request):
                 sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
-                messages.success(request, "Estado de sesion actualizado.")
+                messages.success(request, "Estado de la sesión actualizado.")
                 return redirect(request.get_full_path())
         elif "agregar_persona" in request.POST:
             persona_form = PersonaRapidaForm(request.POST)
@@ -562,7 +562,7 @@ def asistencias_list(request):
                     )
                     messages.success(request, "Persona creada y asignada como estudiante.")
                 else:
-                    messages.warning(request, "Persona creada, pero no se pudo asignar rol estudiante.")
+                    messages.warning(request, "Persona creada, pero no se pudo asignar el rol de estudiante.")
                 return redirect(request.path)
         elif "agregar_asistentes" in request.POST:
             asistencia_form = AsistenciaMasivaForm(request.POST)
@@ -631,7 +631,7 @@ def asistencias_list(request):
 
 @role_required(ROLE_ADMIN)
 def sesion_detail(request, pk):
-    """Session detail and attendee state."""
+    """Detalle de la sesión y estado de sus asistentes."""
     context = _nav_context(request)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
@@ -652,7 +652,7 @@ def sesion_detail(request, pk):
             if estado in dict(SesionClase.Estado.choices):
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
-                messages.success(request, "Estado de sesion actualizado.")
+                messages.success(request, "Estado de la sesión actualizado.")
                 return redirect("asistencias:sesion_detail", pk=sesion.pk)
         elif "agregar_asistentes" in request.POST:
             estudiantes_ids = request.POST.getlist("estudiantes")
@@ -688,9 +688,8 @@ def sesion_detail(request, pk):
 
 @role_required(ROLE_ADMIN)
 def organizaciones_list(request):
-    """Organization cards and base data."""
+    """Tarjetas de organizaciones y datos base."""
     context = _nav_context(request)
     context["hide_periodo"] = True
     context["organizaciones"] = Organizacion.objects.all().order_by("nombre")
     return render(request, "asistencias/organizaciones_list.html", context)
-

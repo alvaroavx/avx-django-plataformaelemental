@@ -1,11 +1,11 @@
-﻿{% extends "asistencias/base_app.html" %}
+{% extends "asistencias/base_app.html" %}
 {% load finanzas_format %}
 {% block title %}Perfil {{ persona }}{% endblock %}
 {% block content %}
 <div class="mt-4">
   <div class="mb-2 d-flex gap-2">
     <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
-      <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atras</span>
+      <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
     </a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'personas:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
       <i class="bi bi-person-vcard"></i><span class="d-none d-md-inline ms-1">Ver en personas</span>
@@ -21,7 +21,7 @@
           <div class="text-muted small">{{ persona.telefono|default:"-" }}</div>
           <div class="mt-2">
             {% for pr in roles_asignados %}
-              <span class="badge text-bg-light me-1">{{ pr.rol.nombre }} Â· {{ pr.organizacion.nombre }}</span>
+              <span class="badge text-bg-light me-1">{{ pr.rol.nombre }} · {{ pr.organizacion.nombre }}</span>
             {% empty %}
               <span class="text-muted">Sin roles</span>
             {% endfor %}
@@ -55,7 +55,7 @@
             <strong>{{ finanzas_resumen.deuda_pendiente }}</strong>
           </div>
           <div class="d-flex justify-content-between small">
-            <span>Ultimo pago</span>
+            <span>Último pago</span>
             <strong>{% if finanzas_resumen.fecha_ultimo_pago %}{{ finanzas_resumen.fecha_ultimo_pago|date:"d/m/Y" }}{% else %}-{% endif %}</strong>
           </div>
           {% endif %}
@@ -156,9 +156,9 @@
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Organizacion</th>
+                <th>Organización</th>
                 <th>Plan</th>
-                <th>Metodo</th>
+                <th>Método</th>
                 <th>Comprobante</th>
                 <th>Boleta</th>
                 <th>Total</th>
@@ -185,7 +185,7 @@
             </tbody>
           </table>
           {% else %}
-            <div class="text-muted">Sin pagos en el periodo seleccionado.</div>
+            <div class="text-muted">Sin pagos en el período seleccionado.</div>
           {% endif %}
         </div>
       </div>
@@ -200,7 +200,7 @@
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Organizacion</th>
+                <th>Organización</th>
                 <th>Disciplina</th>
                 <th>Estado</th>
                 <th>Asistentes</th>
@@ -217,7 +217,7 @@
                 <td>{{ sesion.asistencias.count }}</td>
                 <td class="d-none d-md-table-cell">
                   <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:sesion_detail' sesion.pk %}">
-                    <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesion</span>
+                    <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesión</span>
                   </a>
                   <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?sesion_id={{ sesion.pk }}">
                     <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
@@ -289,4 +289,3 @@
   })();
 </script>
 {% endblock %}
-

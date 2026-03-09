@@ -1,4 +1,4 @@
-﻿{% extends "asistencias/base_app.html" %}
+{% extends "asistencias/base_app.html" %}
 {% block title %}Asistencias{% endblock %}
 {% block content %}
 <div class="mt-4">
@@ -6,9 +6,9 @@
     <div class="col-12">
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Nueva sesion</span>
+          <span>Nueva sesión</span>
           <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">
-            <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesion</span>
+            <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
           </button>
         </div>
         <div class="card-body collapse {% if open_nueva_sesion %}show{% endif %}" id="nuevaSesionForm">
@@ -27,7 +27,7 @@
                   </div>
                   <div>
                     <button class="btn btn-primary" name="crear_sesion" type="submit">
-                      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesion</span>
+                      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesión</span>
                     </button>
                   </div>
                 </div>
@@ -64,7 +64,7 @@
                 {{ persona_form.apellidos }}
               </div>
               <div class="col-md-3">
-                <label class="form-label" for="id_telefono">Telefono: </label>
+                <label class="form-label" for="id_telefono">Teléfono: </label>
                 {{ persona_form.telefono }}
               </div>
               <div class="col-md-3">
@@ -88,7 +88,7 @@
         <div class="card-body collapse {% if sesion_seleccionada %}show{% endif %}" id="agregarAsistentesForm">
           {% if sesion_seleccionada %}
             <div class="mb-2 text-muted small">
-              Sesion: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
+              Sesión: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
             </div>
             <form method="post">
               {% csrf_token %}
@@ -102,7 +102,7 @@
               </button>
             </form>
           {% else %}
-            <div class="text-muted">Crea o selecciona una sesion para agregar asistentes.</div>
+            <div class="text-muted">Crea o selecciona una sesión para agregar asistentes.</div>
           {% endif %}
         </div>
       </div>
@@ -339,4 +339,3 @@
   })();
 </script>
 {% endblock %}
-

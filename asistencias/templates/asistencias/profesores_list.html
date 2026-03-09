@@ -1,4 +1,4 @@
-﻿{% extends "asistencias/base_app.html" %}
+{% extends "asistencias/base_app.html" %}
 {% block title %}Profesores{% endblock %}
 {% block content %}
 <div class="mt-4">
@@ -7,7 +7,7 @@
     <input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">
     <input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">
     <div class="col-md-6">
-      <label class="form-label">Organizacion</label>
+      <label class="form-label">Organización</label>
       <select name="organizacion" class="form-select" id="filtro-organizacion">
         <option value="">Todas</option>
         {% for org in organizaciones %}
@@ -21,9 +21,9 @@
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Organizacion</th>
+          <th>Organización</th>
           <th>Disciplinas</th>
-          <th>Alumnos unicos</th>
+          <th>Alumnos únicos</th>
           <th>Sesiones realizadas</th>
           <th>Total asistencias del mes</th>
           <th></th>
@@ -67,4 +67,3 @@
   }
 </script>
 {% endblock %}
-

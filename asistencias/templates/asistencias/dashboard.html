@@ -1,5 +1,5 @@
-﻿{% extends "asistencias/base_app.html" %}
-{% block title %}Dashboard Asistencias{% endblock %}
+{% extends "asistencias/base_app.html" %}
+{% block title %}Panel de asistencias{% endblock %}
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -92,7 +92,7 @@
             <td>{{ sesion.total_asistentes }}</td>
             <td>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' sesion.pk %}">
-                <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesion</span>
+                <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesión</span>
               </a>
             </td>
           </tr>
@@ -118,4 +118,3 @@
   </div>
 </div>
 {% endblock %}
-

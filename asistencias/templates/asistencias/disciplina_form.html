@@ -33,7 +33,7 @@
 
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label" for="{{ form.organizacion.id_for_label }}">Organizacion</label>
+            <label class="form-label" for="{{ form.organizacion.id_for_label }}">Organización</label>
             {{ form.organizacion }}
             {% for error in form.organizacion.errors %}
               <div class="text-danger small mt-1">{{ error }}</div>
@@ -54,7 +54,7 @@
             {% endfor %}
           </div>
           <div class="col-md-12">
-            <label class="form-label" for="{{ form.descripcion.id_for_label }}">Descripcion</label>
+            <label class="form-label" for="{{ form.descripcion.id_for_label }}">Descripción</label>
             {{ form.descripcion }}
             {% for error in form.descripcion.errors %}
               <div class="text-danger small mt-1">{{ error }}</div>
