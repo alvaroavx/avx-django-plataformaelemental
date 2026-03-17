@@ -3,8 +3,9 @@
 {% block content %}
 <div class="mt-4">
   <h2>Categorias</h2>
+  {% include "finanzas/_info_box.html" %}
   <div class="card mb-3">
-    <div class="card-header">Nueva categoria</div>
+    <div class="card-header text-bg-success">Nueva categoria</div>
     <div class="card-body">
       <form method="post">
         {% csrf_token %}
@@ -17,7 +18,7 @@
             </div>
           {% endfor %}
         </div>
-        <button class="btn btn-primary mt-2" type="submit">Crear categoria</button>
+        <button class="btn btn-success mt-2" type="submit">Crear categoria</button>
       </form>
     </div>
   </div>

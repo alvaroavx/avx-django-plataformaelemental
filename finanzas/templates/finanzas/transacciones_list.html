@@ -7,9 +7,10 @@
     <h2>Transacciones</h2>
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar CSV</a>
   </div>
+  {% include "finanzas/_info_box.html" %}
 
   <div class="card mb-3">
-    <div class="card-header">Nueva transaccion</div>
+    <div class="card-header text-bg-success">Nueva transaccion</div>
     <div class="card-body">
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
@@ -18,11 +19,12 @@
             <div class="col-md-4">
               <label class="form-label">{{ field.label }}</label>
               {{ field }}
+              {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
               {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
             </div>
           {% endfor %}
         </div>
-        <button class="btn btn-primary mt-2" type="submit">Guardar transaccion</button>
+        <button class="btn btn-success mt-2" type="submit">Guardar transaccion</button>
       </form>
     </div>
   </div>
@@ -38,6 +40,7 @@
             <th>Categoria</th>
             <th>Monto</th>
             <th>Descripcion</th>
+            <th>Docs</th>
             <th></th>
           </tr>
         </thead>
@@ -50,13 +53,15 @@
             <td>{{ t.categoria.nombre }}</td>
             <td>{{ t.monto|clp }}</td>
             <td>{{ t.descripcion|default:"-" }}</td>
+            <td>{{ t.documentos_tributarios.count }}</td>
             <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_detail' t.pk %}?{{ request.GET.urlencode }}">Detalle</a>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_edit' t.pk %}?{{ request.GET.urlencode }}">Editar</a>
               <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:transaccion_delete' t.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center text-muted">Sin transacciones.</td></tr>
+          <tr><td colspan="8" class="text-center text-muted">Sin transacciones.</td></tr>
           {% endfor %}
         </tbody>
       </table>

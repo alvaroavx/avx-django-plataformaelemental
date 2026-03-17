@@ -4,14 +4,15 @@ from django.contrib import messages
 from django.db.models import Count, DateField, DecimalField, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
-from database.models import AttendanceConsumption, Asistencia, Payment, Persona, PersonaRol, Rol, SesionClase
+from database.models import AttendanceConsumption, Asistencia, Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
 from finanzas.services import resumen_financiero_estudiante
 from asistencias.decorators import role_required
 from asistencias.utils import ROLE_ADMIN
 from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
 
-from .forms import PersonaCRMForm, PersonaRolCRMForm
+from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm
 
 
 MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
@@ -19,6 +20,12 @@ MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
 
 def _base_context(request):
     return _nav_context(request)
+
+
+def _url_con_filtros(request, nombre_url, **kwargs):
+    url = reverse(nombre_url, kwargs=kwargs or None)
+    query = request.GET.urlencode()
+    return f"{url}?{query}" if query else url
 
 
 def _personas_queryset(organizacion=None):
@@ -38,6 +45,37 @@ def _personas_queryset(organizacion=None):
             | Q(pagos_financieros__organizacion=organizacion)
         ).distinct()
     return queryset
+
+
+def _organizacion_metricas(organizacion, inicio_periodo, fin_periodo):
+    roles_qs = PersonaRol.objects.filter(organizacion=organizacion, activo=True)
+    sesiones_qs = SesionClase.objects.filter(
+        disciplina__organizacion=organizacion,
+        fecha__gte=inicio_periodo,
+        fecha__lte=fin_periodo,
+    )
+    pagos_qs = Payment.objects.filter(
+        organizacion=organizacion,
+        fecha_pago__gte=inicio_periodo,
+        fecha_pago__lte=fin_periodo,
+    )
+    asistencias_qs = Asistencia.objects.filter(
+        sesion__disciplina__organizacion=organizacion,
+        sesion__fecha__gte=inicio_periodo,
+        sesion__fecha__lte=fin_periodo,
+    )
+    return {
+        "personas_activas": roles_qs.values("persona_id").distinct().count(),
+        "estudiantes_activos": roles_qs.filter(rol__codigo="ESTUDIANTE").values("persona_id").distinct().count(),
+        "profesores_activos": roles_qs.filter(rol__codigo="PROFESOR").values("persona_id").distinct().count(),
+        "disciplinas_total": Disciplina.objects.filter(organizacion=organizacion).count(),
+        "disciplinas_activas": Disciplina.objects.filter(organizacion=organizacion, activa=True).count(),
+        "sesiones_periodo": sesiones_qs.count(),
+        "sesiones_completadas_periodo": sesiones_qs.filter(estado=SesionClase.Estado.COMPLETADA).count(),
+        "asistencias_periodo": asistencias_qs.count(),
+        "pagos_periodo": pagos_qs.count(),
+        "ingresos_periodo": pagos_qs.aggregate(total=Sum("monto_total")).get("total") or 0,
+    }
 
 
 def _annotate_personas_resumen(queryset, inicio_periodo, fin_periodo, organizacion=None):
@@ -143,6 +181,79 @@ def dashboard(request):
 
 
 @role_required(ROLE_ADMIN)
+def organizaciones_list(request):
+    context = _base_context(request)
+    inicio_periodo, fin_periodo = _periodo(request)
+    organizacion_filtro = _organizacion_desde_request(request)
+    organizaciones_qs = Organizacion.objects.order_by("nombre")
+    if organizacion_filtro:
+        organizaciones_qs = organizaciones_qs.filter(pk=organizacion_filtro.pk)
+
+    organizaciones = []
+    for organizacion in organizaciones_qs:
+        organizaciones.append(
+            {
+                "organizacion": organizacion,
+                "metricas": _organizacion_metricas(organizacion, inicio_periodo, fin_periodo),
+            }
+        )
+
+    context.update(
+        {
+            "organizaciones": organizaciones,
+            "inicio_periodo": inicio_periodo,
+            "fin_periodo": fin_periodo,
+        }
+    )
+    return render(request, "personas/organizaciones_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def organizacion_detail(request, pk):
+    context = _base_context(request)
+    inicio_periodo, fin_periodo = _periodo(request)
+    organizacion = get_object_or_404(Organizacion, pk=pk)
+    disciplinas = Disciplina.objects.filter(organizacion=organizacion).order_by("nombre")
+    metricas = _organizacion_metricas(organizacion, inicio_periodo, fin_periodo)
+    context.update(
+        {
+            "organizacion_obj": organizacion,
+            "metricas": metricas,
+            "disciplinas": disciplinas[:8],
+            "pagos_recientes": Payment.objects.filter(organizacion=organizacion).select_related("persona").order_by("-fecha_pago", "-id")[:8],
+            "inicio_periodo": inicio_periodo,
+            "fin_periodo": fin_periodo,
+        }
+    )
+    return render(request, "personas/organizacion_detail.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def organizacion_create(request):
+    context = _base_context(request)
+    form = OrganizacionCRMForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        organizacion = form.save()
+        messages.success(request, "Organizacion creada correctamente.")
+        return redirect(_url_con_filtros(request, "personas:organizacion_detail", pk=organizacion.pk))
+    context.update({"form": form, "title": "Nueva organizacion"})
+    return render(request, "personas/organizacion_form.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def organizacion_edit(request, pk):
+    context = _base_context(request)
+    organizacion = get_object_or_404(Organizacion, pk=pk)
+    form = OrganizacionCRMForm(request.POST or None, instance=organizacion)
+    if request.method == "POST" and form.is_valid():
+        organizacion = form.save()
+        messages.success(request, "Organizacion actualizada correctamente.")
+        return redirect(_url_con_filtros(request, "personas:organizacion_detail", pk=organizacion.pk))
+    context.update({"form": form, "title": "Editar organizacion", "organizacion_obj": organizacion})
+    return render(request, "personas/organizacion_form.html", context)
+
+
+@role_required(ROLE_ADMIN)
 def personas_list(request):
     context = _base_context(request)
     inicio_periodo, fin_periodo = _periodo(request)
@@ -220,7 +331,7 @@ def persona_create(request):
                     persona_rol.activo = True
                     persona_rol.save(update_fields=["activo"])
             messages.success(request, "Persona creada correctamente.")
-            return redirect("personas:persona_detail", pk=persona.pk)
+            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     context.update(
         {
             "form": form,
@@ -247,7 +358,7 @@ def persona_detail(request, pk):
             ),
             Prefetch(
                 "pagos_financieros",
-                queryset=Payment.objects.select_related("organizacion", "plan", "boleta").order_by("-fecha_pago", "-id"),
+                queryset=Payment.objects.select_related("organizacion", "plan", "documento_tributario").order_by("-fecha_pago", "-id"),
             ),
             Prefetch(
                 "consumos_asistencia",
@@ -280,7 +391,7 @@ def persona_detail(request, pk):
                     messages.success(request, "Rol agregado a la persona.")
                 else:
                     messages.info(request, "Ese rol ya estaba activo para la persona.")
-                return redirect("personas:persona_detail", pk=persona.pk)
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
             elif rol_form_post.is_valid():
                 messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
             else:
@@ -290,7 +401,7 @@ def persona_detail(request, pk):
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])
             messages.success(request, "Estado del rol actualizado.")
-            return redirect("personas:persona_detail", pk=persona.pk)
+            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     roles_asignados = list(persona.roles.all())
     asistencias = persona.asistencias.all()
     pagos = persona.pagos_financieros.all()
@@ -326,7 +437,7 @@ def persona_detail(request, pk):
             "pagos": pagos,
             "consumos": consumos,
             "sesiones_profesor": sesiones_profesor,
-            "boletas": [pago.boleta for pago in pagos if pago.boleta_id],
+            "documentos_tributarios": [pago.documento_tributario for pago in pagos if pago.documento_tributario_id],
             "finanzas_resumen": finanzas_resumen,
             "monto_pagado": pagos.aggregate(total=Sum("monto_total")).get("total") or 0,
             "consumos_consumidos": consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),
@@ -360,7 +471,7 @@ def persona_edit(request, pk):
             if form.is_valid():
                 form.save()
                 messages.success(request, "Perfil de persona actualizado.")
-                return redirect("personas:persona_edit", pk=persona.pk)
+                return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "agregar_rol":
             rol_form = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
@@ -380,7 +491,7 @@ def persona_edit(request, pk):
                     messages.success(request, "Rol agregado a la persona.")
                 else:
                     messages.info(request, "Ese rol ya estaba activo para la persona.")
-                return redirect("personas:persona_edit", pk=persona.pk)
+                return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
             elif rol_form.is_valid():
                 messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
             else:
@@ -390,8 +501,7 @@ def persona_edit(request, pk):
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])
             messages.success(request, "Estado del rol actualizado.")
-            return redirect("personas:persona_edit", pk=persona.pk)
+            return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
 
     context.update({"form": form, "rol_form": rol_form, "persona_obj": persona, "roles_asignados": persona.roles.all()})
     return render(request, "personas/persona_edit.html", context)
-

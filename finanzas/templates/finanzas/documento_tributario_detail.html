@@ -1,0 +1,135 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Detalle de documento tributario{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Detalle de documento tributario</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
+        <i class="bi bi-arrow-left"></i><span class="ms-1">Volver</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_edit' documento.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+        <i class="bi bi-pencil"></i><span class="ms-1">Editar</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="alert alert-light border shadow-sm mb-3">
+    <div class="fw-semibold mb-1">Que guardar aqui</div>
+    <div class="small text-muted mb-0">
+      Esta vista concentra el documento tributario emitido o recibido. Aqui debe vivir el PDF o XML del SII y sus datos fiscales.
+      Las asociaciones con pagos, transacciones u otros documentos se resuelven desde este registro.
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Informacion tributaria</div>
+        <div class="card-body">
+          <div class="mb-3"><span class="small text-muted d-block">Organizacion</span><strong>{{ documento.organizacion.nombre }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Tipo</span><strong>{{ documento.get_tipo_documento_display }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Fuente</span><strong>{{ documento.get_fuente_display }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Folio</span><strong>{{ documento.folio }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Fecha emision</span><strong>{{ documento.fecha_emision|date:"d/m/Y" }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Emisor</span><div>{{ documento.nombre_emisor|default:"-" }}</div><div class="small text-muted">{{ documento.rut_emisor|default:"" }}</div></div>
+          <div class="mb-3"><span class="small text-muted d-block">Receptor</span><div>{{ documento.nombre_receptor|default:"-" }}</div><div class="small text-muted">{{ documento.rut_receptor|default:"" }}</div></div>
+          <div class="mb-3"><span class="small text-muted d-block">Monto neto</span><strong>{{ documento.monto_neto|clp }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Monto exento</span><strong>{{ documento.monto_exento|clp }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">IVA</span><strong>{{ documento.monto_iva|clp }}</strong><div class="small text-muted">Tasa: {{ documento.iva_tasa }}%</div></div>
+          <div class="mb-3"><span class="small text-muted d-block">Retencion</span><strong>{{ documento.retencion_monto|clp }}</strong><div class="small text-muted">Tasa: {{ documento.retencion_tasa }}%</div></div>
+          <div class="mb-3"><span class="small text-muted d-block">Monto total</span><strong>{{ documento.monto_total|clp }}</strong></div>
+          <div class="mb-3">
+            <span class="small text-muted d-block">Documento relacionado</span>
+            {% if documento.documento_relacionado %}
+              <a href="{% url 'finanzas:documento_tributario_detail' documento.documento_relacionado.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                {{ documento.documento_relacionado.get_tipo_documento_display }} #{{ documento.documento_relacionado.folio }}
+              </a>
+            {% else %}
+              <div class="text-muted">-</div>
+            {% endif %}
+          </div>
+          <div><span class="small text-muted d-block">Observaciones</span><div>{{ documento.observaciones|default:"-" }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">Archivos del documento</div>
+        <div class="card-body">
+          <div class="d-flex gap-2 mb-3 flex-wrap">
+            {% if documento.archivo_pdf %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}" target="_blank">Abrir PDF</a>
+            {% endif %}
+            {% if documento.archivo_xml %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'xml' %}" target="_blank">Abrir XML</a>
+            {% endif %}
+            {% if documento.enlace_sii %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ documento.enlace_sii }}" target="_blank">Ver en SII</a>
+            {% endif %}
+          </div>
+          {% if archivo_es_pdf %}
+            <div class="border rounded overflow-hidden">
+              <iframe
+                src="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}#toolbar=1&navpanes=0&scrollbar=1"
+                title="PDF documento {{ documento.pk }}"
+                width="100%"
+                height="720"
+                style="border: 0;"
+              ></iframe>
+            </div>
+          {% elif documento.archivo_pdf or documento.archivo_xml %}
+            <div class="text-muted">El documento no tiene PDF embebible, pero puedes abrir sus archivos desde los botones superiores.</div>
+          {% else %}
+            <div class="text-muted">Este documento no tiene archivos adjuntos.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Asociaciones</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="fw-semibold">Pagos asociados</div>
+            {% for pago in documento.pagos_asociados.all %}
+              <div>
+                <a href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                  Pago {{ pago.pk }} - {{ pago.persona }} - {{ pago.fecha_pago|date:"d/m/Y" }}
+                </a>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin pagos asociados.</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <div class="fw-semibold">Transacciones asociadas</div>
+            {% for transaccion in documento.transacciones_asociadas.all %}
+              <div>
+                <a href="{% url 'finanzas:transaccion_detail' transaccion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                  {{ transaccion.get_tipo_display }} {{ transaccion.monto|clp }} - {{ transaccion.fecha|date:"d/m/Y" }}
+                </a>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin transacciones asociadas.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div class="fw-semibold">Documentos derivados</div>
+            {% for hijo in documento.documentos_hijos.all %}
+              <div>
+                <a href="{% url 'finanzas:documento_tributario_detail' hijo.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                  {{ hijo.get_tipo_documento_display }} #{{ hijo.folio }}
+                </a>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin documentos relacionados hacia abajo.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

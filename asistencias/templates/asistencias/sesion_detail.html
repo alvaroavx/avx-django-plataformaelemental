@@ -4,10 +4,10 @@
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
+      <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
       </a>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}">
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
       </a>
     </div>
@@ -24,7 +24,7 @@
           <div>
             {% if sesion.profesores.all %}
               {% for profe in sesion.profesores.all %}
-                {{ profe }}{% if not forloop.last %}, {% endif %}
+                <a href="{% url 'asistencias:persona_detail' profe.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ profe }}</a>{% if not forloop.last %}, {% endif %}
               {% endfor %}
             {% else %}
               -
@@ -119,7 +119,7 @@
         <tbody>
           {% for item in asistencias %}
           <tr>
-            <td><a href="{% url 'asistencias:persona_detail' item.persona.pk %}">{{ item.persona }}</a></td>
+            <td><a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
             <td>{{ item.get_estado_display }}</td>
             <td>{{ item.registrada_en|date:"H:i" }}</td>
           </tr>

@@ -41,7 +41,7 @@
         {% for item in estudiantes %}
         <tr>
           <td>
-            <a href="{% url 'asistencias:persona_detail' item.persona.pk %}">{{ item.persona }}</a>
+            <a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
             {% for rol in item.persona.roles.all %}
               {% if rol.rol.codigo == "ESTUDIANTE" %}
                 <span class="badge text-bg-light ms-1">{{ rol.organizacion.nombre }}</span>
@@ -58,7 +58,7 @@
             {% endif %}
           </td>
           <td>
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:persona_detail' item.persona.pk %}">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
               <i class="bi bi-person"></i><span class="d-none d-md-inline ms-1">Perfil</span>
             </a>
           </td>

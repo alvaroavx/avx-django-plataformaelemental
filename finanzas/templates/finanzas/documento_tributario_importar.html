@@ -1,0 +1,174 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Carga asistida de documentos{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Carga asistida de documentos tributarios</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documentos_tributarios_list' %}?{{ request.GET.urlencode }}">Volver a documentos</a>
+  </div>
+  {% include "finanzas/_info_box.html" %}
+
+  {% if not review_payload %}
+  <div class="card">
+    <div class="card-header">Subir archivo para parseo</div>
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="parsear">
+        <div class="row g-3">
+          {% for field in upload_form %}
+          <div class="col-md-6">
+            <label class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="small text-muted mt-3">
+          Reglas del MVP: si subes XML y PDF, prevalece XML. Si subes solo PDF, se aplica un parser basico y la revision manual es mas importante.
+        </div>
+        <button class="btn btn-success mt-3" type="submit">Parsear y revisar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header">Resumen de extraccion</div>
+        <div class="card-body">
+          <div class="mb-2"><span class="small text-muted d-block">Categoria</span><strong>{{ documento_normalizado.encabezado.categoria_documental.value|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="small text-muted d-block">Nombre</span><strong>{{ documento_normalizado.encabezado.nombre_legible.value|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="small text-muted d-block">Folio</span><strong>{{ documento_normalizado.encabezado.folio.value|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="small text-muted d-block">Fecha</span><strong>{{ documento_normalizado.encabezado.fecha_emision.value|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="small text-muted d-block">Emisor</span><div>{{ documento_normalizado.emisor.razon_social.value|default:"-" }}</div><div class="small text-muted">{{ documento_normalizado.emisor.rut.value|default:"" }}</div></div>
+          <div class="mb-2"><span class="small text-muted d-block">Receptor</span><div>{{ documento_normalizado.receptor.razon_social.value|default:"-" }}</div><div class="small text-muted">{{ documento_normalizado.receptor.rut.value|default:"" }}</div></div>
+          <div class="mb-2"><span class="small text-muted d-block">Total</span><strong>{{ documento_normalizado.montos.total_bruto.value|default:0|clp }}</strong></div>
+          <div class="mb-2"><span class="small text-muted d-block">Parser</span><strong>{{ documento_normalizado.metadata_archivo.parser_usado.value|default:"-" }}</strong></div>
+          <div><span class="small text-muted d-block">Fuente principal</span><strong>{{ documento_normalizado.metadata_archivo.fuente_principal.value|default:"-" }}</strong></div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header">Warnings y errores</div>
+        <div class="card-body">
+          {% if review_payload.warnings %}
+            {% for item in review_payload.warnings %}
+              <div class="alert alert-warning py-2 mb-2">{{ item }}</div>
+            {% endfor %}
+          {% endif %}
+          {% if review_payload.errors %}
+            {% for item in review_payload.errors %}
+              <div class="alert alert-danger py-2 mb-2">{{ item }}</div>
+            {% endfor %}
+          {% endif %}
+          {% if not review_payload.warnings and not review_payload.errors %}
+            <div class="text-muted">Sin warnings ni errores relevantes.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Posibles duplicados</div>
+        <div class="card-body">
+          {% if review_payload.duplicates %}
+            {% for item in review_payload.duplicates %}
+              <div class="border rounded p-2 mb-2">
+                <div>Documento #{{ item.id }}</div>
+                <div class="small text-muted">Folio {{ item.folio }} | {{ item.fecha_emision }} | {{ item.monto_total }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="text-muted">No se detectaron duplicados probables.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="confirmar">
+        {% for field in confirm_form.hidden_fields %}{{ field }}{% endfor %}
+        {% for field in documento_form.hidden_fields %}{{ field }}{% endfor %}
+
+        <div class="card mb-3">
+          <div class="card-header">Revision del documento tributario</div>
+          <div class="card-body">
+            <div class="row g-2">
+              {% for field in documento_form.visible_fields %}
+                <div class="col-md-6">
+                  <label class="form-label">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        {% if pago_form %}
+        <div class="card mb-3">
+          <div class="card-header">Pago sugerido</div>
+          <div class="card-body">
+            <div class="form-check mb-3">
+              {{ confirm_form.guardar_pago_sugerido }}
+              <label class="form-check-label" for="{{ confirm_form.guardar_pago_sugerido.id_for_label }}">
+                {{ confirm_form.guardar_pago_sugerido.label }}
+              </label>
+            </div>
+            <div class="row g-2">
+              {% for field in pago_form %}
+                <div class="col-md-6">
+                  <label class="form-label">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
+                  {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="card mb-3">
+          <div class="card-header">Detalle extraido</div>
+          <div class="card-body table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Descripcion</th>
+                  <th>Cantidad</th>
+                  <th>Precio</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for linea in documento_normalizado.lineas %}
+                <tr>
+                  <td>{{ linea.fields.numero_linea.value|default:"-" }}</td>
+                  <td>{{ linea.fields.descripcion.value|default:"-" }}</td>
+                  <td>{{ linea.fields.cantidad.value|default:"-" }}</td>
+                  <td>{{ linea.fields.precio_unitario.value|default:"-" }}</td>
+                  <td>{% if linea.fields.subtotal_linea.value %}{{ linea.fields.subtotal_linea.value|clp }}{% else %}-{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">Sin lineas extraidas.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-success" type="submit">Confirmar y guardar</button>
+          <a class="btn btn-outline-secondary" href="{% url 'finanzas:documento_tributario_importar' %}?{{ request.GET.urlencode }}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

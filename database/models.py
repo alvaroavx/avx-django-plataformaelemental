@@ -308,39 +308,76 @@ class PaymentPlan(TimeStampedModel):
         return neto, iva, total
 
 
-class Invoice(TimeStampedModel):
-    class Tipo(models.TextChoices):
-        BOLETA_SERVICIOS = "boleta_servicios", "Boleta de servicios"
-        BOLETA_EXENTA = "boleta_exenta", "Boleta exenta"
-        FACTURA = "factura", "Factura"
+class DocumentoTributario(TimeStampedModel):
+    class TipoDocumento(models.TextChoices):
+        FACTURA_AFECTA = "factura_afecta", "Factura afecta"
+        FACTURA_EXENTA = "factura_exenta", "Factura exenta"
+        BOLETA_VENTA_AFECTA = "boleta_venta_afecta", "Boleta de venta afecta"
+        BOLETA_VENTA_EXENTA = "boleta_venta_exenta", "Boleta de venta exenta"
+        BOLETA_HONORARIOS = "boleta_honorarios", "Boleta de honorarios"
+        NOTA_CREDITO = "nota_credito", "Nota de credito"
+        NOTA_DEBITO = "nota_debito", "Nota de debito"
         OTRO = "otro", "Otro"
+
+    class Fuente(models.TextChoices):
+        MANUAL = "manual", "Carga manual"
+        SII = "sii", "Importado desde SII"
 
     organizacion = models.ForeignKey(
         Organizacion,
         on_delete=models.CASCADE,
-        related_name="boletas_facturas",
+        related_name="documentos_tributarios",
     )
-    tipo = models.CharField(max_length=30, choices=Tipo.choices, default=Tipo.BOLETA_SERVICIOS)
+    tipo_documento = models.CharField(
+        max_length=40,
+        choices=TipoDocumento.choices,
+        default=TipoDocumento.FACTURA_AFECTA,
+    )
+    fuente = models.CharField(max_length=20, choices=Fuente.choices, default=Fuente.MANUAL)
     folio = models.CharField(max_length=100)
     fecha_emision = models.DateField(default=timezone.localdate)
-    cliente = models.CharField(max_length=255, blank=True)
+    nombre_emisor = models.CharField(max_length=255, blank=True)
+    rut_emisor = models.CharField(max_length=20, blank=True)
+    nombre_receptor = models.CharField(max_length=255, blank=True)
+    rut_receptor = models.CharField(max_length=20, blank=True)
     monto_neto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    monto_exento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    iva_tasa = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("19.00"))
     monto_iva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    retencion_tasa = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    retencion_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    archivo = models.FileField(upload_to="finanzas/invoices/", null=True, blank=True)
+    documento_relacionado = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="documentos_hijos",
+        null=True,
+        blank=True,
+    )
+    archivo_pdf = models.FileField(upload_to="finanzas/documentos/pdf/", null=True, blank=True)
+    archivo_xml = models.FileField(upload_to="finanzas/documentos/xml/", null=True, blank=True)
     enlace_sii = models.URLField(blank=True)
+    metadata_extra = models.JSONField(default=dict, blank=True)
     observaciones = models.TextField(blank=True)
 
     class Meta:
         app_label = "finanzas"
-        verbose_name = "Boleta o factura"
-        verbose_name_plural = "Boletas y facturas"
+        verbose_name = "Documento tributario"
+        verbose_name_plural = "Documentos tributarios"
         ordering = ["-fecha_emision", "-id"]
         db_table = "finanzas_invoice"
-        unique_together = ("organizacion", "tipo", "folio")
+        unique_together = ("organizacion", "tipo_documento", "folio")
 
     def __str__(self) -> str:
-        return f"{self.get_tipo_display()} #{self.folio}"
+        return f"{self.get_tipo_documento_display()} #{self.folio}"
+
+    @property
+    def archivo_principal(self):
+        return self.archivo_pdf or self.archivo_xml
+
+    @property
+    def tiene_archivo_pdf(self) -> bool:
+        return bool(self.archivo_pdf and self.archivo_pdf.name.lower().endswith(".pdf"))
 
 
 class Category(TimeStampedModel):
@@ -388,10 +425,10 @@ class Payment(TimeStampedModel):
         null=True,
         blank=True,
     )
-    boleta = models.ForeignKey(
-        Invoice,
+    documento_tributario = models.ForeignKey(
+        DocumentoTributario,
         on_delete=models.SET_NULL,
-        related_name="pagos",
+        related_name="pagos_asociados",
         null=True,
         blank=True,
     )
@@ -524,6 +561,11 @@ class Transaction(TimeStampedModel):
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     descripcion = models.TextField(blank=True)
     archivo = models.FileField(upload_to="finanzas/transactions/", null=True, blank=True)
+    documentos_tributarios = models.ManyToManyField(
+        DocumentoTributario,
+        related_name="transacciones_asociadas",
+        blank=True,
+    )
 
     class Meta:
         app_label = "finanzas"
@@ -538,3 +580,6 @@ class Transaction(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_tipo_display()} {self.monto} ({self.categoria})"
+
+
+Invoice = DocumentoTributario

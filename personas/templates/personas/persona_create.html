@@ -39,7 +39,7 @@
             {% if form.non_field_errors %}<div class="text-danger small mt-2">{{ form.non_field_errors|join:", " }}</div>{% endif %}
             {% if rol_form.non_field_errors %}<div class="text-danger small mt-2">{{ rol_form.non_field_errors|join:", " }}</div>{% endif %}
             <div class="d-flex gap-2 mt-3">
-              <button class="btn btn-primary" type="submit">Crear persona</button>
+              <button class="btn btn-success" type="submit">Crear persona</button>
               <a class="btn btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">Cancelar</a>
             </div>
           </form>

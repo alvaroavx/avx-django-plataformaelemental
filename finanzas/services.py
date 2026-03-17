@@ -61,7 +61,10 @@ def resumen_financiero_estudiante(persona: Persona, organizacion=None):
     if organizacion:
         pagos = pagos.filter(organizacion=organizacion)
         consumos = consumos.filter(asistencia__sesion__disciplina__organizacion=organizacion)
+    return _resumen_financiero_estudiante_queryset(pagos, consumos)
 
+
+def _resumen_financiero_estudiante_queryset(pagos, consumos):
     clases_pagadas = pagos.aggregate(total=Sum("clases_asignadas")).get("total") or 0
     clases_consumidas = consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count()
     deuda_pendiente = consumos.filter(estado=AttendanceConsumption.Estado.DEUDA).count()
@@ -74,6 +77,43 @@ def resumen_financiero_estudiante(persona: Persona, organizacion=None):
         "deuda_pendiente": deuda_pendiente,
         "fecha_ultimo_pago": ultimo_pago.fecha_pago if ultimo_pago else None,
     }
+
+
+def resumen_financiero_estudiante_periodo(persona: Persona, inicio_periodo, fin_periodo, organizacion=None):
+    pagos = Payment.objects.filter(
+        persona=persona,
+        fecha_pago__gte=inicio_periodo,
+        fecha_pago__lte=fin_periodo,
+    )
+    consumos = AttendanceConsumption.objects.filter(
+        persona=persona,
+        clase_fecha__gte=inicio_periodo,
+        clase_fecha__lte=fin_periodo,
+    )
+    if organizacion:
+        pagos = pagos.filter(organizacion=organizacion)
+        consumos = consumos.filter(asistencia__sesion__disciplina__organizacion=organizacion)
+    return _resumen_financiero_estudiante_queryset(pagos, consumos)
+
+
+def asociar_asistencia_a_pago(asistencia: Asistencia, pago: Payment) -> AttendanceConsumption:
+    if asistencia.estado != Asistencia.Estado.PRESENTE:
+        raise ValueError("Solo se pueden asociar asistencias presentes a un pago.")
+    if pago.persona_id != asistencia.persona_id:
+        raise ValueError("El pago seleccionado no corresponde a la misma persona.")
+    if pago.organizacion_id != asistencia.sesion.disciplina.organizacion_id:
+        raise ValueError("El pago seleccionado pertenece a otra organizacion.")
+
+    consumo = getattr(asistencia, "consumo_financiero", None) or asignar_consumo_asistencia(asistencia)
+    if consumo.pago_id != pago.id and pago.saldo_clases <= 0:
+        raise ValueError("El pago seleccionado no tiene saldo disponible.")
+
+    consumo.persona = asistencia.persona
+    consumo.clase_fecha = asistencia.sesion.fecha
+    consumo.pago = pago
+    consumo.estado = AttendanceConsumption.Estado.CONSUMIDO
+    consumo.save(update_fields=["persona", "clase_fecha", "pago", "estado", "actualizado_en"])
+    return consumo
 
 
 def imputar_pago_a_deudas(pago: Payment) -> int:

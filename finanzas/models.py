@@ -7,7 +7,7 @@ Financial models now live in ``database.models``.
 from database.models import (
     AttendanceConsumption,
     Category,
-    Invoice,
+    DocumentoTributario,
     Payment,
     PaymentPlan,
     TimeStampedModel,
@@ -17,7 +17,7 @@ from database.models import (
 __all__ = [
     "TimeStampedModel",
     "PaymentPlan",
-    "Invoice",
+    "DocumentoTributario",
     "Category",
     "Payment",
     "AttendanceConsumption",

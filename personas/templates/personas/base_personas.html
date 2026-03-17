@@ -13,7 +13,7 @@
     {% include "shared/barra_apps.html" %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'personas:dashboard' %}">
+        <a class="navbar-brand" href="{% url 'personas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
           <img src="{% static 'img/logotipo-blanco.png' %}" alt="Personas" style="height: 40px;">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#personasNav">
@@ -23,6 +23,7 @@
           <ul class="navbar-nav me-auto">
             <li class="nav-item"><a class="nav-link" href="{% url 'personas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'personas:personas_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Personas</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'personas:organizaciones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Organizaciones</a></li>
           </ul>
           <span class="navbar-text text-white">
             {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}

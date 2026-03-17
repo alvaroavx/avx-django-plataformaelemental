@@ -55,8 +55,8 @@
               <div>{{ pago.plan|default:"-" }}</div>
             </div>
             <div class="col-md-4">
-              <div class="small text-muted">Boleta</div>
-              <div>{{ pago.boleta|default:"-" }}</div>
+              <div class="small text-muted">Documento tributario</div>
+              <div>{{ pago.documento_tributario|default:"-" }}</div>
             </div>
             <div class="col-md-4">
               <div class="small text-muted">Clases asignadas</div>
@@ -124,25 +124,32 @@
           </div>
           {% endif %}
 
-          {% if pago.boleta %}
+          {% if pago.documento_tributario %}
           <div class="mb-3">
-            <div class="fw-semibold">Boleta o factura</div>
-            <div class="small">{{ pago.boleta.get_tipo_display }} #{{ pago.boleta.folio }}</div>
-            <div class="small">Fecha: {{ pago.boleta.fecha_emision|date:"d/m/Y" }}</div>
-            <div class="small">Cliente: {{ pago.boleta.cliente|default:"-" }}</div>
-            <div class="small">Total: {{ pago.boleta.monto_total|clp }}</div>
+            <div class="fw-semibold">Documento tributario asociado</div>
+            <div class="small">{{ pago.documento_tributario.get_tipo_documento_display }} #{{ pago.documento_tributario.folio }}</div>
+            <div class="small">Fecha: {{ pago.documento_tributario.fecha_emision|date:"d/m/Y" }}</div>
+            <div class="small">Emisor: {{ pago.documento_tributario.nombre_emisor|default:"-" }}</div>
+            <div class="small">Receptor: {{ pago.documento_tributario.nombre_receptor|default:"-" }}</div>
+            <div class="small">Total: {{ pago.documento_tributario.monto_total|clp }}</div>
             <div class="d-flex gap-2 mt-2">
-              {% if pago.boleta.archivo %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ pago.boleta.archivo.url }}" target="_blank">Archivo</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_detail' pago.documento_tributario.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                Ver documento
+              </a>
+              {% if pago.documento_tributario.archivo_pdf %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'pdf' %}" target="_blank">PDF</a>
               {% endif %}
-              {% if pago.boleta.enlace_sii %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ pago.boleta.enlace_sii }}" target="_blank">SII</a>
+              {% if pago.documento_tributario.archivo_xml %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'xml' %}" target="_blank">XML</a>
+              {% endif %}
+              {% if pago.documento_tributario.enlace_sii %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ pago.documento_tributario.enlace_sii }}" target="_blank">SII</a>
               {% endif %}
             </div>
           </div>
           {% endif %}
 
-          {% if not pago.plan and not pago.boleta and not consumos %}
+          {% if not pago.plan and not pago.documento_tributario and not consumos %}
           <div class="text-muted">No hay relaciones adicionales para este pago.</div>
           {% endif %}
         </div>
@@ -188,7 +195,7 @@
               <td>{{ item.asistencia.sesion.disciplina.organizacion.nombre }}</td>
               <td>{{ item.get_estado_display }}</td>
               <td>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.asistencia.sesion.pk %}">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.asistencia.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
                   <i class="bi bi-eye"></i><span class="ms-1">Ver sesion</span>
                 </a>
               </td>
@@ -204,4 +211,3 @@
   </div>
 </div>
 {% endblock %}
-

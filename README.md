@@ -1,23 +1,72 @@
-﻿# avx-django-plataformaelemental
-Plataforma administrativa para Espacio Elementos, construida con Django + Django REST Framework.
+# Plataforma Elemental
+
+Plataforma administrativa construida en Django para operar academias, organizaciones y finanzas desde una sola base. Hoy el proyecto ya cubre tres frentes principales:
+- operacion academica diaria en `asistencias`
+- CRM y organizaciones en `personas`
+- cobros, documentos y caja en `finanzas`
+
+## Idea general
+La plataforma esta pensada para trabajar con varias organizaciones y mantener siempre activos tres filtros globales:
+- `periodo_mes`
+- `periodo_anio`
+- `organizacion`
+
+Esos filtros deben arrastrarse por toda la navegacion.
+
+## Apps principales
+
+### `asistencias`
+Operacion academica diaria:
+- sesiones
+- registro de asistentes
+- perfiles operativos de estudiantes y profesores
+- estado financiero rapido del estudiante
+
+### `personas`
+CRM transversal:
+- listado de personas
+- perfiles completos
+- roles por organizacion
+- administracion de organizaciones
+
+### `finanzas`
+Operacion financiera:
+- planes
+- pagos de estudiantes
+- documentos tributarios
+- carga asistida XML-first para documentos tributarios
+- transacciones de caja
+- categorias y reportes
+
+## Criterio actual de finanzas
+- `Pagos`: cobros academicos a estudiantes.
+- `Documentos tributarios`: facturas, boletas de venta, boletas de honorarios y otros documentos fiscales.
+- `Transacciones`: movimientos reales de dinero con su respaldo bancario o de caja.
+
+La fuente tributaria objetivo es el SII. La plataforma debe servir para importar, revisar y asociar documentos, no para duplicar innecesariamente la informacion.
+
+## Documentacion del repo
+- [docs/README.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/README.md)
+- [PLATAFORMA.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/PLATAFORMA.md)
+- [finanzas/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/finanzas/FINANZAS.md)
+- [asistencias/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/asistencias/ASISTENCIAS.md)
+- [personas/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/personas/PERSONAS.md)
 
 ## Puesta en marcha
 1. Activa el entorno virtual:
    ```bash
-   .\.venv\Scripts\activate
+   source ./.venv/bin/activate
    ```
-2. Copia `.env.example` a `.env` y completa al menos:
-   - `DJANGO_SECRET_KEY`
-   - `DJANGO_ENV`
-   - `DJANGO_ALLOWED_HOSTS`
-   - `DJANGO_CSRF_TRUSTED_ORIGINS`
-3. Instala dependencias:
+2. Instala dependencias:
    ```bash
    pip install -r requirements.txt
    ```
-4. Ejecuta migraciones y crea un usuario administrador:
+3. Aplica migraciones:
    ```bash
    python manage.py migrate
+   ```
+4. Crea un usuario admin si hace falta:
+   ```bash
    python manage.py createsuperuser
    ```
 5. Levanta el servidor:
@@ -25,80 +74,14 @@ Plataforma administrativa para Espacio Elementos, construida con Django + Django
    python manage.py runserver
    ```
 
-Accesos:
-- Admin Django: `http://127.0.0.1:8000/admin/`
+## Rutas utiles
 - Login: `http://127.0.0.1:8000/accounts/login/`
-- App Asistencias: `http://127.0.0.1:8000/asistencias/`
+- Asistencias: `http://127.0.0.1:8000/asistencias/`
+- Personas: `http://127.0.0.1:8000/personas/`
+- Finanzas: `http://127.0.0.1:8000/finanzas/`
+- Admin Django: `http://127.0.0.1:8000/admin/`
 
-La ruta `/` redirige a `/asistencias/`. El login redirige a `/asistencias/` y el logout vuelve a `/accounts/login/`. La ruta antigua `/app/` queda como redireccion.
-
-## App Asistencias (/asistencias/)
-Enfocada en operacion administrativa y asistencia academica.
-
-Rutas disponibles:
-- Panel administrador: `/asistencias/`
-- Talleres/sesiones: `/asistencias/sesiones/`
-- Asistencias: `/asistencias/asistencias/`
-- Perfil de persona: `/asistencias/personas/<id>/`
-- Estudiantes: `/asistencias/estudiantes/`
-- Profesores: `/asistencias/profesores/`
-- Organizaciones: `/asistencias/organizaciones/`
-
-Flujos rapidos:
-- Crear sesion y cargar asistentes desde `/asistencias/asistencias/`.
-- Alta rapida de persona en `/asistencias/asistencias/` (se asigna rol ESTUDIANTE cuando aplica).
-- Revision de asistencia por persona en `/asistencias/personas/<id>/`.
-
-## Variables de entorno (dev)
-Si quieres un punto de partida rapido, puedes copiar `.env.dev` y ajustar `DJANGO_SECRET_KEY`.
-
-## Comando de trabajo Codex
-```bash
-codex resume 019b6a94-f3a0-7cf2-98d1-fed2abe0e70c
-```
-
-## API REST
-Autenticacion disponible:
-- Session Authentication
-- Token Authentication
-
-| Endpoint | Metodo | Descripcion |
-| --- | --- | --- |
-| `/api/health/` | GET | Estado del servicio. |
-| `/api/auth/login/` | POST | Credenciales -> token + datos del usuario. |
-| `/api/auth/refresh/` | POST | Rota el token actual. |
-| `/api/auth/logout/` | POST | Invalida el token. |
-| `/api/sesiones/` | GET | Lista de sesiones (filtro `?fecha=YYYY-MM-DD`). |
-| `/api/sesiones/<id>/asistencias/` | GET/POST | Consulta o registra asistencias (`persona`, `estado`). |
-| `/api/estudiantes/` | GET | Personas con rol estudiante. |
-| `/api/estudiantes/<id>/estado/` | GET | Totales de asistencia del estudiante. |
-| `/api/reportes/resumen/` | GET | Totales generales de sesiones, asistencias y estudiantes. |
-
-## Importar planillas Excel
-Coloca los archivos en `data/` y ejecuta:
-```bash
-python manage.py import_asistencias --archivo "Asistencia Talleres Elementos.xlsx"
-```
-
-## Carga masiva de personas desde texto
-```bash
-python manage.py importar_personas <ruta_al_archivo> --dominio elementos.cl
-```
-
-Opciones:
-- `--dominio`: dominio para correos generados (por defecto `example.com`).
-- `--dry-run`: simula la importacion.
-
-## Pruebas automatizadas
+## Pruebas
 ```bash
 python manage.py test
 ```
-
-## Settings por entorno
-`DJANGO_ENV` define que modulo se usa:
-- `dev` (por defecto) -> `plataformaelemental.config.dev`
-- `prod` -> `plataformaelemental.config.prod`
-
-Tambien puedes forzar el modulo con:
-`DJANGO_SETTINGS_MODULE=plataformaelemental.config.<entorno>`.
-

@@ -10,7 +10,7 @@
     <h2>Listado CRM de personas</h2>
     <div class="d-flex gap-2">
       <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:dashboard' %}?{{ request.GET.urlencode }}">Volver al dashboard</a>
-      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_create' %}?{{ request.GET.urlencode }}">Nueva persona</a>
+      <a class="btn btn-sm btn-success" href="{% url 'personas:persona_create' %}?{{ request.GET.urlencode }}">Nueva persona</a>
     </div>
   </div>
 

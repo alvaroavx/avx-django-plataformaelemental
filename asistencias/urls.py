@@ -16,6 +16,4 @@ urlpatterns = [
     path("personas/<int:pk>/", views.persona_detail, name="persona_detail"),
     path("estudiantes/", views.estudiantes_list, name="estudiantes_list"),
     path("profesores/", views.profesores_list, name="profesores_list"),
-    path("organizaciones/", views.organizaciones_list, name="organizaciones_list"),
 ]
-

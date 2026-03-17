@@ -1,0 +1,88 @@
+{% extends "personas/base_personas.html" %}
+{% load finanzas_format %}
+{% block title %}Organizacion {{ organizacion_obj.nombre }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-0">{{ organizacion_obj.nombre }}</h2>
+      <small class="text-muted">Periodo {{ inicio_periodo|date:"d/m/Y" }} al {{ fin_periodo|date:"d/m/Y" }}</small>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:organizaciones_list' %}?{{ request.GET.urlencode }}">Volver al listado</a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personas:organizacion_edit' organizacion_obj.pk %}?{{ request.GET.urlencode }}">Editar organizacion</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Datos base</div>
+        <div class="card-body small">
+          <div class="mb-2"><span class="text-muted d-block">Razon social</span><strong>{{ organizacion_obj.razon_social|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">RUT</span><strong>{{ organizacion_obj.rut }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Email</span><strong>{{ organizacion_obj.email_contacto|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Telefono</span><strong>{{ organizacion_obj.telefono_contacto|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Sitio web</span><strong>{{ organizacion_obj.sitio_web|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Direccion</span><strong>{{ organizacion_obj.direccion|default:"-" }}</strong></div>
+          <div><span class="text-muted d-block">IVA</span><strong>{% if organizacion_obj.es_exenta_iva %}Exenta{% else %}Afecta{% endif %}</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="row g-3">
+        <div class="col-md-3"><div class="card text-bg-primary h-100"><div class="card-body"><div class="small">Personas activas</div><div class="display-6">{{ metricas.personas_activas }}</div></div></div></div>
+        <div class="col-md-3"><div class="card text-bg-success h-100"><div class="card-body"><div class="small">Estudiantes</div><div class="display-6">{{ metricas.estudiantes_activos }}</div></div></div></div>
+        <div class="col-md-3"><div class="card text-bg-info h-100"><div class="card-body"><div class="small">Profesores</div><div class="display-6">{{ metricas.profesores_activos }}</div></div></div></div>
+        <div class="col-md-3"><div class="card text-bg-warning h-100"><div class="card-body"><div class="small">Ingresos</div><div class="display-6">{{ metricas.ingresos_periodo|clp }}</div></div></div></div>
+        <div class="col-md-4"><div class="card h-100"><div class="card-body"><div class="small text-muted">Disciplinas</div><div class="h3 mb-0">{{ metricas.disciplinas_total }}</div><div class="small">Activas: {{ metricas.disciplinas_activas }}</div></div></div></div>
+        <div class="col-md-4"><div class="card h-100"><div class="card-body"><div class="small text-muted">Sesiones</div><div class="h3 mb-0">{{ metricas.sesiones_periodo }}</div><div class="small">Completadas: {{ metricas.sesiones_completadas_periodo }}</div></div></div></div>
+        <div class="col-md-4"><div class="card h-100"><div class="card-body"><div class="small text-muted">Pagos</div><div class="h3 mb-0">{{ metricas.pagos_periodo }}</div><div class="small">Asistencias: {{ metricas.asistencias_periodo }}</div></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Disciplinas relacionadas</div>
+        <div class="card-body">
+          {% for disciplina in disciplinas %}
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+              <span>{{ disciplina.nombre }}</span>
+              {% if disciplina.activa %}
+                <span class="badge text-bg-success">Activa</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactiva</span>
+              {% endif %}
+            </div>
+          {% empty %}
+            <div class="text-muted">Sin disciplinas asociadas.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">Pagos recientes</div>
+        <div class="card-body">
+          {% for pago in pagos_recientes %}
+            <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+              <div>
+                <div class="fw-semibold">{{ pago.persona }}</div>
+                <div class="small text-muted">{{ pago.fecha_pago|date:"d/m/Y" }}</div>
+              </div>
+              <div class="text-end">
+                <div>{{ pago.monto_total|clp }}</div>
+                <a class="small" href="{% url 'finanzas:pago_detail' pago.pk %}?{{ request.GET.urlencode }}">Ver pago</a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="text-muted">Sin pagos recientes.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

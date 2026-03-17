@@ -4,7 +4,7 @@
 {% block content %}
 <div class="mt-4">
   <div class="mb-2 d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="{{ request.META.HTTP_REFERER|default:'#' }}">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}">
       <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
     </a>
     <a class="btn btn-outline-primary btn-sm" href="{% url 'personas:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
@@ -33,7 +33,7 @@
         <div class="card-header">Resumen Estudiante</div>
         <div class="card-body">
           <div class="d-flex justify-content-between">
-            <span>Asistencias mes</span>
+            <span>Asistencias período</span>
             <strong>{{ asistencias_mes }}</strong>
           </div>
           {% if finanzas_resumen %}
@@ -121,6 +121,7 @@
                 <th>Fecha</th>
                 <th>Disciplina</th>
                 <th>Estado</th>
+                <th>Finanzas</th>
               </tr>
             </thead>
             <tbody>
@@ -128,11 +129,36 @@
               <tr>
                 <td>{{ asistencia.sesion.fecha|date:"d/m/Y" }}</td>
                 <td>
-                  <a href="{% url 'asistencias:sesion_detail' asistencia.sesion.pk %}">
+                  <a href="{% url 'asistencias:sesion_detail' asistencia.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
                     {{ asistencia.sesion.disciplina }}
                   </a>
                 </td>
                 <td>{{ asistencia.get_estado_display }}</td>
+                <td class="text-nowrap">
+                  <span class="badge text-bg-{{ asistencia.estado_financiero_clase }}">{{ asistencia.estado_financiero_label }}</span>
+                  {% if asistencia.consumo_financiero_actual and asistencia.consumo_financiero_actual.pago %}
+                    <span class="small ms-2">
+                      <a href="{% url 'finanzas:pago_detail' asistencia.consumo_financiero_actual.pago.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                        Pago {{ asistencia.consumo_financiero_actual.pago.fecha_pago|date:"d/m/Y" }}
+                      </a>
+                    </span>
+                  {% endif %}
+                  {% if asistencia.estado == "presente" and asistencia.pagos_asociables %}
+                    <form method="post" class="d-inline-flex gap-2 ms-2 align-items-center">
+                      {% csrf_token %}
+                      <input type="hidden" name="asociar_pago_asistencia" value="1">
+                      <input type="hidden" name="asistencia_id" value="{{ asistencia.pk }}">
+                      <select name="pago_id" class="form-select form-select-sm w-auto">
+                        {% for pago in asistencia.pagos_asociables %}
+                          <option value="{{ pago.pk }}" {% if asistencia.consumo_financiero_actual and asistencia.consumo_financiero_actual.pago_id == pago.pk %}selected{% endif %}>
+                            {{ pago.fecha_pago|date:"d/m/Y" }} · {{ pago.organizacion.nombre }} · saldo {{ pago.saldo_clases_total }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Asociar</button>
+                    </form>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -175,7 +201,7 @@
                 <td>{{ pago.plan|default:"-" }}</td>
                 <td>{{ pago.get_metodo_pago_display }}</td>
                 <td>{{ pago.numero_comprobante|default:"-" }}</td>
-                <td>{{ pago.boleta|default:"-" }}</td>
+                <td>{{ pago.documento_tributario|default:"-" }}</td>
                 <td>{{ pago.monto_total|clp }}</td>
                 <td>{{ pago.clases_asignadas }}</td>
                 <td>{{ pago.clases_consumidas_total }}</td>
@@ -212,14 +238,14 @@
               <tr>
                 <td>{{ sesion.fecha|date:"d/m/Y" }}</td>
                 <td>{{ sesion.disciplina.organizacion.nombre }}</td>
-                <td><a href="{% url 'asistencias:sesion_detail' sesion.pk %}">{{ sesion.disciplina }}</a></td>
+                <td><a href="{% url 'asistencias:sesion_detail' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ sesion.disciplina }}</a></td>
                 <td>{{ sesion.get_estado_display }}</td>
                 <td>{{ sesion.asistencias.count }}</td>
                 <td class="d-none d-md-table-cell">
-                  <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:sesion_detail' sesion.pk %}">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:sesion_detail' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
                     <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesión</span>
                   </a>
-                  <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?sesion_id={{ sesion.pk }}">
+                  <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ sesion.pk }}">
                     <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
                   </a>
                   <form method="post" class="d-inline">

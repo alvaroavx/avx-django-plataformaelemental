@@ -10,6 +10,7 @@
       <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar transacciones CSV</a>
     </div>
   </div>
+  {% include "finanzas/_info_box.html" %}
 
   <div class="row g-3">
     <div class="col-md-3">

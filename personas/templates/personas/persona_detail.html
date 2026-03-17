@@ -58,7 +58,7 @@
               {{ rol_form.organizacion }}
             </div>
             <div class="col-md-2 d-flex align-items-end">
-              <button class="btn btn-sm btn-outline-primary w-100" type="submit">Agregar</button>
+              <button class="btn btn-sm btn-outline-success w-100" type="submit">Agregar</button>
             </div>
           </form>
           {% for item in roles_asignados %}
@@ -131,7 +131,7 @@
               {% for item in asistencias %}
               <tr>
                 <td>{{ item.sesion.fecha|date:"d/m/Y" }}</td>
-                <td><a href="{% url 'asistencias:sesion_detail' item.sesion.pk %}">{{ item.sesion.disciplina.nombre }}</a></td>
+                <td><a href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.sesion.disciplina.nombre }}</a></td>
                 <td>{{ item.sesion.disciplina.organizacion.nombre }}</td>
                 <td>{{ item.get_estado_display }}</td>
               </tr>
@@ -206,21 +206,21 @@
       </div>
 
       <div class="card mb-3">
-        <div class="card-header">Boletas relacionadas</div>
+        <div class="card-header">Documentos tributarios relacionados</div>
         <div class="card-body table-responsive">
-          {% if boletas %}
+          {% if documentos_tributarios %}
           <table class="table table-sm mb-0">
             <thead><tr><th>Fecha</th><th>Tipo</th><th>Folio</th><th>Total</th><th></th></tr></thead>
             <tbody>
-              {% for item in boletas %}
+              {% for item in documentos_tributarios %}
               <tr>
                 <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
-                <td>{{ item.get_tipo_display }}</td>
+                <td>{{ item.get_tipo_documento_display }}</td>
                 <td>{{ item.folio }}</td>
                 <td>{{ item.monto_total|clp }}</td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:boleta_edit' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                    Ver boleta
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_detail' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                    Ver documento
                   </a>
                 </td>
               </tr>
@@ -228,7 +228,7 @@
             </tbody>
           </table>
           {% else %}
-          <div class="text-muted">Sin boletas relacionadas en el periodo.</div>
+          <div class="text-muted">Sin documentos tributarios relacionados en el periodo.</div>
           {% endif %}
         </div>
       </div>
@@ -243,7 +243,7 @@
               {% for item in sesiones_profesor %}
               <tr>
                 <td>{{ item.fecha|date:"d/m/Y" }}</td>
-                <td><a href="{% url 'asistencias:sesion_detail' item.pk %}">{{ item.disciplina.nombre }}</a></td>
+                <td><a href="{% url 'asistencias:sesion_detail' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.disciplina.nombre }}</a></td>
                 <td>{{ item.disciplina.organizacion.nombre }}</td>
                 <td>{{ item.get_estado_display }}</td>
                 <td>{{ item.asistencias.count }}</td>
@@ -260,4 +260,3 @@
   </div>
 </div>
 {% endblock %}
-

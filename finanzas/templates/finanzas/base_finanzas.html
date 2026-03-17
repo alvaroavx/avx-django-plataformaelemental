@@ -13,7 +13,7 @@
     {% include "shared/barra_apps.html" %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'finanzas:dashboard' %}">
+        <a class="navbar-brand" href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
           <img src="{% static 'img/logotipo-blanco.png' %}" alt="Finanzas" style="height: 40px;">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#finanzasNav">
@@ -24,7 +24,7 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:planes_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Planes</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:pagos_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Pagos</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:boletas_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Boletas</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:documentos_tributarios_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Documentos tributarios</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:categorias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Categorias</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:transacciones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Transacciones</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:reporte_categorias' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Reporte categorias</a></li>

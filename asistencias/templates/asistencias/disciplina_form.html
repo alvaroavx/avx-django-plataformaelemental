@@ -74,7 +74,7 @@
         </div>
 
         <div class="mt-4 d-flex gap-2">
-          <button class="btn btn-primary" type="submit">
+          <button class="btn {% if modo_formulario == "editar" %}btn-primary{% else %}btn-success{% endif %}" type="submit">
             {% if modo_formulario == "editar" %}Guardar cambios{% else %}Crear disciplina{% endif %}
           </button>
           <a

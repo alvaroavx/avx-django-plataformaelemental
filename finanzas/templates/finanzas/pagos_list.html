@@ -11,10 +11,38 @@
     <h2>Pagos</h2>
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar CSV</a>
   </div>
+  {% include "finanzas/_info_box.html" %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Total pagos</div>
+          <div class="display-6">{{ total_pagos_monto|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Total clases pagadas</div>
+          <div class="display-6">{{ total_clases_pagadas }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Saldo</div>
+          <div class="display-6">{{ total_saldo_clases }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="card mb-3">
     <button
-      class="card-header btn text-start w-100 border-0 rounded-0"
+      class="card-header btn btn-success text-start w-100 border-0 rounded-0"
       type="button"
       data-bs-toggle="collapse"
       data-bs-target="#registrarPagoCollapse"
@@ -35,11 +63,15 @@
               >
                 <label class="form-label">{{ field.label }}</label>
                 {{ field }}
+                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
                 {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                {% if field.name == "plan" %}
+                  <div id="plan-help-organizacion" class="small text-muted mt-1 d-none"></div>
+                {% endif %}
               </div>
             {% endfor %}
           </div>
-          <button class="btn btn-primary mt-2" type="submit">Guardar pago</button>
+          <button class="btn btn-success mt-2" type="submit">Guardar pago</button>
         </form>
       </div>
     </div>
@@ -96,7 +128,7 @@
             <td>{{ pago.plan|default:"-" }}</td>
             <td data-order="{{ pago.monto_total }}">{{ pago.monto_total|clp }}</td>
             <td data-order="{{ pago.clases_asignadas }}">{{ pago.clases_asignadas }}</td>
-            <td data-order="{{ pago.saldo_clases }}">{{ pago.saldo_clases }}</td>
+            <td data-order="{{ pago.saldo_clases_calculado }}">{{ pago.saldo_clases_calculado }}</td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">Detalle</a>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_edit' pago.pk %}?{{ request.GET.urlencode }}">Editar</a>
@@ -172,9 +204,54 @@
     }
 
     const planSelect = document.getElementById("id_plan");
+    const planHelp = document.getElementById("plan-help-organizacion");
     const montoReferenciaInput = document.getElementById("id_monto_referencia");
     const clasesAsignadasInput = document.getElementById("id_clases_asignadas");
-    if (planSelect && montoReferenciaInput && clasesAsignadasInput) {
+    if (planSelect && organizacionSelect && montoReferenciaInput && clasesAsignadasInput) {
+      const planesBase = Array.from(planSelect.options).map((option) => ({
+        value: option.value,
+        text: option.text,
+        org: option.dataset.org || "",
+        precio: option.dataset.precio || "",
+        numClases: option.dataset.numClases || "",
+      }));
+
+      function renderizarPlanes(mantenerSeleccion) {
+        const orgId = organizacionSelect.value;
+        const valorActual = mantenerSeleccion ? planSelect.value : "";
+        planSelect.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = orgId ? "Selecciona un plan" : "Selecciona una organizacion primero";
+        planSelect.appendChild(placeholder);
+
+        const opcionesFiltradas = planesBase.filter((option) => option.value && orgId && option.org === orgId);
+        opcionesFiltradas.forEach((option) => {
+          const nodo = document.createElement("option");
+          nodo.value = option.value;
+          nodo.textContent = option.text;
+          if (option.precio) nodo.dataset.precio = option.precio;
+          if (option.numClases) nodo.dataset.numClases = option.numClases;
+          if (option.org) nodo.dataset.org = option.org;
+          planSelect.appendChild(nodo);
+        });
+
+        const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
+        planSelect.value = seleccionValida ? valorActual : "";
+        planSelect.disabled = !orgId || !opcionesFiltradas.length;
+
+        if (planHelp) {
+          if (orgId && !opcionesFiltradas.length) {
+            planHelp.textContent = "No hay planes creados para esta organizacion.";
+            planHelp.classList.remove("d-none");
+          } else {
+            planHelp.textContent = "";
+            planHelp.classList.add("d-none");
+          }
+        }
+      }
+
       function cargarDatosDesdePlan(forzar) {
         const opcion = planSelect.options[planSelect.selectedIndex];
         if (!opcion || !opcion.value) return;
@@ -197,10 +274,14 @@
         }
       }
 
+      renderizarPlanes(true);
       cargarDatosDesdePlan(false);
       planSelect.addEventListener("change", function () {
         if (!planSelect.value) return;
         cargarDatosDesdePlan(true);
+      });
+      organizacionSelect.addEventListener("change", function () {
+        renderizarPlanes(false);
       });
     }
 

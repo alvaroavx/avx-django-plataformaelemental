@@ -1,0 +1,39 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>{{ title }}</h2>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:organizaciones_list' %}?{{ request.GET.urlencode }}">Volver al listado</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Nombre</label>{{ form.nombre }}{% if form.nombre.errors %}<div class="text-danger small">{{ form.nombre.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Razon social</label>{{ form.razon_social }}{% if form.razon_social.errors %}<div class="text-danger small">{{ form.razon_social.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-4"><label class="form-label">RUT</label>{{ form.rut }}{% if form.rut.errors %}<div class="text-danger small">{{ form.rut.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-4"><label class="form-label">Email contacto</label>{{ form.email_contacto }}{% if form.email_contacto.errors %}<div class="text-danger small">{{ form.email_contacto.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-4"><label class="form-label">Telefono contacto</label>{{ form.telefono_contacto }}{% if form.telefono_contacto.errors %}<div class="text-danger small">{{ form.telefono_contacto.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Sitio web</label>{{ form.sitio_web }}{% if form.sitio_web.errors %}<div class="text-danger small">{{ form.sitio_web.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Direccion</label>{{ form.direccion }}{% if form.direccion.errors %}<div class="text-danger small">{{ form.direccion.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.es_exenta_iva }}
+              <label class="form-check-label" for="{{ form.es_exenta_iva.id_for_label }}">Organizacion exenta de IVA</label>
+            </div>
+            {% if form.es_exenta_iva.errors %}<div class="text-danger small">{{ form.es_exenta_iva.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        {% if form.non_field_errors %}<div class="text-danger small mt-3">{{ form.non_field_errors|join:", " }}</div>{% endif %}
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-success" type="submit">{% if organizacion_obj %}Guardar cambios{% else %}Crear organizacion{% endif %}</button>
+          <a class="btn btn-outline-secondary" href="{% if organizacion_obj %}{% url 'personas:organizacion_detail' organizacion_obj.pk %}?{{ request.GET.urlencode }}{% else %}{% url 'personas:organizaciones_list' %}?{{ request.GET.urlencode }}{% endif %}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

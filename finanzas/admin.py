@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from database.models import AttendanceConsumption, Category, Invoice, Payment, PaymentPlan, Transaction
+from database.models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
 @admin.register(PaymentPlan)
@@ -17,11 +17,11 @@ class PaymentAdmin(admin.ModelAdmin):
     search_fields = ("persona__nombres", "persona__apellidos")
 
 
-@admin.register(Invoice)
-class InvoiceAdmin(admin.ModelAdmin):
-    list_display = ("fecha_emision", "organizacion", "tipo", "folio", "monto_total")
-    list_filter = ("organizacion", "tipo")
-    search_fields = ("folio", "cliente")
+@admin.register(DocumentoTributario)
+class DocumentoTributarioAdmin(admin.ModelAdmin):
+    list_display = ("fecha_emision", "organizacion", "tipo_documento", "folio", "monto_total", "fuente")
+    list_filter = ("organizacion", "tipo_documento", "fuente")
+    search_fields = ("folio", "nombre_emisor", "nombre_receptor", "rut_emisor", "rut_receptor")
 
 
 @admin.register(AttendanceConsumption)

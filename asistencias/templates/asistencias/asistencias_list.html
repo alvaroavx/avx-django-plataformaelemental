@@ -7,7 +7,7 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Nueva sesión</span>
-          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">
+          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">
             <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
           </button>
         </div>
@@ -26,7 +26,7 @@
                     {{ sesion_form.fecha }}
                   </div>
                   <div>
-                    <button class="btn btn-primary" name="crear_sesion" type="submit">
+                    <button class="btn btn-success" name="crear_sesion" type="submit">
                       <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesión</span>
                     </button>
                   </div>
@@ -47,7 +47,7 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Nueva persona</span>
-          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">
+          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">
             <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
           </button>
         </div>
@@ -68,7 +68,7 @@
                 {{ persona_form.telefono }}
               </div>
               <div class="col-md-3">
-                <button class="btn btn-outline-secondary" name="agregar_persona" type="submit">
+                <button class="btn btn-outline-success" name="agregar_persona" type="submit">
                   <i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Guardar persona</span>
                 </button>
               </div>
@@ -185,8 +185,12 @@
                 {% endif %}
               </td>
               <td>
-                {% for asistencia in item.sesion.asistencias.all %}
-                  <a class="badge text-bg-light border text-dark me-1 text-decoration-none" href="{% url 'asistencias:persona_detail' asistencia.persona.pk %}">
+                {% for asistencia in item.asistentes %}
+                  <a
+                    class="badge {{ asistencia.badge_finanzas_class }} me-1 text-decoration-none"
+                    href="{% url 'asistencias:persona_detail' asistencia.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+                    title="{{ asistencia.badge_finanzas_label }}"
+                  >
                     {{ asistencia.persona }}
                   </a>
                 {% empty %}
@@ -195,10 +199,10 @@
               </td>
               <td>{{ item.total_asistentes }}</td>
               <td>
-                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}" title="Ver">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:asistencias_list' %}?sesion_id={{ item.sesion.pk }}" title="Agregar asistentes">
+                <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ item.sesion.pk }}" title="Agregar asistentes">
                   <i class="bi bi-person-plus"></i>
                 </a>
                 <form method="post" class="d-inline">

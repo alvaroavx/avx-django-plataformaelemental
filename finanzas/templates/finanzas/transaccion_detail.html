@@ -1,0 +1,84 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Detalle de transaccion{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Detalle de transaccion</h2>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
+        <i class="bi bi-arrow-left"></i><span class="ms-1">Volver</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_edit' transaccion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+        <i class="bi bi-pencil"></i><span class="ms-1">Editar</span>
+      </a>
+    </div>
+  </div>
+  <div class="alert alert-light border shadow-sm mb-3">
+    <div class="fw-semibold mb-1">Que guardar aqui</div>
+    <div class="small text-muted mb-0">
+      Esta pantalla describe un movimiento de caja. El archivo adjunto corresponde al respaldo del movimiento, como transferencia,
+      cartola o comprobante. Los documentos tributarios relacionados se gestionan por separado.
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-header">Informacion</div>
+        <div class="card-body">
+          <div class="mb-3"><span class="small text-muted d-block">Organizacion</span><strong>{{ transaccion.organizacion.nombre }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Categoria</span><strong>{{ transaccion.categoria.nombre }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Tipo</span><strong>{{ transaccion.get_tipo_display }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Fecha</span><strong>{{ transaccion.fecha|date:"d/m/Y" }}</strong></div>
+          <div class="mb-3"><span class="small text-muted d-block">Monto</span><strong>{{ transaccion.monto|clp }}</strong></div>
+          <div class="mb-3">
+            <span class="small text-muted d-block">Documentos tributarios asociados</span>
+            {% if transaccion.documentos_tributarios.all %}
+              {% for documento in transaccion.documentos_tributarios.all %}
+                <div>
+                  <a href="{% url 'finanzas:documento_tributario_detail' documento.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+                    {{ documento.get_tipo_documento_display }} #{{ documento.folio }}
+                  </a>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-muted">Sin documentos asociados.</div>
+            {% endif %}
+          </div>
+          <div><span class="small text-muted d-block">Descripcion</span><div>{{ transaccion.descripcion|default:"-" }}</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-header">Respaldo del movimiento</div>
+        <div class="card-body">
+          {% if transaccion.archivo %}
+            <div class="d-flex gap-2 mb-3">
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_archivo' transaccion.pk %}" target="_blank">Abrir archivo</a>
+            </div>
+            {% if archivo_es_pdf %}
+              <div class="border rounded overflow-hidden">
+                <iframe
+                  src="{% url 'finanzas:transaccion_archivo' transaccion.pk %}#toolbar=1&navpanes=0&scrollbar=1"
+                  title="PDF transaccion {{ transaccion.pk }}"
+                  width="100%"
+                  height="720"
+                  style="border: 0;"
+                ></iframe>
+              </div>
+            {% else %}
+              <div class="alert alert-light border mb-0">
+                El archivo adjunto no es PDF. Puedes abrirlo desde el boton superior.
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="text-muted">Esta transaccion no tiene documento adjunto.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
