@@ -1,36 +1,35 @@
 # Plataforma Elemental
 
-Plataforma administrativa construida en Django para operar academias, organizaciones y finanzas desde una sola base. Hoy el proyecto ya cubre tres frentes principales:
-- operacion academica diaria en `asistencias`
-- CRM y organizaciones en `personas`
-- cobros, documentos y caja en `finanzas`
+Plataforma administrativa construida en Django para operar academias, organizaciones y finanzas desde una sola base. Hoy integra operacion academica, CRM, cobros, documentos tributarios y movimientos de caja, manteniendo filtros globales de `periodo_mes`, `periodo_anio` y `organizacion` en toda la navegacion.
 
-## Idea general
-La plataforma esta pensada para trabajar con varias organizaciones y mantener siempre activos tres filtros globales:
-- `periodo_mes`
-- `periodo_anio`
-- `organizacion`
+## Descripcion
 
-Esos filtros deben arrastrarse por toda la navegacion.
+La plataforma esta pensada para centralizar:
+- registro y seguimiento de sesiones y asistencias
+- administracion de personas, roles y organizaciones
+- pagos academicos y consumo de clases
+- documentos tributarios opcionales
+- transacciones de caja y reportes operativos
 
-## Apps principales
+Regla funcional importante:
+- la plataforma debe poder usarse aunque no existan documentos tributarios
+- `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas
+
+## Modulos principales
 
 ### `asistencias`
-Operacion academica diaria:
 - sesiones
 - registro de asistentes
 - perfiles operativos de estudiantes y profesores
 - estado financiero rapido del estudiante
 
 ### `personas`
-CRM transversal:
-- listado de personas
-- perfiles completos
-- roles por organizacion
-- administracion de organizaciones
+- CRM transversal
+- personas y roles por organizacion
+- organizaciones
+- vista administrativa consolidada por persona
 
 ### `finanzas`
-Operacion financiera:
 - planes
 - pagos de estudiantes
 - documentos tributarios
@@ -38,50 +37,154 @@ Operacion financiera:
 - transacciones de caja
 - categorias y reportes
 
-## Criterio actual de finanzas
-- `Pagos`: cobros academicos a estudiantes.
-- `Documentos tributarios`: facturas, boletas de venta, boletas de honorarios y otros documentos fiscales.
-- `Transacciones`: movimientos reales de dinero con su respaldo bancario o de caja.
+## Endpoints y rutas principales
 
-La fuente tributaria objetivo es el SII. La plataforma debe servir para importar, revisar y asociar documentos, no para duplicar innecesariamente la informacion.
+### Acceso
+- `/accounts/login/`
+- `/admin/`
+- `/`
+- `/app/`
 
-## Documentacion del repo
-- [docs/README.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/README.md)
-- [PLATAFORMA.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/PLATAFORMA.md)
-- [finanzas/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/finanzas/FINANZAS.md)
-- [asistencias/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/asistencias/ASISTENCIAS.md)
-- [personas/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/personas/PERSONAS.md)
+### Asistencias
+- `/asistencias/`
+- `/asistencias/sesiones/`
+- `/asistencias/sesiones/<id>/`
+- `/asistencias/asistencias/`
+- `/asistencias/personas/<id>/`
+- `/asistencias/estudiantes/`
+- `/asistencias/profesores/`
+- `/asistencias/disciplinas/`
 
-## Puesta en marcha
-1. Activa el entorno virtual:
-   ```bash
-   source ./.venv/bin/activate
-   ```
-2. Instala dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Aplica migraciones:
-   ```bash
-   python manage.py migrate
-   ```
-4. Crea un usuario admin si hace falta:
-   ```bash
-   python manage.py createsuperuser
-   ```
-5. Levanta el servidor:
-   ```bash
-   python manage.py runserver
-   ```
+### Personas
+- `/personas/`
+- `/personas/listado/`
+- `/personas/nuevo/`
+- `/personas/<id>/`
+- `/personas/<id>/editar/`
+- `/personas/organizaciones/`
+- `/personas/organizaciones/nueva/`
+- `/personas/organizaciones/<id>/`
+- `/personas/organizaciones/<id>/editar/`
 
-## Rutas utiles
-- Login: `http://127.0.0.1:8000/accounts/login/`
-- Asistencias: `http://127.0.0.1:8000/asistencias/`
-- Personas: `http://127.0.0.1:8000/personas/`
-- Finanzas: `http://127.0.0.1:8000/finanzas/`
-- Admin Django: `http://127.0.0.1:8000/admin/`
+### Finanzas
+- `/finanzas/`
+- `/finanzas/pagos/`
+- `/finanzas/planes/`
+- `/finanzas/documentos-tributarios/`
+- `/finanzas/documentos-tributarios/importar/`
+- `/finanzas/transacciones/`
+- `/finanzas/categorias/`
+- `/finanzas/reportes/categorias/`
+- `/finanzas/export/pagos.csv`
+- `/finanzas/export/transacciones.csv`
 
-## Pruebas
+## Arquitectura
+
+### Stack
+- Django 5
+- Django REST Framework
+- SQLite en desarrollo
+- Bootstrap 5
+- DataTables
+- Tom Select
+
+### Estructura del repo
+- `plataformaelemental/`: configuracion del proyecto Django
+- `database/`: modelos del dominio
+- `asistencias/`: operacion academica
+- `personas/`: CRM, roles y organizaciones
+- `finanzas/`: pagos, documentos tributarios y caja
+- `api/`: endpoints externos
+- `data/`: cargas masivas y soporte de datos
+- `docs/`: documentacion viva
+
+### Reglas tecnicas transversales
+- Los modelos del dominio se mantienen en `database/`.
+- El codigo debe estar en espanol siempre que no complique artificialmente la comprension.
+- Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegacion.
+
+## Comandos principales
+
+### Activar entorno virtual
+```bash
+source ./.venv/bin/activate
+```
+
+### Instalar dependencias
+```bash
+pip install -r requirements.txt
+```
+
+### Aplicar migraciones
+```bash
+python manage.py migrate
+```
+
+### Levantar servidor de desarrollo
+```bash
+python manage.py runserver
+```
+
+### Ejecutar pruebas
 ```bash
 python manage.py test
 ```
+
+### Ejecutar pruebas por app
+```bash
+python manage.py test asistencias.tests
+python manage.py test personas.tests
+python manage.py test finanzas.tests
+```
+
+## Formas de usar la plataforma
+
+### Flujo academico basico
+1. Crear organizacion y disciplinas.
+2. Registrar personas y roles.
+3. Crear sesiones.
+4. Registrar asistencias.
+5. Revisar estado academico y financiero de cada estudiante.
+
+### Flujo financiero academico basico
+1. Crear planes si aplica.
+2. Registrar pagos de estudiantes.
+3. Consumir clases contra asistencias del mismo mes y anio.
+4. Revisar saldo de clases y deudas.
+
+### Flujo tributario basico
+1. Registrar un documento tributario manualmente o usar carga asistida.
+2. Revisar y confirmar los formularios precargados.
+3. Asociar el documento a pagos o transacciones cuando corresponda.
+
+## Carga asistida de documentos tributarios
+
+Estado actual:
+- XML-first
+- soporte inicial para DTE XML clasico
+- soporte inicial para boleta de honorarios XML
+- PDF fallback basico
+- revision humana antes del guardado
+
+Reglas:
+- si subes XML y PDF, prevalece XML
+- si subes solo PDF, el parseo depende de que el PDF tenga texto seleccionable
+- subir un archivo no guarda el registro final automaticamente
+
+## Documentacion
+
+Orden recomendado:
+1. [AGENTS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/AGENTS.md)
+2. [docs/INDICE.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/INDICE.md)
+3. [docs/arquitectura/PLATAFORMA.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/arquitectura/PLATAFORMA.md)
+4. [docs/proceso/DECISIONES.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/proceso/DECISIONES.md)
+5. Documentos por app:
+   - [docs/apps/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/ASISTENCIAS.md)
+   - [docs/apps/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/PERSONAS.md)
+   - [docs/apps/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/FINANZAS.md)
+
+## Observaciones
+
+- `README.md` es el documento humano general del proyecto.
+- `AGENTS.md` se mantiene en la raiz porque es una instruccion operativa especial para el agente.
+- La documentacion viva del proyecto debe vivir dentro de `docs/`.

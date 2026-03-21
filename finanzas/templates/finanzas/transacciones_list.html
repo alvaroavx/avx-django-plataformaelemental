@@ -9,13 +9,49 @@
   </div>
   {% include "finanzas/_info_box.html" %}
 
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Total transacciones</div>
+          <div class="display-6">{{ total_transacciones }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Ingresos</div>
+          <div class="display-6">{{ total_ingresos|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Egresos</div>
+          <div class="display-6">{{ total_egresos|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Balance</div>
+          <div class="display-6">{{ balance_transacciones|clp }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card mb-3">
     <div class="card-header text-bg-success">Nueva transaccion</div>
     <div class="card-body">
       <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
         <div class="row g-2">
-          {% for field in form %}
+          {% for field in form.visible_fields %}
             <div class="col-md-4">
               <label class="form-label">{{ field.label }}</label>
               {{ field }}

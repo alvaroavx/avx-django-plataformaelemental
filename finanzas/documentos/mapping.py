@@ -1,11 +1,25 @@
 import json
 from decimal import Decimal
 
+from django.utils.dateparse import parse_date
+
 from database.models import DocumentoTributario, Organizacion, Payment, Persona
 
 
 def map_tipo_documento(normalized):
     return normalized.get_value("encabezado", "tipo_documento_sugerido", "otro") or "otro"
+
+
+def _glosa_documento(normalized):
+    glosas = []
+    for linea in normalized.lineas:
+        descripcion = linea.fields.get("descripcion")
+        if not descripcion or not descripcion.value:
+            continue
+        texto = str(descripcion.value).strip()
+        if texto and texto not in glosas:
+            glosas.append(texto)
+    return "\n".join(glosas)
 
 
 def _rut_normalizado(value):
@@ -37,18 +51,26 @@ def detectar_duplicados_documento(normalized, organizacion_id=None):
     rut_emisor = normalized.get_value("emisor", "rut")
     rut_receptor = normalized.get_value("receptor", "rut")
     tipo_documento = map_tipo_documento(normalized)
-    if folio:
-        queryset = queryset.filter(folio=folio)
-    if fecha:
-        queryset = queryset.filter(fecha_emision=fecha)
-    if total is not None:
-        queryset = queryset.filter(monto_total=total)
-    if tipo_documento:
-        queryset = queryset.filter(tipo_documento=tipo_documento)
-    if rut_emisor:
-        queryset = queryset.filter(rut_emisor__iexact=rut_emisor)
-    if rut_receptor:
-        queryset = queryset.filter(rut_receptor__iexact=rut_receptor)
+    if folio and tipo_documento and rut_emisor:
+        queryset = queryset.filter(
+            folio=folio,
+            tipo_documento=tipo_documento,
+            rut_emisor__iexact=rut_emisor,
+        )
+    else:
+        if folio:
+            queryset = queryset.filter(folio=folio)
+        if tipo_documento:
+            queryset = queryset.filter(tipo_documento=tipo_documento)
+        fecha_parseada = parse_date(fecha) if isinstance(fecha, str) else fecha
+        if fecha_parseada:
+            queryset = queryset.filter(fecha_emision=fecha_parseada)
+        if total is not None:
+            queryset = queryset.filter(monto_total=total)
+        if rut_emisor:
+            queryset = queryset.filter(rut_emisor__iexact=rut_emisor)
+        if rut_receptor:
+            queryset = queryset.filter(rut_receptor__iexact=rut_receptor)
     return [
         {
             "id": item.pk,
@@ -62,6 +84,7 @@ def detectar_duplicados_documento(normalized, organizacion_id=None):
 
 def documento_initial_from_normalized(normalized, organizacion_id=None):
     metadata = normalized.to_dict()
+    observaciones = _glosa_documento(normalized) or "\n".join(normalized.warnings)
     return {
         "organizacion": organizacion_id or "",
         "tipo_documento": map_tipo_documento(normalized),
@@ -80,7 +103,7 @@ def documento_initial_from_normalized(normalized, organizacion_id=None):
         "retencion_monto": normalized.get_value("montos", "retencion_honorarios") or Decimal("0"),
         "monto_total": normalized.get_value("montos", "total_bruto") or Decimal("0"),
         "metadata_extra": json.dumps(metadata, ensure_ascii=True),
-        "observaciones": "\n".join(normalized.warnings),
+        "observaciones": observaciones,
     }
 
 

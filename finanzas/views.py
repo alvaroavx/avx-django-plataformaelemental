@@ -1,16 +1,19 @@
 ﻿import csv
 import json
 import mimetypes
+from pathlib import Path
 
 from django.contrib import messages
 from django.core.files import File
-from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch, Q, Sum
+from django.db.models import CharField, Count, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from database.models import (
+    Asistencia,
     AttendanceConsumption,
     Category,
     DocumentoTributario,
@@ -25,6 +28,7 @@ from .documentos.dtos import NormalizedTaxDocument
 from .documentos.services import build_review_payload, parse_tax_document
 from .documentos.temp_storage import (
     actualizar_payload_importacion,
+    cargar_archivo_importacion_temporal,
     cargar_importacion_temporal,
     eliminar_importacion_temporal,
     guardar_importacion_temporal,
@@ -118,7 +122,15 @@ def _documento_revision_form(*, data=None, initial=None):
     return form
 
 
-def _review_context_from_payload(request, payload, *, documento_data=None, pago_data=None):
+def _leer_xml_temporal(path):
+    try:
+        content = Path(path).read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        content = Path(path).read_text(encoding="latin-1")
+    return content
+
+
+def _review_context_from_payload(request, payload, *, token_importacion=None, documento_data=None, pago_data=None):
     organizacion = _organizacion_desde_request(request)
     documento_form = _documento_revision_form(
         data=documento_data,
@@ -132,15 +144,38 @@ def _review_context_from_payload(request, payload, *, documento_data=None, pago_
             initial=pago_inicial,
             prefix="pago",
         )
+    archivo_pdf_url = ""
+    archivo_xml_url = ""
+    archivo_xml_preview = ""
+    if token_importacion:
+        archivo_pdf = cargar_archivo_importacion_temporal(request, token_importacion, "pdf")
+        if archivo_pdf:
+            archivo_pdf_url = reverse(
+                "finanzas:documento_tributario_importacion_archivo",
+                kwargs={"token": token_importacion, "tipo_archivo": "pdf"},
+            )
+        archivo_xml = cargar_archivo_importacion_temporal(request, token_importacion, "xml")
+        if archivo_xml:
+            archivo_xml_url = reverse(
+                "finanzas:documento_tributario_importacion_archivo",
+                kwargs={"token": token_importacion, "tipo_archivo": "xml"},
+            )
+            archivo_xml_preview = _leer_xml_temporal(archivo_xml["path"])
     return {
         "upload_form": DocumentoTributarioImportUploadForm(),
         "confirm_form": DocumentoTributarioImportConfirmForm(
-            initial={"guardar_pago_sugerido": bool(pago_inicial)}
+            initial={
+                "guardar_pago_sugerido": bool(pago_inicial),
+                "token_importacion": token_importacion or "",
+            }
         ),
         "documento_form": documento_form,
         "pago_form": pago_form,
         "review_payload": payload,
         "documento_normalizado": NormalizedTaxDocument.from_dict(payload.get("normalized", {})),
+        "archivo_importacion_pdf_url": archivo_pdf_url,
+        "archivo_importacion_xml_url": archivo_xml_url,
+        "archivo_importacion_xml_preview": archivo_xml_preview,
         "ayuda_seccion": {
             "titulo": "Carga asistida",
             "texto": (
@@ -150,6 +185,55 @@ def _review_context_from_payload(request, payload, *, documento_data=None, pago_
         },
         "organizacion_sugerida_id": organizacion.pk if organizacion else "",
     }
+
+
+def _metadata_extra_como_dict(value):
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _tipo_visualizacion_archivo(nombre_archivo):
+    if not nombre_archivo:
+        return {"es_pdf": False, "es_imagen": False}
+    content_type, _ = mimetypes.guess_type(nombre_archivo)
+    nombre = nombre_archivo.lower()
+    es_pdf = bool(content_type == "application/pdf" or nombre.endswith(".pdf"))
+    es_imagen = bool(
+        (content_type and content_type.startswith("image/"))
+        or nombre.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"))
+    )
+    return {"es_pdf": es_pdf, "es_imagen": es_imagen}
+
+
+def _subquery_disciplina_principal(*, inicio_mes=None, fin_mes=None):
+    filtros = {
+        "persona_id": OuterRef("persona_id"),
+        "sesion__disciplina__organizacion_id": OuterRef("organizacion_id"),
+        "estado": Asistencia.Estado.PRESENTE,
+    }
+    if inicio_mes and fin_mes:
+        filtros["sesion__fecha__gte"] = inicio_mes
+        filtros["sesion__fecha__lte"] = fin_mes
+    return (
+        Asistencia.objects.filter(**filtros)
+        .values("sesion__disciplina__nombre")
+        .annotate(total=Count("id"))
+        .order_by("-total", "sesion__disciplina__nombre")
+        .values("sesion__disciplina__nombre")[:1]
+    )
 
 
 @admin_finanzas_required
@@ -248,6 +332,7 @@ def pagos_list(request):
     context = _base_context(request)
     inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
+    disciplina_principal_historica = _subquery_disciplina_principal()
 
     pagos_qs = (
         Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario")
@@ -263,6 +348,12 @@ def pagos_list(request):
             saldo_clases_calculado=ExpressionWrapper(
                 F("clases_asignadas") - F("clases_consumidas_calculadas"),
                 output_field=IntegerField(),
+            )
+        )
+        .annotate(
+            disciplina_principal_nombre=Coalesce(
+                Subquery(disciplina_principal_historica, output_field=CharField()),
+                Value("Sin disciplina", output_field=CharField()),
             )
         )
         .order_by("-fecha_pago", "-id")
@@ -282,6 +373,16 @@ def pagos_list(request):
         total_clases_pagadas=Sum("clases_asignadas"),
         total_saldo_clases=Sum("saldo_clases_calculado"),
     )
+    pagos = list(pagos_qs)
+    for pago in pagos:
+        disciplina = pago.disciplina_principal_nombre or "Sin disciplina"
+        nombre_plan = pago.plan.nombre if pago.plan_id else "Sin plan"
+        pago.estado_fiscal_label = "Afecta" if pago.monto_iva else "Exenta"
+        pago.estado_fiscal_badge_class = "text-bg-primary" if pago.monto_iva else "text-bg-secondary"
+        pago.texto_copia = f"Taller de {disciplina} - {nombre_plan} ({pago.persona.nombre_completo})"
+        pago.monto_neto_copia = str(int(pago.monto_neto or 0))
+        pago.monto_iva_copia = str(int(pago.monto_iva or 0))
+        pago.monto_total_copia = str(int(pago.monto_total or 0))
 
     form = PaymentForm(
         request.POST or None,
@@ -294,7 +395,7 @@ def pagos_list(request):
 
     context.update(
         {
-            "pagos": pagos_qs,
+            "pagos": pagos,
             "form": form,
             "metodos_pago": Payment.Metodo.choices,
             "q": q or "",
@@ -377,12 +478,23 @@ def documentos_tributarios_list(request):
     context = _base_context(request)
     inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    documentos_qs = DocumentoTributario.objects.select_related("organizacion", "documento_relacionado").order_by(
-        "-fecha_emision", "-id"
+    documentos_qs = DocumentoTributario.objects.select_related("organizacion", "documento_relacionado").annotate(
+        pagos_asociados_total=Count("pagos_asociados", distinct=True),
+        transacciones_asociadas_total=Count("transacciones_asociadas", distinct=True),
     )
     documentos_qs = documentos_qs.filter(fecha_emision__gte=inicio_mes, fecha_emision__lte=fin_mes)
     if organizacion:
         documentos_qs = documentos_qs.filter(organizacion=organizacion)
+    documentos_qs = documentos_qs.order_by("-fecha_emision", "-id")
+
+    resumen_documentos = documentos_qs.aggregate(
+        total_documentos=Count("id"),
+        monto_total_documentos=Sum("monto_total"),
+        monto_total_iva=Sum("monto_iva"),
+        monto_total_retencion=Sum("retencion_monto"),
+        total_pagos_asociados=Sum("pagos_asociados_total"),
+        total_transacciones_asociadas=Sum("transacciones_asociadas_total"),
+    )
 
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
@@ -394,6 +506,12 @@ def documentos_tributarios_list(request):
         {
             "documentos": documentos_qs,
             "form": form,
+            "total_documentos": resumen_documentos["total_documentos"] or 0,
+            "monto_total_documentos": resumen_documentos["monto_total_documentos"] or 0,
+            "monto_total_iva": resumen_documentos["monto_total_iva"] or 0,
+            "monto_total_retencion": resumen_documentos["monto_total_retencion"] or 0,
+            "total_pagos_asociados": resumen_documentos["total_pagos_asociados"] or 0,
+            "total_transacciones_asociadas": resumen_documentos["total_transacciones_asociadas"] or 0,
             "ayuda_seccion": _ayuda_finanzas("documentos"),
         }
     )
@@ -421,7 +539,7 @@ def documento_tributario_importar(request):
         )
         if formularios_validos:
             documento = documento_form.save(commit=False)
-            metadata_extra = documento.metadata_extra or {}
+            metadata_extra = _metadata_extra_como_dict(documento.metadata_extra)
             metadata_extra["importacion_normalizada"] = payload.get("normalized", {})
             metadata_extra["warnings_importacion"] = payload.get("warnings", [])
             metadata_extra["duplicates_detected"] = payload.get("duplicates", [])
@@ -446,7 +564,15 @@ def documento_tributario_importar(request):
             messages.success(request, "Documento tributario importado y revisado correctamente.")
             return redirect(_url_with_query(request, "finanzas:documento_tributario_detail", pk=documento.pk))
 
-        context.update(_review_context_from_payload(request, payload, documento_data=request.POST, pago_data=request.POST))
+        context.update(
+            _review_context_from_payload(
+                request,
+                payload,
+                token_importacion=token,
+                documento_data=request.POST,
+                pago_data=request.POST,
+            )
+        )
         context["confirm_form"] = confirm_form
         return render(request, "finanzas/documento_tributario_importar.html", context)
 
@@ -470,7 +596,7 @@ def documento_tributario_importar(request):
         if pdf_file:
             pdf_file.seek(0)
         token = guardar_importacion_temporal(request, xml_file=xml_file, pdf_file=pdf_file, payload=payload)
-        context.update(_review_context_from_payload(request, payload))
+        context.update(_review_context_from_payload(request, payload, token_importacion=token))
         context["confirm_form"] = DocumentoTributarioImportConfirmForm(
             initial={"token_importacion": token, "guardar_pago_sugerido": bool(payload.get("pago_initial"))}
         )
@@ -521,6 +647,27 @@ def documento_tributario_parse_preview(request):
     actualizar_payload_importacion(request, token, payload)
     response_payload = json.loads(json.dumps({"ok": True, "token": token, **payload}, default=str))
     return JsonResponse(response_payload)
+
+
+@admin_finanzas_required
+@xframe_options_sameorigin
+def documento_tributario_importacion_archivo(request, token, tipo_archivo):
+    if tipo_archivo not in {"pdf", "xml"}:
+        raise Http404("Tipo de archivo no soportado.")
+    archivo_info = cargar_archivo_importacion_temporal(request, token, tipo_archivo)
+    if not archivo_info:
+        raise Http404("La importacion temporal ya no existe o no contiene ese archivo.")
+
+    path = archivo_info["path"]
+    content_type, _ = mimetypes.guess_type(path.name)
+    response = FileResponse(
+        path.open("rb"),
+        as_attachment=False,
+        filename=archivo_info["name"],
+        content_type=content_type or "application/octet-stream",
+    )
+    response["Content-Disposition"] = f'inline; filename="{archivo_info["name"]}"'
+    return response
 
 
 @admin_finanzas_required
@@ -658,13 +805,31 @@ def transacciones_list(request):
     if organizacion:
         trans_qs = trans_qs.filter(organizacion=organizacion)
 
+    resumen_transacciones = trans_qs.aggregate(
+        total_transacciones=Count("id"),
+        total_ingresos=Sum("monto", filter=Q(tipo=Transaction.Tipo.INGRESO)),
+        total_egresos=Sum("monto", filter=Q(tipo=Transaction.Tipo.EGRESO)),
+    )
+    total_ingresos = resumen_transacciones["total_ingresos"] or 0
+    total_egresos = resumen_transacciones["total_egresos"] or 0
+
     form = TransactionForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Transaccion registrada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
 
-    context.update({"transacciones": trans_qs, "form": form, "ayuda_seccion": _ayuda_finanzas("transacciones")})
+    context.update(
+        {
+            "transacciones": trans_qs,
+            "form": form,
+            "total_transacciones": resumen_transacciones["total_transacciones"] or 0,
+            "total_ingresos": total_ingresos,
+            "total_egresos": total_egresos,
+            "balance_transacciones": total_ingresos - total_egresos,
+            "ayuda_seccion": _ayuda_finanzas("transacciones"),
+        }
+    )
     return render(request, "finanzas/transacciones_list.html", context)
 
 
@@ -675,11 +840,12 @@ def transaccion_detail(request, pk):
         Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios"),
         pk=pk,
     )
-    archivo_es_pdf = bool(transaccion.archivo and transaccion.archivo.name.lower().endswith(".pdf"))
+    tipo_archivo = _tipo_visualizacion_archivo(transaccion.archivo.name if transaccion.archivo else "")
     context.update(
         {
             "transaccion": transaccion,
-            "archivo_es_pdf": archivo_es_pdf,
+            "archivo_es_pdf": tipo_archivo["es_pdf"],
+            "archivo_es_imagen": tipo_archivo["es_imagen"],
             "back_url": request.META.get("HTTP_REFERER") or _url_with_query(request, "finanzas:transacciones_list"),
         }
     )
@@ -746,6 +912,7 @@ def reporte_categorias(request):
         .annotate(total=Sum("monto"))
         .order_by("categoria__tipo", "-total")
     )
+    consolidado = list(consolidado)
     context.update(
         {
             "consolidado": consolidado,

@@ -105,17 +105,23 @@
 
   <div class="card rounded-top-0">
     <div class="card-body table-responsive">
+      <div class="small text-muted mb-2">
+        Haz clic sobre los montos de neto, IVA o bruto para copiar el valor sin puntos.
+      </div>
       {% if pagos %}
       <table id="tabla-pagos" class="table table-sm">
         <thead>
           <tr>
             <th>Fecha</th>
             <th>Alumno</th>
-            <th>Organizacion</th>
             <th>Plan</th>
-            <th>Total</th>
+            <th>Estado</th>
+            <th>Neto</th>
+            <th>IVA</th>
+            <th>Bruto</th>
             <th>Clases</th>
             <th>Saldo</th>
+            <th class="text-center">Msg</th>
             <th></th>
           </tr>
         </thead>
@@ -124,11 +130,62 @@
           <tr>
             <td data-order="{{ pago.fecha_pago|date:'Ymd' }}">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
             <td>{{ pago.persona }}</td>
-            <td>{{ pago.organizacion.nombre }}</td>
             <td>{{ pago.plan|default:"-" }}</td>
-            <td data-order="{{ pago.monto_total }}">{{ pago.monto_total|clp }}</td>
+            <td data-order="{{ pago.monto_iva }}">
+              <span class="badge {{ pago.estado_fiscal_badge_class }}">{{ pago.estado_fiscal_label }}</span>
+            </td>
+            <td data-order="{{ pago.monto_neto }}">
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none js-copiar-monto"
+                data-copy-value="{{ pago.monto_neto_copia }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="{{ pago.monto_neto|clp }} · clic para copiar {{ pago.monto_neto_copia }}"
+              >
+                {{ pago.monto_neto|clp }}
+              </button>
+            </td>
+            <td data-order="{{ pago.monto_iva }}">
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none js-copiar-monto"
+                data-copy-value="{{ pago.monto_iva_copia }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="{{ pago.monto_iva|clp }} · clic para copiar {{ pago.monto_iva_copia }}"
+              >
+                {{ pago.monto_iva|clp }}
+              </button>
+            </td>
+            <td data-order="{{ pago.monto_total }}">
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 text-decoration-none js-copiar-monto"
+                data-copy-value="{{ pago.monto_total_copia }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="{{ pago.monto_total|clp }} · clic para copiar {{ pago.monto_total_copia }}"
+              >
+                {{ pago.monto_total|clp }}
+              </button>
+            </td>
             <td data-order="{{ pago.clases_asignadas }}">{{ pago.clases_asignadas }}</td>
             <td data-order="{{ pago.saldo_clases_calculado }}">{{ pago.saldo_clases_calculado }}</td>
+            <td class="text-center">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary js-copiar-pago"
+                data-copy-text="{{ pago.texto_copia|escape }}"
+                data-tooltip-text="{{ pago.texto_copia|escape }} · clic para copiar"
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="{{ pago.texto_copia|escape }} · clic para copiar"
+                aria-label="Copiar texto sugerido del pago"
+              >
+                <i class="bi bi-chat-text"></i>
+              </button>
+            </td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">Detalle</a>
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_edit' pago.pk %}?{{ request.GET.urlencode }}">Editar</a>
@@ -311,7 +368,7 @@
         stateSave: true,
         order: [[0, "desc"]],
         columnDefs: [
-          { orderable: false, targets: 7 },
+          { orderable: false, targets: [9, 10] },
         ],
         language: {
           lengthMenu: "Mostrar _MENU_",
@@ -322,6 +379,53 @@
         },
       });
     }
+
+    function copiarTexto(texto) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(texto);
+      }
+      return new Promise(function (resolve, reject) {
+        const area = document.createElement("textarea");
+        area.value = texto;
+        area.setAttribute("readonly", "");
+        area.style.position = "absolute";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        try {
+          document.execCommand("copy");
+          resolve();
+        } catch (error) {
+          reject(error);
+        } finally {
+          document.body.removeChild(area);
+        }
+      });
+    }
+
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+      if (window.bootstrap && window.bootstrap.Tooltip) {
+        bootstrap.Tooltip.getOrCreateInstance(element);
+      }
+    });
+
+    document.querySelectorAll(".js-copiar-pago").forEach(function (button) {
+      const tooltipText = button.dataset.tooltipText || "";
+      button.addEventListener("click", function () {
+        copiarTexto(button.dataset.copyText || "");
+        if (window.bootstrap && window.bootstrap.Tooltip) {
+          const tooltip = bootstrap.Tooltip.getOrCreateInstance(button);
+          button.setAttribute("data-bs-original-title", tooltipText);
+          tooltip.setContent({ ".tooltip-inner": tooltipText });
+        }
+      });
+    });
+
+    document.querySelectorAll(".js-copiar-monto").forEach(function (button) {
+      button.addEventListener("click", function () {
+        copiarTexto(button.dataset.copyValue || "");
+      });
+    });
   })();
 </script>
 {% endblock %}

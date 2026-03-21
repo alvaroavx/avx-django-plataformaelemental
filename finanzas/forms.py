@@ -1,6 +1,8 @@
 from django import forms
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.db.models import Q
 from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 
 from database.models import Category, DocumentoTributario, Payment, PaymentPlan, Persona, PersonaRol, Transaction
 
@@ -176,6 +178,12 @@ class PaymentForm(forms.ModelForm):
 
 
 class DocumentoTributarioForm(forms.ModelForm):
+    monto_neto = forms.CharField(required=False)
+    monto_exento = forms.CharField(required=False)
+    monto_iva = forms.CharField(required=False)
+    retencion_monto = forms.CharField(required=False)
+    monto_total = forms.CharField(required=False)
+
     class Meta:
         model = DocumentoTributario
         fields = [
@@ -203,9 +211,16 @@ class DocumentoTributarioForm(forms.ModelForm):
             "observaciones",
         ]
         widgets = {
-            "fecha_emision": forms.DateInput(attrs={"type": "date"}),
+            "fecha_emision": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "metadata_extra": forms.Textarea(attrs={"rows": 2}),
             "observaciones": forms.Textarea(attrs={"rows": 2}),
+        }
+        error_messages = {
+            NON_FIELD_ERRORS: {
+                "unique_together": (
+                    "Ya existe un documento tributario con ese tipo, folio y RUT emisor dentro de la organizacion."
+                ),
+            }
         }
 
     def __init__(self, *args, **kwargs):
@@ -219,6 +234,39 @@ class DocumentoTributarioForm(forms.ModelForm):
         self.fields["archivo_xml"].label = "XML del documento"
         self.fields["metadata_extra"].help_text = "Uso opcional para datos adicionales importados desde SII."
 
+    @staticmethod
+    def _normalizar_monto_tributario(value):
+        if value in (None, ""):
+            return Decimal("0")
+        if isinstance(value, Decimal):
+            return value
+        raw = str(value).strip().replace("$", "").replace(" ", "")
+        if "," in raw:
+            raw = raw.replace(".", "").replace(",", ".")
+        elif "." in raw and raw.count(".") >= 1:
+            partes = raw.split(".")
+            if all(parte.isdigit() for parte in partes) and all(len(parte) == 3 for parte in partes[1:]):
+                raw = "".join(partes)
+        try:
+            return Decimal(raw)
+        except (InvalidOperation, ValueError):
+            raise forms.ValidationError("Ingresa un monto valido.")
+
+    def clean_monto_neto(self):
+        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_neto")))
+
+    def clean_monto_exento(self):
+        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_exento")))
+
+    def clean_monto_iva(self):
+        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_iva")))
+
+    def clean_retencion_monto(self):
+        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("retencion_monto")))
+
+    def clean_monto_total(self):
+        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_total")))
+
 
 class CategoryForm(forms.ModelForm):
     class Meta:
@@ -226,7 +274,18 @@ class CategoryForm(forms.ModelForm):
         fields = ["nombre", "tipo", "activa"]
 
 
+class DocumentoTributarioMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        extracto = (obj.observaciones or "").strip().replace("\n", " ")
+        if len(extracto) > 80:
+            extracto = f"{extracto[:77].rstrip()}..."
+        base = f"{obj.get_tipo_documento_display()} #{obj.folio}"
+        return f"{base} - {extracto}" if extracto else base
+
+
 class TransactionForm(forms.ModelForm):
+    tipo = forms.CharField(required=False, widget=forms.HiddenInput())
+
     class Meta:
         model = Transaction
         fields = [
@@ -247,7 +306,18 @@ class TransactionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["documentos_tributarios"].queryset = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
+        queryset_documentos = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
+        self.fields["documentos_tributarios"] = DocumentoTributarioMultipleChoiceField(
+            queryset=queryset_documentos,
+            required=False,
+            widget=forms.SelectMultiple(attrs={"size": 6}),
+            help_text="Asocia uno o mas documentos tributarios relacionados con este movimiento.",
+        )
+        if self.is_bound:
+            self.fields["documentos_tributarios"].widget.choices = self.fields["documentos_tributarios"].choices
+        elif self.instance.pk:
+            self.initial["tipo"] = self.instance.categoria.tipo if self.instance.categoria_id else self.instance.tipo
+        self.fields["tipo"].initial = self.initial.get("tipo", "")
         self.fields["documentos_tributarios"].help_text = (
             "Asocia uno o mas documentos tributarios relacionados con este movimiento."
         )
@@ -257,9 +327,8 @@ class TransactionForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         categoria = cleaned.get("categoria")
-        tipo = cleaned.get("tipo")
-        if categoria and tipo and categoria.tipo != tipo:
-            self.add_error("categoria", "La categoria debe coincidir con el tipo de transaccion.")
+        if categoria:
+            cleaned["tipo"] = categoria.tipo
         organizacion = cleaned.get("organizacion")
         for documento in cleaned.get("documentos_tributarios") or []:
             if organizacion and documento.organizacion_id != organizacion.id:

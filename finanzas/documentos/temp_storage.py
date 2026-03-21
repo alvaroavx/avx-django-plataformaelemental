@@ -41,6 +41,19 @@ def cargar_importacion_temporal(request, token):
     return _session_bucket(request).get(token)
 
 
+def cargar_archivo_importacion_temporal(request, token, tipo_archivo):
+    info = cargar_importacion_temporal(request, token)
+    if not info:
+        return None
+    archivo = info.get("files", {}).get(tipo_archivo)
+    if not archivo:
+        return None
+    path = Path(archivo["path"])
+    if not path.exists():
+        return None
+    return {"path": path, "name": archivo["name"]}
+
+
 def actualizar_payload_importacion(request, token, payload):
     bucket = _session_bucket(request)
     if token in bucket:

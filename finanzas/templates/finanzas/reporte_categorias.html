@@ -6,29 +6,112 @@
   <h2>Consolidado por categorias</h2>
   {% include "finanzas/_info_box.html" %}
   <div class="text-muted mb-2">Periodo: {{ inicio_mes|date:"d/m/Y" }} - {{ fin_mes|date:"d/m/Y" }}</div>
-  <div class="card">
-    <div class="card-body table-responsive">
-      <table class="table table-sm">
-        <thead>
-          <tr>
-            <th>Categoria</th>
-            <th>Tipo</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in consolidado %}
-          <tr>
-            <td>{{ row.categoria__nombre }}</td>
-            <td>{{ row.categoria__tipo|title }}</td>
-            <td>{{ row.total|clp }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="3" class="text-center text-muted">Sin datos en el periodo seleccionado.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-header">Grafico por categorias</div>
+        <div class="card-body">
+          {% if consolidado %}
+          <div class="small text-muted mb-3">
+            Distribucion visual del total filtrado por categoria.
+          </div>
+          <div style="min-height: 340px;">
+            <canvas id="categoriasChart"></canvas>
+          </div>
+          {% else %}
+          <div class="text-center text-muted">Sin datos para graficar en el periodo seleccionado.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-header">Detalle</div>
+        <div class="card-body table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Categoria</th>
+                <th>Tipo</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in consolidado %}
+              <tr>
+                <td>{{ row.categoria__nombre }}</td>
+                <td>{{ row.categoria__tipo|title }}</td>
+                <td>{{ row.total|clp }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-center text-muted">Sin datos en el periodo seleccionado.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+{{ consolidado|json_script:"reporte-categorias-data" }}
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const canvas = document.getElementById("categoriasChart");
+    const dataNode = document.getElementById("reporte-categorias-data");
+    if (!canvas || !dataNode || typeof Chart === "undefined") return;
+
+    const rows = JSON.parse(dataNode.textContent || "[]");
+    if (!rows.length) return;
+
+    const labels = rows.map((row) => row.categoria__nombre);
+    const values = rows.map((row) => Number(row.total));
+    const palette = [
+      "#1b4965",
+      "#ca6702",
+      "#2a9d8f",
+      "#a44a3f",
+      "#6c757d",
+      "#3a86ff",
+      "#588157",
+      "#ffb703",
+      "#7b2cbf",
+      "#d62828",
+    ];
+
+    new Chart(canvas, {
+      type: "pie",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: labels.map((_, index) => palette[index % palette.length]),
+            borderColor: "#ffffff",
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "bottom",
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const value = Number(context.raw || 0);
+                return `${context.label}: ${new Intl.NumberFormat("es-CL").format(value)}`;
+              },
+            },
+          },
+        },
+      },
+    });
+  })();
+</script>
 {% endblock %}

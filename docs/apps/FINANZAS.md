@@ -1,0 +1,91 @@
+# Finanzas
+
+Fecha de actualizacion: 2026-03-21
+
+## Proposito
+La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
+
+Debe servir para operar varias organizaciones y tambien debe poder escalar a finanzas no academicas sin asumir una sola logica de negocio.
+
+## Regla conceptual principal
+- `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas.
+- `DocumentoTributario` no es obligatorio para que la plataforma funcione.
+- El documento tributario actua como respaldo y como ingreso asistido de informacion cuando existe.
+- La plataforma debe seguir operando aunque no exista documento tributario.
+
+## Modelo funcional vigente
+- `Payment`: cobro academico a estudiante por clases o planes.
+- `Transaction`: movimiento real de dinero, ingreso o egreso, con respaldo bancario o de caja.
+- `DocumentoTributario`: documento fiscal opcional, con PDF/XML, montos, tasas y asociaciones.
+- `Category`: clasificacion de transacciones para reportes.
+- `PaymentPlan`: estructura comercial de clases y precio.
+
+## Reglas de uso
+- Un ingreso puede existir como `Transaction` y tambien como `DocumentoTributario`, pero cada entidad cumple un rol distinto.
+- Una boleta de venta puede sugerir un `Payment`, pero no debe fusionarse con el pago.
+- Una boleta de honorarios puede respaldar un egreso, pero no reemplaza la `Transaction`.
+- El archivo adjunto de una `Transaction` corresponde al respaldo del movimiento, por ejemplo transferencia o cartola.
+- El PDF/XML tributario vive en `DocumentoTributario`.
+- Las asociaciones entre entidades deben poder hacerse manualmente.
+- Las clases pagadas no se arrastran entre meses.
+- Una asistencia solo puede consumirse contra pagos del mismo mes y anio de la clase.
+- Si no existe pago del mismo mes con saldo disponible, la asistencia debe generar deuda.
+- Si luego aparece un pago, solo puede imputar deudas del mismo mes y anio.
+
+## Carga asistida de documentos
+Estado actual:
+- XML-first
+- soporte inicial para DTE XML clasico
+- soporte inicial para boleta de honorarios XML
+- PDF fallback basico
+- parser PDF con mejora especifica para boletas de honorarios electronicas
+- pantalla de revision antes del guardado
+- la pantalla de revision incluye visor inline del PDF/XML temporal para contrastar el formulario contra el archivo original
+- si no hay libreria Python para leer PDF, se intenta `pdftotext` del sistema
+- el fallback PDF funciona sobre PDFs con texto seleccionable; no resuelve escaneos sin OCR
+
+Reglas:
+- subir un archivo no debe guardar automaticamente registros finales
+- el flujo debe ser:
+  - subir archivo
+  - extraer datos
+  - mostrar formularios precargados
+- revisar/corregir
+- confirmar guardado
+- si existe XML y PDF, prevalece XML
+- la deteccion de duplicados es advertencia, no bloqueo automatico
+- la unicidad operativa de un documento tributario dentro de una organizacion se define por `tipo_documento + folio + rut_emisor`; el folio por si solo no basta, porque distintos emisores pueden repetirlo
+- los datos extraidos desde PDF tienen menor confianza y deben revisarse siempre
+- en facturas y boletas, un monto con punto de miles como `500.000` significa `500000` sin decimales; esa normalizacion aplica tanto al parser PDF como a la confirmacion manual de la carga asistida
+- en la carga asistida, `observaciones` debe precargarse con la glosa o descripcion principal extraida del documento, antes que con warnings tecnicos
+- la pantalla de revision de carga asistida debe mostrar errores generales del formulario cuando el guardado no puede confirmarse
+
+## UI y navegacion
+- Todas las vistas de `finanzas` deben mantener `periodo_mes`, `periodo_anio` y `organizacion`.
+- El menu superior agrupa visualmente los accesos en bloques redondeados, manteniendo este orden: `dashboard`, `pagos`, `documentos tributarios`, `transacciones` | `planes`, `categorias` | `reporte categorias`.
+- Cada seccion principal debe tener una ayuda breve visible.
+- Botones de crear/agregar en verde.
+- Botones de eliminar en rojo.
+
+## Cambios ya implementados
+- Resumen superior en `pagos` con total pagos, total clases pagadas y saldo.
+- Resumen superior en `documentos tributarios` y `transacciones` usando el mismo universo filtrado del listado; en documentos incluye monto total, IVA y retencion.
+- `reporte categorias` muestra tabla y grafico de torta sobre el mismo consolidado filtrado.
+- Listado de `pagos` con badge fiscal `Afecta/Exenta`, columnas separadas de neto, IVA y bruto, y accion rapida para copiar descripcion operativa del pago.
+- Los montos de neto, IVA y bruto en `pagos` son clickeables y copian el valor sin formato al portapapeles.
+- La descripcion operativa del pago usa como disciplina principal aquella donde la persona registra mas asistencias `presente`.
+- En transacciones, el tipo `ingreso/egreso` se deriva automaticamente desde la categoria y no se expone como selector manual.
+- En transacciones, el selector de documentos tributarios muestra tipo, folio y extracto de observaciones para dar contexto antes de asociar.
+- Filtro de planes por organizacion en el formulario de pagos.
+- Boton volver en editar pago prioriza la pagina anterior.
+- Visor embebido en detalle de transacciones para PDF e imagenes; otros archivos siguen abriendose externamente.
+- Separacion clara entre `Documentos tributarios` y `Transacciones`.
+- Carga asistida tributaria con parseo, revision y confirmacion.
+- Integracion asistencia-pagos restringida al mismo mes de la clase y del pago.
+
+## Pendientes
+- Mejorar parser PDF para mas formatos y layouts.
+- Importacion directa desde SII.
+- Matching mejor de contraparte.
+- Flujo de conciliacion mas asistido entre pagos, documentos y transacciones.
+- Evaluar una entidad superior de evento/proyecto si el control financiero por presentacion se vuelve necesario.

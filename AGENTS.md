@@ -1,6 +1,15 @@
 ﻿## Usar este archivo para:
 - objetivos del repo
 - convenciones (arquitectura, naming, estilo)
+
+## Documentacion viva
+- Antes de hacer cambios transversales, revisar `docs/INDICE.md` y `docs/arquitectura/PLATAFORMA.md`.
+- Antes de trabajar una app puntual, revisar su archivo local:
+  - `docs/apps/ASISTENCIAS.md`
+  - `docs/apps/PERSONAS.md`
+  - `docs/apps/FINANZAS.md`
+- Cada decision concreta debe actualizar su `.md` correspondiente en el mismo cambio de codigo.
+
 ## Estructura del proyecto
 api/ contiene las apis hacia el exterior de esta plataforma
 data/ cargas masivas de informacion

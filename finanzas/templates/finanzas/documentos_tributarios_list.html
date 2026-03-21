@@ -11,6 +11,57 @@
   </div>
   {% include "finanzas/_info_box.html" %}
 
+  <div class="row g-3 mb-3">
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Total documentos</div>
+          <div class="display-6">{{ total_documentos }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Monto total</div>
+          <div class="display-6">{{ monto_total_documentos|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">IVA</div>
+          <div class="display-6">{{ monto_total_iva|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Retencion</div>
+          <div class="display-6">{{ monto_total_retencion|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Pagos asociados</div>
+          <div class="display-6">{{ total_pagos_asociados }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">Transacciones asociadas</div>
+          <div class="display-6">{{ total_transacciones_asociadas }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card mb-3">
     <button
       class="card-header btn btn-success text-start w-100 border-0 rounded-0"
@@ -69,8 +120,8 @@
             <td>{{ item.nombre_receptor|default:"-" }}</td>
             <td>{{ item.monto_total|clp }}</td>
             <td class="small">
-              <div>Pagos: {{ item.pagos_asociados.count }}</div>
-              <div>Transacciones: {{ item.transacciones_asociadas.count }}</div>
+              <div>Pagos: {{ item.pagos_asociados_total }}</div>
+              <div>Transacciones: {{ item.transacciones_asociadas_total }}</div>
             </td>
             <td class="text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_detail' item.pk %}?{{ request.GET.urlencode }}">Detalle</a>

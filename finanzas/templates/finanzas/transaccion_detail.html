@@ -68,9 +68,18 @@
                   style="border: 0;"
                 ></iframe>
               </div>
+            {% elif archivo_es_imagen %}
+              <div class="border rounded overflow-hidden text-center bg-light">
+                <img
+                  src="{% url 'finanzas:transaccion_archivo' transaccion.pk %}"
+                  alt="Respaldo transaccion {{ transaccion.pk }}"
+                  class="img-fluid"
+                  style="max-height: 720px;"
+                >
+              </div>
             {% else %}
               <div class="alert alert-light border mb-0">
-                El archivo adjunto no es PDF. Puedes abrirlo desde el boton superior.
+                El archivo adjunto no es PDF ni imagen compatible para visor embebido. Puedes abrirlo desde el boton superior.
               </div>
             {% endif %}
           {% else %}

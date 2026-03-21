@@ -366,7 +366,7 @@ class DocumentoTributario(TimeStampedModel):
         verbose_name_plural = "Documentos tributarios"
         ordering = ["-fecha_emision", "-id"]
         db_table = "finanzas_invoice"
-        unique_together = ("organizacion", "tipo_documento", "folio")
+        unique_together = ("organizacion", "tipo_documento", "folio", "rut_emisor")
 
     def __str__(self) -> str:
         return f"{self.get_tipo_documento_display()} #{self.folio}"

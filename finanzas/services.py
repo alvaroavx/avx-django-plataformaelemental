@@ -1,6 +1,28 @@
 from django.db.models import Count, Q, Sum
+from django.utils.dateparse import parse_date
 
 from database.models import Asistencia, AttendanceConsumption, Payment, Persona
+
+
+def _filtro_mismo_periodo_mensual(fecha, prefijo_campo):
+    if isinstance(fecha, str):
+        fecha = parse_date(fecha)
+    if fecha is None:
+        raise ValueError("La fecha entregada para filtrar periodo mensual no es valida.")
+    return {
+        f"{prefijo_campo}__year": fecha.year,
+        f"{prefijo_campo}__month": fecha.month,
+    }
+
+
+def _misma_clave_periodo_mensual(fecha_a, fecha_b):
+    if isinstance(fecha_a, str):
+        fecha_a = parse_date(fecha_a)
+    if isinstance(fecha_b, str):
+        fecha_b = parse_date(fecha_b)
+    if fecha_a is None or fecha_b is None:
+        raise ValueError("No se pudo comparar el periodo mensual por una fecha invalida.")
+    return fecha_a.year == fecha_b.year and fecha_a.month == fecha_b.month
 
 
 def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
@@ -28,6 +50,7 @@ def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
         Payment.objects.filter(
             persona=asistencia.persona,
             organizacion=asistencia.sesion.disciplina.organizacion,
+            **_filtro_mismo_periodo_mensual(asistencia.sesion.fecha, "fecha_pago"),
         )
         .annotate(
             consumos_contador=Count(
@@ -103,6 +126,8 @@ def asociar_asistencia_a_pago(asistencia: Asistencia, pago: Payment) -> Attendan
         raise ValueError("El pago seleccionado no corresponde a la misma persona.")
     if pago.organizacion_id != asistencia.sesion.disciplina.organizacion_id:
         raise ValueError("El pago seleccionado pertenece a otra organizacion.")
+    if not _misma_clave_periodo_mensual(pago.fecha_pago, asistencia.sesion.fecha):
+        raise ValueError("Solo se pueden asociar pagos del mismo mes y anio de la asistencia.")
 
     consumo = getattr(asistencia, "consumo_financiero", None) or asignar_consumo_asistencia(asistencia)
     if consumo.pago_id != pago.id and pago.saldo_clases <= 0:
@@ -123,6 +148,7 @@ def imputar_pago_a_deudas(pago: Payment) -> int:
     deudas = AttendanceConsumption.objects.filter(
         persona=pago.persona,
         asistencia__sesion__disciplina__organizacion=pago.organizacion,
+        **_filtro_mismo_periodo_mensual(pago.fecha_pago, "clase_fecha"),
         estado=AttendanceConsumption.Estado.DEUDA,
         pago__isnull=True,
     ).order_by("clase_fecha", "id")[:saldo]

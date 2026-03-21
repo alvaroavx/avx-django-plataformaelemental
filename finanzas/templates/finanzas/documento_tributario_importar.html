@@ -84,6 +84,37 @@
           {% endif %}
         </div>
       </div>
+
+      {% if archivo_importacion_pdf_url or archivo_importacion_xml_preview %}
+      <div class="card mt-3">
+        <div class="card-header">Visor del archivo subido</div>
+        <div class="card-body">
+          <div class="small text-muted mb-3">
+            Revisa el archivo original mientras corriges los campos faltantes del formulario.
+          </div>
+          {% if archivo_importacion_pdf_url %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong>PDF</strong>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ archivo_importacion_pdf_url }}" target="_blank" rel="noopener">Abrir PDF</a>
+            </div>
+            <iframe src="{{ archivo_importacion_pdf_url }}" class="w-100 border rounded" style="min-height: 520px;"></iframe>
+          </div>
+          {% endif %}
+          {% if archivo_importacion_xml_preview %}
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong>XML</strong>
+              {% if archivo_importacion_xml_url %}
+              <a class="btn btn-sm btn-outline-secondary" href="{{ archivo_importacion_xml_url }}" target="_blank" rel="noopener">Abrir XML</a>
+              {% endif %}
+            </div>
+            <pre class="bg-light border rounded p-3 small mb-0" style="max-height: 520px; overflow: auto;"><code>{{ archivo_importacion_xml_preview }}</code></pre>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="col-lg-7">
@@ -96,6 +127,13 @@
         <div class="card mb-3">
           <div class="card-header">Revision del documento tributario</div>
           <div class="card-body">
+            {% if documento_form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in documento_form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
             <div class="row g-2">
               {% for field in documento_form.visible_fields %}
                 <div class="col-md-6">

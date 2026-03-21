@@ -24,6 +24,11 @@ urlpatterns = [
         views.documento_tributario_parse_preview,
         name="documento_tributario_parse_preview",
     ),
+    path(
+        "documentos-tributarios/importar/archivo/<str:token>/<str:tipo_archivo>/",
+        views.documento_tributario_importacion_archivo,
+        name="documento_tributario_importacion_archivo",
+    ),
     path("documentos-tributarios/<int:pk>/", views.documento_tributario_detail, name="documento_tributario_detail"),
     path(
         "documentos-tributarios/<int:pk>/archivo/<str:tipo_archivo>/",

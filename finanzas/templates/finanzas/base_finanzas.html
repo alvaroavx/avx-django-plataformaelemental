@@ -7,6 +7,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      .finanzas-nav-groups {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .finanzas-nav-group {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .finanzas-nav-group .nav-link {
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .finanzas-nav-group .nav-link:hover,
+      .finanzas-nav-group .nav-link:focus {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      @media (max-width: 991.98px) {
+        .finanzas-nav-groups {
+          flex-direction: column;
+          align-items: stretch;
+          margin-top: 0.75rem;
+        }
+
+        .finanzas-nav-group {
+          flex-wrap: wrap;
+          border-radius: 1rem;
+        }
+      }
+    </style>
     {% block extra_head %}{% endblock %}
   </head>
   <body class="bg-light">
@@ -20,15 +63,21 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="finanzasNav">
-          <ul class="navbar-nav me-auto">
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Dashboard</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:planes_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Planes</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:pagos_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Pagos</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:documentos_tributarios_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Documentos tributarios</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:categorias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Categorias</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:transacciones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Transacciones</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'finanzas:reporte_categorias' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Reporte categorias</a></li>
-          </ul>
+          <div class="finanzas-nav-groups me-auto">
+            <div class="finanzas-nav-group">
+              <a class="nav-link" href="{% url 'finanzas:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Dashboard</a>
+              <a class="nav-link" href="{% url 'finanzas:pagos_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Pagos</a>
+              <a class="nav-link" href="{% url 'finanzas:documentos_tributarios_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Documentos tributarios</a>
+              <a class="nav-link" href="{% url 'finanzas:transacciones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Transacciones</a>
+            </div>
+            <div class="finanzas-nav-group">
+              <a class="nav-link" href="{% url 'finanzas:planes_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Planes</a>
+              <a class="nav-link" href="{% url 'finanzas:categorias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Categorias</a>
+            </div>
+            <div class="finanzas-nav-group">
+              <a class="nav-link" href="{% url 'finanzas:reporte_categorias' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Reporte categorias</a>
+            </div>
+          </div>
           <span class="navbar-text text-white">{{ request.user.get_username }}</span>
         </div>
       </div>
