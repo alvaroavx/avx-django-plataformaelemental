@@ -264,6 +264,18 @@
     const planHelp = document.getElementById("plan-help-organizacion");
     const montoReferenciaInput = document.getElementById("id_monto_referencia");
     const clasesAsignadasInput = document.getElementById("id_clases_asignadas");
+    const aplicaIvaInput = document.getElementById("id_aplica_iva");
+    if (organizacionSelect && aplicaIvaInput) {
+      function sincronizarIvaDesdeOrganizacion() {
+        const selectedOption = organizacionSelect.options[organizacionSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) return;
+        aplicaIvaInput.checked = selectedOption.dataset.esExentaIva !== "true";
+      }
+
+      sincronizarIvaDesdeOrganizacion();
+      organizacionSelect.addEventListener("change", sincronizarIvaDesdeOrganizacion);
+    }
+
     if (planSelect && organizacionSelect && montoReferenciaInput && clasesAsignadasInput) {
       const planesBase = Array.from(planSelect.options).map((option) => ({
         value: option.value,

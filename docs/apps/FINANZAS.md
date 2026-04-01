@@ -27,6 +27,10 @@ Debe servir para operar varias organizaciones y tambien debe poder escalar a fin
 - El archivo adjunto de una `Transaction` corresponde al respaldo del movimiento, por ejemplo transferencia o cartola.
 - El PDF/XML tributario vive en `DocumentoTributario`.
 - Las asociaciones entre entidades deben poder hacerse manualmente.
+- Cada organizacion debe tener un solo `PaymentPlan` por defecto.
+- El primer plan creado en una organizacion queda por defecto automaticamente.
+- El plan por defecto se puede cambiar desde gestion de planes y es el que aparece preseleccionado al registrar un nuevo pago.
+- Al registrar un nuevo pago, el checkbox `aplica IVA` debe precargarse segun `Organizacion.es_exenta_iva`: organizaciones exentas parten sin IVA, las demas con IVA activo.
 - Las clases pagadas no se arrastran entre meses.
 - Una asistencia solo puede consumirse contra pagos del mismo mes y anio de la clase.
 - Si no existe pago del mismo mes con saldo disponible, la asistencia debe generar deuda.
@@ -52,13 +56,14 @@ Reglas:
   - mostrar formularios precargados
 - revisar/corregir
 - confirmar guardado
-- si existe XML y PDF, prevalece XML
+- la UI de carga asistida usa un solo input de archivo; el backend detecta internamente si el archivo subido es XML o PDF
 - la deteccion de duplicados es advertencia, no bloqueo automatico
 - la unicidad operativa de un documento tributario dentro de una organizacion se define por `tipo_documento + folio + rut_emisor`; el folio por si solo no basta, porque distintos emisores pueden repetirlo
 - los datos extraidos desde PDF tienen menor confianza y deben revisarse siempre
 - en facturas y boletas, un monto con punto de miles como `500.000` significa `500000` sin decimales; esa normalizacion aplica tanto al parser PDF como a la confirmacion manual de la carga asistida
 - en la carga asistida, `observaciones` debe precargarse con la glosa o descripcion principal extraida del documento, antes que con warnings tecnicos
 - la pantalla de revision de carga asistida debe mostrar errores generales del formulario cuando el guardado no puede confirmarse
+- las vistas de crear/editar documentos tributarios deben mostrar un error legible si la base rechaza el guardado por un conflicto de unicidad, en vez de exponer un `IntegrityError`
 
 ## UI y navegacion
 - Todas las vistas de `finanzas` deben mantener `periodo_mes`, `periodo_anio` y `organizacion`.
@@ -69,14 +74,18 @@ Reglas:
 
 ## Cambios ya implementados
 - Resumen superior en `pagos` con total pagos, total clases pagadas y saldo.
-- Resumen superior en `documentos tributarios` y `transacciones` usando el mismo universo filtrado del listado; en documentos incluye monto total, IVA y retencion.
+- Resumen superior en `documentos tributarios` y `transacciones` usando el mismo universo filtrado del listado; en documentos separa `ingresos` y `egresos` segun si la organizacion del documento actua como emisor o receptor, y ademas muestra `IVA` y `retencion`.
+- El listado de `documentos tributarios` prioriza lectura financiera/tributaria: muestra `neto`, `exento`, `IVA`, `retencion` y `total`, y no repite `organizacion` porque ya existe filtro superior.
 - `reporte categorias` muestra tabla y grafico de torta sobre el mismo consolidado filtrado.
 - Listado de `pagos` con badge fiscal `Afecta/Exenta`, columnas separadas de neto, IVA y bruto, y accion rapida para copiar descripcion operativa del pago.
 - Los montos de neto, IVA y bruto en `pagos` son clickeables y copian el valor sin formato al portapapeles.
 - La descripcion operativa del pago usa como disciplina principal aquella donde la persona registra mas asistencias `presente`.
 - En transacciones, el tipo `ingreso/egreso` se deriva automaticamente desde la categoria y no se expone como selector manual.
 - En transacciones, el selector de documentos tributarios muestra tipo, folio y extracto de observaciones para dar contexto antes de asociar.
+- Al crear una transaccion nueva, la organizacion debe quedar precargada desde el filtro superior activo.
 - Filtro de planes por organizacion en el formulario de pagos.
+- Gestion de planes con marca `por defecto` por organizacion y precarga automatica en el alta de pagos.
+- `finanzas/planes/<id>/editar` reutiliza el mismo listado de planes y abre una edicion inline dentro de la tabla, en vez de navegar a una pantalla separada.
 - Boton volver en editar pago prioriza la pagina anterior.
 - Visor embebido en detalle de transacciones para PDF e imagenes; otros archivos siguen abriendose externamente.
 - Separacion clara entre `Documentos tributarios` y `Transacciones`.

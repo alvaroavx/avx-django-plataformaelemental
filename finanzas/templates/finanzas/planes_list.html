@@ -42,6 +42,7 @@
           <tr>
             <th>Organizacion</th>
             <th>Nombre</th>
+            <th>Por defecto</th>
             <th>Clases</th>
             <th>Precio</th>
             <th>Activo</th>
@@ -50,9 +51,94 @@
         </thead>
         <tbody>
           {% for plan in planes %}
+          {% if editing_plan_id == plan.pk and edit_form %}
+          <tr>
+            <td colspan="7" class="bg-light">
+              <form method="post" action="{% url 'finanzas:plan_edit' plan.pk %}?{{ request.GET.urlencode }}">
+                {% csrf_token %}
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label small">{{ edit_form.organizacion.label }}</label>
+                    {{ edit_form.organizacion }}
+                    {% if edit_form.organizacion.errors %}<div class="text-danger small">{{ edit_form.organizacion.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label small">{{ edit_form.nombre.label }}</label>
+                    {{ edit_form.nombre }}
+                    {% if edit_form.nombre.errors %}<div class="text-danger small">{{ edit_form.nombre.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">{{ edit_form.num_clases.label }}</label>
+                    {{ edit_form.num_clases }}
+                    {% if edit_form.num_clases.errors %}<div class="text-danger small">{{ edit_form.num_clases.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">{{ edit_form.precio.label }}</label>
+                    {{ edit_form.precio }}
+                    {% if edit_form.precio.errors %}<div class="text-danger small">{{ edit_form.precio.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small d-block">{{ edit_form.es_por_defecto.label }}</label>
+                    <div class="form-check mt-2">
+                      {{ edit_form.es_por_defecto }}
+                    </div>
+                    {% if edit_form.es_por_defecto.errors %}<div class="text-danger small">{{ edit_form.es_por_defecto.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small d-block">{{ edit_form.precio_incluye_iva.label }}</label>
+                    <div class="form-check mt-2">
+                      {{ edit_form.precio_incluye_iva }}
+                    </div>
+                    {% if edit_form.precio_incluye_iva.errors %}<div class="text-danger small">{{ edit_form.precio_incluye_iva.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">{{ edit_form.fecha_inicio.label }}</label>
+                    {{ edit_form.fecha_inicio }}
+                    {% if edit_form.fecha_inicio.errors %}<div class="text-danger small">{{ edit_form.fecha_inicio.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">{{ edit_form.fecha_fin.label }}</label>
+                    {{ edit_form.fecha_fin }}
+                    {% if edit_form.fecha_fin.errors %}<div class="text-danger small">{{ edit_form.fecha_fin.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small d-block">{{ edit_form.activo.label }}</label>
+                    <div class="form-check mt-2">
+                      {{ edit_form.activo }}
+                    </div>
+                    {% if edit_form.activo.errors %}<div class="text-danger small">{{ edit_form.activo.errors|join:", " }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label small">{{ edit_form.descripcion.label }}</label>
+                    {{ edit_form.descripcion }}
+                    {% if edit_form.descripcion.errors %}<div class="text-danger small">{{ edit_form.descripcion.errors|join:", " }}</div>{% endif %}
+                  </div>
+                </div>
+                {% if edit_form.non_field_errors %}
+                <div class="alert alert-danger py-2 mt-3 mb-0">
+                  {% for error in edit_form.non_field_errors %}
+                    <div>{{ error }}</div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+                <div class="d-flex gap-2 mt-3">
+                  <button class="btn btn-sm btn-success" type="submit">Guardar cambios</button>
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:planes_list' %}?{{ request.GET.urlencode }}">Cancelar</a>
+                </div>
+              </form>
+            </td>
+          </tr>
+          {% else %}
           <tr>
             <td>{{ plan.organizacion.nombre }}</td>
             <td>{{ plan.nombre }}</td>
+            <td>
+              {% if plan.es_por_defecto %}
+              <span class="badge text-bg-success">Si</span>
+              {% else %}
+              <span class="badge text-bg-secondary">No</span>
+              {% endif %}
+            </td>
             <td>{{ plan.num_clases }}</td>
             <td>{{ plan.precio|clp }}</td>
             <td>{% if plan.activo %}Si{% else %}No{% endif %}</td>
@@ -61,8 +147,9 @@
               <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:plan_delete' plan.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
             </td>
           </tr>
+          {% endif %}
           {% empty %}
-          <tr><td colspan="6" class="text-center text-muted">Sin planes registrados.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted">Sin planes registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>

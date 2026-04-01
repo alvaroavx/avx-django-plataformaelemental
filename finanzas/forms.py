@@ -26,6 +26,25 @@ class PersonaOrganizacionSelect(forms.Select):
         return option
 
 
+class OrganizacionIvaSelect(forms.Select):
+    def __init__(self, *args, organizaciones_iva=None, **kwargs):
+        self.organizaciones_iva = organizaciones_iva or {}
+        super().__init__(*args, **kwargs)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        raw_value = getattr(value, "value", value)
+        try:
+            organizacion_id = int(raw_value) if raw_value is not None and raw_value != "" else None
+        except (TypeError, ValueError):
+            organizacion_id = None
+        if organizacion_id is not None:
+            es_exenta_iva = self.organizaciones_iva.get(organizacion_id)
+            if es_exenta_iva is not None:
+                option["attrs"]["data-es-exenta-iva"] = "true" if es_exenta_iva else "false"
+        return option
+
+
 class PlanMontoSelect(forms.Select):
     def __init__(self, *args, planes_data=None, **kwargs):
         self.planes_data = planes_data or {}
@@ -55,6 +74,7 @@ class PaymentPlanForm(forms.ModelForm):
             "num_clases",
             "precio",
             "precio_incluye_iva",
+            "es_por_defecto",
             "fecha_inicio",
             "fecha_fin",
             "descripcion",
@@ -94,6 +114,12 @@ class PaymentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if not self.is_bound and not self.initial.get("fecha_pago"):
             self.initial["fecha_pago"] = timezone.localdate()
+        organizaciones_qs = self.fields["organizacion"].queryset.only("id", "es_exenta_iva")
+        self.fields["organizacion"].widget = OrganizacionIvaSelect(
+            attrs=self.fields["organizacion"].widget.attrs,
+            choices=self.fields["organizacion"].choices,
+            organizaciones_iva={org.pk: org.es_exenta_iva for org in organizaciones_qs},
+        )
         estudiantes_qs = (
             Persona.objects.filter(roles__rol__codigo="ESTUDIANTE", roles__activo=True)
             .distinct()
@@ -116,9 +142,12 @@ class PaymentForm(forms.ModelForm):
             choices=self.fields["persona"].choices,
             persona_orgs={k: sorted(v) for k, v in persona_orgs.items()},
         )
-        planes_qs = PaymentPlan.objects.filter(activo=True).order_by("nombre")
+        planes_qs = PaymentPlan.objects.filter(activo=True).order_by("-es_por_defecto", "nombre")
         if self.instance.pk and self.instance.plan_id:
-            planes_qs = PaymentPlan.objects.filter(Q(activo=True) | Q(pk=self.instance.plan_id)).order_by("nombre")
+            planes_qs = PaymentPlan.objects.filter(Q(activo=True) | Q(pk=self.instance.plan_id)).order_by(
+                "-es_por_defecto",
+                "nombre",
+            )
         self.fields["plan"].queryset = planes_qs
         self.fields["plan"].widget = PlanMontoSelect(
             attrs=self.fields["plan"].widget.attrs,
@@ -132,6 +161,20 @@ class PaymentForm(forms.ModelForm):
                 for plan in planes_qs.only("id", "precio", "num_clases", "organizacion_id")
             },
         )
+        if not self.is_bound and not self.instance.pk and not self.initial.get("plan"):
+            organizacion_inicial = self.initial.get("organizacion")
+            organizacion_id = getattr(organizacion_inicial, "pk", organizacion_inicial)
+            if organizacion_id:
+                plan_por_defecto = planes_qs.filter(organizacion_id=organizacion_id, es_por_defecto=True).first()
+                if plan_por_defecto:
+                    self.initial["plan"] = plan_por_defecto.pk
+        if not self.is_bound and not self.instance.pk and "aplica_iva" not in self.initial:
+            organizacion_inicial = self.initial.get("organizacion")
+            organizacion_id = getattr(organizacion_inicial, "pk", organizacion_inicial)
+            if organizacion_id:
+                plan_org = organizaciones_qs.filter(pk=organizacion_id).first()
+                if plan_org is not None:
+                    self.initial["aplica_iva"] = not plan_org.es_exenta_iva
         documentos_qs = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
         if self.instance.pk and self.instance.documento_tributario_id:
             documentos_qs = DocumentoTributario.objects.filter(
@@ -341,13 +384,12 @@ class TransactionForm(forms.ModelForm):
 
 
 class DocumentoTributarioImportUploadForm(forms.Form):
-    archivo_xml = forms.FileField(required=False, label="XML")
-    archivo_pdf = forms.FileField(required=False, label="PDF")
+    archivo = forms.FileField(required=False, label="Archivo tributario")
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get("archivo_xml") and not cleaned.get("archivo_pdf"):
-            raise forms.ValidationError("Debes subir al menos un XML o un PDF.")
+        if not cleaned.get("archivo"):
+            raise forms.ValidationError("Debes subir un archivo XML o PDF.")
         return cleaned
 
 

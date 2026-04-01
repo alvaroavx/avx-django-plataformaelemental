@@ -1,6 +1,7 @@
 from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 from decimal import Decimal
@@ -189,6 +190,47 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
         self.assertIn("inline;", response["Content-Disposition"])
 
+    @patch("finanzas.views.DocumentoTributarioForm.save", side_effect=IntegrityError("conflicto"))
+    def test_documento_tributario_edit_muestra_error_legible_si_falla_unicidad(self, _mock_save):
+        documento = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.BOLETA_HONORARIOS,
+            folio="B-1",
+            fecha_emision="2026-02-27",
+            rut_emisor="11.111.111-1",
+            nombre_emisor="Emisor Original",
+            monto_total=10000,
+        )
+        self.client.force_login(self.user_admin)
+        response = self.client.post(
+            reverse("finanzas:documento_tributario_edit", kwargs={"pk": documento.pk}),
+            {
+                "organizacion": self.org.pk,
+                "tipo_documento": DocumentoTributario.TipoDocumento.BOLETA_HONORARIOS,
+                "fuente": DocumentoTributario.Fuente.MANUAL,
+                "folio": "B-1",
+                "fecha_emision": "2026-02-27",
+                "nombre_emisor": "Emisor Original",
+                "rut_emisor": "11.111.111-1",
+                "nombre_receptor": "",
+                "rut_receptor": "",
+                "monto_neto": "10000",
+                "monto_exento": "0",
+                "iva_tasa": "0",
+                "monto_iva": "0",
+                "retencion_tasa": "0",
+                "retencion_monto": "0",
+                "monto_total": "10000",
+                "documento_relacionado": "",
+                "enlace_sii": "",
+                "metadata_extra": "{}",
+                "observaciones": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No se pudo guardar el documento por un conflicto de unicidad")
+
     def test_reporte_categorias_muestra_grafico_torta(self):
         categoria = Category.objects.create(nombre="Arriendo sala", tipo="egreso", activa=True)
         Transaction.objects.create(
@@ -211,6 +253,134 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, "Chart(", html=False)
         self.assertContains(response, "Arriendo sala")
 
+    def test_payment_plan_primer_plan_queda_por_defecto_y_se_puede_reasignar(self):
+        plan_1 = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Inicial",
+            num_clases=4,
+            precio=20000,
+            activo=True,
+        )
+        plan_1.refresh_from_db()
+        self.assertTrue(plan_1.es_por_defecto)
+
+        plan_2 = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Nuevo",
+            num_clases=8,
+            precio=35000,
+            activo=True,
+        )
+        plan_2.refresh_from_db()
+        self.assertFalse(plan_2.es_por_defecto)
+
+        plan_2.es_por_defecto = True
+        plan_2.save()
+        plan_1.refresh_from_db()
+        plan_2.refresh_from_db()
+
+        self.assertFalse(plan_1.es_por_defecto)
+        self.assertTrue(plan_2.es_por_defecto)
+
+        plan_2.delete()
+        plan_1.refresh_from_db()
+        self.assertTrue(plan_1.es_por_defecto)
+
+    def test_payment_form_precarga_plan_por_defecto_de_la_organizacion(self):
+        PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Base",
+            num_clases=4,
+            precio=20000,
+            activo=True,
+        )
+        plan_destacado = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Destacado",
+            num_clases=8,
+            precio=30000,
+            activo=True,
+            es_por_defecto=True,
+        )
+
+        form = PaymentForm(initial={"organizacion": self.org.pk})
+
+        self.assertEqual(str(form["plan"].value()), str(plan_destacado.pk))
+
+    def test_payment_form_precarga_aplica_iva_segun_configuracion_de_organizacion(self):
+        form_afecta = PaymentForm(initial={"organizacion": self.org.pk})
+        self.assertTrue(form_afecta.initial["aplica_iva"])
+
+        org_exenta = Organizacion.objects.create(
+            nombre="Org Exenta",
+            razon_social="Org Exenta SPA",
+            rut="66.666.666-6",
+            es_exenta_iva=True,
+        )
+        form_exenta = PaymentForm(initial={"organizacion": org_exenta.pk})
+        self.assertFalse(form_exenta.initial["aplica_iva"])
+
+    def test_plan_edit_renderiza_listado_con_edicion_inline(self):
+        plan = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Editable",
+            num_clases=4,
+            precio=20000,
+            activo=True,
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("finanzas:plan_edit", kwargs={"pk": plan.pk}),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "finanzas/planes_list.html")
+        self.assertEqual(response.context["editing_plan_id"], plan.pk)
+        self.assertContains(response, "Guardar cambios")
+        self.assertContains(response, 'name="es_por_defecto"', html=False)
+        self.assertNotContains(response, "Editar plan")
+
+    def test_plan_edit_inline_actualiza_plan_por_defecto(self):
+        plan_base = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Base",
+            num_clases=4,
+            precio=20000,
+            activo=True,
+        )
+        plan_otro = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Otro",
+            num_clases=8,
+            precio=30000,
+            activo=True,
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            f"{reverse('finanzas:plan_edit', kwargs={'pk': plan_otro.pk})}?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}",
+            {
+                "organizacion": self.org.pk,
+                "nombre": "Plan Otro",
+                "num_clases": 8,
+                "precio": 30000,
+                "precio_incluye_iva": "",
+                "es_por_defecto": "on",
+                "fecha_inicio": "",
+                "fecha_fin": "",
+                "descripcion": "",
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        plan_base.refresh_from_db()
+        plan_otro.refresh_from_db()
+        self.assertFalse(plan_base.es_por_defecto)
+        self.assertTrue(plan_otro.es_por_defecto)
+
     def test_transaction_form_deriva_tipo_desde_categoria(self):
         categoria = Category.objects.create(nombre="Venta", tipo="ingreso", activa=True)
         form = TransactionForm(
@@ -227,6 +397,18 @@ class FinanzasAccessTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         transaccion = form.save(commit=False)
         self.assertEqual(transaccion.tipo, Transaction.Tipo.INGRESO)
+
+    def test_transacciones_list_precarga_organizacion_del_filtro_en_formulario(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("finanzas:transacciones_list"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"].initial["organizacion"], self.org.pk)
+        self.assertContains(response, f'<option value="{self.org.pk}" selected>', html=False)
 
     def test_transaction_form_muestra_extracto_en_opciones_de_documentos(self):
         documento = DocumentoTributario.objects.create(
@@ -291,11 +473,15 @@ class FinanzasAccessTests(TestCase):
         categoria = Category.objects.create(nombre="Honorarios evento", tipo="egreso", activa=True)
         documento_1 = DocumentoTributario.objects.create(
             organizacion=self.org,
-            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_EXENTA,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
             folio="D-1",
             fecha_emision="2026-02-10",
-            nombre_emisor="Emisor Uno",
+            nombre_emisor=self.org.razon_social,
+            rut_emisor=self.org.rut,
             nombre_receptor="Receptor Uno",
+            rut_receptor="11.111.111-1",
+            monto_neto=10000,
+            monto_exento=88100,
             monto_iva=1900,
             monto_total=100000,
         )
@@ -305,7 +491,10 @@ class FinanzasAccessTests(TestCase):
             folio="D-2",
             fecha_emision="2026-02-15",
             nombre_emisor="Emisor Dos",
-            nombre_receptor="Receptor Dos",
+            rut_emisor="33.333.333-3",
+            nombre_receptor=self.org.razon_social,
+            rut_receptor=self.org.rut,
+            monto_neto=50000,
             retencion_monto=15250,
             monto_total=50000,
         )
@@ -337,15 +526,28 @@ class FinanzasAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["total_documentos"], 2)
-        self.assertEqual(response.context["monto_total_documentos"], 150000)
+        self.assertEqual(response.context["monto_total_ingresos_documentales"], 100000)
+        self.assertEqual(response.context["monto_total_egresos_documentales"], 50000)
         self.assertEqual(response.context["monto_total_iva"], 1900)
         self.assertEqual(response.context["monto_total_retencion"], 15250)
         self.assertEqual(response.context["total_pagos_asociados"], 1)
         self.assertEqual(response.context["total_transacciones_asociadas"], 1)
-        self.assertContains(response, "Total documentos")
-        self.assertContains(response, "Monto total")
+        self.assertNotContains(response, "Total documentos")
+        self.assertContains(response, "Ingresos")
+        self.assertContains(response, "Egresos")
         self.assertContains(response, "IVA")
         self.assertContains(response, "Retencion")
+        self.assertContains(response, "<th>Neto</th>", html=False)
+        self.assertContains(response, "<th>Exento</th>", html=False)
+        self.assertContains(response, "<th>IVA</th>", html=False)
+        self.assertContains(response, "<th>Retencion</th>", html=False)
+        self.assertNotContains(response, "<th>Organizacion</th>", html=False)
+        self.assertContains(response, "$ 100.000")
+        self.assertContains(response, "$ 10.000")
+        self.assertContains(response, "$ 88.100")
+        self.assertContains(response, "$ 1.900")
+        self.assertContains(response, "$ 15.250")
+        self.assertContains(response, "$ 50.000")
 
     def test_transacciones_list_muestra_resumen_del_listado(self):
         categoria_ingreso = Category.objects.create(nombre="Venta", tipo="ingreso", activa=True)
@@ -434,9 +636,15 @@ class FinanzasAccessTests(TestCase):
         )
         self.client.force_login(self.user_admin)
 
+        upload_response = self.client.get(reverse("finanzas:documento_tributario_importar"))
+        self.assertEqual(upload_response.status_code, 200)
+        self.assertContains(upload_response, 'name="archivo"', html=False)
+        self.assertNotContains(upload_response, 'name="archivo_xml"', html=False)
+        self.assertNotContains(upload_response, 'name="archivo_pdf"', html=False)
+
         response = self.client.post(
             reverse("finanzas:documento_tributario_importar"),
-            {"accion": "parsear", "archivo_xml": xml},
+            {"accion": "parsear", "archivo": xml},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -479,7 +687,7 @@ class FinanzasAccessTests(TestCase):
 
         response = self.client.post(
             reverse("finanzas:documento_tributario_importar"),
-            {"accion": "parsear", "archivo_pdf": pdf},
+            {"accion": "parsear", "archivo": pdf},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -537,7 +745,7 @@ class FinanzasAccessTests(TestCase):
 
         response = self.client.post(
             reverse("finanzas:documento_tributario_importar"),
-            {"accion": "parsear", "archivo_xml": xml},
+            {"accion": "parsear", "archivo": xml},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -591,7 +799,7 @@ class FinanzasAccessTests(TestCase):
 
         parse_response = self.client.post(
             f"{reverse('finanzas:documento_tributario_importar')}?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
-            {"accion": "parsear", "archivo_xml": xml},
+            {"accion": "parsear", "archivo": xml},
         )
         self.assertEqual(parse_response.status_code, 200)
 
@@ -635,7 +843,7 @@ class FinanzasAccessTests(TestCase):
 
         parse_response = self.client.post(
             f"{reverse('finanzas:documento_tributario_importar')}?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}",
-            {"accion": "parsear", "archivo_pdf": pdf},
+            {"accion": "parsear", "archivo": pdf},
         )
 
         self.assertEqual(parse_response.status_code, 200)
@@ -692,7 +900,7 @@ class FinanzasAccessTests(TestCase):
 
         response = self.client.post(
             f"{reverse('finanzas:documento_tributario_importar')}?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}",
-            {"accion": "parsear", "archivo_pdf": pdf},
+            {"accion": "parsear", "archivo": pdf},
         )
 
         self.assertEqual(response.status_code, 200)

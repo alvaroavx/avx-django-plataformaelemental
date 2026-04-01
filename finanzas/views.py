@@ -2,9 +2,11 @@
 import json
 import mimetypes
 from pathlib import Path
+from decimal import Decimal
 
 from django.contrib import messages
 from django.core.files import File
+from django.db import IntegrityError
 from django.db.models import CharField, Count, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -130,6 +132,29 @@ def _leer_xml_temporal(path):
     return content
 
 
+def _clasificar_archivo_tributario(archivo_subido):
+    if not archivo_subido:
+        return None, None
+
+    nombre = (archivo_subido.name or "").lower()
+    content_type = (getattr(archivo_subido, "content_type", "") or "").lower()
+
+    if nombre.endswith(".xml") or "xml" in content_type:
+        return archivo_subido, None
+    if nombre.endswith(".pdf") or content_type == "application/pdf":
+        return None, archivo_subido
+
+    posicion = archivo_subido.tell()
+    encabezado = archivo_subido.read(128)
+    archivo_subido.seek(posicion)
+    encabezado_limpio = encabezado.lstrip()
+    if encabezado.startswith(b"%PDF"):
+        return None, archivo_subido
+    if encabezado_limpio.startswith(b"<"):
+        return archivo_subido, None
+    return None, None
+
+
 def _review_context_from_payload(request, payload, *, token_importacion=None, documento_data=None, pago_data=None):
     organizacion = _organizacion_desde_request(request)
     documento_form = _documento_revision_form(
@@ -203,6 +228,52 @@ def _metadata_extra_como_dict(value):
     except (TypeError, json.JSONDecodeError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _agregar_error_conflicto_documento(form):
+    form.add_error(
+        None,
+        "No se pudo guardar el documento por un conflicto de unicidad. Revisa organizacion, tipo, folio y RUT emisor.",
+    )
+
+
+def _normalizar_rut_basico(value):
+    return (value or "").replace(".", "").replace("-", "").replace(" ", "").upper().strip()
+
+
+def _normalizar_texto_basico(value):
+    return " ".join((value or "").upper().split())
+
+
+def _documento_match_organizacion(documento, lado):
+    if lado not in {"emisor", "receptor"}:
+        return False
+    organizacion = getattr(documento, "organizacion", None)
+    if not organizacion:
+        return False
+
+    rut_documento = _normalizar_rut_basico(getattr(documento, f"rut_{lado}", ""))
+    rut_organizacion = _normalizar_rut_basico(getattr(organizacion, "rut", ""))
+    if rut_documento and rut_organizacion and rut_documento == rut_organizacion:
+        return True
+
+    nombre_documento = _normalizar_texto_basico(getattr(documento, f"nombre_{lado}", ""))
+    nombres_organizacion = {
+        _normalizar_texto_basico(getattr(organizacion, "nombre", "")),
+        _normalizar_texto_basico(getattr(organizacion, "razon_social", "")),
+    }
+    nombres_organizacion.discard("")
+    return bool(nombre_documento and nombre_documento in nombres_organizacion)
+
+
+def _rol_financiero_documento(documento):
+    es_emisor = _documento_match_organizacion(documento, "emisor")
+    es_receptor = _documento_match_organizacion(documento, "receptor")
+    if es_emisor and not es_receptor:
+        return "ingreso"
+    if es_receptor and not es_emisor:
+        return "egreso"
+    return "sin_clasificar"
 
 
 def _tipo_visualizacion_archivo(nombre_archivo):
@@ -284,7 +355,11 @@ def dashboard(request):
 def planes_list(request):
     context = _base_context(request)
     organizacion = _organizacion_desde_request(request)
-    planes_qs = PaymentPlan.objects.select_related("organizacion").order_by("organizacion__nombre", "nombre")
+    planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
+        "organizacion__nombre",
+        "-es_por_defecto",
+        "nombre",
+    )
     if organizacion:
         planes_qs = planes_qs.filter(organizacion=organizacion)
 
@@ -294,23 +369,48 @@ def planes_list(request):
         messages.success(request, "Plan de pago creado.")
         return _redirect_with_query(request, "finanzas:planes_list")
 
-    context.update({"planes": planes_qs, "form": form, "ayuda_seccion": _ayuda_finanzas("planes")})
+    context.update(
+        {
+            "planes": planes_qs,
+            "form": form,
+            "edit_form": None,
+            "editing_plan_id": None,
+            "ayuda_seccion": _ayuda_finanzas("planes"),
+        }
+    )
     return render(request, "finanzas/planes_list.html", context)
 
 
 @admin_finanzas_required
 def plan_edit(request, pk):
+    context = _base_context(request)
+    organizacion = _organizacion_desde_request(request)
     plan = get_object_or_404(PaymentPlan, pk=pk)
-    form = PaymentPlanForm(request.POST or None, instance=plan)
-    if request.method == "POST" and form.is_valid():
-        form.save()
+    planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
+        "organizacion__nombre",
+        "-es_por_defecto",
+        "nombre",
+    )
+    if organizacion:
+        planes_qs = planes_qs.filter(organizacion=organizacion)
+
+    form_creacion = PaymentPlanForm()
+    form_edicion = PaymentPlanForm(request.POST or None, instance=plan)
+    if request.method == "POST" and form_edicion.is_valid():
+        form_edicion.save()
         messages.success(request, "Plan actualizado.")
         return _redirect_with_query(request, "finanzas:planes_list")
-    return render(
-        request,
-        "finanzas/form_page.html",
-        {"form": form, "title": "Editar plan", "back_url": _url_with_query(request, "finanzas:planes_list")},
+
+    context.update(
+        {
+            "planes": planes_qs,
+            "form": form_creacion,
+            "edit_form": form_edicion,
+            "editing_plan_id": plan.pk,
+            "ayuda_seccion": _ayuda_finanzas("planes"),
+        }
     )
+    return render(request, "finanzas/planes_list.html", context)
 
 
 @admin_finanzas_required
@@ -495,19 +595,34 @@ def documentos_tributarios_list(request):
         total_pagos_asociados=Sum("pagos_asociados_total"),
         total_transacciones_asociadas=Sum("transacciones_asociadas_total"),
     )
+    documentos = list(documentos_qs)
+    monto_total_ingresos_documentales = Decimal("0")
+    monto_total_egresos_documentales = Decimal("0")
+    for item in documentos:
+        item.rol_financiero = _rol_financiero_documento(item)
+        if item.rol_financiero == "ingreso":
+            monto_total_ingresos_documentales += item.monto_total or Decimal("0")
+        elif item.rol_financiero == "egreso":
+            monto_total_egresos_documentales += item.monto_total or Decimal("0")
 
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Documento tributario registrado.")
-        return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
+        try:
+            form.save()
+        except IntegrityError:
+            _agregar_error_conflicto_documento(form)
+        else:
+            messages.success(request, "Documento tributario registrado.")
+            return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
 
     context.update(
         {
-            "documentos": documentos_qs,
+            "documentos": documentos,
             "form": form,
             "total_documentos": resumen_documentos["total_documentos"] or 0,
             "monto_total_documentos": resumen_documentos["monto_total_documentos"] or 0,
+            "monto_total_ingresos_documentales": monto_total_ingresos_documentales,
+            "monto_total_egresos_documentales": monto_total_egresos_documentales,
             "monto_total_iva": resumen_documentos["monto_total_iva"] or 0,
             "monto_total_retencion": resumen_documentos["monto_total_retencion"] or 0,
             "total_pagos_asociados": resumen_documentos["total_pagos_asociados"] or 0,
@@ -553,7 +668,21 @@ def documento_tributario_importar(request):
             if pdf_info:
                 with open(pdf_info["path"], "rb") as pdf_handler:
                     documento.archivo_pdf.save(pdf_info["name"], File(pdf_handler), save=False)
-            documento.save()
+            try:
+                documento.save()
+            except IntegrityError:
+                _agregar_error_conflicto_documento(documento_form)
+                context.update(
+                    _review_context_from_payload(
+                        request,
+                        payload,
+                        token_importacion=token,
+                        documento_data=request.POST,
+                        pago_data=request.POST,
+                    )
+                )
+                context["confirm_form"] = confirm_form
+                return render(request, "finanzas/documento_tributario_importar.html", context)
 
             if guardar_pago and pago_form is not None:
                 pago = pago_form.save(commit=False)
@@ -578,29 +707,32 @@ def documento_tributario_importar(request):
 
     upload_form = DocumentoTributarioImportUploadForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and request.POST.get("accion") == "parsear" and upload_form.is_valid():
-        xml_file = upload_form.cleaned_data.get("archivo_xml")
-        pdf_file = upload_form.cleaned_data.get("archivo_pdf")
-        xml_bytes = xml_file.read() if xml_file else None
-        pdf_bytes = pdf_file.read() if pdf_file else None
-        organizacion = _organizacion_desde_request(request)
-        normalized = parse_tax_document(
-            xml_bytes=xml_bytes,
-            xml_name=xml_file.name if xml_file else None,
-            pdf_bytes=pdf_bytes,
-            pdf_name=pdf_file.name if pdf_file else None,
-            organizacion_id=organizacion.pk if organizacion else None,
-        )
-        payload = build_review_payload(normalized, organizacion_id=organizacion.pk if organizacion else None)
-        if xml_file:
-            xml_file.seek(0)
-        if pdf_file:
-            pdf_file.seek(0)
-        token = guardar_importacion_temporal(request, xml_file=xml_file, pdf_file=pdf_file, payload=payload)
-        context.update(_review_context_from_payload(request, payload, token_importacion=token))
-        context["confirm_form"] = DocumentoTributarioImportConfirmForm(
-            initial={"token_importacion": token, "guardar_pago_sugerido": bool(payload.get("pago_initial"))}
-        )
-        return render(request, "finanzas/documento_tributario_importar.html", context)
+        archivo_subido = upload_form.cleaned_data.get("archivo")
+        xml_file, pdf_file = _clasificar_archivo_tributario(archivo_subido)
+        if not xml_file and not pdf_file:
+            upload_form.add_error("archivo", "No se pudo reconocer el archivo como XML o PDF.")
+        else:
+            xml_bytes = xml_file.read() if xml_file else None
+            pdf_bytes = pdf_file.read() if pdf_file else None
+            organizacion = _organizacion_desde_request(request)
+            normalized = parse_tax_document(
+                xml_bytes=xml_bytes,
+                xml_name=xml_file.name if xml_file else None,
+                pdf_bytes=pdf_bytes,
+                pdf_name=pdf_file.name if pdf_file else None,
+                organizacion_id=organizacion.pk if organizacion else None,
+            )
+            payload = build_review_payload(normalized, organizacion_id=organizacion.pk if organizacion else None)
+            if xml_file:
+                xml_file.seek(0)
+            if pdf_file:
+                pdf_file.seek(0)
+            token = guardar_importacion_temporal(request, xml_file=xml_file, pdf_file=pdf_file, payload=payload)
+            context.update(_review_context_from_payload(request, payload, token_importacion=token))
+            context["confirm_form"] = DocumentoTributarioImportConfirmForm(
+                initial={"token_importacion": token, "guardar_pago_sugerido": bool(payload.get("pago_initial"))}
+            )
+            return render(request, "finanzas/documento_tributario_importar.html", context)
 
     context.update(
         {
@@ -608,8 +740,8 @@ def documento_tributario_importar(request):
             "ayuda_seccion": {
                 "titulo": "Carga asistida",
                 "texto": (
-                    "El archivo se parsea primero y luego se muestran formularios precargados para revision humana. "
-                    "Si subes XML y PDF, prevalece el XML."
+                    "Sube un XML o un PDF en un solo campo. El sistema detecta el tipo de archivo, "
+                    "lo parsea y luego muestra formularios precargados para revision humana."
                 ),
             },
         }
@@ -626,8 +758,13 @@ def documento_tributario_parse_preview(request):
     if not form.is_valid():
         return JsonResponse({"ok": False, "errors": form.errors}, status=400)
 
-    xml_file = form.cleaned_data.get("archivo_xml")
-    pdf_file = form.cleaned_data.get("archivo_pdf")
+    archivo_subido = form.cleaned_data.get("archivo")
+    xml_file, pdf_file = _clasificar_archivo_tributario(archivo_subido)
+    if not xml_file and not pdf_file:
+        return JsonResponse(
+            {"ok": False, "errors": {"archivo": ["No se pudo reconocer el archivo como XML o PDF."]}},
+            status=400,
+        )
     xml_bytes = xml_file.read() if xml_file else None
     pdf_bytes = pdf_file.read() if pdf_file else None
     organizacion = _organizacion_desde_request(request)
@@ -717,9 +854,13 @@ def documento_tributario_edit(request, pk):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None, instance=documento)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Documento tributario actualizado.")
-        return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
+        try:
+            form.save()
+        except IntegrityError:
+            _agregar_error_conflicto_documento(form)
+        else:
+            messages.success(request, "Documento tributario actualizado.")
+            return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
     return render(
         request,
         "finanzas/form_page.html",
@@ -813,7 +954,11 @@ def transacciones_list(request):
     total_ingresos = resumen_transacciones["total_ingresos"] or 0
     total_egresos = resumen_transacciones["total_egresos"] or 0
 
-    form = TransactionForm(request.POST or None, request.FILES or None)
+    form = TransactionForm(
+        request.POST or None,
+        request.FILES or None,
+        initial={"organizacion": organizacion.pk} if organizacion else None,
+    )
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Transaccion registrada.")

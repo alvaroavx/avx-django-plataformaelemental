@@ -277,6 +277,7 @@ class PaymentPlan(TimeStampedModel):
     num_clases = models.PositiveIntegerField(default=1)
     precio = models.DecimalField(max_digits=12, decimal_places=2)
     precio_incluye_iva = models.BooleanField(default=False)
+    es_por_defecto = models.BooleanField(default=False)
     fecha_inicio = models.DateField(null=True, blank=True)
     fecha_fin = models.DateField(null=True, blank=True)
     descripcion = models.TextField(blank=True)
@@ -292,6 +293,29 @@ class PaymentPlan(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.nombre} ({self.organizacion})"
+
+    def save(self, *args, **kwargs):
+        queryset_organizacion = PaymentPlan.objects.filter(organizacion_id=self.organizacion_id)
+        if self.pk:
+            queryset_organizacion = queryset_organizacion.exclude(pk=self.pk)
+        if not queryset_organizacion.exists():
+            self.es_por_defecto = True
+        elif not self.es_por_defecto and not queryset_organizacion.filter(es_por_defecto=True).exists():
+            self.es_por_defecto = True
+        super().save(*args, **kwargs)
+        if self.es_por_defecto:
+            PaymentPlan.objects.filter(organizacion_id=self.organizacion_id).exclude(pk=self.pk).update(
+                es_por_defecto=False
+            )
+
+    def delete(self, *args, **kwargs):
+        organizacion_id = self.organizacion_id
+        era_por_defecto = self.es_por_defecto
+        super().delete(*args, **kwargs)
+        if era_por_defecto:
+            siguiente_plan = PaymentPlan.objects.filter(organizacion_id=organizacion_id).order_by("nombre", "id").first()
+            if siguiente_plan:
+                PaymentPlan.objects.filter(pk=siguiente_plan.pk).update(es_por_defecto=True)
 
     def calcular_montos(self):
         precio = _money(Decimal(self.precio or 0))

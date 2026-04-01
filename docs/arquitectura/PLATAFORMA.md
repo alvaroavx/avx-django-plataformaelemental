@@ -95,6 +95,7 @@ Rutas principales:
 Regla vigente:
 - `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas.
 - Pueden asociarse entre si, pero no deben colapsarse en una sola entidad.
+- En resumentes de `documentos tributarios`, un documento cuenta como `ingreso` si la organizacion asociada es la emisora y como `egreso` si la organizacion asociada es la receptora.
 
 ## Integracion academica-financiera
 - Las asistencias presentes pueden consumirse contra pagos existentes.
@@ -119,6 +120,7 @@ Estado actual:
 
 Regla vigente:
 - subir un archivo no debe guardar automaticamente registros definitivos
+- la carga asistida expone un solo input de archivo y detecta internamente si el archivo subido es XML o PDF
 - el flujo debe ser:
   - subir
   - extraer

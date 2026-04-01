@@ -24,9 +24,9 @@ from django.views.generic import RedirectView
 from asistencias.forms import CustomLoginForm
 from django.utils.translation import gettext_lazy as _
 
-admin.site.site_header = _("AdministraciÃ³n Plataforma Elemental")
+admin.site.site_header = _("Administración Plataforma Elemental")
 admin.site.site_title = _("Panel de control")
-admin.site.index_title = _("GestiÃ³n de operaciones")
+admin.site.index_title = _("Gestión de operaciones")
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/asistencias/", permanent=False)),
@@ -48,4 +48,3 @@ urlpatterns += [
     path("personas/", include("personas.urls")),
     path("finanzas/", include("finanzas.urls")),
 ]
-

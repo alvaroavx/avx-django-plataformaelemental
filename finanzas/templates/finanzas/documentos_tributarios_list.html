@@ -12,48 +12,48 @@
   {% include "finanzas/_info_box.html" %}
 
   <div class="row g-3 mb-3">
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-success-subtle bg-success-subtle shadow-sm">
         <div class="card-body">
-          <div class="text-muted small text-uppercase">Total documentos</div>
-          <div class="display-6">{{ total_documentos }}</div>
+          <div class="text-muted small text-uppercase">Ingresos</div>
+          <div class="display-6">{{ monto_total_ingresos_documentales|clp }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-danger-subtle bg-danger-subtle shadow-sm">
         <div class="card-body">
-          <div class="text-muted small text-uppercase">Monto total</div>
-          <div class="display-6">{{ monto_total_documentos|clp }}</div>
+          <div class="text-muted small text-uppercase">Egresos</div>
+          <div class="display-6">{{ monto_total_egresos_documentales|clp }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-primary-subtle bg-primary-subtle shadow-sm">
         <div class="card-body">
           <div class="text-muted small text-uppercase">IVA</div>
           <div class="display-6">{{ monto_total_iva|clp }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-primary-subtle bg-primary-subtle shadow-sm">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Retencion</div>
           <div class="display-6">{{ monto_total_retencion|clp }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-secondary-subtle bg-light shadow-sm">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Pagos asociados</div>
           <div class="display-6">{{ total_pagos_asociados }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-2">
-      <div class="card border-0 shadow-sm">
+    <div class="col-6 col-lg-3 col-xxl-2">
+      <div class="card border-secondary-subtle bg-light shadow-sm">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Transacciones asociadas</div>
           <div class="display-6">{{ total_transacciones_asociadas }}</div>
@@ -99,11 +99,14 @@
         <thead>
           <tr>
             <th>Fecha</th>
-            <th>Organizacion</th>
             <th>Tipo</th>
             <th>Folio</th>
             <th>Emisor</th>
             <th>Receptor</th>
+            <th>Neto</th>
+            <th>Exento</th>
+            <th>IVA</th>
+            <th>Retencion</th>
             <th>Total</th>
             <th>Asociaciones</th>
             <th></th>
@@ -113,11 +116,14 @@
           {% for item in documentos %}
           <tr>
             <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
-            <td>{{ item.organizacion.nombre }}</td>
             <td>{{ item.get_tipo_documento_display }}</td>
             <td>{{ item.folio }}</td>
             <td>{{ item.nombre_emisor|default:"-" }}</td>
             <td>{{ item.nombre_receptor|default:"-" }}</td>
+            <td>{{ item.monto_neto|clp }}</td>
+            <td>{{ item.monto_exento|clp }}</td>
+            <td>{{ item.monto_iva|clp }}</td>
+            <td>{{ item.retencion_monto|clp }}</td>
             <td>{{ item.monto_total|clp }}</td>
             <td class="small">
               <div>Pagos: {{ item.pagos_asociados_total }}</div>
@@ -130,7 +136,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="9" class="text-center text-muted">Sin documentos tributarios en el periodo.</td></tr>
+          <tr><td colspan="12" class="text-center text-muted">Sin documentos tributarios en el periodo.</td></tr>
           {% endfor %}
         </tbody>
       </table>
