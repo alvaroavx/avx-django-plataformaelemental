@@ -59,16 +59,18 @@ En el archivo de entorno de produccion conviene definir al menos:
 2. Clonar el repo en la ruta final:
    - `git clone <repo> /srv/plataformaelemental`
 3. Crear el archivo de entorno de produccion.
-4. Ajustar el unit file desde `deploy/systemd/plataformaelemental.service.example`:
+4. Asegurar que el usuario de despliegue pueda reiniciar el servicio:
+   - idealmente con `sudo` sin password para `systemctl restart` y `systemctl is-active`
+5. Ajustar el unit file desde `deploy/systemd/plataformaelemental.service.example`:
    - reemplazar `__SERVICE_USER__`
    - reemplazar `__APP_DIR__`
    - reemplazar `__ENV_FILE__`
    - reemplazar `__VENV_DIR__`
-5. Instalar el servicio:
+6. Instalar el servicio:
    - copiarlo a `/etc/systemd/system/plataformaelemental.service`
    - `sudo systemctl daemon-reload`
    - `sudo systemctl enable plataformaelemental`
-6. Ejecutar una primera vez:
+7. Ejecutar una primera vez:
    - `cd /srv/plataformaelemental`
    - `bash scripts/deploy.sh`
 
