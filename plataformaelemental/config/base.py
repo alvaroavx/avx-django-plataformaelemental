@@ -117,15 +117,25 @@ LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "api.authentication.ApiKeyAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "api.permissions.ApiKeyLecturaOUsuarioAutenticado",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "api.throttles.ApiBurstRateThrottle",
+        "api.throttles.ApiSustainedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "api_burst": "120/min",
+        "api_sustained": "5000/day",
+        "auth_burst": "5/min",
+        "auth_sustained": "100/day",
+    },
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
 }
-

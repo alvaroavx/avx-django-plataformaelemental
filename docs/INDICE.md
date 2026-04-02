@@ -1,6 +1,6 @@
 # INDICE
 
-Fecha de actualizacion: 2026-03-21
+Fecha de actualizacion: 2026-04-01
 
 Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta al trabajar sobre el repo.
 
@@ -15,6 +15,7 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
    - [docs/apps/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/ASISTENCIAS.md)
    - [docs/apps/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/PERSONAS.md)
    - [docs/apps/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/FINANZAS.md)
+   - [docs/apps/API.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/API.md)
 5. [README.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/README.md)
    Resumen humano y puesta en marcha.
 
@@ -32,3 +33,4 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
 - `docs/apps/ASISTENCIAS.md`: decisiones de la app `asistencias`.
 - `docs/apps/PERSONAS.md`: decisiones de la app `personas`.
 - `docs/apps/FINANZAS.md`: decisiones de la app `finanzas`.
+- `docs/apps/API.md`: decisiones de la app `api`.

@@ -37,6 +37,13 @@ Regla funcional importante:
 - transacciones de caja
 - categorias y reportes
 
+### `api`
+- API REST externa
+- endpoints base versionados por app bajo `/api/v1/`
+- autenticacion por token para usuarios
+- API key de solo lectura para consultas externas
+- rate limiting por usuario, API key o IP
+
 ## Endpoints y rutas principales
 
 ### Acceso
@@ -44,6 +51,9 @@ Regla funcional importante:
 - `/admin/`
 - `/`
 - `/app/`
+- `/api/health/`
+- `/api/me/`
+- `/api/auth/login/`
 
 ### Asistencias
 - `/asistencias/`
@@ -78,6 +88,20 @@ Regla funcional importante:
 - `/finanzas/export/pagos.csv`
 - `/finanzas/export/transacciones.csv`
 
+### API externa
+- `/api/v1/personas/organizaciones/`
+- `/api/v1/personas/personas/`
+- `/api/v1/personas/resumen/`
+- `/api/v1/asistencias/disciplinas/`
+- `/api/v1/asistencias/sesiones/`
+- `/api/v1/asistencias/asistencias/`
+- `/api/v1/asistencias/resumen/`
+- `/api/v1/finanzas/planes/`
+- `/api/v1/finanzas/pagos/`
+- `/api/v1/finanzas/documentos-tributarios/`
+- `/api/v1/finanzas/transacciones/`
+- `/api/v1/finanzas/resumen/`
+
 ## Arquitectura
 
 ### Stack
@@ -90,18 +114,23 @@ Regla funcional importante:
 
 ### Estructura del repo
 - `plataformaelemental/`: configuracion del proyecto Django
-- `database/`: modelos del dominio
 - `asistencias/`: operacion academica
 - `personas/`: CRM, roles y organizaciones
 - `finanzas/`: pagos, documentos tributarios y caja
 - `api/`: endpoints externos
 - `data/`: cargas masivas y soporte de datos
 - `docs/`: documentacion viva
+- `database/`: namespace legado de migraciones y compatibilidad historica
 
 ### Reglas tecnicas transversales
-- Los modelos del dominio se mantienen en `database/`.
+- Los modelos viven en su app duena:
+  - `personas` concentra personas, roles y organizaciones.
+  - `asistencias` concentra disciplinas, sesiones y asistencias.
+  - `finanzas` concentra pagos, documentos tributarios, consumos y transacciones.
+- `database/` ya no concentra modelos de runtime; se mantiene como capa de compatibilidad de migraciones para no romper la historia ni los datos existentes.
 - El codigo debe estar en espanol siempre que no complique artificialmente la comprension.
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegacion.
+- La API externa base vive en `/api/v1/`; las consultas pueden usar API key de solo lectura y las escrituras requieren usuario autenticado.
 
 ## Comandos principales
 
@@ -135,6 +164,25 @@ python manage.py test
 python manage.py test asistencias.tests
 python manage.py test personas.tests
 python manage.py test finanzas.tests
+python manage.py test api.tests
+```
+
+### Crear API key de consulta
+```bash
+python manage.py crear_api_key integracion-externa
+```
+
+### Consumir la API con API key
+```bash
+curl -H "X-API-Key: <tu_clave>" http://127.0.0.1:8000/api/v1/personas/organizaciones/
+curl -H "Authorization: ApiKey <tu_clave>" "http://127.0.0.1:8000/api/v1/finanzas/pagos/?organizacion=1&periodo_mes=4&periodo_anio=2026"
+```
+
+### Consumir la API con token de usuario
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"usuario","password":"clave"}'
 ```
 
 ## Formas de usar la plataforma
@@ -182,6 +230,7 @@ Orden recomendado:
    - [docs/apps/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/ASISTENCIAS.md)
    - [docs/apps/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/PERSONAS.md)
    - [docs/apps/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/FINANZAS.md)
+   - [docs/apps/API.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/API.md)
 
 ## Observaciones
 

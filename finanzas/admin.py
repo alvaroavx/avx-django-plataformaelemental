@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from database.models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
 @admin.register(PaymentPlan)

@@ -1,6 +1,6 @@
 from django.core.exceptions import PermissionDenied
 
-from database.models import Persona, PersonaRol
+from personas.models import Persona, PersonaRol
 
 ROLE_ADMIN = "admin"
 ROLE_STAFF_ASISTENCIA = "staff_asistencia"

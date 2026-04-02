@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-03-17
+Fecha de actualizacion: 2026-04-01
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -15,6 +15,7 @@ Debe concentrar:
 - La administracion de organizaciones vive en esta app y no en `asistencias`.
 - Los perfiles de persona deben mantener filtros globales de periodo y organizacion.
 - Desde aqui se debe poder ver actividad academica y financiera relevante de cada persona dentro del periodo seleccionado.
+- Los modelos propios de personas, roles y organizaciones viven en `personas.models`; no deben declararse en `database`.
 
 ## Decisiones funcionales vigentes
 - Debe existir listado, detalle, creacion y edicion de organizaciones.
@@ -25,3 +26,10 @@ Debe concentrar:
 - `asistencias` usa perfiles operativos y flujos rapidos.
 - `finanzas` mantiene la logica de cobros, documentos y caja.
 - `personas` conecta ambas vistas desde una perspectiva administrativa.
+
+## API externa base
+- `personas` expone una base de consumo externo en:
+  - `/api/v1/personas/organizaciones/`
+  - `/api/v1/personas/personas/`
+  - `/api/v1/personas/resumen/`
+- La API permite filtrar y reutilizar personas y organizaciones sin acoplar clientes externos al frontend HTML.

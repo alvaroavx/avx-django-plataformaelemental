@@ -14,17 +14,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from database.models import (
-    Asistencia,
-    AttendanceConsumption,
-    Category,
-    DocumentoTributario,
-    Organizacion,
-    Payment,
-    PaymentPlan,
-    Transaction,
-)
+from asistencias.models import Asistencia
 from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
+from personas.models import Organizacion
 
 from .documentos.dtos import NormalizedTaxDocument
 from .documentos.services import build_review_payload, parse_tax_document
@@ -45,6 +37,7 @@ from .forms import (
     PaymentPlanForm,
     TransactionForm,
 )
+from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
 def _base_context(request):

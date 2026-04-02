@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-03-21
+Fecha de actualizacion: 2026-04-01
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -19,6 +19,7 @@ Debe servir para operar varias organizaciones y tambien debe poder escalar a fin
 - `DocumentoTributario`: documento fiscal opcional, con PDF/XML, montos, tasas y asociaciones.
 - `Category`: clasificacion de transacciones para reportes.
 - `PaymentPlan`: estructura comercial de clases y precio.
+- Los modelos financieros viven en `finanzas.models`; `database` ya no concentra modelos de runtime y queda solo como compatibilidad historica de migraciones.
 
 ## Reglas de uso
 - Un ingreso puede existir como `Transaction` y tambien como `DocumentoTributario`, pero cada entidad cumple un rol distinto.
@@ -98,3 +99,13 @@ Reglas:
 - Matching mejor de contraparte.
 - Flujo de conciliacion mas asistido entre pagos, documentos y transacciones.
 - Evaluar una entidad superior de evento/proyecto si el control financiero por presentacion se vuelve necesario.
+
+## API externa base
+- `finanzas` expone una base de consumo externo en:
+  - `/api/v1/finanzas/planes/`
+  - `/api/v1/finanzas/pagos/`
+  - `/api/v1/finanzas/documentos-tributarios/`
+  - `/api/v1/finanzas/transacciones/`
+  - `/api/v1/finanzas/resumen/`
+- En esta fase la API es principalmente de lectura; no se expone aun escritura financiera externa.
+- La API key de solo lectura es valida para estos endpoints.

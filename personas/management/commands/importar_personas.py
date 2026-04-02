@@ -5,7 +5,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from database.models import Persona
+from personas.models import Persona
 
 
 def normalizar_texto(valor: str) -> str:

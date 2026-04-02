@@ -2,7 +2,10 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from database.models import Asistencia, AttendanceConsumption, Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
+from finanzas.models import AttendanceConsumption, Payment
+from personas.models import Organizacion, Persona, PersonaRol, Rol
+
+from .models import Asistencia, Disciplina, SesionClase
 
 
 class AsistenciasViewTests(TestCase):

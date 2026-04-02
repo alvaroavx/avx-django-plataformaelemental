@@ -12,19 +12,15 @@ from finanzas.documentos.temp_storage import SESSION_KEY
 from finanzas.forms import DocumentoTributarioForm, PaymentForm, TransactionForm
 from finanzas.services import asociar_asistencia_a_pago
 
-from database.models import (
-    Asistencia,
+from asistencias.models import Asistencia, Disciplina, SesionClase
+from personas.models import Organizacion, Persona, PersonaRol, Rol
+
+from finanzas.models import (
     AttendanceConsumption,
     Category,
     DocumentoTributario,
-    Disciplina,
-    Organizacion,
     Payment,
     PaymentPlan,
-    Persona,
-    PersonaRol,
-    Rol,
-    SesionClase,
     Transaction,
 )
 

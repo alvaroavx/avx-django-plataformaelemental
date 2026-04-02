@@ -1,6 +1,6 @@
 from django import forms
 
-from database.models import Organizacion, Persona, PersonaRol, Rol
+from .models import Organizacion, Persona, PersonaRol, Rol
 
 
 class OrganizacionCRMForm(forms.ModelForm):

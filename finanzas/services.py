@@ -1,7 +1,10 @@
 from django.db.models import Count, Q, Sum
 from django.utils.dateparse import parse_date
 
-from database.models import Asistencia, AttendanceConsumption, Payment, Persona
+from asistencias.models import Asistencia
+from personas.models import Persona
+
+from .models import AttendanceConsumption, Payment
 
 
 def _filtro_mismo_periodo_mensual(fecha, prefijo_campo):

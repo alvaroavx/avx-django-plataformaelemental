@@ -1,7 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from database.models import Asistencia, Payment
+from asistencias.models import Asistencia
+
+from .models import Payment
 from .services import asignar_consumo_asistencia, imputar_pago_a_deudas
 
 

@@ -1,7 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
-from database.models import Disciplina, Persona
+from personas.models import Persona
+
+from .models import Disciplina
 
 
 class DisciplinaForm(forms.ModelForm):

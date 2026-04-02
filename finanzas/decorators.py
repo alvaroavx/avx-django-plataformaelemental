@@ -3,7 +3,7 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
-from database.models import PersonaRol
+from personas.models import PersonaRol
 
 
 ADMIN_CODES = {"ADMINISTRADOR", "ADMIN", "admin"}

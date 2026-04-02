@@ -1,6 +1,6 @@
 from django.utils import timezone
 
-from database.models import Organizacion
+from personas.models import Organizacion
 
 
 def periodo_context(request):

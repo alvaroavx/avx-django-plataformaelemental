@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-03-21
+Fecha de actualizacion: 2026-04-01
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -18,13 +18,17 @@ La plataforma opera hoy como un monolito Django modular con tres apps funcionale
 - `finanzas`
 
 Adicionalmente existen:
-- `database` como fuente unica de modelos
-- `api` para endpoints REST
+- `database` como namespace legado de migraciones y compatibilidad historica
+- `api` para endpoints REST y consumo externo
 - `plataformaelemental` para configuracion del proyecto
 
 ## Reglas transversales
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegacion.
-- Los modelos del dominio se trabajan en `database`.
+- Los modelos del dominio viven en su app duena:
+  - `personas`: personas, roles y organizaciones
+  - `asistencias`: disciplinas, sesiones y asistencias
+  - `finanzas`: pagos, documentos tributarios, consumos y transacciones
+- `database` se mantiene solo para conservar compatibilidad historica de migraciones y no debe recibir modelos nuevos.
 - El codigo debe mantenerse en espanol siempre que no complique artificialmente la comprension.
 - La plataforma debe funcionar aunque no existan documentos tributarios; estos son opcionales y no la fuente obligatoria de verdad del sistema.
 
@@ -42,6 +46,7 @@ Responsabilidad:
 - operacion academica diaria
 - sesiones y registro de asistencia
 - perfiles operativos de estudiantes y profesores
+- exponer una base externa de lectura y carga de asistencia via API
 
 Rutas principales:
 - `/asistencias/`
@@ -58,6 +63,7 @@ Responsabilidad:
 - CRM transversal
 - personas, roles y organizaciones
 - vista administrativa consolidada por persona y por organizacion
+- exponer personas y organizaciones para consumo externo
 
 Rutas principales:
 - `/personas/`
@@ -76,6 +82,7 @@ Responsabilidad:
 - documentos tributarios
 - transacciones de caja
 - categorias, planes y reportes
+- exponer resumentes y listados financieros base para consumo externo
 
 Rutas principales:
 - `/finanzas/`
@@ -86,6 +93,29 @@ Rutas principales:
 - `/finanzas/transacciones/`
 - `/finanzas/categorias/`
 - `/finanzas/reportes/categorias/`
+
+### `api`
+Responsabilidad:
+- exponer una API REST externa y versionada
+- servir una base reutilizable para futuras apps moviles e integraciones
+- controlar autenticacion de API key de lectura y rate limiting
+
+Rutas principales:
+- `/api/health/`
+- `/api/me/`
+- `/api/auth/login/`
+- `/api/auth/refresh/`
+- `/api/auth/logout/`
+- `/api/v1/personas/...`
+- `/api/v1/asistencias/...`
+- `/api/v1/finanzas/...`
+
+Reglas vigentes:
+- La API versionada base vive en `/api/v1/`.
+- Las consultas `GET` aceptan usuario autenticado o API key valida.
+- Las escrituras requieren usuario autenticado.
+- La API key es solo de lectura.
+- La API aplica throttling por usuario, API key o IP.
 
 ## Modelo financiero actual
 - `Payment`: cobro academico a estudiante.
@@ -135,11 +165,14 @@ Regla vigente:
 - `/app/` redirige a `/asistencias/`
 - login en `/accounts/login/`
 - las vistas HTML operan con autenticacion y roles
+- la API externa base usa token de DRF para usuarios y API key de solo lectura para consultas
+- la API tiene rate limiting por usuario, API key o IP, y un throttling mas estricto para login
+- la API key puede enviarse por `X-API-Key` o por `Authorization: ApiKey <clave>`
 
 ## Estado reciente validado
 Ultima validacion conocida:
-- `python manage.py test asistencias.tests personas.tests finanzas.tests`
-- resultado: `37 tests OK`
+- `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+- resultado: `75 tests OK`
 
 ## Observaciones tecnicas
 - Sigue existiendo logica de negocio importante en views; no toda esta encapsulada en servicios.

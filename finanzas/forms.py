@@ -4,7 +4,9 @@ from django.db.models import Q
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
-from database.models import Category, DocumentoTributario, Payment, PaymentPlan, Persona, PersonaRol, Transaction
+from personas.models import Persona, PersonaRol
+
+from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
 class PersonaOrganizacionSelect(forms.Select):

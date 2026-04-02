@@ -1,6 +1,6 @@
 # DECISIONES
 
-Fecha de actualizacion: 2026-03-21
+Fecha de actualizacion: 2026-04-01
 
 ## Proposito
 Este documento define como se mantiene la documentacion viva del repo.
@@ -23,6 +23,8 @@ Toda decision concreta de producto, modelo, navegacion, integracion o flujo oper
    Decisiones y criterios locales de `asistencias`.
 7. `docs/apps/PERSONAS.md`
    Decisiones y criterios locales de `personas`.
+8. `docs/apps/API.md`
+   Decisiones y criterios locales de `api`.
 
 ## Convencion de mantenimiento
 - Si una decision afecta solo una app, actualizar el `.md` de esa app.

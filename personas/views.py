@@ -6,13 +6,15 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from database.models import AttendanceConsumption, Asistencia, Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
-from finanzas.services import resumen_financiero_estudiante
 from asistencias.decorators import role_required
+from asistencias.models import Asistencia, Disciplina, SesionClase
 from asistencias.utils import ROLE_ADMIN
 from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
+from finanzas.models import AttendanceConsumption, Payment
+from finanzas.services import resumen_financiero_estudiante
 
 from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm
+from .models import Organizacion, Persona, PersonaRol, Rol
 
 
 MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)

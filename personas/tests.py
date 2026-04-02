@@ -2,7 +2,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from database.models import Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
+from asistencias.models import Disciplina, SesionClase
+from finanzas.models import Payment
+
+from .models import Organizacion, Persona, PersonaRol, Rol
 
 
 class PersonasOrganizacionesTests(TestCase):

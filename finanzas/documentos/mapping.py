@@ -3,7 +3,9 @@ from decimal import Decimal
 
 from django.utils.dateparse import parse_date
 
-from database.models import DocumentoTributario, Organizacion, Payment, Persona
+from personas.models import Organizacion, Persona
+
+from finanzas.models import DocumentoTributario, Payment
 
 
 def map_tipo_documento(normalized):

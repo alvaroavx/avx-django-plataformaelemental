@@ -8,7 +8,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.formats import date_format
 
-from database.models import AttendanceConsumption, Asistencia, Disciplina, Organizacion, Payment, Persona, PersonaRol, Rol, SesionClase
+from finanzas.models import AttendanceConsumption, Payment
+from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante_periodo
+from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 from .decorators import role_required
 from .forms import (
@@ -17,8 +19,8 @@ from .forms import (
     PersonaRapidaForm,
     SesionBasicaForm,
 )
+from .models import Asistencia, Disciplina, SesionClase
 from .utils import ROLE_ADMIN
-from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante_periodo
 
 
 def _nav_context(request):
