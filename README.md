@@ -1,94 +1,96 @@
 # Plataforma Elemental
 
-Plataforma administrativa construida en Django para operar academias, organizaciones y finanzas desde una sola base. Hoy integra operacion academica, CRM, cobros, documentos tributarios y movimientos de caja, manteniendo filtros globales de `periodo_mes`, `periodo_anio` y `organizacion` en toda la navegacion.
+Plataforma administrativa construida en Django para operar organizaciones, asistencias y finanzas desde una sola base.
 
-## Descripcion
-
-La plataforma esta pensada para centralizar:
-- registro y seguimiento de sesiones y asistencias
-- administracion de personas, roles y organizaciones
-- pagos academicos y consumo de clases
+Hoy el proyecto integra:
+- operación académica diaria
+- CRM de personas, roles y organizaciones
+- pagos y consumo de clases
 - documentos tributarios opcionales
-- transacciones de caja y reportes operativos
+- transacciones de caja
+- API externa versionada para consumo desde clientes externos
 
-Regla funcional importante:
-- la plataforma debe poder usarse aunque no existan documentos tributarios
+## Estado actual
+
+Reglas funcionales vigentes:
+- la plataforma debe funcionar aunque no existan documentos tributarios
 - `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas
+- los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegación HTML
+- los modelos viven en su app dueña y `database/` quedó como namespace legado de migraciones y compatibilidad histórica
 
-## Modulos principales
+## Apps del proyecto
 
 ### `asistencias`
 - sesiones
-- registro de asistentes
+- registro de asistencia
 - perfiles operativos de estudiantes y profesores
-- estado financiero rapido del estudiante
+- integración con consumo financiero de clases
 
 ### `personas`
-- CRM transversal
-- personas y roles por organizacion
+- personas
+- roles por organización
 - organizaciones
-- vista administrativa consolidada por persona
+- vista administrativa consolidada
 
 ### `finanzas`
 - planes
-- pagos de estudiantes
+- pagos
 - documentos tributarios
-- carga asistida XML-first para documentos tributarios
-- transacciones de caja
-- categorias y reportes
+- carga asistida XML/PDF para documentos tributarios
+- transacciones
+- categorías y reportes
 
 ### `api`
 - API REST externa
-- endpoints base versionados por app bajo `/api/v1/`
-- autenticacion por token para usuarios
+- endpoints base bajo `/api/v1/`
+- autenticación por token para usuarios
 - API key de solo lectura para consultas externas
 - rate limiting por usuario, API key o IP
 
-## Endpoints y rutas principales
+## Arquitectura
+
+### Stack
+- Django 5
+- Django REST Framework
+- SQLite en desarrollo
+- Bootstrap 5
+- DataTables
+- Tom Select
+
+### Estructura del repo
+- `plataformaelemental/`: configuración del proyecto Django
+- `asistencias/`: dominio académico
+- `personas/`: personas, roles y organizaciones
+- `finanzas/`: pagos, documentos tributarios y caja
+- `api/`: API externa
+- `docs/`: documentación viva
+- `data/`: cargas y soporte de datos
+- `database/`: compatibilidad histórica de migraciones
+
+### Ownership de modelos
+- `personas.models`: `Organizacion`, `Persona`, `Rol`, `PersonaRol`
+- `asistencias.models`: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`
+- `finanzas.models`: `PaymentPlan`, `Payment`, `DocumentoTributario`, `AttendanceConsumption`, `Transaction`, `Category`
+
+## Rutas principales
 
 ### Acceso
-- `/accounts/login/`
-- `/admin/`
 - `/`
 - `/app/`
+- `/accounts/login/`
+- `/admin/`
+
+### HTML
+- `/asistencias/`
+- `/personas/`
+- `/finanzas/`
+
+### API base
 - `/api/health/`
 - `/api/me/`
 - `/api/auth/login/`
-
-### Asistencias
-- `/asistencias/`
-- `/asistencias/sesiones/`
-- `/asistencias/sesiones/<id>/`
-- `/asistencias/asistencias/`
-- `/asistencias/personas/<id>/`
-- `/asistencias/estudiantes/`
-- `/asistencias/profesores/`
-- `/asistencias/disciplinas/`
-
-### Personas
-- `/personas/`
-- `/personas/listado/`
-- `/personas/nuevo/`
-- `/personas/<id>/`
-- `/personas/<id>/editar/`
-- `/personas/organizaciones/`
-- `/personas/organizaciones/nueva/`
-- `/personas/organizaciones/<id>/`
-- `/personas/organizaciones/<id>/editar/`
-
-### Finanzas
-- `/finanzas/`
-- `/finanzas/pagos/`
-- `/finanzas/planes/`
-- `/finanzas/documentos-tributarios/`
-- `/finanzas/documentos-tributarios/importar/`
-- `/finanzas/transacciones/`
-- `/finanzas/categorias/`
-- `/finanzas/reportes/categorias/`
-- `/finanzas/export/pagos.csv`
-- `/finanzas/export/transacciones.csv`
-
-### API externa
+- `/api/auth/refresh/`
+- `/api/auth/logout/`
 - `/api/v1/personas/organizaciones/`
 - `/api/v1/personas/personas/`
 - `/api/v1/personas/resumen/`
@@ -102,37 +104,7 @@ Regla funcional importante:
 - `/api/v1/finanzas/transacciones/`
 - `/api/v1/finanzas/resumen/`
 
-## Arquitectura
-
-### Stack
-- Django 5
-- Django REST Framework
-- SQLite en desarrollo
-- Bootstrap 5
-- DataTables
-- Tom Select
-
-### Estructura del repo
-- `plataformaelemental/`: configuracion del proyecto Django
-- `asistencias/`: operacion academica
-- `personas/`: CRM, roles y organizaciones
-- `finanzas/`: pagos, documentos tributarios y caja
-- `api/`: endpoints externos
-- `data/`: cargas masivas y soporte de datos
-- `docs/`: documentacion viva
-- `database/`: namespace legado de migraciones y compatibilidad historica
-
-### Reglas tecnicas transversales
-- Los modelos viven en su app duena:
-  - `personas` concentra personas, roles y organizaciones.
-  - `asistencias` concentra disciplinas, sesiones y asistencias.
-  - `finanzas` concentra pagos, documentos tributarios, consumos y transacciones.
-- `database/` ya no concentra modelos de runtime; se mantiene como capa de compatibilidad de migraciones para no romper la historia ni los datos existentes.
-- El codigo debe estar en espanol siempre que no complique artificialmente la comprension.
-- Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegacion.
-- La API externa base vive en `/api/v1/`; las consultas pueden usar API key de solo lectura y las escrituras requieren usuario autenticado.
-
-## Comandos principales
+## Puesta en marcha
 
 ### Activar entorno virtual
 ```bash
@@ -149,17 +121,85 @@ pip install -r requirements.txt
 python manage.py migrate
 ```
 
-### Levantar servidor de desarrollo
+### Levantar servidor local
 ```bash
 python manage.py runserver
 ```
 
-### Ejecutar pruebas
+## Uso operativo básico
+
+### Flujo académico
+1. Crear organización y disciplinas.
+2. Registrar personas y asignar roles.
+3. Crear sesiones.
+4. Registrar asistencias.
+5. Revisar estado académico y financiero por persona.
+
+### Flujo financiero
+1. Crear planes si corresponde.
+2. Registrar pagos.
+3. Consumir clases contra asistencias del mismo mes y año.
+4. Revisar saldo, deudas y resúmenes.
+
+### Flujo tributario
+1. Registrar un documento tributario manualmente o por carga asistida.
+2. Revisar y corregir los campos precargados.
+3. Confirmar el guardado final.
+4. Asociarlo a pagos o transacciones si corresponde.
+
+## Carga asistida de documentos tributarios
+
+Estado actual:
+- XML-first
+- soporte base para DTE XML clásico
+- soporte base para boleta de honorarios XML
+- parser PDF fallback
+- revisión humana antes del guardado
+- visor inline del archivo cargado en la pantalla de revisión
+
+Reglas:
+- si hay XML y PDF, prevalece XML
+- si hay solo PDF, el resultado depende de que el archivo tenga texto seleccionable
+- subir un archivo no guarda automáticamente el registro final
+
+## API externa
+
+### Autenticación disponible
+- token DRF para usuarios autenticados
+- API key de solo lectura para consultas externas
+
+### Crear API key
+```bash
+python manage.py crear_api_key integracion-externa
+```
+
+### Consultar con API key
+```bash
+curl -H "X-API-Key: <tu_clave>" http://127.0.0.1:8000/api/v1/personas/organizaciones/
+curl -H "Authorization: ApiKey <tu_clave>" "http://127.0.0.1:8000/api/v1/finanzas/pagos/?organizacion=1&periodo_mes=4&periodo_anio=2026"
+```
+
+### Obtener token de usuario
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"usuario","password":"clave"}'
+```
+
+### Seguridad base actual
+- throttling por usuario, API key o IP
+- throttling más estricto para login
+- API key solo para lectura
+- escrituras requieren usuario autenticado
+
+## Testing
+
+### Suite completa
 ```bash
 python manage.py test
 ```
 
-### Ejecutar pruebas por app
+### Por app
 ```bash
 python manage.py test asistencias.tests
 python manage.py test personas.tests
@@ -167,59 +207,11 @@ python manage.py test finanzas.tests
 python manage.py test api.tests
 ```
 
-### Crear API key de consulta
-```bash
-python manage.py crear_api_key integracion-externa
-```
+Última validación conocida:
+- `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+- resultado: `75 tests OK`
 
-### Consumir la API con API key
-```bash
-curl -H "X-API-Key: <tu_clave>" http://127.0.0.1:8000/api/v1/personas/organizaciones/
-curl -H "Authorization: ApiKey <tu_clave>" "http://127.0.0.1:8000/api/v1/finanzas/pagos/?organizacion=1&periodo_mes=4&periodo_anio=2026"
-```
-
-### Consumir la API con token de usuario
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario","password":"clave"}'
-```
-
-## Formas de usar la plataforma
-
-### Flujo academico basico
-1. Crear organizacion y disciplinas.
-2. Registrar personas y roles.
-3. Crear sesiones.
-4. Registrar asistencias.
-5. Revisar estado academico y financiero de cada estudiante.
-
-### Flujo financiero academico basico
-1. Crear planes si aplica.
-2. Registrar pagos de estudiantes.
-3. Consumir clases contra asistencias del mismo mes y anio.
-4. Revisar saldo de clases y deudas.
-
-### Flujo tributario basico
-1. Registrar un documento tributario manualmente o usar carga asistida.
-2. Revisar y confirmar los formularios precargados.
-3. Asociar el documento a pagos o transacciones cuando corresponda.
-
-## Carga asistida de documentos tributarios
-
-Estado actual:
-- XML-first
-- soporte inicial para DTE XML clasico
-- soporte inicial para boleta de honorarios XML
-- PDF fallback basico
-- revision humana antes del guardado
-
-Reglas:
-- si subes XML y PDF, prevalece XML
-- si subes solo PDF, el parseo depende de que el PDF tenga texto seleccionable
-- subir un archivo no guarda el registro final automaticamente
-
-## Documentacion
+## Documentación
 
 Orden recomendado:
 1. [AGENTS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/AGENTS.md)
@@ -234,6 +226,6 @@ Orden recomendado:
 
 ## Observaciones
 
-- `README.md` es el documento humano general del proyecto.
-- `AGENTS.md` se mantiene en la raiz porque es una instruccion operativa especial para el agente.
-- La documentacion viva del proyecto debe vivir dentro de `docs/`.
+- `README.md` es el documento general y humano del proyecto.
+- `AGENTS.md` se mantiene en la raíz porque contiene reglas operativas del agente.
+- La documentación viva del proyecto debe vivir dentro de `docs/`.
