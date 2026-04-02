@@ -38,6 +38,7 @@ Adicionalmente existen:
 - Base de datos de desarrollo: SQLite
 - UI: Bootstrap 5, DataTables y Tom Select via CDN
 - Zona horaria: `America/Santiago`
+- Despliegue minimo versionado: GitHub Actions + SSH + `systemd` + `gunicorn`
 
 ## Apps
 
@@ -168,6 +169,16 @@ Regla vigente:
 - la API externa base usa token de DRF para usuarios y API key de solo lectura para consultas
 - la API tiene rate limiting por usuario, API key o IP, y un throttling mas estricto para login
 - la API key puede enviarse por `X-API-Key` o por `Authorization: ApiKey <clave>`
+
+## Deploy
+- El flujo minimo de CI/CD corre en GitHub Actions al hacer push a `main`.
+- La estrategia vigente es:
+  - tests en GitHub Actions
+  - conexion SSH al servidor
+  - `git reset --hard origin/main`
+  - `scripts/deploy.sh`
+  - reinicio de `systemd`
+- La guia operativa vive en `docs/operacion/DEPLOY.md`.
 
 ## Estado reciente validado
 Ultima validacion conocida:

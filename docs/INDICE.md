@@ -18,6 +18,8 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
    - [docs/apps/API.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/API.md)
 5. [README.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/README.md)
    Resumen humano y puesta en marcha.
+6. [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
+   Guia operativa de CI/CD y despliegue.
 
 ## Como mantenerla
 - Cada decision concreta debe quedar documentada en el mismo cambio de codigo.
@@ -30,6 +32,7 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
 - `docs/arquitectura/`: fotografia tecnica transversal.
 - `docs/apps/`: decisiones y criterios por app.
 - `docs/proceso/`: reglas de mantenimiento y documentacion.
+- `docs/operacion/`: guias operativas del proyecto.
 - `docs/apps/ASISTENCIAS.md`: decisiones de la app `asistencias`.
 - `docs/apps/PERSONAS.md`: decisiones de la app `personas`.
 - `docs/apps/FINANZAS.md`: decisiones de la app `finanzas`.

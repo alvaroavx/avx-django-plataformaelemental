@@ -192,6 +192,16 @@ curl -X POST http://127.0.0.1:8000/api/auth/login/ \
 - API key solo para lectura
 - escrituras requieren usuario autenticado
 
+## CI/CD y despliegue
+
+El proyecto incluye una base mínima de CI/CD con GitHub Actions:
+- corre tests en cada push a `main`
+- si los tests pasan, despliega por SSH al servidor
+- el servidor actualiza código, instala dependencias, migra, recopila estáticos y reinicia `systemd`
+
+La guía operativa completa está en:
+- [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
+
 ## Testing
 
 ### Suite completa
@@ -223,6 +233,8 @@ Orden recomendado:
    - [docs/apps/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/PERSONAS.md)
    - [docs/apps/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/FINANZAS.md)
    - [docs/apps/API.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/API.md)
+6. Documentos operativos:
+   - [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
 
 ## Observaciones
 

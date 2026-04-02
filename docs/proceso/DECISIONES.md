@@ -25,12 +25,15 @@ Toda decision concreta de producto, modelo, navegacion, integracion o flujo oper
    Decisiones y criterios locales de `personas`.
 8. `docs/apps/API.md`
    Decisiones y criterios locales de `api`.
+9. `docs/operacion/DEPLOY.md`
+   Guia operativa de despliegue y CI/CD.
 
 ## Convencion de mantenimiento
 - Si una decision afecta solo una app, actualizar el `.md` de esa app.
 - Si afecta varias apps o la arquitectura general, actualizar tambien `docs/arquitectura/PLATAFORMA.md`.
 - Si cambia la forma de trabajar del agente o la gobernanza documental, actualizar `AGENTS.md` y este archivo.
 - Si cambia la explicacion general para humanos, actualizar `README.md`.
+- Si cambia la operacion del proyecto en servidor o CI/CD, actualizar `docs/operacion/`.
 
 ## Criterios de calidad
 - Evitar duplicar texto largo entre archivos.
