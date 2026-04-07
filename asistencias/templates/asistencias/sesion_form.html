@@ -1,0 +1,49 @@
+{% extends "asistencias/base_app.html" %}
+{% block title %}Editar sesión{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-1">Editar sesión</h2>
+      <div class="text-muted">{{ sesion.disciplina }} - {{ sesion.fecha|date:"d/m/Y" }}</div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}">
+      <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.disciplina.id_for_label }}">Disciplina</label>
+            {{ form.disciplina }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.fecha.id_for_label }}">Fecha</label>
+            {{ form.fecha }}
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="{{ form.profesores.id_for_label }}">Profesores</label>
+            {{ form.profesores }}
+          </div>
+          <div class="col-12">
+            <button class="btn btn-success" type="submit">
+              <i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Guardar cambios</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

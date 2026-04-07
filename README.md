@@ -202,6 +202,51 @@ El proyecto incluye una base mínima de CI/CD con GitHub Actions:
 La guía operativa completa está en:
 - [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
 
+### Secrets de GitHub Actions
+
+Obligatorios:
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_PATH`
+- `DEPLOY_SERVICE`
+
+Opcionales:
+- `DEPLOY_PORT`
+  - default: `22`
+- `DEPLOY_ENV_FILE`
+  - si no se define, `scripts/deploy.sh` no carga archivo de entorno externo
+- `DEPLOY_VENV_DIR`
+  - si no se define, usa `.venv` dentro del repo
+- `DEPLOY_PYTHON_BIN`
+  - si no se define, usa `python3`
+
+### Llave SSH de deploy
+
+No intentes reutilizar una llave con passphrase para GitHub Actions.
+Lo correcto es crear una llave nueva, exclusiva para deploy, sin passphrase.
+
+Ejemplo:
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy@plataforma-elemental" -f ~/.ssh/plataforma_elemental_deploy -N ""
+```
+
+Eso genera:
+- privada: `~/.ssh/plataforma_elemental_deploy`
+- publica: `~/.ssh/plataforma_elemental_deploy.pub`
+
+Instalacion:
+1. Copia la publica al servidor, al `authorized_keys` del usuario definido en `DEPLOY_USER`.
+2. Copia la privada completa al secret `DEPLOY_SSH_KEY` en GitHub Actions.
+3. Prueba localmente antes del workflow:
+
+```bash
+ssh -i ~/.ssh/plataforma_elemental_deploy -o IdentitiesOnly=yes -p 22 USUARIO@HOST
+```
+
+Si esa prueba local falla, el workflow tambien fallara.
+
 ## Testing
 
 ### Suite completa

@@ -7,10 +7,19 @@
       <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
       </a>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>
+      </a>
       <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
       </a>
     </div>
+    <form method="post" onsubmit="return window.confirm('Se eliminara la sesion y todas sus asistencias relacionadas. ¿Continuar?');">
+      {% csrf_token %}
+      <button class="btn btn-danger btn-sm" name="eliminar_sesion" type="submit">
+        <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Eliminar sesión</span>
+      </button>
+    </form>
   </div>
   <div class="card mb-3">
     <div class="card-body">
@@ -113,7 +122,9 @@
           <tr>
             <th>Persona</th>
             <th>Estado</th>
+            <th>Estado de pago</th>
             <th>Hora</th>
+            <th class="text-end">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -121,10 +132,20 @@
           <tr>
             <td><a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
             <td>{{ item.get_estado_display }}</td>
+            <td><span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span></td>
             <td>{{ item.registrada_en|date:"H:i" }}</td>
+            <td class="text-end">
+              <form method="post" class="d-inline" onsubmit="return window.confirm('Se eliminara este asistente de la sesión. ¿Continuar?');">
+                {% csrf_token %}
+                <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                <button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">
+                  <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>
+                </button>
+              </form>
+            </td>
           </tr>
           {% empty %}
-          <tr><td colspan="3" class="text-center text-muted">Sin asistentes.</td></tr>
+          <tr><td colspan="5" class="text-center text-muted">Sin asistentes.</td></tr>
           {% endfor %}
         </tbody>
       </table>

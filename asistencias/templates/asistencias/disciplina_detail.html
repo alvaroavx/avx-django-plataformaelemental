@@ -48,6 +48,14 @@
         <div class="col-md-9">
           <div class="small text-muted">Descripción</div>
           <div>{{ disciplina.descripcion|default:"Sin descripción." }}</div>
+          <div class="small text-muted mt-2">Profesores del período</div>
+          <div>
+            {% for profesor in profesores_periodo %}
+              <span class="badge text-bg-light">{{ profesor }}</span>
+            {% empty %}
+              <span class="text-muted">Sin profesores asignados en el período.</span>
+            {% endfor %}
+          </div>
         </div>
       </div>
     </div>
@@ -94,16 +102,13 @@
       <small class="text-muted">Cada fila permite ver la sesión en detalle</small>
     </div>
     <div class="card-body table-responsive">
-      <table class="table table-sm align-middle mb-0">
+      <table id="tabla-sesiones-disciplina" class="table table-sm align-middle mb-0">
         <thead>
           <tr>
             <th>Fecha</th>
-            <th>Estado</th>
-            <th>Profesores</th>
+            <th>Asistentes</th>
             <th>Asistencias</th>
-            <th>Presentes</th>
-            <th>Ausentes</th>
-            <th>Justificadas</th>
+            <th>Estado</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -111,6 +116,14 @@
           {% for sesion in sesiones %}
           <tr>
             <td>{{ sesion.fecha|date:"d/m/Y" }}</td>
+            <td>
+              {% for asistencia in sesion.asistencias.all %}
+                {{ asistencia.persona }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                <span class="text-muted">Sin asistentes</span>
+              {% endfor %}
+            </td>
+            <td>{{ sesion.total_asistentes }}</td>
             <td>
               {% if sesion.estado == "completada" %}
                 <span class="badge text-bg-success">Completada</span>
@@ -120,17 +133,6 @@
                 <span class="badge text-bg-info">Programada</span>
               {% endif %}
             </td>
-            <td>
-              {% for profesor in sesion.profesores.all %}
-                {{ profesor }}{% if not forloop.last %}, {% endif %}
-              {% empty %}
-                <span class="text-muted">Sin profesores</span>
-              {% endfor %}
-            </td>
-            <td>{{ sesion.total_asistentes }}</td>
-            <td>{{ sesion.presentes }}</td>
-            <td>{{ sesion.ausentes }}</td>
-            <td>{{ sesion.justificadas }}</td>
             <td class="text-end">
               <a
                 class="btn btn-sm btn-outline-secondary"
@@ -142,7 +144,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4">
+            <td colspan="5" class="text-center text-muted py-4">
               No hay sesiones en el período seleccionado.
             </td>
           </tr>
@@ -152,4 +154,32 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  (function () {
+    const table = document.getElementById("tabla-sesiones-disciplina");
+    if (!table || !window.jQuery) return;
+    jQuery(table).DataTable({
+      paging: true,
+      pageLength: 20,
+      order: [[0, "desc"]],
+      stateSave: true,
+      language: {
+        search: "Buscar",
+        lengthMenu: "Mostrar _MENU_",
+        info: "Mostrando _START_ a _END_ de _TOTAL_",
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+      },
+      columnDefs: [
+        { orderable: false, targets: 4 },
+      ],
+    });
+  })();
+</script>
 {% endblock %}

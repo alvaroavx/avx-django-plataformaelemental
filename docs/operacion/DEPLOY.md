@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-04-04
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -22,27 +22,95 @@ Este documento describe el CI/CD minimo del proyecto:
 - `scripts/deploy.sh`
 - `deploy/systemd/plataformaelemental.service.example`
 
-## Secrets requeridos en GitHub
+## Secrets de GitHub Actions
+
+### Obligatorios
 - `DEPLOY_HOST`
   - host o IP del servidor
-- `DEPLOY_PORT`
-  - puerto SSH, normalmente `22`
 - `DEPLOY_USER`
   - usuario SSH de despliegue
 - `DEPLOY_SSH_KEY`
-  - clave privada SSH usada por GitHub Actions
+  - clave privada SSH exclusiva para GitHub Actions
+  - debe ser una clave nueva de deploy, sin passphrase
 - `DEPLOY_PATH`
   - ruta absoluta del repo en el servidor, por ejemplo `/srv/plataformaelemental`
 - `DEPLOY_SERVICE`
   - nombre del servicio systemd, por ejemplo `plataformaelemental`
 
-Secrets opcionales:
+### Opcionales
+- `DEPLOY_PORT`
+  - puerto SSH, normalmente `22`
+  - si no existe, el workflow usa `22`
 - `DEPLOY_ENV_FILE`
   - ruta absoluta del archivo de entorno del servidor, por ejemplo `/srv/plataformaelemental/.env.prod`
+  - si no existe, `scripts/deploy.sh` no carga archivo externo
 - `DEPLOY_VENV_DIR`
   - ruta absoluta del virtualenv si no quieres usar `.venv` dentro del repo
+  - si no existe, usa `.venv` en el repo
 - `DEPLOY_PYTHON_BIN`
   - binario python a usar para crear el virtualenv, por ejemplo `python3.13`
+  - si no existe, usa `python3`
+
+## Llave SSH de deploy
+
+No intentes adaptar tu llave actual con passphrase al pipeline.
+Lo sensato es preparar una llave nueva de deploy, separada, sin passphrase, con su publica en `authorized_keys` del servidor.
+
+### Crear la llave nueva
+
+En tu maquina local:
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy@plataforma-elemental" -f ~/.ssh/plataforma_elemental_deploy -N ""
+```
+
+Eso genera:
+- privada: `~/.ssh/plataforma_elemental_deploy`
+- publica: `~/.ssh/plataforma_elemental_deploy.pub`
+
+### Instalar la publica en el servidor
+
+Con otro acceso ya funcional al servidor:
+
+```bash
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+cat ~/.ssh/plataforma_elemental_deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Si la vas a instalar para otro usuario:
+
+```bash
+sudo -u USUARIO mkdir -p /home/USUARIO/.ssh
+sudo -u USUARIO chmod 700 /home/USUARIO/.ssh
+sudo -u USUARIO bash -c 'cat >> /home/USUARIO/.ssh/authorized_keys' < ~/.ssh/plataforma_elemental_deploy.pub
+sudo chmod 600 /home/USUARIO/.ssh/authorized_keys
+sudo chown -R USUARIO:USUARIO /home/USUARIO/.ssh
+```
+
+### Cargar la privada en GitHub
+
+En GitHub:
+1. Ir a `Settings`
+2. `Secrets and variables`
+3. `Actions`
+4. Crear el secret `DEPLOY_SSH_KEY`
+5. Pegar el contenido completo de la privada:
+
+```text
+-----BEGIN OPENSSH PRIVATE KEY-----
+...
+-----END OPENSSH PRIVATE KEY-----
+```
+
+### Probar antes del workflow
+
+```bash
+ssh -i ~/.ssh/plataforma_elemental_deploy -o IdentitiesOnly=yes -p 22 USUARIO@HOST
+```
+
+Si eso no funciona desde tu maquina, el workflow tampoco va a funcionar.
 
 ## Variables de servidor esperadas
 En el archivo de entorno de produccion conviene definir al menos:
@@ -61,6 +129,7 @@ En el archivo de entorno de produccion conviene definir al menos:
 3. Crear el archivo de entorno de produccion.
 4. Asegurar que el usuario de despliegue pueda reiniciar el servicio:
    - idealmente con `sudo` sin password para `systemctl restart` y `systemctl is-active`
+   - ese mismo usuario debe ser el que figura en `DEPLOY_USER`
 5. Ajustar el unit file desde `deploy/systemd/plataformaelemental.service.example`:
    - reemplazar `__SERVICE_USER__`
    - reemplazar `__APP_DIR__`
@@ -78,10 +147,14 @@ En el archivo de entorno de produccion conviene definir al menos:
 1. `actions/checkout`
 2. instalar dependencias Python
 3. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-4. abrir SSH al servidor
-5. `git fetch`
-6. `git reset --hard origin/main`
-7. ejecutar `bash scripts/deploy.sh`
+4. validar secrets obligatorios
+5. escribir la llave privada en `~/.ssh/deploy_key`
+6. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
+7. poblar `known_hosts` con `ssh-keyscan`
+8. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
+9. `git fetch`
+10. `git reset --hard origin/main`
+11. ejecutar `bash scripts/deploy.sh`
 
 ## Que hace `scripts/deploy.sh`
 - carga variables desde `DEPLOY_ENV_FILE` si existe
@@ -117,6 +190,7 @@ bash scripts/deploy.sh
 - No hay hasta ahora configuracion de `systemd`, `nginx` o proceso WSGI versionada; por eso se agrega el unit file ejemplo.
 - El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
 - `python manage.py check --deploy` no se ejecuta automaticamente porque la configuracion de produccion todavia es minima y podria bloquear deploys hasta cerrar endurecimiento de seguridad.
+- Si `DEPLOY_SSH_KEY` contiene una clave con passphrase o una clave mal pegada, el workflow fallara antes de intentar el SSH remoto.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado

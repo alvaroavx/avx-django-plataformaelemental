@@ -227,6 +227,7 @@ def profesores_list(request):
     context = _nav_context(request)
     profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
     org_id = request.GET.get("organizacion")
+    organizacion = _organizacion_desde_request(request)
     inicio_mes, fin_mes = _periodo(request)
     profesores_data = []
     for profesor in profesores:
@@ -271,7 +272,29 @@ def profesores_list(request):
                 }
             )
     profesores_data.sort(key=lambda item: (item["persona"].apellidos or "", item["persona"].nombres or "", item["organizacion"].nombre or ""))
+    asistencias_resumen_qs = Asistencia.objects.filter(
+        sesion__fecha__gte=inicio_mes,
+        sesion__fecha__lte=fin_mes,
+        sesion__profesores__isnull=False,
+    )
+    sesiones_realizadas_qs = SesionClase.objects.filter(
+        fecha__gte=inicio_mes,
+        fecha__lte=fin_mes,
+        estado=SesionClase.Estado.COMPLETADA,
+        profesores__isnull=False,
+    )
+    if organizacion:
+        asistencias_resumen_qs = asistencias_resumen_qs.filter(sesion__disciplina__organizacion=organizacion)
+        sesiones_realizadas_qs = sesiones_realizadas_qs.filter(disciplina__organizacion=organizacion)
+
+    resumen_profesores = {
+        "alumnos_unicos": asistencias_resumen_qs.values("persona_id").distinct().count(),
+        "sesiones_realizadas": sesiones_realizadas_qs.distinct().count(),
+        "asistencias_mes": asistencias_resumen_qs.values("id").distinct().count(),
+        "profesores_activos": len({item["persona"].pk for item in profesores_data}),
+    }
     context["profesores"] = profesores_data
+    context["resumen_profesores"] = resumen_profesores
     return render(request, "asistencias/profesores_list.html", context)
 
 
@@ -311,7 +334,7 @@ def disciplinas_list(request):
             filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
             distinct=True,
         ),
-    ).order_by("organizacion__nombre", "nombre", "nivel")
+    ).order_by("-activa", "organizacion__nombre", "nombre", "nivel")
 
     context.update(
         {
@@ -337,7 +360,13 @@ def disciplina_detail(request, pk):
             fecha__gte=inicio_mes,
             fecha__lte=fin_mes,
         )
-        .prefetch_related("profesores")
+        .prefetch_related(
+            "profesores",
+            Prefetch(
+                "asistencias",
+                queryset=Asistencia.objects.select_related("persona").order_by("persona__apellidos", "persona__nombres"),
+            ),
+        )
         .annotate(
             total_asistentes=Count("asistencias"),
             presentes=Count("asistencias", filter=Q(asistencias__estado=Asistencia.Estado.PRESENTE)),
@@ -358,12 +387,18 @@ def disciplina_detail(request, pk):
         "asistencias_total": asistencias_qs.count(),
         "estudiantes_unicos": asistencias_qs.values("persona_id").distinct().count(),
     }
+    profesores_periodo = Persona.objects.filter(
+        sesiones_en_equipo__disciplina=disciplina,
+        sesiones_en_equipo__fecha__gte=inicio_mes,
+        sesiones_en_equipo__fecha__lte=fin_mes,
+    ).distinct().order_by("apellidos", "nombres")
 
     context.update(
         {
             "disciplina": disciplina,
             "sesiones": sesiones,
             "resumen": resumen,
+            "profesores_periodo": profesores_periodo,
             "inicio_mes": inicio_mes,
             "fin_mes": fin_mes,
         }
@@ -595,9 +630,16 @@ def asistencias_list(request):
     context = _nav_context(request)
     sesion_id = request.GET.get("sesion_id")
     organizacion = _organizacion_desde_request(request)
+    sesion_seleccionada = SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None
+    asistentes_ids = set()
+    if sesion_seleccionada:
+        asistentes_ids = set(
+            Asistencia.objects.filter(sesion=sesion_seleccionada).values_list("persona_id", flat=True)
+        )
     sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()})
     asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
     persona_form = PersonaRapidaForm()
+    open_nueva_persona = False
     estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().order_by("apellidos", "nombres")
     asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
 
@@ -629,25 +671,34 @@ def asistencias_list(request):
                 return redirect(request.get_full_path())
         elif "agregar_persona" in request.POST:
             persona_form = PersonaRapidaForm(request.POST)
+            open_nueva_persona = True
             if persona_form.is_valid():
-                persona = Persona.objects.create(
-                    nombres=persona_form.cleaned_data["nombres"].strip(),
-                    apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
-                    telefono=persona_form.cleaned_data.get("telefono", "").strip(),
-                )
                 rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
-                organizacion_base = Organizacion.objects.first()
-                if rol_estudiante and organizacion_base:
+                if not organizacion:
+                    persona_form.add_error(
+                        None,
+                        "Debes seleccionar una organización en el filtro superior antes de crear a la persona.",
+                    )
+                elif rol_estudiante:
+                    persona = Persona.objects.create(
+                        nombres=persona_form.cleaned_data["nombres"].strip(),
+                        apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
+                        telefono=persona_form.cleaned_data.get("telefono", "").strip(),
+                    )
                     PersonaRol.objects.get_or_create(
                         persona=persona,
                         rol=rol_estudiante,
-                        organizacion=organizacion_base,
+                        organizacion=organizacion,
                         defaults={"activo": True},
                     )
                     messages.success(request, "Persona creada y asignada como estudiante.")
+                    open_nueva_persona = False
+                    return redirect(_url_actual_con_filtros(request))
                 else:
-                    messages.warning(request, "Persona creada, pero no se pudo asignar el rol de estudiante.")
-                return redirect(_url_actual_con_filtros(request))
+                    persona_form.add_error(
+                        None,
+                        "No existe el rol ESTUDIANTE configurado para asignar a la nueva persona.",
+                    )
         elif "agregar_asistentes" in request.POST:
             asistencia_form = AsistenciaMasivaForm(request.POST)
             asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
@@ -670,14 +721,19 @@ def asistencias_list(request):
                 return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk))
 
     inicio_mes, fin_mes = _periodo(request)
-    estudiantes_mes_qs = Persona.objects.filter(
-        roles__rol__codigo="ESTUDIANTE",
-        asistencias__sesion__fecha__gte=inicio_mes,
-        asistencias__sesion__fecha__lte=fin_mes,
-    )
-    if organizacion:
-        estudiantes_mes_qs = estudiantes_mes_qs.filter(asistencias__sesion__disciplina__organizacion=organizacion)
-    estudiantes_total_mes = estudiantes_mes_qs.distinct().count()
+    estudiantes_total_disciplina_periodo = 0
+    if sesion_seleccionada:
+        estudiantes_disciplina_qs = Persona.objects.filter(
+            roles__rol__codigo="ESTUDIANTE",
+            asistencias__sesion__disciplina=sesion_seleccionada.disciplina,
+            asistencias__sesion__fecha__gte=inicio_mes,
+            asistencias__sesion__fecha__lte=fin_mes,
+        )
+        if organizacion:
+            estudiantes_disciplina_qs = estudiantes_disciplina_qs.filter(
+                asistencias__sesion__disciplina__organizacion=organizacion
+            )
+        estudiantes_total_disciplina_periodo = estudiantes_disciplina_qs.distinct().count()
     sesiones_qs = (
         SesionClase.objects.select_related("disciplina")
         .prefetch_related(
@@ -721,10 +777,13 @@ def asistencias_list(request):
             "asistencia_form": asistencia_form,
             "persona_form": persona_form,
             "open_nueva_sesion": request.GET.get("open") == "nueva_sesion",
+            "open_nueva_persona": open_nueva_persona,
             "sesiones": sesiones_list,
-            "sesion_seleccionada": SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None,
+            "sesion_seleccionada": sesion_seleccionada,
+            "asistentes_ids": asistentes_ids,
+            "estudiantes": estudiantes_qs,
             "estudiantes_total": estudiantes_qs.count(),
-            "estudiantes_total_mes": estudiantes_total_mes,
+            "estudiantes_total_disciplina_periodo": estudiantes_total_disciplina_periodo,
             "disciplinas": Disciplina.objects.filter(organizacion=organizacion) if organizacion else Disciplina.objects.all(),
             "profesores": Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
             "organizaciones": Organizacion.objects.all(),
@@ -751,7 +810,18 @@ def sesion_detail(request, pk):
         .order_by("apellidos", "nombres")
     )
     if request.method == "POST":
-        if "cambiar_estado" in request.POST:
+        if "eliminar_sesion" in request.POST:
+            sesion_resumen = str(sesion)
+            sesion.delete()
+            messages.success(request, f"Sesión eliminada: {sesion_resumen}.")
+            return redirect(_url_con_filtros(request, "asistencias:sesiones_list"))
+        elif "eliminar_asistente" in request.POST:
+            asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
+            persona_nombre = str(asistencia.persona)
+            asistencia.delete()
+            messages.success(request, f"Asistente eliminado de la sesión: {persona_nombre}.")
+            return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
+        elif "cambiar_estado" in request.POST:
             estado = request.POST.get("estado")
             if estado in dict(SesionClase.Estado.choices):
                 sesion.estado = estado
@@ -776,7 +846,21 @@ def sesion_detail(request, pk):
             messages.success(request, f"Asistencias agregadas: {creados}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
 
-    asistencias = sesion.asistencias.select_related("persona").order_by("-registrada_en")
+    asistencias = sesion.asistencias.select_related("persona", "consumo_financiero__pago").order_by("-registrada_en")
+    for asistencia in asistencias:
+        consumo = getattr(asistencia, "consumo_financiero", None)
+        if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
+            asistencia.estado_financiero_label = "Pagada"
+            asistencia.estado_financiero_clase = "success"
+        elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
+            asistencia.estado_financiero_label = "Deuda"
+            asistencia.estado_financiero_clase = "danger"
+        elif consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
+            asistencia.estado_financiero_label = "Sin cobro"
+            asistencia.estado_financiero_clase = "secondary"
+        else:
+            asistencia.estado_financiero_label = "Sin consumo"
+            asistencia.estado_financiero_clase = "light"
     asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
     context.update(
         {
@@ -789,3 +873,47 @@ def sesion_detail(request, pk):
         }
     )
     return render(request, "asistencias/sesion_detail.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def sesion_edit(request, pk):
+    """Edita una sesión existente."""
+    context = _nav_context(request)
+    sesion = get_object_or_404(
+        SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores"),
+        pk=pk,
+    )
+    form = SesionBasicaForm(
+        request.POST or None,
+        initial={
+            "disciplina": sesion.disciplina,
+            "fecha": sesion.fecha,
+            "profesores": sesion.profesores.all(),
+        },
+    )
+    form.fields["disciplina"].queryset = Disciplina.objects.filter(organizacion=sesion.disciplina.organizacion).order_by("nombre")
+    form.fields["profesores"].queryset = (
+        Persona.objects.filter(
+            roles__rol__codigo="PROFESOR",
+            roles__organizacion=sesion.disciplina.organizacion,
+        )
+        .distinct()
+        .order_by("apellidos", "nombres")
+    )
+
+    if request.method == "POST" and form.is_valid():
+        sesion.disciplina = form.cleaned_data["disciplina"]
+        sesion.fecha = form.cleaned_data["fecha"] or sesion.fecha
+        sesion.save(update_fields=["disciplina", "fecha"])
+        sesion.profesores.set(form.cleaned_data["profesores"])
+        messages.success(request, "Sesión actualizada correctamente.")
+        return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
+
+    context.update(
+        {
+            "form": form,
+            "sesion": sesion,
+            "back_url": request.META.get("HTTP_REFERER") or _url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk),
+        }
+    )
+    return render(request, "asistencias/sesion_form.html", context)

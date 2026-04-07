@@ -26,8 +26,15 @@ class DisciplinaForm(forms.ModelForm):
 
 
 class SesionBasicaForm(forms.Form):
-    disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.all(), required=True)
-    fecha = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    disciplina = forms.ModelChoiceField(
+        queryset=Disciplina.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    fecha = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
     profesores = forms.ModelMultipleChoiceField(
         queryset=Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
         required=False,

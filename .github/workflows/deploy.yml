@@ -37,19 +37,70 @@ jobs:
     needs: test
 
     steps:
-      - name: Configure SSH
+      - name: Validate deploy secrets
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SERVICE: ${{ secrets.DEPLOY_SERVICE }}
+          DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
+          DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
+          DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+
+          # Validamos antes de abrir SSH para fallar con un mensaje claro cuando falte un secret esencial.
+          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_PATH DEPLOY_SERVICE; do
+            if [[ -z "${!required_var:-}" ]]; then
+              echo "Falta el secret requerido ${required_var}. El deploy no puede continuar sin ese valor." >&2
+              missing=1
+            fi
+          done
+
+          # Estas variables son opcionales porque scripts/deploy.sh ya soporta valores vacios
+          # y aplica defaults internos.
+          # DEPLOY_PORT tambien es opcional: si no existe, el workflow usa el puerto 22.
+          # Opcionales:
+          # - DEPLOY_ENV_FILE
+          # - DEPLOY_VENV_DIR
+          # - DEPLOY_PYTHON_BIN
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf "%s\n" "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          # printf "%s" evita agregar un salto de linea extra al final del secret.
+          # tr -d '\r' elimina retornos de carro si la clave fue pegada desde Windows o desde un portapapeles que los conserve.
+          printf "%s" "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "DEPLOY_SSH_KEY no pudo cargarse como una clave privada SSH valida." >&2
+            echo "Verifica que el secret contenga la clave privada completa, no la .pub, y que la nueva llave de deploy no tenga passphrase." >&2
+            exit 1
+          fi
+
+          touch ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          if ! ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/tmp/ssh-keyscan.err; then
+            echo "No se pudo obtener la host key del servidor con ssh-keyscan." >&2
+            echo "Revisa DEPLOY_HOST, DEPLOY_PORT y que el servidor SSH sea accesible desde GitHub Actions." >&2
+            cat /tmp/ssh-keyscan.err >&2 || true
+            exit 1
+          fi
 
       - name: Deploy to production
         env:
@@ -63,7 +114,17 @@ jobs:
           DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
         run: |
           set -euo pipefail
-          ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
+
+          # -i ~/.ssh/deploy_key evita depender del nombre por defecto de OpenSSH
+          # y asegura que el workflow use exactamente la clave exclusiva de deploy.
+          # StrictHostKeyChecking=yes mantiene la validacion del host remoto contra known_hosts.
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -p "${DEPLOY_PORT:-22}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
           set -euo pipefail
           cd "${DEPLOY_PATH}"
           git fetch --prune origin

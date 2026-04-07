@@ -3,6 +3,40 @@
 {% block content %}
 <div class="mt-4">
   <h2>Profesores</h2>
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card border-0 bg-success-subtle h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total alumnos únicos</div>
+          <div class="display-6">{{ resumen_profesores.alumnos_unicos }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 bg-primary-subtle h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total sesiones realizadas</div>
+          <div class="display-6">{{ resumen_profesores.sesiones_realizadas }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 bg-warning-subtle h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total general de asistencias del mes</div>
+          <div class="display-6">{{ resumen_profesores.asistencias_mes }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 bg-info-subtle h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total de profesores activos</div>
+          <div class="display-6">{{ resumen_profesores.profesores_activos }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="table-responsive">
     <table class="table">
       <thead>

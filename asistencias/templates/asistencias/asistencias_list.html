@@ -51,21 +51,37 @@
             <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
           </button>
         </div>
-        <div class="card-body collapse {% if estudiantes_total == 0 %}show{% endif %}" id="nuevaPersonaForm">
+        <div class="card-body collapse {% if estudiantes_total == 0 or open_nueva_persona %}show{% endif %}" id="nuevaPersonaForm">
           <form method="post">
             {% csrf_token %}
+            {% if persona_form.non_field_errors %}
+              <div class="alert alert-danger py-2">
+                {% for error in persona_form.non_field_errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
             <div class="row g-2">
               <div class="col-md-3">
                 <label class="form-label" for="id_nombres">Nombres: </label>
                 {{ persona_form.nombres }}
+                {% for error in persona_form.nombres.errors %}
+                  <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
               </div>
               <div class="col-md-3">
                 <label class="form-label" for="id_apellidos">Apellidos: </label>
                 {{ persona_form.apellidos }}
+                {% for error in persona_form.apellidos.errors %}
+                  <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
               </div>
               <div class="col-md-3">
                 <label class="form-label" for="id_telefono">Teléfono: </label>
                 {{ persona_form.telefono }}
+                {% for error in persona_form.telefono.errors %}
+                  <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
               </div>
               <div class="col-md-3">
                 <button class="btn btn-outline-success" name="agregar_persona" type="submit">
@@ -95,8 +111,30 @@
               {{ asistencia_form.sesion_id }}
               <label class="form-label" for="estudiantes_search">Buscar estudiante</label>
               <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
-              {{ asistencia_form.estudiantes }}
-              <div class="form-text">Total estudiantes del mes: {{ estudiantes_total_mes }}</div>
+              <div class="d-flex gap-2 mb-2">
+                <button id="seleccionar_visibles" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
+                <button id="limpiar_seleccion" class="btn btn-sm btn-outline-secondary" type="button">Limpiar selección</button>
+              </div>
+              <div class="border rounded p-2" style="max-height: 320px; overflow-y: auto;">
+                {% for estudiante in estudiantes %}
+                  <div class="form-check mb-1 estudiante-opcion" data-text="{{ estudiante }}">
+                    <input
+                      class="form-check-input estudiante-check"
+                      type="checkbox"
+                      name="estudiantes"
+                      value="{{ estudiante.pk }}"
+                      id="estudiante_{{ estudiante.pk }}"
+                      {% if estudiante.pk in asistentes_ids %}checked{% endif %}
+                    >
+                    <label class="form-check-label" for="estudiante_{{ estudiante.pk }}">{{ estudiante }}</label>
+                  </div>
+                {% empty %}
+                  <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>
+                {% endfor %}
+              </div>
+              <div class="form-text">
+                Total asistencia a {{ sesion_seleccionada.disciplina }}: {{ estudiantes_total_disciplina_periodo }}
+              </div>
               <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">
                 <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
               </button>
@@ -245,23 +283,49 @@
         .replace(/[\u0300-\u036f]/g, "");
 
     const input = document.getElementById("estudiantes_search");
-    const select = document.getElementById("id_estudiantes");
+    const selectVisibleBtn = document.getElementById("seleccionar_visibles");
+    const clearBtn = document.getElementById("limpiar_seleccion");
+    const rows = Array.from(document.querySelectorAll(".estudiante-opcion"));
     const nuevaPersona = document.getElementById("nuevaPersonaForm");
-    if (!input || !select) return;
-    input.addEventListener("input", function () {
-      const term = normalizeText(input.value);
+    if (!rows.length) return;
+
+    const aplicarFiltro = function () {
+      const term = normalizeText(input ? input.value : "");
       let visibles = 0;
-      Array.from(select.options).forEach((opt) => {
-        const text = normalizeText(opt.text);
+      rows.forEach((row) => {
+        const text = normalizeText(row.dataset.text || "");
         const visible = !term || text.includes(term);
-        opt.hidden = !visible;
+        row.style.display = visible ? "" : "none";
         if (visible) visibles += 1;
       });
       if (nuevaPersona && term && visibles === 0 && window.bootstrap) {
         const collapse = bootstrap.Collapse.getOrCreateInstance(nuevaPersona);
         collapse.show();
       }
-    });
+    };
+
+    if (input) {
+      input.addEventListener("input", aplicarFiltro);
+    }
+
+    if (selectVisibleBtn) {
+      selectVisibleBtn.addEventListener("click", function () {
+        rows.forEach((row) => {
+          if (row.style.display === "none") return;
+          const check = row.querySelector(".estudiante-check");
+          if (check) check.checked = true;
+        });
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        rows.forEach((row) => {
+          const check = row.querySelector(".estudiante-check");
+          if (check) check.checked = false;
+        });
+      });
+    }
   })();
   (function () {
     const normalizeText = (value) =>
