@@ -104,16 +104,55 @@
     </div>
   </div>
 
-  <h2 class="mb-3">Estudiantes sin asistencia</h2>
-  <div class="card mb-4">
-    <div class="card-body">
-      <ul class="mb-0">
-        {% for persona in estudiantes_sin_asistencia %}
-          <li><a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></li>
-        {% empty %}
-          <li class="text-muted">Sin pendientes.</li>
-        {% endfor %}
-      </ul>
+  <h2 class="mb-3">Seguimiento de estudiantes</h2>
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header">Estudiantes sin asistencia</div>
+        <div class="card-body">
+          <ul class="mb-0">
+            {% for persona in estudiantes_sin_asistencia %}
+              <li><a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></li>
+            {% empty %}
+              <li class="text-muted">Sin pendientes.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header">Estudiantes con deuda</div>
+        <div class="card-body">
+          <ul class="mb-0">
+            {% for persona in estudiantes_con_deuda %}
+              <li>
+                <a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a>
+                <span class="text-muted">({{ persona.clases_deuda }} clases)</span>
+              </li>
+            {% empty %}
+              <li class="text-muted">Sin deuda en el período.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header">Estudiantes con más asistencia</div>
+        <div class="card-body">
+          <ul class="mb-0">
+            {% for persona in estudiantes_con_mas_asistencia %}
+              <li>
+                <a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a>
+                <span class="text-muted">({{ persona.total_asistencias_mes }} clases)</span>
+              </li>
+            {% empty %}
+              <li class="text-muted">Sin asistencias registradas.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </div>

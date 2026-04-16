@@ -4,43 +4,46 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Dashboard Financiero</h2>
+    <h2 class="mb-0 finanzas-help-title">Dashboard Financiero {% include "finanzas/_help_tooltip.html" %}</h2>
     <div>
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar pagos CSV</a>
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}">Exportar transacciones CSV</a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}" title="Exportar pagos CSV">
+        <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar pagos CSV</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}" title="Exportar transacciones CSV">
+        <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar transacciones CSV</span>
+      </a>
     </div>
   </div>
-  {% include "finanzas/_info_box.html" %}
 
   <div class="row g-3">
     <div class="col-md-3">
-      <div class="card text-bg-success">
+      <div class="card border-0 shadow-sm bg-success-subtle">
         <div class="card-body">
-          <div class="card-title">Ingresos</div>
+          <div class="card-title text-muted small text-uppercase">Ingresos</div>
           <div class="display-6">{{ ingresos_totales|clp }}</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card text-bg-danger">
+      <div class="card border-0 shadow-sm bg-danger-subtle">
         <div class="card-body">
-          <div class="card-title">Egresos</div>
+          <div class="card-title text-muted small text-uppercase">Egresos</div>
           <div class="display-6">{{ egresos_totales|clp }}</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card text-bg-primary">
+      <div class="card border-0 shadow-sm bg-primary-subtle">
         <div class="card-body">
-          <div class="card-title">Balance</div>
+          <div class="card-title text-muted small text-uppercase">Balance</div>
           <div class="display-6">{{ balance|clp }}</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
-      <div class="card text-bg-warning">
+      <div class="card border-0 shadow-sm bg-warning-subtle">
         <div class="card-body">
-          <div class="card-title">IVA debito</div>
+          <div class="card-title text-muted small text-uppercase">IVA debito</div>
           <div class="display-6">{{ iva_debito|clp }}</div>
           <div class="small">Exentos: {{ ingresos_exentos|clp }}</div>
         </div>
@@ -83,8 +86,8 @@
           </table>
         </div>
         <div class="card-footer text-end">
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'finanzas:pagos_list' %}?{{ request.GET.urlencode }}">
-            Ver todos los pagos del periodo
+          <a class="btn btn-sm btn-outline-primary finanzas-btn" href="{% url 'finanzas:pagos_list' %}?{{ request.GET.urlencode }}" title="Ver todos los pagos del periodo">
+            <i class="bi bi-list-ul"></i><span class="finanzas-btn-label">Ver todos los pagos del periodo</span>
           </a>
         </div>
       </div>

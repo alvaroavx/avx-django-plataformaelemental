@@ -247,7 +247,7 @@ class PersonaViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(nombres__icontains=buscar)
                 | Q(apellidos__icontains=buscar)
                 | Q(email__icontains=buscar)
-                | Q(identificador__icontains=buscar)
+                | Q(rut__icontains=buscar)
             )
         return qs.distinct()
 

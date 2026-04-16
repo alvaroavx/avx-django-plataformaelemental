@@ -37,6 +37,37 @@
         background: rgba(255, 255, 255, 0.08);
       }
 
+      .finanzas-help-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .finanzas-help-trigger {
+        color: #8a6d3b;
+      }
+
+      .finanzas-help-trigger:hover,
+      .finanzas-help-trigger:focus {
+        color: #6f5a2c;
+      }
+
+      .finanzas-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .finanzas-btn-label {
+        display: none;
+      }
+
+      @media (min-width: 768px) {
+        .finanzas-btn-label {
+          display: inline;
+        }
+      }
+
       @media (max-width: 991.98px) {
         .finanzas-nav-groups {
           flex-direction: column;
@@ -47,6 +78,10 @@
         .finanzas-nav-group {
           flex-wrap: wrap;
           border-radius: 1rem;
+        }
+
+        .finanzas-help-title {
+          align-items: flex-start;
         }
       }
     </style>
@@ -89,7 +124,7 @@
           <div id="periodo-finanzas-hidden"></div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Mes</label>
-            <select name="periodo_mes" class="form-select form-select-sm">
+            <select name="periodo_mes" class="form-select form-select-sm js-periodo-autosubmit">
               {% for value, label in periodo_meses %}
                 <option value="{{ value }}" {% if periodo_mes == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -97,25 +132,20 @@
           </div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Año</label>
-            <select name="periodo_anio" class="form-select form-select-sm">
+            <select name="periodo_anio" class="form-select form-select-sm js-periodo-autosubmit">
               {% for y in periodo_anios %}
-                <option value="{{ y }}" {% if periodo_anio == y %}selected{% endif %}>{{ y }}</option>
+                <option value="{{ y.0 }}" {% if periodo_anio == y.0 %}selected{% endif %}>{{ y.1 }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small mb-1">Organizacion</label>
-            <select name="organizacion" class="form-select form-select-sm">
+            <select name="organizacion" class="form-select form-select-sm js-periodo-autosubmit">
               <option value="">Todas</option>
               {% for org in organizaciones_global %}
                 <option value="{{ org.id }}" {% if organizacion_id == org.id|stringformat:"s" %}selected{% endif %}>{{ org.nombre }}</option>
               {% endfor %}
             </select>
-          </div>
-          <div class="col-12 col-md-2">
-            <button class="btn btn-sm btn-outline-primary" type="submit">
-              <i class="bi bi-funnel"></i><span class="ms-1">Aplicar filtros</span>
-            </button>
           </div>
         </form>
       </div>
@@ -147,6 +177,58 @@
           input.value = value;
           hiddenWrap.appendChild(input);
         });
+        form.querySelectorAll(".js-periodo-autosubmit").forEach((element) => {
+          element.addEventListener("change", function () {
+            form.requestSubmit();
+          });
+        });
+      })();
+      (function () {
+        const triggers = Array.from(document.querySelectorAll(".finanzas-help-trigger"));
+        if (!triggers.length || !window.bootstrap) return;
+
+        const mobileQuery = window.matchMedia("(max-width: 991.98px)");
+
+        const resetInstances = function (el) {
+          const tooltip = bootstrap.Tooltip.getInstance(el);
+          if (tooltip) tooltip.dispose();
+          const popover = bootstrap.Popover.getInstance(el);
+          if (popover) popover.dispose();
+          el.removeAttribute("data-bs-toggle");
+          el.removeAttribute("data-bs-placement");
+          el.removeAttribute("data-bs-title");
+          el.removeAttribute("data-bs-content");
+          el.removeAttribute("data-bs-trigger");
+        };
+
+        const applyHelpMode = function () {
+          const isMobile = mobileQuery.matches;
+          triggers.forEach((el) => {
+            const title = el.dataset.helpTitle || "";
+            const text = el.dataset.helpText || "";
+            resetInstances(el);
+            if (isMobile) {
+              el.setAttribute("data-bs-toggle", "popover");
+              el.setAttribute("data-bs-trigger", "focus");
+              el.setAttribute("data-bs-placement", "bottom");
+              el.setAttribute("data-bs-title", title);
+              el.setAttribute("data-bs-content", text);
+              bootstrap.Popover.getOrCreateInstance(el);
+            } else {
+              el.setAttribute("data-bs-toggle", "tooltip");
+              el.setAttribute("data-bs-placement", "right");
+              el.setAttribute("data-bs-title", title + ": " + text);
+              bootstrap.Tooltip.getOrCreateInstance(el);
+            }
+          });
+        };
+
+        applyHelpMode();
+        if (typeof mobileQuery.addEventListener === "function") {
+          mobileQuery.addEventListener("change", applyHelpMode);
+        } else if (typeof mobileQuery.addListener === "function") {
+          mobileQuery.addListener(applyHelpMode);
+        }
       })();
     </script>
     {% block extra_js %}{% endblock %}

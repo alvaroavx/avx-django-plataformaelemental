@@ -38,7 +38,7 @@
           <div id="periodo-personas-hidden"></div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Mes</label>
-            <select name="periodo_mes" class="form-select form-select-sm">
+            <select name="periodo_mes" class="form-select form-select-sm js-periodo-autosubmit">
               {% for value, label in periodo_meses %}
                 <option value="{{ value }}" {% if periodo_mes == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -46,25 +46,20 @@
           </div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Ano</label>
-            <select name="periodo_anio" class="form-select form-select-sm">
+            <select name="periodo_anio" class="form-select form-select-sm js-periodo-autosubmit">
               {% for y in periodo_anios %}
-                <option value="{{ y }}" {% if periodo_anio == y %}selected{% endif %}>{{ y }}</option>
+                <option value="{{ y.0 }}" {% if periodo_anio == y.0 %}selected{% endif %}>{{ y.1 }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label small mb-1">Organizacion</label>
-            <select name="organizacion" class="form-select form-select-sm">
+            <select name="organizacion" class="form-select form-select-sm js-periodo-autosubmit">
               <option value="">Todas</option>
               {% for org in organizaciones_global %}
                 <option value="{{ org.id }}" {% if organizacion_id == org.id|stringformat:"s" %}selected{% endif %}>{{ org.nombre }}</option>
               {% endfor %}
             </select>
-          </div>
-          <div class="col-12 col-md-2">
-            <button class="btn btn-sm btn-outline-primary" type="submit">
-              <i class="bi bi-funnel"></i><span class="ms-1">Aplicar filtros</span>
-            </button>
           </div>
         </form>
       </div>
@@ -95,6 +90,11 @@
           input.name = key;
           input.value = value;
           hiddenWrap.appendChild(input);
+        });
+        form.querySelectorAll(".js-periodo-autosubmit").forEach((element) => {
+          element.addEventListener("change", function () {
+            form.requestSubmit();
+          });
         });
       })();
     </script>

@@ -8,8 +8,12 @@
       <p>¿Seguro que quieres eliminar <strong>{{ obj }}</strong>?</p>
       <form method="post">
         {% csrf_token %}
-        <button class="btn btn-danger" type="submit">Eliminar</button>
-        <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancelar</a>
+        <button class="btn btn-danger finanzas-btn" type="submit" title="Eliminar">
+          <i class="bi bi-trash"></i><span class="finanzas-btn-label">Eliminar</span>
+        </button>
+        <a class="btn btn-outline-secondary finanzas-btn" href="{{ back_url }}" title="Cancelar">
+          <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+        </a>
       </form>
     </div>
   </div>

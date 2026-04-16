@@ -52,9 +52,21 @@ class AsistenciaMasivaForm(forms.Form):
 
 
 class PersonaRapidaForm(forms.Form):
-    nombres = forms.CharField(max_length=150, required=True)
-    apellidos = forms.CharField(max_length=150, required=False)
-    telefono = forms.CharField(max_length=50, required=False)
+    nombres = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombres"}),
+    )
+    apellidos = forms.CharField(
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Apellidos"}),
+    )
+    telefono = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Telefono"}),
+    )
 
 
 class CustomLoginForm(AuthenticationForm):

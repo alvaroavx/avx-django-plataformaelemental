@@ -65,7 +65,7 @@
           <div id="periodo-hidden-filtros"></div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Mes</label>
-            <select name="periodo_mes" class="form-select form-select-sm">
+            <select name="periodo_mes" class="form-select form-select-sm js-periodo-autosubmit">
               {% for value, label in periodo_meses %}
                 <option value="{{ value }}" {% if periodo_mes == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -73,20 +73,15 @@
           </div>
           <div class="col-6 col-md-2">
             <label class="form-label small mb-1">Año</label>
-            <select name="periodo_anio" class="form-select form-select-sm">
+            <select name="periodo_anio" class="form-select form-select-sm js-periodo-autosubmit">
               {% for y in periodo_anios %}
-                <option value="{{ y }}" {% if periodo_anio == y %}selected{% endif %}>{{ y }}</option>
+                <option value="{{ y.0 }}" {% if periodo_anio == y.0 %}selected{% endif %}>{{ y.1 }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="col-12 col-md-2">
-            <button class="btn btn-sm btn-outline-primary" type="submit">
-              <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Aplicar período</span>
-            </button>
-          </div>
           <div class="col-12 col-md-3">
             <label class="form-label small mb-1">Organización</label>
-            <select name="organizacion" class="form-select form-select-sm" onchange="this.form.submit()">
+            <select name="organizacion" class="form-select form-select-sm js-periodo-autosubmit">
               <option value="">Todas</option>
               {% for org in organizaciones_global %}
                 <option value="{{ org.id }}" {% if organizacion_id == org.id|stringformat:"s" %}selected{% endif %}>{{ org.nombre }}</option>
@@ -108,6 +103,7 @@
       {% endif %}
       {% block content %}{% endblock %}
     </div>
+    {% block modals %}{% endblock %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
       (function () {
@@ -116,12 +112,17 @@
         if (!form || !hiddenWrap) return;
         const params = new URLSearchParams(window.location.search);
         params.forEach((value, key) => {
-          if (key === "periodo_mes" || key === "periodo_anio") return;
+          if (key === "periodo_mes" || key === "periodo_anio" || key === "organizacion") return;
           const input = document.createElement("input");
           input.type = "hidden";
           input.name = key;
           input.value = value;
           hiddenWrap.appendChild(input);
+        });
+        form.querySelectorAll(".js-periodo-autosubmit").forEach((element) => {
+          element.addEventListener("change", function () {
+            form.requestSubmit();
+          });
         });
       })();
     </script>

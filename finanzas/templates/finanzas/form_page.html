@@ -9,8 +9,12 @@
         {% csrf_token %}
         {{ form.as_p }}
         <div class="d-flex gap-2">
-          <button class="btn btn-primary" type="submit">Guardar</button>
-          <a class="btn btn-outline-secondary" href="{{ back_url }}">Volver</a>
+          <button class="btn btn-primary finanzas-btn" type="submit" title="Guardar">
+            <i class="bi bi-save"></i><span class="finanzas-btn-label">Guardar</span>
+          </button>
+          <a class="btn btn-outline-secondary finanzas-btn" href="{{ back_url }}" title="Volver">
+            <i class="bi bi-arrow-left"></i><span class="finanzas-btn-label">Volver</span>
+          </a>
         </div>
       </form>
     </div>

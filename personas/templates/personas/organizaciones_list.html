@@ -6,7 +6,7 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h2 class="mb-0">Organizaciones</h2>
-      <small class="text-muted">Resumen del periodo {{ inicio_periodo|date:"d/m/Y" }} al {{ fin_periodo|date:"d/m/Y" }}.</small>
+      <small class="text-muted">Resumen del período {{ periodo_descripcion_vista }}.</small>
     </div>
     <a class="btn btn-success" href="{% url 'personas:organizacion_create' %}?{{ request.GET.urlencode }}">
       <i class="bi bi-building-add"></i><span class="ms-1">Nueva organizacion</span>

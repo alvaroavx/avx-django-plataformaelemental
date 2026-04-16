@@ -4,10 +4,11 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
-    <h2 class="mb-0">Carga asistida de documentos tributarios</h2>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documentos_tributarios_list' %}?{{ request.GET.urlencode }}">Volver a documentos</a>
+    <h2 class="mb-0 finanzas-help-title">Carga asistida de documentos tributarios {% include "finanzas/_help_tooltip.html" %}</h2>
+    <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documentos_tributarios_list' %}?{{ request.GET.urlencode }}" title="Volver a documentos">
+      <i class="bi bi-arrow-left"></i><span class="finanzas-btn-label">Volver a documentos</span>
+    </a>
   </div>
-  {% include "finanzas/_info_box.html" %}
 
   {% if not review_payload %}
   <div class="card">
@@ -28,7 +29,9 @@
         <div class="small text-muted mt-3">
           Sube un XML o un PDF. El sistema detecta internamente el tipo de archivo. Si es PDF, se aplica un parser basico y la revision manual es mas importante.
         </div>
-        <button class="btn btn-success mt-3" type="submit">Parsear y revisar</button>
+        <button class="btn btn-success mt-3 finanzas-btn" type="submit" title="Parsear y revisar">
+          <i class="bi bi-magic"></i><span class="finanzas-btn-label">Parsear y revisar</span>
+        </button>
       </form>
     </div>
   </div>
@@ -47,6 +50,16 @@
           <div class="mb-2"><span class="small text-muted d-block">Total</span><strong>{{ documento_normalizado.montos.total_bruto.value|default:0|clp }}</strong></div>
           <div class="mb-2"><span class="small text-muted d-block">Parser</span><strong>{{ documento_normalizado.metadata_archivo.parser_usado.value|default:"-" }}</strong></div>
           <div><span class="small text-muted d-block">Fuente principal</span><strong>{{ documento_normalizado.metadata_archivo.fuente_principal.value|default:"-" }}</strong></div>
+          {% if review_payload.suggestions.persona_sugerida_nombre or review_payload.suggestions.organizacion_sugerida_nombre %}
+          <hr>
+          <div class="small text-muted mb-1">Contraparte sugerida</div>
+          {% if review_payload.suggestions.persona_sugerida_nombre %}
+            <div><strong>Persona:</strong> {{ review_payload.suggestions.persona_sugerida_nombre }}</div>
+          {% endif %}
+          {% if review_payload.suggestions.organizacion_sugerida_nombre %}
+            <div><strong>Organización:</strong> {{ review_payload.suggestions.organizacion_sugerida_nombre }}</div>
+          {% endif %}
+          {% endif %}
         </div>
       </div>
 
@@ -96,7 +109,9 @@
           <div class="mb-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <strong>PDF</strong>
-              <a class="btn btn-sm btn-outline-secondary" href="{{ archivo_importacion_pdf_url }}" target="_blank" rel="noopener">Abrir PDF</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ archivo_importacion_pdf_url }}" target="_blank" rel="noopener" title="Abrir PDF">
+                <i class="bi bi-file-earmark-pdf"></i><span class="finanzas-btn-label">Abrir PDF</span>
+              </a>
             </div>
             <iframe src="{{ archivo_importacion_pdf_url }}" class="w-100 border rounded" style="min-height: 520px;"></iframe>
           </div>
@@ -106,7 +121,9 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
               <strong>XML</strong>
               {% if archivo_importacion_xml_url %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ archivo_importacion_xml_url }}" target="_blank" rel="noopener">Abrir XML</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ archivo_importacion_xml_url }}" target="_blank" rel="noopener" title="Abrir XML">
+                <i class="bi bi-filetype-xml"></i><span class="finanzas-btn-label">Abrir XML</span>
+              </a>
               {% endif %}
             </div>
             <pre class="bg-light border rounded p-3 small mb-0" style="max-height: 520px; overflow: auto;"><code>{{ archivo_importacion_xml_preview }}</code></pre>
@@ -201,8 +218,12 @@
         </div>
 
         <div class="d-flex gap-2">
-          <button class="btn btn-success" type="submit">Confirmar y guardar</button>
-          <a class="btn btn-outline-secondary" href="{% url 'finanzas:documento_tributario_importar' %}?{{ request.GET.urlencode }}">Cancelar</a>
+          <button class="btn btn-success finanzas-btn" type="submit" title="Confirmar y guardar">
+            <i class="bi bi-check2-circle"></i><span class="finanzas-btn-label">Confirmar y guardar</span>
+          </button>
+          <a class="btn btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_importar' %}?{{ request.GET.urlencode }}" title="Cancelar">
+            <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+          </a>
         </div>
       </form>
     </div>

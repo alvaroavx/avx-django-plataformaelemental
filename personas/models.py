@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from .validators import formatear_rut_chileno, validar_rut_chileno
+
 
 class Organizacion(models.Model):
     nombre = models.CharField(max_length=255)
@@ -32,7 +34,12 @@ class Persona(models.Model):
     apellidos = models.CharField(max_length=150)
     email = models.EmailField(unique=True, null=True, blank=True)
     telefono = models.CharField(max_length=50, blank=True)
-    identificador = models.CharField(max_length=50, blank=True)
+    rut = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        validators=[validar_rut_chileno],
+    )
     fecha_nacimiento = models.DateField(null=True, blank=True)
     activo = models.BooleanField(default=True)
     user = models.OneToOneField(
@@ -64,6 +71,10 @@ class Persona(models.Model):
 
     def tiene_rol(self, codigo):
         return codigo in self.roles.filter(activo=True).values_list("rol__codigo", flat=True)
+
+    def save(self, *args, **kwargs):
+        self.rut = formatear_rut_chileno(self.rut)
+        super().save(*args, **kwargs)
 
 
 class Rol(models.Model):

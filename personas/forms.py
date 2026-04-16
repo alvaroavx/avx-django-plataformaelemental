@@ -1,6 +1,7 @@
 from django import forms
 
 from .models import Organizacion, Persona, PersonaRol, Rol
+from .validators import formatear_rut_chileno
 
 
 class OrganizacionCRMForm(forms.ModelForm):
@@ -38,7 +39,7 @@ class PersonaCRMForm(forms.ModelForm):
             "apellidos",
             "email",
             "telefono",
-            "identificador",
+            "rut",
             "fecha_nacimiento",
             "activo",
             "user",
@@ -55,6 +56,10 @@ class PersonaCRMForm(forms.ModelForm):
             else:
                 css_class = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = f"{css_class} form-control".strip()
+        self.fields["rut"].widget.attrs["placeholder"] = "12.345.678-5"
+
+    def clean_rut(self):
+        return formatear_rut_chileno(self.cleaned_data.get("rut", ""))
 
 
 class PersonaRolCRMForm(forms.Form):

@@ -5,6 +5,7 @@ from django.urls import reverse
 from asistencias.models import Disciplina, SesionClase
 from finanzas.models import Payment
 
+from .forms import PersonaCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
 
 
@@ -109,3 +110,40 @@ class PersonasOrganizacionesTests(TestCase):
     def test_ruta_organizaciones_sale_de_asistencias(self):
         response = self.client.get("/asistencias/organizaciones/")
         self.assertEqual(response.status_code, 404)
+
+
+class PersonasRutFormTests(TestCase):
+    def test_persona_form_valida_y_formatea_rut_chileno(self):
+        form = PersonaCRMForm(
+            data={
+                "nombres": "Julia",
+                "apellidos": "Perez",
+                "email": "",
+                "telefono": "",
+                "rut": "12345678-5",
+                "fecha_nacimiento": "",
+                "activo": "on",
+                "user": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        persona = form.save()
+        self.assertEqual(persona.rut, "12.345.678-5")
+
+    def test_persona_form_rechaza_rut_chileno_invalido(self):
+        form = PersonaCRMForm(
+            data={
+                "nombres": "Julia",
+                "apellidos": "Perez",
+                "email": "",
+                "telefono": "",
+                "rut": "12.345.678-9",
+                "fecha_nacimiento": "",
+                "activo": "on",
+                "user": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("rut", form.errors)

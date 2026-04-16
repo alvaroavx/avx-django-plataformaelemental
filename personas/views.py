@@ -8,8 +8,9 @@ from django.urls import reverse
 
 from asistencias.decorators import role_required
 from asistencias.models import Asistencia, Disciplina, SesionClase
+from asistencias.periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
 from asistencias.utils import ROLE_ADMIN
-from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
+from asistencias.views import _nav_context, _organizacion_desde_request
 from finanzas.models import AttendanceConsumption, Payment
 from finanzas.services import resumen_financiero_estudiante
 
@@ -49,22 +50,25 @@ def _personas_queryset(organizacion=None):
     return queryset
 
 
-def _organizacion_metricas(organizacion, inicio_periodo, fin_periodo):
+def _organizacion_metricas(organizacion, *, mes=None, anio=None):
     roles_qs = PersonaRol.objects.filter(organizacion=organizacion, activo=True)
-    sesiones_qs = SesionClase.objects.filter(
-        disciplina__organizacion=organizacion,
-        fecha__gte=inicio_periodo,
-        fecha__lte=fin_periodo,
+    sesiones_qs = aplicar_periodo(
+        SesionClase.objects.filter(disciplina__organizacion=organizacion),
+        "fecha",
+        mes=mes,
+        anio=anio,
     )
-    pagos_qs = Payment.objects.filter(
-        organizacion=organizacion,
-        fecha_pago__gte=inicio_periodo,
-        fecha_pago__lte=fin_periodo,
+    pagos_qs = aplicar_periodo(
+        Payment.objects.filter(organizacion=organizacion),
+        "fecha_pago",
+        mes=mes,
+        anio=anio,
     )
-    asistencias_qs = Asistencia.objects.filter(
-        sesion__disciplina__organizacion=organizacion,
-        sesion__fecha__gte=inicio_periodo,
-        sesion__fecha__lte=fin_periodo,
+    asistencias_qs = aplicar_periodo(
+        Asistencia.objects.filter(sesion__disciplina__organizacion=organizacion),
+        "sesion__fecha",
+        mes=mes,
+        anio=anio,
     )
     return {
         "personas_activas": roles_qs.values("persona_id").distinct().count(),
@@ -80,26 +84,22 @@ def _organizacion_metricas(organizacion, inicio_periodo, fin_periodo):
     }
 
 
-def _annotate_personas_resumen(queryset, inicio_periodo, fin_periodo, organizacion=None):
+def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=None):
     asistencias_qs = Asistencia.objects.filter(
         persona=OuterRef("pk"),
-        sesion__fecha__gte=inicio_periodo,
-        sesion__fecha__lte=fin_periodo,
+        **filtros_periodo("sesion__fecha", mes=mes, anio=anio),
     )
     pagos_qs = Payment.objects.filter(
         persona=OuterRef("pk"),
-        fecha_pago__gte=inicio_periodo,
-        fecha_pago__lte=fin_periodo,
+        **filtros_periodo("fecha_pago", mes=mes, anio=anio),
     )
     consumos_qs = AttendanceConsumption.objects.filter(
         persona=OuterRef("pk"),
-        clase_fecha__gte=inicio_periodo,
-        clase_fecha__lte=fin_periodo,
+        **filtros_periodo("clase_fecha", mes=mes, anio=anio),
     )
     sesiones_profesor_qs = SesionClase.objects.filter(
         profesores=OuterRef("pk"),
-        fecha__gte=inicio_periodo,
-        fecha__lte=fin_periodo,
+        **filtros_periodo("fecha", mes=mes, anio=anio),
     )
     if organizacion:
         asistencias_qs = asistencias_qs.filter(sesion__disciplina__organizacion=organizacion)
@@ -141,18 +141,18 @@ def _annotate_personas_resumen(queryset, inicio_periodo, fin_periodo, organizaci
 @role_required(ROLE_ADMIN)
 def dashboard(request):
     context = _base_context(request)
-    inicio_periodo, fin_periodo = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion = _organizacion_desde_request(request)
 
     personas_qs = _annotate_personas_resumen(
         _personas_queryset(organizacion),
-        inicio_periodo,
-        fin_periodo,
-        organizacion,
+        mes=periodo["mes"],
+        anio=periodo["anio"],
+        organizacion=organizacion,
     )
-    pagos_qs = Payment.objects.filter(fecha_pago__gte=inicio_periodo, fecha_pago__lte=fin_periodo)
-    consumos_qs = AttendanceConsumption.objects.filter(clase_fecha__gte=inicio_periodo, clase_fecha__lte=fin_periodo)
-    asistencias_qs = Asistencia.objects.filter(sesion__fecha__gte=inicio_periodo, sesion__fecha__lte=fin_periodo)
+    pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
+    consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
+    asistencias_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
     if organizacion:
         pagos_qs = pagos_qs.filter(organizacion=organizacion)
         consumos_qs = consumos_qs.filter(asistencia__sesion__disciplina__organizacion=organizacion)
@@ -185,7 +185,7 @@ def dashboard(request):
 @role_required(ROLE_ADMIN)
 def organizaciones_list(request):
     context = _base_context(request)
-    inicio_periodo, fin_periodo = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion_filtro = _organizacion_desde_request(request)
     organizaciones_qs = Organizacion.objects.order_by("nombre")
     if organizacion_filtro:
@@ -196,15 +196,14 @@ def organizaciones_list(request):
         organizaciones.append(
             {
                 "organizacion": organizacion,
-                "metricas": _organizacion_metricas(organizacion, inicio_periodo, fin_periodo),
+                "metricas": _organizacion_metricas(organizacion, mes=periodo["mes"], anio=periodo["anio"]),
             }
         )
 
     context.update(
         {
             "organizaciones": organizaciones,
-            "inicio_periodo": inicio_periodo,
-            "fin_periodo": fin_periodo,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
         }
     )
     return render(request, "personas/organizaciones_list.html", context)
@@ -213,18 +212,17 @@ def organizaciones_list(request):
 @role_required(ROLE_ADMIN)
 def organizacion_detail(request, pk):
     context = _base_context(request)
-    inicio_periodo, fin_periodo = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion = get_object_or_404(Organizacion, pk=pk)
     disciplinas = Disciplina.objects.filter(organizacion=organizacion).order_by("nombre")
-    metricas = _organizacion_metricas(organizacion, inicio_periodo, fin_periodo)
+    metricas = _organizacion_metricas(organizacion, mes=periodo["mes"], anio=periodo["anio"])
     context.update(
         {
             "organizacion_obj": organizacion,
             "metricas": metricas,
             "disciplinas": disciplinas[:8],
             "pagos_recientes": Payment.objects.filter(organizacion=organizacion).select_related("persona").order_by("-fecha_pago", "-id")[:8],
-            "inicio_periodo": inicio_periodo,
-            "fin_periodo": fin_periodo,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
         }
     )
     return render(request, "personas/organizacion_detail.html", context)
@@ -258,13 +256,13 @@ def organizacion_edit(request, pk):
 @role_required(ROLE_ADMIN)
 def personas_list(request):
     context = _base_context(request)
-    inicio_periodo, fin_periodo = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion = _organizacion_desde_request(request)
     personas_qs = _annotate_personas_resumen(
         _personas_queryset(organizacion),
-        inicio_periodo,
-        fin_periodo,
-        organizacion,
+        mes=periodo["mes"],
+        anio=periodo["anio"],
+        organizacion=organizacion,
     )
 
     q = (request.GET.get("q") or "").strip()
@@ -279,7 +277,7 @@ def personas_list(request):
             | Q(apellidos__icontains=q)
             | Q(email__icontains=q)
             | Q(telefono__icontains=q)
-            | Q(identificador__icontains=q)
+            | Q(rut__icontains=q)
         )
     if rol:
         personas_qs = personas_qs.filter(roles__activo=True, roles__rol__codigo=rol)
@@ -346,7 +344,7 @@ def persona_create(request):
 @role_required(ROLE_ADMIN)
 def persona_detail(request, pk):
     context = _base_context(request)
-    inicio_periodo, fin_periodo = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion = _organizacion_desde_request(request)
     persona = get_object_or_404(
         Persona.objects.select_related("user").prefetch_related(
@@ -411,21 +409,20 @@ def persona_detail(request, pk):
     sesiones_profesor = (
         SesionClase.objects.filter(
             profesores=persona,
-            fecha__gte=inicio_periodo,
-            fecha__lte=fin_periodo,
         )
         .select_related("disciplina__organizacion")
         .prefetch_related("profesores")
         .order_by("-fecha")
     )
+    sesiones_profesor = aplicar_periodo(sesiones_profesor, "fecha", request=request)
     if organizacion:
         asistencias = asistencias.filter(sesion__disciplina__organizacion=organizacion)
         pagos = pagos.filter(organizacion=organizacion)
         consumos = consumos.filter(asistencia__sesion__disciplina__organizacion=organizacion)
         sesiones_profesor = sesiones_profesor.filter(disciplina__organizacion=organizacion)
-    asistencias = asistencias.filter(sesion__fecha__gte=inicio_periodo, sesion__fecha__lte=fin_periodo)
-    pagos = pagos.filter(fecha_pago__gte=inicio_periodo, fecha_pago__lte=fin_periodo)
-    consumos = consumos.filter(clase_fecha__gte=inicio_periodo, clase_fecha__lte=fin_periodo)
+    asistencias = aplicar_periodo(asistencias, "sesion__fecha", request=request)
+    pagos = aplicar_periodo(pagos, "fecha_pago", request=request)
+    consumos = aplicar_periodo(consumos, "clase_fecha", request=request)
 
     roles_codigos = {item.rol.codigo for item in roles_asignados if item.activo}
     finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if "ESTUDIANTE" in roles_codigos else None

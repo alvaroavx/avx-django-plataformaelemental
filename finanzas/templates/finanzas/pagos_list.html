@@ -1,6 +1,6 @@
 {% extends "finanzas/base_finanzas.html" %}
 {% load finanzas_format %}
-{% block title %}Pagos{% endblock %}
+{% block title %}Pagos de Clases{% endblock %}
 {% block extra_head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
@@ -8,13 +8,34 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
-    <h2>Pagos</h2>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}">Exportar CSV</a>
+    <h2 class="mb-0 finanzas-help-title">Pagos de Clases {% include "finanzas/_help_tooltip.html" %}</h2>
+    <div class="d-flex flex-wrap gap-2">
+      <button
+        class="btn btn-sm btn-success finanzas-btn"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#nuevaPersonaPagoModal"
+        title="Nueva persona"
+      >
+        <i class="bi bi-person-plus"></i><span class="finanzas-btn-label">Nueva persona</span>
+      </button>
+      <button
+        class="btn btn-sm btn-success finanzas-btn"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#registrarPagoModal"
+        title="Registrar pago"
+      >
+        <i class="bi bi-cash-coin"></i><span class="finanzas-btn-label">Registrar pago</span>
+      </button>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}" title="Exportar CSV">
+        <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar CSV</span>
+      </a>
+    </div>
   </div>
-  {% include "finanzas/_info_box.html" %}
 
   <div class="row g-3 mb-3">
-    <div class="col-md-4">
+    <div class="col-md-6 col-xl-3">
       <div class="card border-0 shadow-sm bg-success-subtle">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Total pagos</div>
@@ -22,7 +43,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-xl-3">
       <div class="card border-0 shadow-sm bg-primary-subtle">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Total clases pagadas</div>
@@ -30,49 +51,20 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card border-0 shadow-sm bg-info-subtle">
+        <div class="card-body">
+          <div class="text-muted small text-uppercase">IVA total</div>
+          <div class="display-6">{{ total_iva_monto|clp }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
       <div class="card border-0 shadow-sm bg-warning-subtle">
         <div class="card-body">
           <div class="text-muted small text-uppercase">Saldo</div>
           <div class="display-6">{{ total_saldo_clases }}</div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card mb-3">
-    <button
-      class="card-header btn btn-success text-start w-100 border-0 rounded-0"
-      type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#registrarPagoCollapse"
-      aria-expanded="{% if form.errors %}true{% else %}false{% endif %}"
-      aria-controls="registrarPagoCollapse"
-    >
-      Registrar pago
-    </button>
-    <div id="registrarPagoCollapse" class="collapse{% if form.errors %} show{% endif %}">
-      <div class="card-body">
-        <form method="post" action="{% url 'finanzas:pagos_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
-          {% csrf_token %}
-          <div class="row g-2">
-            {% for field in form %}
-              <div
-                class="col-md-4{% if field.name == 'numero_comprobante' and form.metodo_pago.value != 'transferencia' %} d-none{% endif %}"
-                data-field-name="{{ field.name }}"
-              >
-                <label class="form-label">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
-                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
-                {% if field.name == "plan" %}
-                  <div id="plan-help-organizacion" class="small text-muted mt-1 d-none"></div>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-          <button class="btn btn-success mt-2" type="submit">Guardar pago</button>
-        </form>
       </div>
     </div>
   </div>
@@ -97,7 +89,9 @@
           </select>
         </div>
         <div class="col-md-3">
-          <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+          <button class="btn btn-outline-primary finanzas-btn" type="submit" title="Filtrar">
+            <i class="bi bi-funnel"></i><span class="finanzas-btn-label">Filtrar</span>
+          </button>
         </div>
       </form>
     </div>
@@ -187,9 +181,15 @@
               </button>
             </td>
             <td class="text-nowrap">
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">Detalle</a>
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:pago_edit' pago.pk %}?{{ request.GET.urlencode }}">Editar</a>
-              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Detalle">
+                <i class="bi bi-eye"></i><span class="finanzas-btn-label">Detalle</span>
+              </a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}editar_pago={{ pago.pk }}" title="Editar">
+                <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
+              </a>
+              <a class="btn btn-sm btn-outline-danger finanzas-btn" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}" title="Eliminar">
+                <i class="bi bi-trash"></i><span class="finanzas-btn-label">Eliminar</span>
+              </a>
             </td>
           </tr>
           {% endfor %}
@@ -201,6 +201,148 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="nuevaPersonaPagoModal" tabindex="-1" aria-labelledby="nuevaPersonaPagoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="nuevaPersonaPagoModalLabel">Nueva persona</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{% url 'finanzas:pagos_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+          {% csrf_token %}
+          {% if persona_form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in persona_form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label" for="id_nombres">Nombres</label>
+              {{ persona_form.nombres }}
+              {% for error in persona_form.nombres.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_apellidos">Apellidos</label>
+              {{ persona_form.apellidos }}
+              {% for error in persona_form.apellidos.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_telefono">Telefono</label>
+              {{ persona_form.telefono }}
+              {% for error in persona_form.telefono.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="small text-muted mt-3">
+            La nueva persona se agregara como estudiante a la organizacion filtrada actualmente.
+          </div>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary finanzas-btn" data-bs-dismiss="modal" title="Cancelar">
+              <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+            </button>
+            <button class="btn btn-success finanzas-btn" name="agregar_persona" type="submit" title="Guardar persona">
+              <i class="bi bi-save"></i><span class="finanzas-btn-label">Guardar persona</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="registrarPagoModal" tabindex="-1" aria-labelledby="registrarPagoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="registrarPagoModalLabel">Registrar pago</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{% url 'finanzas:pagos_list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+          {% csrf_token %}
+          <div class="row g-2">
+            {% for field in form %}
+              <div
+                class="col-md-4{% if field.name == 'numero_comprobante' and form.metodo_pago.value != 'transferencia' %} d-none{% endif %}"
+                data-field-name="{{ field.name }}"
+              >
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                {% if field.name == "plan" %}
+                  <div id="plan-help-organizacion" class="small text-muted mt-1 d-none"></div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary finanzas-btn" data-bs-dismiss="modal" title="Cancelar">
+              <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+            </button>
+            <button class="btn btn-success finanzas-btn" name="guardar_pago" type="submit" title="Guardar pago">
+              <i class="bi bi-save"></i><span class="finanzas-btn-label">Guardar pago</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% if edit_form and edit_pago %}
+<div class="modal fade" id="editarPagoModal" tabindex="-1" aria-labelledby="editarPagoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarPagoModalLabel">Editar pago</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{% url 'finanzas:pago_edit' edit_pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+          {% csrf_token %}
+          <div class="row g-2">
+            {% for field in edit_form %}
+              <div
+                class="col-md-4{% if field.name == 'numero_comprobante' and edit_form.metodo_pago.value != 'transferencia' %} d-none{% endif %}"
+                data-field-name="{{ field.name }}"
+              >
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                {% if field.name == "plan" %}
+                  <div id="edit-plan-help-organizacion" class="small text-muted mt-1 d-none"></div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <a
+              class="btn btn-outline-secondary finanzas-btn"
+              href="?{% for key, value in request.GET.items %}{% if key != 'editar_pago' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}"
+              title="Cancelar"
+            >
+              <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+            </a>
+            <button class="btn btn-success finanzas-btn" type="submit" title="Guardar cambios">
+              <i class="bi bi-save"></i><span class="finanzas-btn-label">Guardar cambios</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
@@ -209,167 +351,206 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
-    const personaSelect = document.getElementById("id_persona");
-    const organizacionSelect = document.getElementById("id_organizacion");
-    if (personaSelect && organizacionSelect && typeof TomSelect !== "undefined") {
-      const opcionesBase = Array.from(personaSelect.options).map((option) => ({
-        value: option.value,
-        text: option.text,
-        orgs: (option.dataset.orgs || "")
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      }));
+    const personaModalEl = document.getElementById("nuevaPersonaPagoModal");
+    if (personaModalEl && {{ open_nueva_persona|yesno:"true,false" }}) {
+      bootstrap.Modal.getOrCreateInstance(personaModalEl).show();
+    }
+    const createModalEl = document.getElementById("registrarPagoModal");
+    if (createModalEl && {{ form.errors|yesno:"true,false" }}) {
+      bootstrap.Modal.getOrCreateInstance(createModalEl).show();
+    }
+    const editModalEl = document.getElementById("editarPagoModal");
+    if (editModalEl && {{ edit_form|yesno:"true,false" }}) {
+      bootstrap.Modal.getOrCreateInstance(editModalEl).show();
+    }
+  })();
+  (function () {
+    function inicializarFormularioPago(config) {
+      const modalEl = document.getElementById(config.modalId);
+      if (!modalEl) return;
 
-      const tom = new TomSelect(personaSelect, {
-        create: false,
-        allowEmptyOption: true,
-        maxOptions: 2000,
-        placeholder: "Selecciona una organizacion primero",
-      });
-
-      function filtrarPersonas(mantenerSeleccion) {
-        const orgId = organizacionSelect.value;
-        const valorActual = mantenerSeleccion ? tom.getValue() : "";
-        tom.clearOptions();
-        const opcionesFiltradas = opcionesBase.filter((option) => {
-          if (!option.value) return true;
-          if (!orgId) return false;
-          return option.orgs.includes(orgId);
-        });
-        opcionesFiltradas.forEach((option) => {
-          tom.addOption({ value: option.value, text: option.text });
-        });
-        tom.refreshOptions(false);
-        const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
-        tom.setValue(seleccionValida ? valorActual : "", true);
-
-        if (!orgId) {
-          tom.disable();
-          tom.settings.placeholder = "Selecciona una organizacion primero";
-        } else {
-          tom.enable();
-          tom.settings.placeholder = "Buscar estudiante...";
-        }
-        tom.inputState();
+      function fieldId(name) {
+        return config.prefix ? "id_" + config.prefix + "-" + name : "id_" + name;
       }
 
-      filtrarPersonas(true);
-      organizacionSelect.addEventListener("change", function () {
-        filtrarPersonas(false);
-      });
-    }
+      const personaSelect = document.getElementById(fieldId("persona"));
+      const organizacionSelect = document.getElementById(fieldId("organizacion"));
+      const planSelect = document.getElementById(fieldId("plan"));
+      const montoReferenciaInput = document.getElementById(fieldId("monto_referencia"));
+      const clasesAsignadasInput = document.getElementById(fieldId("clases_asignadas"));
+      const aplicaIvaInput = document.getElementById(fieldId("aplica_iva"));
+      const metodoPagoSelect = document.getElementById(fieldId("metodo_pago"));
+      const numeroComprobanteInput = document.getElementById(fieldId("numero_comprobante"));
+      const numeroComprobanteContainer = modalEl.querySelector('[data-field-name="numero_comprobante"]');
+      const planHelp = document.getElementById(config.planHelpId);
 
-    const planSelect = document.getElementById("id_plan");
-    const planHelp = document.getElementById("plan-help-organizacion");
-    const montoReferenciaInput = document.getElementById("id_monto_referencia");
-    const clasesAsignadasInput = document.getElementById("id_clases_asignadas");
-    const aplicaIvaInput = document.getElementById("id_aplica_iva");
-    if (organizacionSelect && aplicaIvaInput) {
-      function sincronizarIvaDesdeOrganizacion() {
-        const selectedOption = organizacionSelect.options[organizacionSelect.selectedIndex];
-        if (!selectedOption || !selectedOption.value) return;
-        aplicaIvaInput.checked = selectedOption.dataset.esExentaIva !== "true";
-      }
+      if (personaSelect && organizacionSelect && typeof TomSelect !== "undefined") {
+        const opcionesBase = Array.from(personaSelect.options).map((option) => ({
+          value: option.value,
+          text: option.text,
+          orgs: (option.dataset.orgs || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        }));
 
-      sincronizarIvaDesdeOrganizacion();
-      organizacionSelect.addEventListener("change", sincronizarIvaDesdeOrganizacion);
-    }
-
-    if (planSelect && organizacionSelect && montoReferenciaInput && clasesAsignadasInput) {
-      const planesBase = Array.from(planSelect.options).map((option) => ({
-        value: option.value,
-        text: option.text,
-        org: option.dataset.org || "",
-        precio: option.dataset.precio || "",
-        numClases: option.dataset.numClases || "",
-      }));
-
-      function renderizarPlanes(mantenerSeleccion) {
-        const orgId = organizacionSelect.value;
-        const valorActual = mantenerSeleccion ? planSelect.value : "";
-        planSelect.innerHTML = "";
-
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = orgId ? "Selecciona un plan" : "Selecciona una organizacion primero";
-        planSelect.appendChild(placeholder);
-
-        const opcionesFiltradas = planesBase.filter((option) => option.value && orgId && option.org === orgId);
-        opcionesFiltradas.forEach((option) => {
-          const nodo = document.createElement("option");
-          nodo.value = option.value;
-          nodo.textContent = option.text;
-          if (option.precio) nodo.dataset.precio = option.precio;
-          if (option.numClases) nodo.dataset.numClases = option.numClases;
-          if (option.org) nodo.dataset.org = option.org;
-          planSelect.appendChild(nodo);
+        const tom = new TomSelect(personaSelect, {
+          create: false,
+          allowEmptyOption: true,
+          maxOptions: 2000,
+          placeholder: "Selecciona una organizacion primero",
         });
 
-        const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
-        planSelect.value = seleccionValida ? valorActual : "";
-        planSelect.disabled = !orgId || !opcionesFiltradas.length;
+        function filtrarPersonas(mantenerSeleccion) {
+          const orgId = organizacionSelect.value;
+          const valorActual = mantenerSeleccion ? tom.getValue() : "";
+          tom.clearOptions();
+          const opcionesFiltradas = opcionesBase.filter((option) => {
+            if (!option.value) return true;
+            if (!orgId) return false;
+            return option.orgs.includes(orgId);
+          });
+          opcionesFiltradas.forEach((option) => {
+            tom.addOption({ value: option.value, text: option.text });
+          });
+          tom.refreshOptions(false);
+          const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
+          tom.setValue(seleccionValida ? valorActual : "", true);
 
-        if (planHelp) {
-          if (orgId && !opcionesFiltradas.length) {
-            planHelp.textContent = "No hay planes creados para esta organizacion.";
-            planHelp.classList.remove("d-none");
+          if (!orgId) {
+            tom.disable();
+            tom.settings.placeholder = "Selecciona una organizacion primero";
           } else {
-            planHelp.textContent = "";
-            planHelp.classList.add("d-none");
+            tom.enable();
+            tom.settings.placeholder = "Buscar estudiante...";
+          }
+          tom.inputState();
+        }
+
+        filtrarPersonas(true);
+        organizacionSelect.addEventListener("change", function () {
+          filtrarPersonas(false);
+        });
+      }
+
+      if (organizacionSelect && aplicaIvaInput) {
+        function sincronizarIvaDesdeOrganizacion() {
+          const selectedOption = organizacionSelect.options[organizacionSelect.selectedIndex];
+          if (!selectedOption || !selectedOption.value) return;
+          aplicaIvaInput.checked = selectedOption.dataset.esExentaIva !== "true";
+        }
+
+        if (!config.preserveIvaValue) {
+          sincronizarIvaDesdeOrganizacion();
+        }
+        organizacionSelect.addEventListener("change", sincronizarIvaDesdeOrganizacion);
+      }
+
+      if (planSelect && organizacionSelect && montoReferenciaInput && clasesAsignadasInput) {
+        const planesBase = Array.from(planSelect.options).map((option) => ({
+          value: option.value,
+          text: option.text,
+          org: option.dataset.org || "",
+          precio: option.dataset.precio || "",
+          numClases: option.dataset.numClases || "",
+        }));
+
+        function renderizarPlanes(mantenerSeleccion) {
+          const orgId = organizacionSelect.value;
+          const valorActual = mantenerSeleccion ? planSelect.value : "";
+          planSelect.innerHTML = "";
+
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = orgId ? "Selecciona un plan" : "Selecciona una organizacion primero";
+          planSelect.appendChild(placeholder);
+
+          const opcionesFiltradas = planesBase.filter((option) => option.value && orgId && option.org === orgId);
+          opcionesFiltradas.forEach((option) => {
+            const nodo = document.createElement("option");
+            nodo.value = option.value;
+            nodo.textContent = option.text;
+            if (option.precio) nodo.dataset.precio = option.precio;
+            if (option.numClases) nodo.dataset.numClases = option.numClases;
+            if (option.org) nodo.dataset.org = option.org;
+            planSelect.appendChild(nodo);
+          });
+
+          const seleccionValida = opcionesFiltradas.some((option) => option.value === valorActual);
+          planSelect.value = seleccionValida ? valorActual : "";
+          planSelect.disabled = !orgId || !opcionesFiltradas.length;
+
+          if (planHelp) {
+            if (orgId && !opcionesFiltradas.length) {
+              planHelp.textContent = "No hay planes creados para esta organizacion.";
+              planHelp.classList.remove("d-none");
+            } else {
+              planHelp.textContent = "";
+              planHelp.classList.add("d-none");
+            }
           }
         }
-      }
 
-      function cargarDatosDesdePlan(forzar) {
-        const opcion = planSelect.options[planSelect.selectedIndex];
-        if (!opcion || !opcion.value) return;
-        const precio = opcion.dataset.precio;
-        const numClases = opcion.dataset.numClases;
-        if (!precio && !numClases) return;
+        function cargarDatosDesdePlan(forzar) {
+          const opcion = planSelect.options[planSelect.selectedIndex];
+          if (!opcion || !opcion.value) return;
+          const precio = opcion.dataset.precio;
+          const numClases = opcion.dataset.numClases;
+          if (!precio && !numClases) return;
 
-        const valorActual = (montoReferenciaInput.value || "").trim();
-        const valorActualNumero = Number(valorActual);
-        const estaVacioOCero = !valorActual || Number.isNaN(valorActualNumero) || valorActualNumero === 0;
-        if (precio && (forzar || estaVacioOCero)) {
-          montoReferenciaInput.value = precio;
+          const valorActual = (montoReferenciaInput.value || "").trim();
+          const valorActualNumero = Number(valorActual);
+          const estaVacioOCero = !valorActual || Number.isNaN(valorActualNumero) || valorActualNumero === 0;
+          if (precio && (forzar || estaVacioOCero)) {
+            montoReferenciaInput.value = precio;
+          }
+
+          const clasesActual = (clasesAsignadasInput.value || "").trim();
+          const clasesActualNumero = Number(clasesActual);
+          const clasesVaciasOCero = !clasesActual || Number.isNaN(clasesActualNumero) || clasesActualNumero === 0;
+          if (numClases && (forzar || clasesVaciasOCero)) {
+            clasesAsignadasInput.value = numClases;
+          }
         }
 
-        const clasesActual = (clasesAsignadasInput.value || "").trim();
-        const clasesActualNumero = Number(clasesActual);
-        const clasesVaciasOCero = !clasesActual || Number.isNaN(clasesActualNumero) || clasesActualNumero === 0;
-        if (numClases && (forzar || clasesVaciasOCero)) {
-          clasesAsignadasInput.value = numClases;
-        }
+        renderizarPlanes(true);
+        cargarDatosDesdePlan(false);
+        planSelect.addEventListener("change", function () {
+          if (!planSelect.value) return;
+          cargarDatosDesdePlan(true);
+        });
+        organizacionSelect.addEventListener("change", function () {
+          renderizarPlanes(false);
+        });
       }
 
-      renderizarPlanes(true);
-      cargarDatosDesdePlan(false);
-      planSelect.addEventListener("change", function () {
-        if (!planSelect.value) return;
-        cargarDatosDesdePlan(true);
-      });
-      organizacionSelect.addEventListener("change", function () {
-        renderizarPlanes(false);
-      });
+      if (metodoPagoSelect && numeroComprobanteInput && numeroComprobanteContainer) {
+        function toggleNumeroComprobante() {
+          const esTransferencia = metodoPagoSelect.value === "transferencia";
+          numeroComprobanteContainer.classList.toggle("d-none", !esTransferencia);
+          numeroComprobanteInput.required = esTransferencia;
+          if (!esTransferencia) {
+            numeroComprobanteInput.value = "";
+          }
+        }
+
+        toggleNumeroComprobante();
+        metodoPagoSelect.addEventListener("change", toggleNumeroComprobante);
+      }
     }
 
-    const metodoPagoSelect = document.getElementById("id_metodo_pago");
-    const numeroComprobanteInput = document.getElementById("id_numero_comprobante");
-    const numeroComprobanteContainer = document.querySelector('[data-field-name="numero_comprobante"]');
-    if (metodoPagoSelect && numeroComprobanteInput && numeroComprobanteContainer) {
-      function toggleNumeroComprobante() {
-        const esTransferencia = metodoPagoSelect.value === "transferencia";
-        numeroComprobanteContainer.classList.toggle("d-none", !esTransferencia);
-        numeroComprobanteInput.required = esTransferencia;
-        if (!esTransferencia) {
-          numeroComprobanteInput.value = "";
-        }
-      }
-
-      toggleNumeroComprobante();
-      metodoPagoSelect.addEventListener("change", toggleNumeroComprobante);
-    }
+    inicializarFormularioPago({
+      modalId: "registrarPagoModal",
+      prefix: "",
+      planHelpId: "plan-help-organizacion",
+      preserveIvaValue: false,
+    });
+    inicializarFormularioPago({
+      modalId: "editarPagoModal",
+      prefix: "edit_pago",
+      planHelpId: "edit-plan-help-organizacion",
+      preserveIvaValue: true,
+    });
 
     if (window.jQuery && jQuery("#tabla-pagos").length) {
       jQuery("#tabla-pagos").DataTable({

@@ -14,9 +14,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
+from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia
-from asistencias.views import _nav_context, _organizacion_desde_request, _periodo
-from personas.models import Organizacion
+from asistencias.periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
+from asistencias.views import _nav_context, _organizacion_desde_request
+from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 from .documentos.dtos import NormalizedTaxDocument
 from .documentos.services import build_review_payload, parse_tax_document
@@ -107,6 +109,45 @@ def _url_with_query(request, route_name, **kwargs):
 def _redirect_with_query(request, route_name, **kwargs):
     url = _url_with_query(request, route_name, **kwargs)
     return redirect(url)
+
+
+def _url_pagos_list_con_edicion(request, pago_id):
+    params = request.GET.copy()
+    params["editar_pago"] = str(pago_id)
+    query = params.urlencode()
+    url = reverse("finanzas:pagos_list")
+    if query:
+        url = f"{url}?{query}"
+    return url
+
+
+def _crear_persona_estudiante_desde_filtro(*, form, organizacion):
+    rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
+    if not organizacion:
+        form.add_error(
+            None,
+            "Debes seleccionar una organizacion en el filtro superior antes de crear a la persona.",
+        )
+        return None
+    if not rol_estudiante:
+        form.add_error(
+            None,
+            "No existe el rol ESTUDIANTE configurado para asignar a la nueva persona.",
+        )
+        return None
+
+    persona = Persona.objects.create(
+        nombres=form.cleaned_data["nombres"].strip(),
+        apellidos=form.cleaned_data.get("apellidos", "").strip(),
+        telefono=form.cleaned_data.get("telefono", "").strip(),
+    )
+    PersonaRol.objects.get_or_create(
+        persona=persona,
+        rol=rol_estudiante,
+        organizacion=organizacion,
+        defaults={"activo": True},
+    )
+    return persona
 
 
 def _documento_revision_form(*, data=None, initial=None):
@@ -282,15 +323,13 @@ def _tipo_visualizacion_archivo(nombre_archivo):
     return {"es_pdf": es_pdf, "es_imagen": es_imagen}
 
 
-def _subquery_disciplina_principal(*, inicio_mes=None, fin_mes=None):
+def _subquery_disciplina_principal(*, mes=None, anio=None):
     filtros = {
         "persona_id": OuterRef("persona_id"),
         "sesion__disciplina__organizacion_id": OuterRef("organizacion_id"),
         "estado": Asistencia.Estado.PRESENTE,
     }
-    if inicio_mes and fin_mes:
-        filtros["sesion__fecha__gte"] = inicio_mes
-        filtros["sesion__fecha__lte"] = fin_mes
+    filtros.update(filtros_periodo("sesion__fecha", mes=mes, anio=anio))
     return (
         Asistencia.objects.filter(**filtros)
         .values("sesion__disciplina__nombre")
@@ -303,11 +342,10 @@ def _subquery_disciplina_principal(*, inicio_mes=None, fin_mes=None):
 @admin_finanzas_required
 def dashboard(request):
     context = _base_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
 
-    pagos_qs = Payment.objects.filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes)
-    trans_qs = Transaction.objects.filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+    pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
+    trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
     if organizacion:
         pagos_qs = pagos_qs.filter(organizacion=organizacion)
         trans_qs = trans_qs.filter(organizacion=organizacion)
@@ -335,8 +373,7 @@ def dashboard(request):
             "pagos_recientes": pagos_qs.select_related("persona", "organizacion")[:10],
             "transacciones_recientes": trans_qs.select_related("categoria", "organizacion")[:10],
             "categorias_totales": categorias_totales,
-            "inicio_mes": inicio_mes,
-            "fin_mes": fin_mes,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
             "organizacion_filtro": organizacion,
             "ayuda_seccion": _ayuda_finanzas("dashboard"),
         }
@@ -421,15 +458,14 @@ def plan_delete(request, pk):
 
 
 @admin_finanzas_required
-def pagos_list(request):
+def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, persona_form=None, open_nueva_persona=False):
     context = _base_context(request)
-    inicio_mes, fin_mes = _periodo(request)
+    periodo = resolver_periodo(request)
     organizacion = _organizacion_desde_request(request)
-    disciplina_principal_historica = _subquery_disciplina_principal()
+    disciplina_principal_historica = _subquery_disciplina_principal(mes=periodo["mes"], anio=periodo["anio"])
 
     pagos_qs = (
         Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario")
-        .filter(fecha_pago__gte=inicio_mes, fecha_pago__lte=fin_mes)
         .annotate(
             clases_consumidas_calculadas=Count(
                 "consumos",
@@ -451,6 +487,7 @@ def pagos_list(request):
         )
         .order_by("-fecha_pago", "-id")
     )
+    pagos_qs = aplicar_periodo(pagos_qs, "fecha_pago", request=request)
     if organizacion:
         pagos_qs = pagos_qs.filter(organizacion=organizacion)
 
@@ -463,6 +500,7 @@ def pagos_list(request):
 
     resumen_pagos = pagos_qs.aggregate(
         total_pagos_monto=Sum("monto_total"),
+        total_iva_monto=Sum("monto_iva"),
         total_clases_pagadas=Sum("clases_asignadas"),
         total_saldo_clases=Sum("saldo_clases_calculado"),
     )
@@ -476,15 +514,18 @@ def pagos_list(request):
         pago.monto_neto_copia = str(int(pago.monto_neto or 0))
         pago.monto_iva_copia = str(int(pago.monto_iva or 0))
         pago.monto_total_copia = str(int(pago.monto_total or 0))
+    if form is None:
+        form = PaymentForm(initial={"organizacion": organizacion.pk} if organizacion else None)
+    if persona_form is None:
+        persona_form = PersonaRapidaForm()
 
-    form = PaymentForm(
-        request.POST or None,
-        initial={"organizacion": organizacion.pk} if organizacion else None,
-    )
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Pago registrado.")
-        return _redirect_with_query(request, "finanzas:pagos_list")
+    editar_pago_id = request.GET.get("editar_pago")
+    if not edit_form and editar_pago_id:
+        edit_pago = get_object_or_404(
+            Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"),
+            pk=editar_pago_id,
+        )
+        edit_form = PaymentForm(instance=edit_pago, prefix="edit_pago")
 
     context.update(
         {
@@ -494,28 +535,61 @@ def pagos_list(request):
             "q": q or "",
             "metodo": metodo or "",
             "total_pagos_monto": resumen_pagos["total_pagos_monto"] or 0,
+            "total_iva_monto": resumen_pagos["total_iva_monto"] or 0,
             "total_clases_pagadas": resumen_pagos["total_clases_pagadas"] or 0,
             "total_saldo_clases": resumen_pagos["total_saldo_clases"] or 0,
+            "edit_form": edit_form,
+            "edit_pago": edit_pago,
+            "persona_form": persona_form,
+            "open_nueva_persona": open_nueva_persona,
             "ayuda_seccion": _ayuda_finanzas("pagos"),
         }
     )
+    return context
+
+
+@admin_finanzas_required
+def pagos_list(request):
+    organizacion = _organizacion_desde_request(request)
+    form = PaymentForm(
+        request.POST if request.method == "POST" and "guardar_pago" in request.POST else None,
+        initial={"organizacion": organizacion.pk} if organizacion else None,
+    )
+    persona_form = PersonaRapidaForm(
+        request.POST if request.method == "POST" and "agregar_persona" in request.POST else None
+    )
+    open_nueva_persona = False
+
+    if request.method == "POST":
+        if "agregar_persona" in request.POST:
+            open_nueva_persona = True
+            if persona_form.is_valid():
+                persona = _crear_persona_estudiante_desde_filtro(form=persona_form, organizacion=organizacion)
+                if persona:
+                    messages.success(request, "Persona creada y asignada como estudiante.")
+                    return _redirect_with_query(request, "finanzas:pagos_list")
+        elif form.is_valid():
+            form.save()
+            messages.success(request, "Pago registrado.")
+            return _redirect_with_query(request, "finanzas:pagos_list")
+
+    context = _contexto_pagos_list(request, form=form, persona_form=persona_form, open_nueva_persona=open_nueva_persona)
     return render(request, "finanzas/pagos_list.html", context)
 
 
 @admin_finanzas_required
 def pago_edit(request, pk):
     pago = get_object_or_404(Payment, pk=pk)
-    form = PaymentForm(request.POST or None, instance=pago)
+    if request.method == "GET":
+        return redirect(_url_pagos_list_con_edicion(request, pago.pk))
+
+    form = PaymentForm(request.POST or None, instance=pago, prefix="edit_pago")
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Pago actualizado.")
         return _redirect_with_query(request, "finanzas:pagos_list")
-    back_url = request.META.get("HTTP_REFERER") or _url_with_query(request, "finanzas:pagos_list")
-    return render(
-        request,
-        "finanzas/form_page.html",
-        {"form": form, "title": "Editar pago", "back_url": back_url},
-    )
+    context = _contexto_pagos_list(request, edit_form=form, edit_pago=pago)
+    return render(request, "finanzas/pagos_list.html", context)
 
 
 @admin_finanzas_required
@@ -569,13 +643,17 @@ def pago_delete(request, pk):
 @admin_finanzas_required
 def documentos_tributarios_list(request):
     context = _base_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    documentos_qs = DocumentoTributario.objects.select_related("organizacion", "documento_relacionado").annotate(
+    documentos_qs = DocumentoTributario.objects.select_related(
+        "organizacion",
+        "documento_relacionado",
+        "persona_relacionada",
+        "organizacion_relacionada",
+    ).annotate(
         pagos_asociados_total=Count("pagos_asociados", distinct=True),
         transacciones_asociadas_total=Count("transacciones_asociadas", distinct=True),
     )
-    documentos_qs = documentos_qs.filter(fecha_emision__gte=inicio_mes, fecha_emision__lte=fin_mes)
+    documentos_qs = aplicar_periodo(documentos_qs, "fecha_emision", request=request)
     if organizacion:
         documentos_qs = documentos_qs.filter(organizacion=organizacion)
     documentos_qs = documentos_qs.order_by("-fecha_emision", "-id")
@@ -804,7 +882,12 @@ def documento_tributario_importacion_archivo(request, token, tipo_archivo):
 def documento_tributario_detail(request, pk):
     context = _base_context(request)
     documento = get_object_or_404(
-        DocumentoTributario.objects.select_related("organizacion", "documento_relacionado").prefetch_related(
+        DocumentoTributario.objects.select_related(
+            "organizacion",
+            "documento_relacionado",
+            "persona_relacionada",
+            "organizacion_relacionada",
+        ).prefetch_related(
             "pagos_asociados",
             "transacciones_asociadas",
             "documentos_hijos",
@@ -816,6 +899,7 @@ def documento_tributario_detail(request, pk):
         {
             "documento": documento,
             "archivo_es_pdf": archivo_es_pdf,
+            "ayuda_seccion": _ayuda_finanzas("documentos"),
             "back_url": request.META.get("HTTP_REFERER")
             or _url_with_query(request, "finanzas:documentos_tributarios_list"),
         }
@@ -928,14 +1012,13 @@ def categoria_delete(request, pk):
 @admin_finanzas_required
 def transacciones_list(request):
     context = _base_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
 
     trans_qs = (
         Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios")
-        .filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
         .order_by("-fecha", "-id")
     )
+    trans_qs = aplicar_periodo(trans_qs, "fecha", request=request)
     if organizacion:
         trans_qs = trans_qs.filter(organizacion=organizacion)
 
@@ -984,6 +1067,7 @@ def transaccion_detail(request, pk):
             "transaccion": transaccion,
             "archivo_es_pdf": tipo_archivo["es_pdf"],
             "archivo_es_imagen": tipo_archivo["es_imagen"],
+            "ayuda_seccion": _ayuda_finanzas("transacciones"),
             "back_url": request.META.get("HTTP_REFERER") or _url_with_query(request, "finanzas:transacciones_list"),
         }
     )
@@ -1040,9 +1124,8 @@ def transaccion_delete(request, pk):
 @admin_finanzas_required
 def reporte_categorias(request):
     context = _base_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    trans_qs = Transaction.objects.filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+    trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
     if organizacion:
         trans_qs = trans_qs.filter(organizacion=organizacion)
     consolidado = (
@@ -1054,8 +1137,7 @@ def reporte_categorias(request):
     context.update(
         {
             "consolidado": consolidado,
-            "inicio_mes": inicio_mes,
-            "fin_mes": fin_mes,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
             "ayuda_seccion": _ayuda_finanzas("reporte_categorias"),
         }
     )
@@ -1064,11 +1146,11 @@ def reporte_categorias(request):
 
 @admin_finanzas_required
 def export_pagos_csv(request):
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    pagos = Payment.objects.select_related("persona", "organizacion").filter(
-        fecha_pago__gte=inicio_mes,
-        fecha_pago__lte=fin_mes,
+    pagos = aplicar_periodo(
+        Payment.objects.select_related("persona", "organizacion"),
+        "fecha_pago",
+        request=request,
     )
     if organizacion:
         pagos = pagos.filter(organizacion=organizacion)
@@ -1095,11 +1177,11 @@ def export_pagos_csv(request):
 
 @admin_finanzas_required
 def export_transacciones_csv(request):
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    transacciones = Transaction.objects.select_related("categoria", "organizacion").filter(
-        fecha__gte=inicio_mes,
-        fecha__lte=fin_mes,
+    transacciones = aplicar_periodo(
+        Transaction.objects.select_related("categoria", "organizacion"),
+        "fecha",
+        request=request,
     )
     if organizacion:
         transacciones = transacciones.filter(organizacion=organizacion)

@@ -4,22 +4,14 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Detalle de documento tributario</h2>
+    <h2 class="mb-0 finanzas-help-title">Detalle de documento tributario {% include "finanzas/_help_tooltip.html" %}</h2>
     <div class="d-flex gap-2">
-      <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
-        <i class="bi bi-arrow-left"></i><span class="ms-1">Volver</span>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ back_url }}" title="Volver">
+        <i class="bi bi-arrow-left"></i><span class="finanzas-btn-label">Volver</span>
       </a>
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_edit' documento.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
-        <i class="bi bi-pencil"></i><span class="ms-1">Editar</span>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_edit' documento.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Editar">
+        <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
       </a>
-    </div>
-  </div>
-
-  <div class="alert alert-light border shadow-sm mb-3">
-    <div class="fw-semibold mb-1">Que guardar aqui</div>
-    <div class="small text-muted mb-0">
-      Esta vista concentra el documento tributario emitido o recibido. Aqui debe vivir el PDF o XML del SII y sus datos fiscales.
-      Las asociaciones con pagos, transacciones u otros documentos se resuelven desde este registro.
     </div>
   </div>
 
@@ -50,6 +42,18 @@
               <div class="text-muted">-</div>
             {% endif %}
           </div>
+          <div class="mb-3">
+            <span class="small text-muted d-block">Contraparte asociada</span>
+            {% if documento.persona_relacionada %}
+              <div>{{ documento.persona_relacionada }}</div>
+              <div class="small text-muted">{{ documento.persona_relacionada.rut|default:"" }}</div>
+            {% elif documento.organizacion_relacionada %}
+              <div>{{ documento.organizacion_relacionada.nombre }}</div>
+              <div class="small text-muted">{{ documento.organizacion_relacionada.rut }}</div>
+            {% else %}
+              <div class="text-muted">Sin contraparte asociada.</div>
+            {% endif %}
+          </div>
           <div><span class="small text-muted d-block">Observaciones</span><div>{{ documento.observaciones|default:"-" }}</div></div>
         </div>
       </div>
@@ -61,13 +65,19 @@
         <div class="card-body">
           <div class="d-flex gap-2 mb-3 flex-wrap">
             {% if documento.archivo_pdf %}
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}" target="_blank">Abrir PDF</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}" target="_blank" title="Abrir PDF">
+                <i class="bi bi-file-earmark-pdf"></i><span class="finanzas-btn-label">Abrir PDF</span>
+              </a>
             {% endif %}
             {% if documento.archivo_xml %}
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'xml' %}" target="_blank">Abrir XML</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'xml' %}" target="_blank" title="Abrir XML">
+                <i class="bi bi-filetype-xml"></i><span class="finanzas-btn-label">Abrir XML</span>
+              </a>
             {% endif %}
             {% if documento.enlace_sii %}
-              <a class="btn btn-sm btn-outline-secondary" href="{{ documento.enlace_sii }}" target="_blank">Ver en SII</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ documento.enlace_sii }}" target="_blank" title="Ver en SII">
+                <i class="bi bi-box-arrow-up-right"></i><span class="finanzas-btn-label">Ver en SII</span>
+              </a>
             {% endif %}
           </div>
           {% if archivo_es_pdf %}

@@ -74,27 +74,7 @@ class FinanzasAccessTests(TestCase):
         response = self.client.get(reverse("finanzas:dashboard"))
         self.assertEqual(response.status_code, 200)
 
-    def test_pago_edit_back_url_usa_referer_si_existe(self):
-        pago = Payment.objects.create(
-            persona=self.persona_no_admin,
-            organizacion=self.org,
-            fecha_pago="2026-02-27",
-            metodo_pago=Payment.Metodo.EFECTIVO,
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
-        self.client.force_login(self.user_admin)
-        query = "periodo_mes=2&periodo_anio=2026&organizacion=1&q=ana&metodo=transferencia"
-        referer = f"{reverse('finanzas:pago_detail', kwargs={'pk': pago.pk})}?{query}"
-        response = self.client.get(
-            f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}?{query}",
-            HTTP_REFERER=referer,
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["back_url"], referer)
-
-    def test_pago_edit_back_url_vuelve_a_listado_si_no_hay_referer(self):
+    def test_pago_edit_get_redirige_a_listado_con_modal(self):
         pago = Payment.objects.create(
             persona=self.persona_no_admin,
             organizacion=self.org,
@@ -107,8 +87,82 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
         query = "periodo_mes=2&periodo_anio=2026&organizacion=1&q=ana&metodo=transferencia"
         response = self.client.get(f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}?{query}")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('finanzas:pagos_list')}?{query}&editar_pago={pago.pk}",
+        )
+
+    def test_pagos_list_abre_modal_edicion_cuando_recibe_editar_pago(self):
+        pago = Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-27",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:pagos_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "editar_pago": pago.pk,
+            },
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["back_url"], f"{reverse('finanzas:pagos_list')}?{query}")
+        self.assertEqual(response.context["edit_pago"], pago)
+        self.assertIsNotNone(response.context["edit_form"])
+        self.assertContains(response, 'id="editarPagoModal"', html=False)
+        self.assertContains(response, f'action="{reverse("finanzas:pago_edit", kwargs={"pk": pago.pk})}?periodo_mes=2&amp;periodo_anio=2026&amp;organizacion={self.org.pk}&amp;editar_pago={pago.pk}"', html=False)
+
+    def test_pagos_list_crea_persona_rapida_como_estudiante_en_organizacion_filtrada(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:pagos_list") + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+            {
+                "nombres": "Lucia",
+                "apellidos": "Perez",
+                "telefono": "999999",
+                "agregar_persona": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        persona = Persona.objects.get(nombres="Lucia", apellidos="Perez")
+        self.assertTrue(
+            PersonaRol.objects.filter(
+                persona=persona,
+                rol__codigo="ESTUDIANTE",
+                organizacion=self.org,
+                activo=True,
+            ).exists()
+        )
+
+    def test_pagos_list_nueva_persona_exige_organizacion_filtrada(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:pagos_list") + "?periodo_mes=2&periodo_anio=2026",
+            {
+                "nombres": "Mario",
+                "apellidos": "Lopez",
+                "telefono": "888888",
+                "agregar_persona": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Persona.objects.filter(nombres="Mario", apellidos="Lopez").exists())
+        self.assertTrue(response.context["open_nueva_persona"])
+        self.assertContains(
+            response,
+            "Debes seleccionar una organizacion en el filtro superior antes de crear a la persona.",
+        )
 
     def test_transaccion_detail_muestra_iframe_pdf(self):
         categoria = Category.objects.create(nombre="Arriendo", tipo="egreso", activa=True)
@@ -648,6 +702,88 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, "101")
         self.assertEqual(response.context["documento_form"].initial["observaciones"], "Plan mensual")
         self.assertEqual(DocumentoTributario.objects.count(), 0)
+
+    def test_documento_tributario_importar_sugiere_persona_relacionada_por_rut_contraparte(self):
+        persona_artista = Persona.objects.create(
+            nombres="Barbara",
+            apellidos="Allendes",
+            rut="18.445.523-4",
+            email="barbara@example.com",
+        )
+        pdf_path = Path(__file__).resolve().parent.parent / "public" / "202603_LaTarea+Dificil.12Febrero2026_BarbaraAllendes.pdf"
+        pdf = SimpleUploadedFile(
+            pdf_path.name,
+            pdf_path.read_bytes(),
+            content_type="application/pdf",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            f"{reverse('finanzas:documento_tributario_importar')}?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}",
+            {"accion": "parsear", "archivo": pdf},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["documento_form"].initial["persona_relacionada"], persona_artista.pk)
+        self.assertEqual(response.context["documento_form"].initial["organizacion_relacionada"], "")
+
+    def test_documento_tributario_importar_sugiere_organizacion_relacionada_si_no_hay_persona(self):
+        contraparte = Organizacion.objects.create(
+            nombre="Pereira EIRL",
+            razon_social="PEREIRA E.I.R.L.",
+            rut="77.752.651-0",
+        )
+        xml = SimpleUploadedFile(
+            "factura.xml",
+            b"""
+            <EnvioDTE>
+              <SetDTE>
+                <DTE>
+                  <Documento>
+                    <Encabezado>
+                      <IdDoc>
+                        <TipoDTE>34</TipoDTE>
+                        <Folio>502</Folio>
+                        <FchEmis>2026-03-10</FchEmis>
+                      </IdDoc>
+                      <Emisor>
+                        <RUTEmisor>22.222.222-2</RUTEmisor>
+                        <RznSoc>Org Finanzas SPA</RznSoc>
+                      </Emisor>
+                      <Receptor>
+                        <RUTRecep>77.752.651-0</RUTRecep>
+                        <RznSocRecep>PEREIRA E.I.R.L.</RznSocRecep>
+                      </Receptor>
+                      <Totales>
+                        <MntExe>500000</MntExe>
+                        <MntTotal>500000</MntTotal>
+                      </Totales>
+                    </Encabezado>
+                    <Detalle>
+                      <NroLinDet>1</NroLinDet>
+                      <NmbItem>Funcion</NmbItem>
+                      <QtyItem>1</QtyItem>
+                      <PrcItem>500000</PrcItem>
+                      <MontoItem>500000</MontoItem>
+                    </Detalle>
+                  </Documento>
+                </DTE>
+              </SetDTE>
+            </EnvioDTE>
+            """,
+            content_type="application/xml",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            f"{reverse('finanzas:documento_tributario_importar')}?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}",
+            {"accion": "parsear", "archivo": xml},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["documento_form"].initial["persona_relacionada"], "")
+        self.assertEqual(response.context["documento_form"].initial["organizacion_relacionada"], contraparte.pk)
+        self.assertEqual(response.context["review_payload"]["suggestions"]["organizacion_sugerida_id"], contraparte.pk)
 
     @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pdftotext")
     @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pypdf", return_value="")
@@ -1309,6 +1445,87 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
         form = DocumentoTributarioForm(instance=documento)
         html = form["fecha_emision"].as_widget()
         self.assertIn('value="2026-03-10"', html)
+
+    def test_documento_tributario_form_rechaza_persona_y_organizacion_asociada_al_mismo_tiempo(self):
+        persona = Persona.objects.create(nombres="Julia", apellidos="Lopez", rut="12.345.678-5")
+        otra_org = Organizacion.objects.create(nombre="Org Tercera", razon_social="Org Tercera SPA", rut="44.444.444-4")
+        form = DocumentoTributarioForm(
+            data={
+                "organizacion": self.org.pk,
+                "tipo_documento": DocumentoTributario.TipoDocumento.FACTURA_EXENTA,
+                "fuente": DocumentoTributario.Fuente.MANUAL,
+                "folio": "501",
+                "fecha_emision": "2026-03-10",
+                "nombre_emisor": "Emisor",
+                "rut_emisor": "11.111.111-1",
+                "nombre_receptor": "Receptor",
+                "rut_receptor": "22.222.222-2",
+                "monto_neto": "0",
+                "monto_exento": "500000",
+                "iva_tasa": "0",
+                "monto_iva": "0",
+                "retencion_tasa": "0",
+                "retencion_monto": "0",
+                "monto_total": "500000",
+                "persona_relacionada": persona.pk,
+                "organizacion_relacionada": otra_org.pk,
+                "metadata_extra": "{}",
+                "observaciones": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("organizacion_relacionada", form.errors)
+
+    def test_documento_tributario_edit_permite_asociar_persona(self):
+        persona = Persona.objects.create(nombres="Julia", apellidos="Lopez", rut="12.345.678-5")
+        documento = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_EXENTA,
+            fuente=DocumentoTributario.Fuente.MANUAL,
+            folio="777",
+            fecha_emision="2026-03-10",
+            nombre_emisor="Emisor",
+            rut_emisor="11.111.111-1",
+            nombre_receptor="Receptor",
+            rut_receptor="22.222.222-2",
+            monto_exento=500000,
+            monto_total=500000,
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:documento_tributario_edit", kwargs={"pk": documento.pk}),
+            {
+                "organizacion": self.org.pk,
+                "tipo_documento": DocumentoTributario.TipoDocumento.FACTURA_EXENTA,
+                "fuente": DocumentoTributario.Fuente.MANUAL,
+                "folio": "777",
+                "fecha_emision": "2026-03-10",
+                "nombre_emisor": "Emisor",
+                "rut_emisor": "11.111.111-1",
+                "nombre_receptor": "Receptor",
+                "rut_receptor": "22.222.222-2",
+                "monto_neto": "0",
+                "monto_exento": "500000",
+                "iva_tasa": "0",
+                "monto_iva": "0",
+                "retencion_tasa": "0",
+                "retencion_monto": "0",
+                "monto_total": "500000",
+                "documento_relacionado": "",
+                "persona_relacionada": persona.pk,
+                "organizacion_relacionada": "",
+                "enlace_sii": "",
+                "metadata_extra": "{}",
+                "observaciones": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        documento.refresh_from_db()
+        self.assertEqual(documento.persona_relacionada, persona)
+        self.assertIsNone(documento.organizacion_relacionada)
 
     def test_documento_tributario_form_acepta_montos_con_punto_como_miles(self):
         form = DocumentoTributarioForm(

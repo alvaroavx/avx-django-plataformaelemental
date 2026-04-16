@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 
-from personas.models import Persona, PersonaRol
+from personas.models import Organizacion, Persona, PersonaRol
 
 from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
@@ -249,6 +249,8 @@ class DocumentoTributarioForm(forms.ModelForm):
             "retencion_monto",
             "monto_total",
             "documento_relacionado",
+            "persona_relacionada",
+            "organizacion_relacionada",
             "archivo_pdf",
             "archivo_xml",
             "enlace_sii",
@@ -274,6 +276,16 @@ class DocumentoTributarioForm(forms.ModelForm):
         self.fields["documento_relacionado"].label = "Documento relacionado"
         self.fields["documento_relacionado"].help_text = (
             "Permite vincular, por ejemplo, una boleta de honorarios con una factura o documento origen."
+        )
+        self.fields["persona_relacionada"].queryset = Persona.objects.order_by("apellidos", "nombres")
+        self.fields["persona_relacionada"].label = "Persona asociada"
+        self.fields["persona_relacionada"].help_text = (
+            "Opcional. Vincula la contraparte del documento a una persona existente por RUT o seleccion manual."
+        )
+        self.fields["organizacion_relacionada"].queryset = Organizacion.objects.order_by("nombre")
+        self.fields["organizacion_relacionada"].label = "Organizacion asociada"
+        self.fields["organizacion_relacionada"].help_text = (
+            "Opcional. Usa esta asociacion cuando la contraparte del documento sea una organizacion y no una persona."
         )
         self.fields["archivo_pdf"].label = "PDF del documento"
         self.fields["archivo_xml"].label = "XML del documento"
@@ -311,6 +323,23 @@ class DocumentoTributarioForm(forms.ModelForm):
 
     def clean_monto_total(self):
         return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_total")))
+
+    def clean(self):
+        cleaned = super().clean()
+        persona_relacionada = cleaned.get("persona_relacionada")
+        organizacion_relacionada = cleaned.get("organizacion_relacionada")
+        organizacion = cleaned.get("organizacion")
+        if persona_relacionada and organizacion_relacionada:
+            self.add_error(
+                "organizacion_relacionada",
+                "Selecciona una persona o una organizacion asociada, pero no ambas al mismo tiempo.",
+            )
+        if organizacion and organizacion_relacionada and organizacion_relacionada.pk == organizacion.pk:
+            self.add_error(
+                "organizacion_relacionada",
+                "La organizacion asociada debe representar la contraparte, no la misma organizacion duena del documento.",
+            )
+        return cleaned
 
 
 class CategoryForm(forms.ModelForm):

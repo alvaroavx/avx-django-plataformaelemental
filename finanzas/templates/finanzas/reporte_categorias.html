@@ -3,9 +3,8 @@
 {% block title %}Reporte por categorias{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <h2>Consolidado por categorias</h2>
-  {% include "finanzas/_info_box.html" %}
-  <div class="text-muted mb-2">Periodo: {{ inicio_mes|date:"d/m/Y" }} - {{ fin_mes|date:"d/m/Y" }}</div>
+  <h2 class="mb-3 finanzas-help-title">Consolidado por categorias {% include "finanzas/_help_tooltip.html" %}</h2>
+  <div class="text-muted mb-2">Período: {{ periodo_descripcion_vista }}</div>
   <div class="row g-3">
     <div class="col-lg-5">
       <div class="card h-100">

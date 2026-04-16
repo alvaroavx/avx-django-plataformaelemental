@@ -1,6 +1,7 @@
 from django.db.models import Count, Q, Sum
 from django.utils.dateparse import parse_date
 
+from asistencias.periodo import aplicar_periodo
 from asistencias.models import Asistencia
 from personas.models import Persona
 
@@ -105,17 +106,28 @@ def _resumen_financiero_estudiante_queryset(pagos, consumos):
     }
 
 
-def resumen_financiero_estudiante_periodo(persona: Persona, inicio_periodo, fin_periodo, organizacion=None):
-    pagos = Payment.objects.filter(
-        persona=persona,
-        fecha_pago__gte=inicio_periodo,
-        fecha_pago__lte=fin_periodo,
-    )
-    consumos = AttendanceConsumption.objects.filter(
-        persona=persona,
-        clase_fecha__gte=inicio_periodo,
-        clase_fecha__lte=fin_periodo,
-    )
+def resumen_financiero_estudiante_periodo(
+    persona: Persona,
+    inicio_periodo=None,
+    fin_periodo=None,
+    organizacion=None,
+    mes=None,
+    anio=None,
+):
+    pagos = Payment.objects.filter(persona=persona)
+    consumos = AttendanceConsumption.objects.filter(persona=persona)
+    if mes is not None or anio is not None:
+        pagos = aplicar_periodo(pagos, "fecha_pago", mes=mes, anio=anio)
+        consumos = aplicar_periodo(consumos, "clase_fecha", mes=mes, anio=anio)
+    elif inicio_periodo and fin_periodo:
+        pagos = pagos.filter(
+            fecha_pago__gte=inicio_periodo,
+            fecha_pago__lte=fin_periodo,
+        )
+        consumos = consumos.filter(
+            clase_fecha__gte=inicio_periodo,
+            clase_fecha__lte=fin_periodo,
+        )
     if organizacion:
         pagos = pagos.filter(organizacion=organizacion)
         consumos = consumos.filter(asistencia__sesion__disciplina__organizacion=organizacion)

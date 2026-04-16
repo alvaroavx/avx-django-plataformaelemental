@@ -28,3 +28,4 @@ asistencias/ aplicacion de asistencias
 3.El monto de dinero siempre sera visto en CPL, sin decimales, y con los cientos separados por punto.
 4.Los filtros del menu superior: mes, ano y organizacion. Seran arrastrados en toda la aplicacion y seran siempre mantenidos activos.
 5.No duplicar codigo, no reinventar lo que ya hay.
+6.Cada cambio visual o funcional en desktop debe considerar su equivalente responsive. No se trata de replicar exactamente la misma interfaz, sino de resolver bien la misma necesidad en mobile.

@@ -74,7 +74,7 @@ class Command(BaseCommand):
                     apellidos=apellidos,
                     email=email,
                     telefono="",
-                    identificador="",
+                    rut="",
                     activo=True,
                 )
             )

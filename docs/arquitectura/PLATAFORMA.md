@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-04-08
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -24,6 +24,9 @@ Adicionalmente existen:
 
 ## Reglas transversales
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegacion.
+- Si no existe filtro explicito en la URL, `periodo_mes` y `periodo_anio` deben partir en la fecha actual; `organizacion` debe partir en `Todas`.
+- Los filtros globales deben autoaplicarse al cambiar un selector; no usan boton `Aplicar filtros`.
+- `periodo_mes` y `periodo_anio` aceptan `Todos`, por lo que el sistema debe soportar filtros parciales como `todos los meses de un año`, `un mismo mes en todos los años` o `todo el historial`.
 - Los modelos del dominio viven en su app duena:
   - `personas`: personas, roles y organizaciones
   - `asistencias`: disciplinas, sesiones y asistencias
@@ -65,6 +68,10 @@ Responsabilidad:
 - personas, roles y organizaciones
 - vista administrativa consolidada por persona y por organizacion
 - exponer personas y organizaciones para consumo externo
+
+Reglas vigentes:
+- `Persona.rut` es opcional y se valida como RUT chileno.
+- El RUT de personas se administra desde la app `personas`; los flujos rapidos de otras apps no lo editan.
 
 Rutas principales:
 - `/personas/`
@@ -127,6 +134,7 @@ Regla vigente:
 - `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas.
 - Pueden asociarse entre si, pero no deben colapsarse en una sola entidad.
 - En resumentes de `documentos tributarios`, un documento cuenta como `ingreso` si la organizacion asociada es la emisora y como `egreso` si la organizacion asociada es la receptora.
+- `DocumentoTributario` puede asociar opcionalmente una contraparte interna del sistema como `Persona` o `Organizacion`, usando sugerencia por RUT cuando el dato exista.
 
 ## Integracion academica-financiera
 - Las asistencias presentes pueden consumirse contra pagos existentes.

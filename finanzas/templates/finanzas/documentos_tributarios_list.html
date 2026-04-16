@@ -4,12 +4,22 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
-    <h2 class="mb-0">Documentos tributarios</h2>
-    <a class="btn btn-sm btn-success" href="{% url 'finanzas:documento_tributario_importar' %}?{{ request.GET.urlencode }}">
-      Carga asistida
-    </a>
+    <h2 class="mb-0 finanzas-help-title">Documentos tributarios {% include "finanzas/_help_tooltip.html" %}</h2>
+    <div class="d-flex flex-wrap gap-2">
+      <button
+        class="btn btn-sm btn-success finanzas-btn"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#nuevoDocumentoTributarioModal"
+        title="Nuevo documento tributario"
+      >
+        <i class="bi bi-receipt-cutoff"></i><span class="finanzas-btn-label">Nuevo documento tributario</span>
+      </button>
+      <a class="btn btn-sm btn-outline-success finanzas-btn" href="{% url 'finanzas:documento_tributario_importar' %}?{{ request.GET.urlencode }}" title="Carga asistida">
+        <i class="bi bi-file-earmark-arrow-up"></i><span class="finanzas-btn-label">Carga asistida</span>
+      </a>
+    </div>
   </div>
-  {% include "finanzas/_info_box.html" %}
 
   <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3 col-xxl-2">
@@ -62,37 +72,6 @@
     </div>
   </div>
 
-  <div class="card mb-3">
-    <button
-      class="card-header btn btn-success text-start w-100 border-0 rounded-0"
-      type="button"
-      data-bs-toggle="collapse"
-      data-bs-target="#nuevoDocumentoTributarioCollapse"
-      aria-expanded="{% if form.errors %}true{% else %}false{% endif %}"
-      aria-controls="nuevoDocumentoTributarioCollapse"
-    >
-      Nuevo documento tributario
-    </button>
-    <div id="nuevoDocumentoTributarioCollapse" class="collapse{% if form.errors %} show{% endif %}">
-      <div class="card-body">
-        <form method="post" enctype="multipart/form-data">
-          {% csrf_token %}
-          <div class="row g-2">
-            {% for field in form %}
-              <div class="col-md-4">
-                <label class="form-label">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
-                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
-              </div>
-            {% endfor %}
-          </div>
-          <button class="btn btn-success mt-2" type="submit">Guardar documento tributario</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
   <div class="card">
     <div class="card-body table-responsive">
       <table class="table table-sm align-middle">
@@ -108,6 +87,7 @@
             <th>IVA</th>
             <th>Retencion</th>
             <th>Total</th>
+            <th>Contraparte</th>
             <th>Asociaciones</th>
             <th></th>
           </tr>
@@ -126,21 +106,81 @@
             <td>{{ item.retencion_monto|clp }}</td>
             <td>{{ item.monto_total|clp }}</td>
             <td class="small">
+              {% if item.persona_relacionada %}
+                <div>Persona: {{ item.persona_relacionada }}</div>
+                {% if item.persona_relacionada.rut %}<div class="text-muted">{{ item.persona_relacionada.rut }}</div>{% endif %}
+              {% elif item.organizacion_relacionada %}
+                <div>Organización: {{ item.organizacion_relacionada.nombre }}</div>
+                <div class="text-muted">{{ item.organizacion_relacionada.rut }}</div>
+              {% else %}
+                <span class="text-muted">Sin asociar</span>
+              {% endif %}
+            </td>
+            <td class="small">
               <div>Pagos: {{ item.pagos_asociados_total }}</div>
               <div>Transacciones: {{ item.transacciones_asociadas_total }}</div>
             </td>
             <td class="text-nowrap">
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_detail' item.pk %}?{{ request.GET.urlencode }}">Detalle</a>
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_edit' item.pk %}?{{ request.GET.urlencode }}">Editar</a>
-              <a class="btn btn-sm btn-outline-danger" href="{% url 'finanzas:documento_tributario_delete' item.pk %}?{{ request.GET.urlencode }}">Eliminar</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_detail' item.pk %}?{{ request.GET.urlencode }}" title="Detalle">
+                <i class="bi bi-eye"></i><span class="finanzas-btn-label">Detalle</span>
+              </a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_edit' item.pk %}?{{ request.GET.urlencode }}" title="Editar">
+                <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
+              </a>
+              <a class="btn btn-sm btn-outline-danger finanzas-btn" href="{% url 'finanzas:documento_tributario_delete' item.pk %}?{{ request.GET.urlencode }}" title="Eliminar">
+                <i class="bi bi-trash"></i><span class="finanzas-btn-label">Eliminar</span>
+              </a>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="12" class="text-center text-muted">Sin documentos tributarios en el periodo.</td></tr>
+          <tr><td colspan="13" class="text-center text-muted">Sin documentos tributarios en el periodo.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<div class="modal fade" id="nuevoDocumentoTributarioModal" tabindex="-1" aria-labelledby="nuevoDocumentoTributarioModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="nuevoDocumentoTributarioModalLabel">Nuevo documento tributario</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row g-2">
+            {% for field in form %}
+              <div class="col-md-4">
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="small text-muted mt-1">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary finanzas-btn" data-bs-dismiss="modal" title="Cancelar">
+              <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
+            </button>
+            <button class="btn btn-success finanzas-btn" type="submit" title="Guardar documento tributario">
+              <i class="bi bi-save"></i><span class="finanzas-btn-label">Guardar documento tributario</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const modalEl = document.getElementById("nuevoDocumentoTributarioModal");
+    if (modalEl && {{ form.errors|yesno:"true,false" }}) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  })();
+</script>
 {% endblock %}

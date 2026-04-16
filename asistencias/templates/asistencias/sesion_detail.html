@@ -14,12 +14,17 @@
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
       </a>
     </div>
-    <form method="post" onsubmit="return window.confirm('Se eliminara la sesion y todas sus asistencias relacionadas. ¿Continuar?');">
-      {% csrf_token %}
-      <button class="btn btn-danger btn-sm" name="eliminar_sesion" type="submit">
-        <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Eliminar sesión</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-success btn-sm" type="button" title="Nueva persona" data-bs-toggle="modal" data-bs-target="#nuevaPersonaSesionModal">
+        <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
       </button>
-    </form>
+      <form method="post" onsubmit="return window.confirm('Se eliminara la sesion y todas sus asistencias relacionadas. ¿Continuar?');">
+        {% csrf_token %}
+        <button class="btn btn-danger btn-sm" name="eliminar_sesion" type="submit" title="Eliminar sesión">
+          <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Eliminar sesión</span>
+        </button>
+      </form>
+    </div>
   </div>
   <div class="card mb-3">
     <div class="card-body">
@@ -153,6 +158,62 @@
   </div>
 </div>
 {% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="nuevaPersonaSesionModal" tabindex="-1" aria-labelledby="nuevaPersonaSesionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title h5" id="nuevaPersonaSesionModalLabel">Nueva persona</h2>
+            <div class="text-muted small">Se asignará como estudiante en {{ sesion.disciplina.organizacion }}.</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          {% if persona_form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in persona_form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="id_nombres">Nombres</label>
+            {{ persona_form.nombres }}
+            {% for error in persona_form.nombres.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_apellidos">Apellidos</label>
+            {{ persona_form.apellidos }}
+            {% for error in persona_form.apellidos.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div>
+            <label class="form-label" for="id_telefono">Teléfono</label>
+            {{ persona_form.telefono }}
+            {% for error in persona_form.telefono.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-success" name="crear_persona_estudiante" type="submit">
+            <i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Guardar persona</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block extra_js %}
 <script>
   (function () {
@@ -201,5 +262,14 @@
       });
     }
   })();
+
+  {% if open_nueva_persona %}
+  document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("nuevaPersonaSesionModal");
+    if (modal && window.bootstrap) {
+      bootstrap.Modal.getOrCreateInstance(modal).show();
+    }
+  });
+  {% endif %}
 </script>
 {% endblock %}

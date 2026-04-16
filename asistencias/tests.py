@@ -133,6 +133,55 @@ class AsistenciasViewTests(TestCase):
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
 
+    def test_sesion_detail_crea_persona_en_organizacion_de_la_sesion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="22.222.222-2",
+        )
+        url = (
+            f"{reverse('asistencias:sesion_detail', kwargs={'pk': self.sesion.pk})}"
+            f"?periodo_mes=2&periodo_anio=2026&organizacion={otra_organizacion.pk}"
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "crear_persona_estudiante": "1",
+                "nombres": "Camila",
+                "apellidos": "Nueva",
+                "telefono": "555",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, url)
+        persona = Persona.objects.get(nombres="Camila", apellidos="Nueva")
+        self.assertTrue(
+            PersonaRol.objects.filter(
+                persona=persona,
+                organizacion=self.organizacion,
+                rol__codigo="ESTUDIANTE",
+            ).exists()
+        )
+        self.assertFalse(
+            PersonaRol.objects.filter(
+                persona=persona,
+                organizacion=otra_organizacion,
+                rol__codigo="ESTUDIANTE",
+            ).exists()
+        )
+
+    def test_sesion_detail_muestra_modal_para_crear_persona(self):
+        response = self.client.get(
+            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nueva persona")
+        self.assertContains(response, 'data-bs-target="#nuevaPersonaSesionModal"', html=False)
+
     def test_sesion_detail_elimina_sesion_y_dependencias(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
         self.assertEqual(AttendanceConsumption.objects.filter(asistencia=asistencia).count(), 1)
@@ -403,6 +452,63 @@ class AsistenciasViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["sesiones_realizadas_mes"], 1)
+
+    def test_dashboard_muestra_columnas_de_deuda_y_mas_asistencia(self):
+        otro_estudiante = Persona.objects.create(
+            nombres="Luis",
+            apellidos="Rojas",
+            email="luis.dashboard@example.com",
+        )
+        tercer_estudiante = Persona.objects.create(
+            nombres="Marta",
+            apellidos="Lopez",
+            email="marta.dashboard@example.com",
+        )
+        rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=otro_estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=tercer_estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        sesion_dos = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-02-27",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        asistencia_ana_1 = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        asistencia_ana_2 = Asistencia.objects.create(sesion=sesion_dos, persona=self.estudiante)
+        asistencia_luis = Asistencia.objects.create(sesion=self.sesion, persona=otro_estudiante)
+        consumo_luis = AttendanceConsumption.objects.get(asistencia=asistencia_luis)
+        consumo_luis.estado = AttendanceConsumption.Estado.DEUDA
+        consumo_luis.pago = None
+        consumo_luis.save(update_fields=["estado", "pago", "actualizado_en"])
+
+        response = self.client.get(
+            reverse("asistencias:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Estudiantes con deuda")
+        self.assertContains(response, "Estudiantes con más asistencia")
+        self.assertContains(response, "Luis Rojas")
+        self.assertContains(response, "(1 clases)")
+        self.assertContains(response, "Ana Diaz")
+        self.assertContains(response, "(2 clases)")
+        self.assertIn(otro_estudiante, list(response.context["estudiantes_con_deuda"]))
+        self.assertEqual(response.context["estudiantes_con_deuda"][0], self.estudiante)
+        self.assertEqual(response.context["estudiantes_con_deuda"][0].clases_deuda, 2)
+        self.assertEqual(response.context["estudiantes_con_deuda"][1], otro_estudiante)
+        self.assertEqual(response.context["estudiantes_con_deuda"][1].clases_deuda, 1)
+        self.assertEqual(response.context["estudiantes_con_mas_asistencia"][0], self.estudiante)
+        self.assertEqual(response.context["estudiantes_con_mas_asistencia"][0].total_asistencias_mes, 2)
 
     def test_sesiones_list_muestra_mensaje_cancelada_en_vez_de_asistentes_cero(self):
         self.sesion.estado = SesionClase.Estado.CANCELADA

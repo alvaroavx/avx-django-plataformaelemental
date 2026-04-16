@@ -1,4 +1,3 @@
-from datetime import timedelta
 import calendar
 
 from django.contrib import messages
@@ -6,7 +5,6 @@ from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.formats import date_format
 
 from finanzas.models import AttendanceConsumption, Payment
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante_periodo
@@ -20,6 +18,7 @@ from .forms import (
     SesionBasicaForm,
 )
 from .models import Asistencia, Disciplina, SesionClase
+from .periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
 from .utils import ROLE_ADMIN
 
 
@@ -33,23 +32,9 @@ def _nav_context(request):
 
 
 def _periodo(request):
-    """Resuelve el rango mensual activo desde los parámetros de consulta."""
-    hoy = timezone.localdate()
-    try:
-        anio = int(request.GET.get("periodo_anio", hoy.year))
-    except (TypeError, ValueError):
-        anio = hoy.year
-    try:
-        mes = int(request.GET.get("periodo_mes", hoy.month))
-    except (TypeError, ValueError):
-        mes = hoy.month
-    if mes < 1 or mes > 12:
-        mes = hoy.month
-    if anio < 2000 or anio > 2100:
-        anio = hoy.year
-    inicio = hoy.replace(year=anio, month=mes, day=1)
-    fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    return inicio, fin
+    """Retorna un periodo de referencia para vistas que requieren una fecha base visible."""
+    periodo = resolver_periodo(request)
+    return periodo["referencia_inicio"], periodo["referencia_fin"]
 
 
 def _organizacion_desde_request(request):
@@ -75,22 +60,51 @@ def _url_actual_con_filtros(request, **extra_params):
     return f"{request.path}?{query}" if query else request.path
 
 
+def _crear_persona_estudiante_en_organizacion(persona_form, organizacion):
+    """Crea una persona rapida y la asigna como ESTUDIANTE a la organizacion indicada."""
+    if not organizacion:
+        persona_form.add_error(
+            None,
+            "Debes seleccionar una organización en el filtro superior antes de crear a la persona.",
+        )
+        return None
+
+    rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
+    if not rol_estudiante:
+        persona_form.add_error(
+            None,
+            "No existe el rol ESTUDIANTE configurado para asignar a la nueva persona.",
+        )
+        return None
+
+    persona = Persona.objects.create(
+        nombres=persona_form.cleaned_data["nombres"].strip(),
+        apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
+        telefono=persona_form.cleaned_data.get("telefono", "").strip(),
+    )
+    PersonaRol.objects.get_or_create(
+        persona=persona,
+        rol=rol_estudiante,
+        organizacion=organizacion,
+        defaults={"activo": True},
+    )
+    return persona
+
+
 @role_required(ROLE_ADMIN)
 def dashboard(request):
     """Panel principal con métricas operativas según período y organización."""
     context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
-    nombre_mes = date_format(inicio_mes, "F")
     sesiones_mes = (
-        SesionClase.objects.filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+        aplicar_periodo(SesionClase.objects.all(), "fecha", request=request)
         .select_related("disciplina")
         .prefetch_related("profesores")
     )
     if organizacion:
         sesiones_mes = sesiones_mes.filter(disciplina__organizacion=organizacion)
     sesiones_realizadas_mes = sesiones_mes.filter(estado=SesionClase.Estado.COMPLETADA).count()
-    asistencias_mes_qs = Asistencia.objects.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
+    asistencias_mes_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
     if organizacion:
         asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion=organizacion)
     asistentes_ids_qs = asistencias_mes_qs.values_list("persona_id", flat=True).distinct()
@@ -99,6 +113,27 @@ def dashboard(request):
     if organizacion:
         estudiantes_qs = estudiantes_qs.filter(roles__organizacion=organizacion).distinct()
     estudiantes_sin_asistencia = estudiantes_qs.exclude(id__in=asistentes_ids_qs).order_by("apellidos", "nombres")[:5]
+    filtro_deuda = Q(
+        consumos_asistencia__estado=AttendanceConsumption.Estado.DEUDA,
+        **filtros_periodo("consumos_asistencia__clase_fecha", request=request),
+    )
+    if organizacion:
+        filtro_deuda &= Q(consumos_asistencia__asistencia__sesion__disciplina__organizacion=organizacion)
+    estudiantes_con_deuda = (
+        estudiantes_qs.filter(filtro_deuda)
+        .annotate(clases_deuda=Count("consumos_asistencia", filter=filtro_deuda, distinct=True))
+        .order_by("-clases_deuda", "apellidos", "nombres")[:5]
+    )
+    filtro_asistencia = Q(
+        **filtros_periodo("asistencias__sesion__fecha", request=request),
+    )
+    if organizacion:
+        filtro_asistencia &= Q(asistencias__sesion__disciplina__organizacion=organizacion)
+    estudiantes_con_mas_asistencia = (
+        estudiantes_qs.filter(filtro_asistencia)
+        .annotate(total_asistencias_mes=Count("asistencias", filter=filtro_asistencia, distinct=True))
+        .order_by("-total_asistencias_mes", "apellidos", "nombres")[:5]
+    )
     sesiones_resumen = sesiones_mes.annotate(total_asistentes=Count("asistencias")).order_by("-fecha")[:10]
     context.update(
         {
@@ -107,8 +142,10 @@ def dashboard(request):
             "estudiantes_activos_mes": estudiantes_activos_mes,
             "sesiones_realizadas_mes": sesiones_realizadas_mes,
             "estudiantes_sin_asistencia": estudiantes_sin_asistencia,
+            "estudiantes_con_deuda": estudiantes_con_deuda,
+            "estudiantes_con_mas_asistencia": estudiantes_con_mas_asistencia,
             "sesiones_resumen": sesiones_resumen,
-            "nombre_mes": nombre_mes,
+            "nombre_mes": descripcion_periodo(request=request, corta=True),
         }
     )
     return render(request, "asistencias/dashboard.html", context)
@@ -128,21 +165,34 @@ def sesiones_list(request):
         "text-bg-secondary",
         "text-bg-dark",
     ]
-    inicio_periodo, _ = _periodo(request)
-    year = inicio_periodo.year
-    month = inicio_periodo.month
-    cal = calendar.Calendar(firstweekday=calendar.MONDAY)
-    semanas_raw = cal.monthdatescalendar(year, month)
-    inicio_mes = inicio_periodo.replace(day=1)
-    fin_mes = (inicio_mes.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    periodo = resolver_periodo(request)
+    year = periodo["referencia_inicio"].year
+    month = periodo["referencia_inicio"].month
     sesiones_qs = (
         SesionClase.objects.select_related("disciplina")
         .prefetch_related("profesores")
-        .filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
         .order_by("fecha")
     )
+    sesiones_qs = aplicar_periodo(sesiones_qs, "fecha", request=request)
     if organizacion:
         sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
+    if periodo["mes"] is None or periodo["anio"] is None:
+        context.update(
+            {
+                "mostrar_calendario": False,
+                "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
+                "sesiones_listado": sesiones_qs,
+            }
+        )
+        return render(request, "asistencias/sesiones_list.html", context)
+
+    cal = calendar.Calendar(firstweekday=calendar.MONDAY)
+    semanas_raw = cal.monthdatescalendar(year, month)
+    inicio_mes = periodo["referencia_inicio"]
+    sesiones_qs = (
+        sesiones_qs
+        .order_by("fecha")
+    )
     sesiones_por_fecha = {}
     for sesion in sesiones_qs:
         badge_class = badge_palette[sesion.disciplina_id % len(badge_palette)]
@@ -166,6 +216,7 @@ def sesiones_list(request):
         semanas.append(dias)
     context.update(
         {
+            "mostrar_calendario": True,
             "semanas": semanas,
             "mes_actual": inicio_mes,
         }
@@ -177,7 +228,6 @@ def sesiones_list(request):
 def estudiantes_list(request):
     """Listado de estudiantes con estado de asistencia del período seleccionado."""
     context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     estudiantes = (
         Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
         .distinct()
@@ -191,8 +241,7 @@ def estudiantes_list(request):
     for persona in estudiantes:
         asistencias_mes_qs = Asistencia.objects.filter(
             persona=persona,
-            sesion__fecha__gte=inicio_mes,
-            sesion__fecha__lte=fin_mes,
+            **filtros_periodo("sesion__fecha", request=request),
         )
         if org_id:
             asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion_id=org_id)
@@ -228,7 +277,6 @@ def profesores_list(request):
     profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
     org_id = request.GET.get("organizacion")
     organizacion = _organizacion_desde_request(request)
-    inicio_mes, fin_mes = _periodo(request)
     profesores_data = []
     for profesor in profesores:
         organizaciones_prof = profesor.roles.filter(rol__codigo="PROFESOR").select_related("organizacion")
@@ -237,26 +285,20 @@ def profesores_list(request):
         for rol_prof in organizaciones_prof:
             organizacion = rol_prof.organizacion
             asistencias_qs = Asistencia.objects.filter(
-                sesion__fecha__gte=inicio_mes,
-                sesion__fecha__lte=fin_mes,
+                **filtros_periodo("sesion__fecha", request=request),
                 sesion__profesores=profesor,
                 sesion__disciplina__organizacion=organizacion,
             )
             alumnos_unicos_mes = asistencias_qs.values("persona_id").distinct().count()
             asistencias_mes = asistencias_qs.count()
             sesiones_activas_qs = SesionClase.objects.filter(
-                fecha__gte=inicio_mes,
-                fecha__lte=fin_mes,
+                **filtros_periodo("fecha", request=request),
                 profesores=profesor,
                 disciplina__organizacion=organizacion,
             ).exclude(estado=SesionClase.Estado.CANCELADA)
             if not asistencias_mes and not sesiones_activas_qs.exists():
                 continue
-            sesiones_mes = sesiones_activas_qs.filter(
-                fecha__gte=inicio_mes,
-                fecha__lte=fin_mes,
-                estado=SesionClase.Estado.COMPLETADA,
-            ).distinct().count()
+            sesiones_mes = sesiones_activas_qs.filter(estado=SesionClase.Estado.COMPLETADA).distinct().count()
             disciplinas_qs = Disciplina.objects.filter(
                 sesiones__profesores=profesor,
                 organizacion=organizacion,
@@ -273,13 +315,11 @@ def profesores_list(request):
             )
     profesores_data.sort(key=lambda item: (item["persona"].apellidos or "", item["persona"].nombres or "", item["organizacion"].nombre or ""))
     asistencias_resumen_qs = Asistencia.objects.filter(
-        sesion__fecha__gte=inicio_mes,
-        sesion__fecha__lte=fin_mes,
+        **filtros_periodo("sesion__fecha", request=request),
         sesion__profesores__isnull=False,
     )
     sesiones_realizadas_qs = SesionClase.objects.filter(
-        fecha__gte=inicio_mes,
-        fecha__lte=fin_mes,
+        **filtros_periodo("fecha", request=request),
         estado=SesionClase.Estado.COMPLETADA,
         profesores__isnull=False,
     )
@@ -302,7 +342,6 @@ def profesores_list(request):
 def disciplinas_list(request):
     """Resumen de disciplinas con métricas operativas del período."""
     context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     organizacion = _organizacion_desde_request(request)
 
     disciplinas_qs = Disciplina.objects.select_related("organizacion")
@@ -312,26 +351,25 @@ def disciplinas_list(request):
     disciplinas = disciplinas_qs.annotate(
         sesiones_periodo=Count(
             "sesiones",
-            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            filter=Q(**filtros_periodo("sesiones__fecha", request=request)),
             distinct=True,
         ),
         sesiones_realizadas=Count(
             "sesiones",
             filter=Q(
-                sesiones__fecha__gte=inicio_mes,
-                sesiones__fecha__lte=fin_mes,
+                **filtros_periodo("sesiones__fecha", request=request),
                 sesiones__estado=SesionClase.Estado.COMPLETADA,
             ),
             distinct=True,
         ),
         asistencias_periodo=Count(
             "sesiones__asistencias",
-            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            filter=Q(**filtros_periodo("sesiones__fecha", request=request)),
             distinct=True,
         ),
         estudiantes_unicos=Count(
             "sesiones__asistencias__persona",
-            filter=Q(sesiones__fecha__gte=inicio_mes, sesiones__fecha__lte=fin_mes),
+            filter=Q(**filtros_periodo("sesiones__fecha", request=request)),
             distinct=True,
         ),
     ).order_by("-activa", "organizacion__nombre", "nombre", "nivel")
@@ -339,8 +377,7 @@ def disciplinas_list(request):
     context.update(
         {
             "disciplinas": disciplinas,
-            "inicio_mes": inicio_mes,
-            "fin_mes": fin_mes,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
             "organizacion_seleccionada": organizacion,
         }
     )
@@ -351,14 +388,12 @@ def disciplinas_list(request):
 def disciplina_detail(request, pk):
     """Detalle de disciplina con métricas de sesiones y asistencias por período."""
     context = _nav_context(request)
-    inicio_mes, fin_mes = _periodo(request)
     disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
 
     sesiones = (
         SesionClase.objects.filter(
             disciplina=disciplina,
-            fecha__gte=inicio_mes,
-            fecha__lte=fin_mes,
+            **filtros_periodo("fecha", request=request),
         )
         .prefetch_related(
             "profesores",
@@ -378,8 +413,7 @@ def disciplina_detail(request, pk):
 
     asistencias_qs = Asistencia.objects.filter(
         sesion__disciplina=disciplina,
-        sesion__fecha__gte=inicio_mes,
-        sesion__fecha__lte=fin_mes,
+        **filtros_periodo("sesion__fecha", request=request),
     )
     resumen = {
         "sesiones_total": sesiones.count(),
@@ -389,8 +423,7 @@ def disciplina_detail(request, pk):
     }
     profesores_periodo = Persona.objects.filter(
         sesiones_en_equipo__disciplina=disciplina,
-        sesiones_en_equipo__fecha__gte=inicio_mes,
-        sesiones_en_equipo__fecha__lte=fin_mes,
+        **filtros_periodo("sesiones_en_equipo__fecha", request=request),
     ).distinct().order_by("apellidos", "nombres")
 
     context.update(
@@ -399,8 +432,7 @@ def disciplina_detail(request, pk):
             "sesiones": sesiones,
             "resumen": resumen,
             "profesores_periodo": profesores_periodo,
-            "inicio_mes": inicio_mes,
-            "fin_mes": fin_mes,
+            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
         }
     )
     return render(request, "asistencias/disciplina_detail.html", context)
@@ -460,8 +492,6 @@ def persona_detail(request, pk):
     roles_codigos = set(persona.roles.values_list("rol__codigo", flat=True))
     es_estudiante = "ESTUDIANTE" in roles_codigos
     es_profesor = "PROFESOR" in roles_codigos
-    inicio_mes, fin_mes = _periodo(request)
-
     if request.method == "POST":
         if "asociar_pago_asistencia" in request.POST:
             asistencia = get_object_or_404(
@@ -473,8 +503,7 @@ def persona_detail(request, pk):
                 Payment,
                 pk=request.POST.get("pago_id"),
                 persona=persona,
-                fecha_pago__gte=inicio_mes,
-                fecha_pago__lte=fin_mes,
+                **filtros_periodo("fecha_pago", request=request),
             )
             if organizacion_filtro and pago.organizacion_id != organizacion_filtro.id:
                 messages.error(request, "El pago seleccionado no pertenece a la organizacion filtrada.")
@@ -504,7 +533,7 @@ def persona_detail(request, pk):
         )
         .order_by("-registrada_en")
     )
-    asistencias_periodo = asistencias_qs.filter(sesion__fecha__gte=inicio_mes, sesion__fecha__lte=fin_mes)
+    asistencias_periodo = asistencias_qs.filter(**filtros_periodo("sesion__fecha", request=request))
     if organizacion_filtro:
         asistencias_periodo = asistencias_periodo.filter(sesion__disciplina__organizacion=organizacion_filtro)
 
@@ -515,8 +544,7 @@ def persona_detail(request, pk):
         pagos_estudiante = (
             Payment.objects.filter(
                 persona=persona,
-                fecha_pago__gte=inicio_mes,
-                fecha_pago__lte=fin_mes,
+                **filtros_periodo("fecha_pago", request=request),
             )
             .select_related("organizacion", "plan", "documento_tributario")
             .annotate(
@@ -537,11 +565,12 @@ def persona_detail(request, pk):
         if organizacion_filtro:
             pagos_estudiante = pagos_estudiante.filter(organizacion=organizacion_filtro)
         pagos_estudiante = list(pagos_estudiante)
+        periodo_actual = resolver_periodo(request)
         finanzas_resumen = resumen_financiero_estudiante_periodo(
             persona,
-            inicio_mes,
-            fin_mes,
-            organizacion_filtro,
+            mes=periodo_actual["mes"],
+            anio=periodo_actual["anio"],
+            organizacion=organizacion_filtro,
         )
         for asistencia in asistencias_estudiante:
             consumo = getattr(asistencia, "consumo_financiero", None)
@@ -587,15 +616,13 @@ def persona_detail(request, pk):
     if es_profesor:
         sesiones_realizadas = SesionClase.objects.filter(
             profesores=persona,
-            fecha__gte=inicio_mes,
-            fecha__lte=fin_mes,
+            **filtros_periodo("fecha", request=request),
         ).select_related("disciplina", "disciplina__organizacion").order_by("-fecha")
         if organizacion_filtro:
             sesiones_realizadas = sesiones_realizadas.filter(disciplina__organizacion=organizacion_filtro)
         asistencias_prof = Asistencia.objects.filter(
             sesion__profesores=persona,
-            sesion__fecha__gte=inicio_mes,
-            sesion__fecha__lte=fin_mes,
+            **filtros_periodo("sesion__fecha", request=request),
         ).select_related("sesion__disciplina", "sesion__disciplina__organizacion")
         if organizacion_filtro:
             asistencias_prof = asistencias_prof.filter(sesion__disciplina__organizacion=organizacion_filtro)
@@ -673,32 +700,11 @@ def asistencias_list(request):
             persona_form = PersonaRapidaForm(request.POST)
             open_nueva_persona = True
             if persona_form.is_valid():
-                rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
-                if not organizacion:
-                    persona_form.add_error(
-                        None,
-                        "Debes seleccionar una organización en el filtro superior antes de crear a la persona.",
-                    )
-                elif rol_estudiante:
-                    persona = Persona.objects.create(
-                        nombres=persona_form.cleaned_data["nombres"].strip(),
-                        apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
-                        telefono=persona_form.cleaned_data.get("telefono", "").strip(),
-                    )
-                    PersonaRol.objects.get_or_create(
-                        persona=persona,
-                        rol=rol_estudiante,
-                        organizacion=organizacion,
-                        defaults={"activo": True},
-                    )
+                persona = _crear_persona_estudiante_en_organizacion(persona_form, organizacion)
+                if persona:
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     open_nueva_persona = False
                     return redirect(_url_actual_con_filtros(request))
-                else:
-                    persona_form.add_error(
-                        None,
-                        "No existe el rol ESTUDIANTE configurado para asignar a la nueva persona.",
-                    )
         elif "agregar_asistentes" in request.POST:
             asistencia_form = AsistenciaMasivaForm(request.POST)
             asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
@@ -720,14 +726,12 @@ def asistencias_list(request):
                 messages.success(request, f"Asistencias agregadas: {creados}.")
                 return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk))
 
-    inicio_mes, fin_mes = _periodo(request)
     estudiantes_total_disciplina_periodo = 0
     if sesion_seleccionada:
         estudiantes_disciplina_qs = Persona.objects.filter(
             roles__rol__codigo="ESTUDIANTE",
             asistencias__sesion__disciplina=sesion_seleccionada.disciplina,
-            asistencias__sesion__fecha__gte=inicio_mes,
-            asistencias__sesion__fecha__lte=fin_mes,
+            **filtros_periodo("asistencias__sesion__fecha", request=request),
         )
         if organizacion:
             estudiantes_disciplina_qs = estudiantes_disciplina_qs.filter(
@@ -743,7 +747,7 @@ def asistencias_list(request):
                 queryset=Asistencia.objects.select_related("persona", "consumo_financiero__pago").order_by("-registrada_en"),
             ),
         )
-        .filter(fecha__gte=inicio_mes, fecha__lte=fin_mes)
+        .filter(**filtros_periodo("fecha", request=request))
         .order_by("-fecha")
     )
     if organizacion:
@@ -809,12 +813,25 @@ def sesion_detail(request, pk):
         .distinct()
         .order_by("apellidos", "nombres")
     )
+    persona_form = PersonaRapidaForm()
+    open_nueva_persona = False
     if request.method == "POST":
         if "eliminar_sesion" in request.POST:
             sesion_resumen = str(sesion)
             sesion.delete()
             messages.success(request, f"Sesión eliminada: {sesion_resumen}.")
             return redirect(_url_con_filtros(request, "asistencias:sesiones_list"))
+        elif "crear_persona_estudiante" in request.POST:
+            persona_form = PersonaRapidaForm(request.POST)
+            open_nueva_persona = True
+            if persona_form.is_valid():
+                persona = _crear_persona_estudiante_en_organizacion(
+                    persona_form,
+                    sesion.disciplina.organizacion,
+                )
+                if persona:
+                    messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
+                    return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "eliminar_asistente" in request.POST:
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
@@ -869,6 +886,8 @@ def sesion_detail(request, pk):
             "total_asistentes": asistencias.count(),
             "estudiantes": estudiantes_qs,
             "asistentes_ids": asistentes_ids,
+            "persona_form": persona_form,
+            "open_nueva_persona": open_nueva_persona,
             "back_url": request.META.get("HTTP_REFERER") or _url_con_filtros(request, "asistencias:sesiones_list"),
         }
     )

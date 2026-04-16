@@ -34,6 +34,7 @@ Toda decision concreta de producto, modelo, navegacion, integracion o flujo oper
 - Si cambia la forma de trabajar del agente o la gobernanza documental, actualizar `AGENTS.md` y este archivo.
 - Si cambia la explicacion general para humanos, actualizar `README.md`.
 - Si cambia la operacion del proyecto en servidor o CI/CD, actualizar `docs/operacion/`.
+- Todo cambio de UI debe considerar comportamiento responsive especifico; mobile no debe ser una copia reducida de desktop, sino una resolucion adecuada de la misma necesidad.
 
 ## Criterios de calidad
 - Evitar duplicar texto largo entre archivos.

@@ -49,7 +49,7 @@ class OrganizacionAdmin(admin.ModelAdmin):
 @admin.register(Persona)
 class PersonaAdmin(admin.ModelAdmin):
     list_display = ("nombres", "apellidos", "email", "telefono", "activo", "creado_en", "user")
-    search_fields = ("nombres", "apellidos", "email", "telefono", "identificador")
+    search_fields = ("nombres", "apellidos", "email", "telefono", "rut")
     list_filter = ("activo", ("creado_en", admin.DateFieldListFilter))
     autocomplete_fields = ("user",)
     list_per_page = 25

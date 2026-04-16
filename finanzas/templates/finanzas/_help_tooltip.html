@@ -1,0 +1,13 @@
+{% if ayuda_seccion %}
+  <button
+    type="button"
+    class="btn btn-sm p-0 border-0 bg-transparent d-inline-flex align-items-center text-warning-emphasis finanzas-help-trigger"
+    data-help-title="{{ ayuda_seccion.titulo }}"
+    data-help-text="{{ ayuda_seccion.texto }}"
+    role="button"
+    aria-label="{{ ayuda_seccion.titulo }}"
+    style="cursor: help; line-height: 1;"
+  >
+    <i class="bi bi-info-circle"></i>
+  </button>
+{% endif %}

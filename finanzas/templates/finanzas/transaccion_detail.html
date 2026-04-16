@@ -4,21 +4,14 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Detalle de transaccion</h2>
+    <h2 class="mb-0 finanzas-help-title">Detalle de transaccion {% include "finanzas/_help_tooltip.html" %}</h2>
     <div class="d-flex gap-2">
-      <a class="btn btn-sm btn-outline-secondary" href="{{ back_url }}">
-        <i class="bi bi-arrow-left"></i><span class="ms-1">Volver</span>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ back_url }}" title="Volver">
+        <i class="bi bi-arrow-left"></i><span class="finanzas-btn-label">Volver</span>
       </a>
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_edit' transaccion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
-        <i class="bi bi-pencil"></i><span class="ms-1">Editar</span>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:transaccion_edit' transaccion.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Editar">
+        <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
       </a>
-    </div>
-  </div>
-  <div class="alert alert-light border shadow-sm mb-3">
-    <div class="fw-semibold mb-1">Que guardar aqui</div>
-    <div class="small text-muted mb-0">
-      Esta pantalla describe un movimiento de caja. El archivo adjunto corresponde al respaldo del movimiento, como transferencia,
-      cartola o comprobante. Los documentos tributarios relacionados se gestionan por separado.
     </div>
   </div>
 
@@ -56,7 +49,9 @@
         <div class="card-body">
           {% if transaccion.archivo %}
             <div class="d-flex gap-2 mb-3">
-              <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:transaccion_archivo' transaccion.pk %}" target="_blank">Abrir archivo</a>
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:transaccion_archivo' transaccion.pk %}" target="_blank" title="Abrir archivo">
+                <i class="bi bi-box-arrow-up-right"></i><span class="finanzas-btn-label">Abrir archivo</span>
+              </a>
             </div>
             {% if archivo_es_pdf %}
               <div class="border rounded overflow-hidden">

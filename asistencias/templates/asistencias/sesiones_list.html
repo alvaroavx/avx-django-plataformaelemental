@@ -3,54 +3,119 @@
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Sesiones - {{ mes_actual|date:"F Y" }}</h2>
+    <h2>
+      {% if mostrar_calendario %}
+        Sesiones - {{ mes_actual|date:"F Y" }}
+      {% else %}
+        Sesiones - {{ periodo_descripcion_vista }}
+      {% endif %}
+    </h2>
     <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
       <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
     </a>
   </div>
-  <div class="table-responsive">
-    <table class="table table-bordered align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Lunes</th>
-          <th>Martes</th>
-          <th>Miércoles</th>
-          <th>Jueves</th>
-          <th>Viernes</th>
-          <th>Sábado</th>
-          <th>Domingo</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for semana in semanas %}
-        <tr style="height: 140px;">
-          {% for dia in semana %}
-          <td class="position-relative {% if not dia.en_mes %}bg-light text-muted{% endif %}">
-            <div class="position-absolute top-0 start-0 m-2 fw-bold fs-6">{{ dia.fecha|date:"d" }}</div>
-            <div class="pt-4">
-            {% for item in dia.sesiones %}
-              <div class="mb-2 p-2 bg-white border rounded">
-                <a class="badge {{ item.badge_class }} text-decoration-none mb-1 d-inline-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                  {{ item.sesion.disciplina }}
-                </a>
-                <a class="small text-muted text-decoration-none d-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                  {% if item.sesion.estado == "cancelada" %}
-                    sesión cancelada
-                  {% else %}
-                    asistentes: {{ item.sesion.asistencias.count }}
-                  {% endif %}
-                </a>
+  {% if mostrar_calendario %}
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Lunes</th>
+            <th>Martes</th>
+            <th>Miércoles</th>
+            <th>Jueves</th>
+            <th>Viernes</th>
+            <th>Sábado</th>
+            <th>Domingo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for semana in semanas %}
+          <tr style="height: 140px;">
+            {% for dia in semana %}
+            <td class="position-relative {% if not dia.en_mes %}bg-light text-muted{% endif %}">
+              <div class="position-absolute top-0 start-0 m-2 fw-bold fs-6">{{ dia.fecha|date:"d" }}</div>
+              <div class="pt-4">
+              {% for item in dia.sesiones %}
+                <div class="mb-2 p-2 bg-white border rounded">
+                  <a class="badge {{ item.badge_class }} text-decoration-none mb-1 d-inline-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                    {{ item.sesion.disciplina }}
+                  </a>
+                  <a class="small text-muted text-decoration-none d-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                    {% if item.sesion.estado == "cancelada" %}
+                      sesión cancelada
+                    {% else %}
+                      asistentes: {{ item.sesion.asistencias.count }}
+                    {% endif %}
+                  </a>
+                </div>
+              {% empty %}
+                <div class="text-muted small">Sin sesiones</div>
+              {% endfor %}
               </div>
-            {% empty %}
-              <div class="text-muted small">Sin sesiones</div>
+            </td>
             {% endfor %}
-            </div>
-          </td>
+          </tr>
           {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card">
+      <div class="card-body table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Disciplina</th>
+              <th>Profesores</th>
+              <th>Estado</th>
+              <th>Asistentes</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sesion in sesiones_listado %}
+            <tr>
+              <td>{{ sesion.fecha|date:"d/m/Y" }}</td>
+              <td>{{ sesion.disciplina }}</td>
+              <td>
+                {% for profesor in sesion.profesores.all %}
+                  {{ profesor }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                  <span class="text-muted">Sin profesor</span>
+                {% endfor %}
+              </td>
+              <td>
+                {% if sesion.estado == "cancelada" %}
+                  <span class="badge text-bg-danger">Cancelada</span>
+                {% elif sesion.estado == "completada" %}
+                  <span class="badge text-bg-success">Completada</span>
+                {% else %}
+                  <span class="badge text-bg-info">Programada</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if sesion.estado == "cancelada" %}
+                  <span class="text-muted">Sesión cancelada</span>
+                {% else %}
+                  {{ sesion.asistencias.count }}
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                  Ver sesión
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">No hay sesiones para el período seleccionado.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

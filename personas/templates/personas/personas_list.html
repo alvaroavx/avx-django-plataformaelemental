@@ -22,7 +22,7 @@
         <input type="hidden" name="organizacion" value="{{ organizacion_id }}">
         <div class="col-md-4">
           <label class="form-label">Buscar</label>
-          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nombre, email, telefono o identificador">
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nombre, email, telefono o RUT">
         </div>
         <div class="col-md-2">
           <label class="form-label">Rol</label>
@@ -90,7 +90,7 @@
           <tr>
             <td>
               <div class="fw-semibold">{{ item }}</div>
-              <div class="small text-muted">{{ item.identificador|default:"Sin identificador" }}</div>
+              <div class="small text-muted">{{ item.rut|default:"Sin RUT" }}</div>
             </td>
             <td>
               {% for rol_asignado in item.roles.all %}

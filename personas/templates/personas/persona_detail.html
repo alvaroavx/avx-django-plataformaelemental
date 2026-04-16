@@ -22,7 +22,7 @@
           <div class="mb-2"><span class="small text-muted d-block">Nombre</span>{{ persona_obj }}</div>
           <div class="mb-2"><span class="small text-muted d-block">Email</span>{{ persona_obj.email|default:"-" }}</div>
           <div class="mb-2"><span class="small text-muted d-block">Telefono</span>{{ persona_obj.telefono|default:"-" }}</div>
-          <div class="mb-2"><span class="small text-muted d-block">Identificador</span>{{ persona_obj.identificador|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">RUT</span>{{ persona_obj.rut|default:"-" }}</div>
           <div class="mb-2"><span class="small text-muted d-block">Nacimiento</span>{% if persona_obj.fecha_nacimiento %}{{ persona_obj.fecha_nacimiento|date:"d/m/Y" }}{% else %}-{% endif %}</div>
           <div class="mb-2"><span class="small text-muted d-block">Estado</span>{% if persona_obj.activo %}<span class="badge text-bg-success">Activa</span>{% else %}<span class="badge text-bg-secondary">Inactiva</span>{% endif %}</div>
           <div class="mb-0"><span class="small text-muted d-block">Creado</span>{{ persona_obj.creado_en|date:"d/m/Y H:i" }}</div>

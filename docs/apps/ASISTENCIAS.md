@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-04-14
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -12,6 +12,9 @@ Debe privilegiar:
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
+- Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
+- Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
+- `periodo_mes` y `periodo_anio` deben aceptar la opcion `Todos`, permitiendo filtrar por todos los meses, todos los años, o combinaciones parciales como `todos los meses de un año` y `un mes en todos los años`.
 - La administracion de organizaciones no vive aqui; vive en `personas`.
 - El perfil operativo de persona debe respetar siempre el periodo y la organizacion activos.
 - Las asistencias deben poder verse junto con su estado financiero.
@@ -35,7 +38,10 @@ Debe privilegiar:
 - En `asistencias/sesiones/<id>/`, la eliminacion de una sesion debe pedir confirmacion explicita y borrar en cascada sus asistencias y dependencias asociadas.
 - En `asistencias/sesiones/<id>/`, el listado de asistentes debe incluir estado de pago y permitir quitar asistentes individualmente desde la sesion, con confirmacion previa.
 - En `asistencias/sesiones/<id>/`, debe existir una opcion para editar la sesion, manteniendo filtros globales y permitiendo actualizar disciplina, fecha y profesores.
+- En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/`, una sesion cancelada debe mostrarse como `sesión cancelada` y no como `asistentes: 0`, para no confundir cancelacion con falta de registro.
+- En `asistencias/sesiones/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
+- En el dashboard de `asistencias`, la ultima seccion debe tener tres columnas: estudiantes sin asistencia, estudiantes con deuda por cantidad de clases, y estudiantes con mas asistencia ordenados de mayor a menor en el periodo.
 
 ## Relacion con finanzas
 - `asistencias` no define la verdad financiera completa.

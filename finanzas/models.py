@@ -129,6 +129,20 @@ class DocumentoTributario(TimeStampedModel):
         null=True,
         blank=True,
     )
+    persona_relacionada = models.ForeignKey(
+        "personas.Persona",
+        on_delete=models.SET_NULL,
+        related_name="documentos_tributarios_relacionados",
+        null=True,
+        blank=True,
+    )
+    organizacion_relacionada = models.ForeignKey(
+        "personas.Organizacion",
+        on_delete=models.SET_NULL,
+        related_name="documentos_tributarios_relacionados",
+        null=True,
+        blank=True,
+    )
     archivo_pdf = models.FileField(upload_to="finanzas/documentos/pdf/", null=True, blank=True)
     archivo_xml = models.FileField(upload_to="finanzas/documentos/xml/", null=True, blank=True)
     enlace_sii = models.URLField(blank=True)

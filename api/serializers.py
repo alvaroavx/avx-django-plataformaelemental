@@ -38,7 +38,7 @@ class PersonaApiSerializer(serializers.ModelSerializer):
             "nombre_completo",
             "email",
             "telefono",
-            "identificador",
+            "rut",
             "activo",
             "roles",
         ]
