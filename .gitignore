@@ -8,8 +8,7 @@ __pycache__/
 
 # Virtual environments
 venv/
-!.venv/
-!.venv/**
+.venv/
 
 # Django
 db.sqlite3
@@ -27,3 +26,5 @@ staticfiles/
 .idea/
 Thumbs.db
 .DS_Store
+
+node_modules/
