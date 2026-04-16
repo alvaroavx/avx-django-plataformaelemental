@@ -77,30 +77,34 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # printf "%s" evita agregar un salto de linea extra al final del secret.
-          # tr -d '\r' elimina retornos de carro si la clave fue pegada desde Windows o desde un portapapeles que los conserve.
-          printf "%s" "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf "%s" "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
-            echo "DEPLOY_SSH_KEY no pudo cargarse como una clave privada SSH valida." >&2
-            echo "Verifica que el secret contenga la clave privada completa, no la .pub, y que la nueva llave de deploy no tenga passphrase." >&2
-            exit 1
-          fi
+          ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null
 
           touch ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          if ! ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/tmp/ssh-keyscan.err; then
-            echo "No se pudo obtener la host key del servidor con ssh-keyscan." >&2
-            echo "Revisa DEPLOY_HOST, DEPLOY_PORT y que el servidor SSH sea accesible desde GitHub Actions." >&2
-            cat /tmp/ssh-keyscan.err >&2 || true
-            exit 1
-          fi
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Debug SSH key file
+        env:
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf "%s" "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          echo "bytes: $(wc -c < ~/.ssh/deploy_key)"
+          echo "first line: $(head -n 1 ~/.ssh/deploy_key)"
+          echo "last line: $(tail -n 1 ~/.ssh/deploy_key)"
+          ssh-keygen -lf ~/.ssh/deploy_key
 
       - name: Deploy to production
         env:
