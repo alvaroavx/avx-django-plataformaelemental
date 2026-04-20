@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-04-04
+Fecha de actualizacion: 2026-04-20
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -146,15 +146,34 @@ En el archivo de entorno de produccion conviene definir al menos:
 ## Flujo del workflow
 1. `actions/checkout`
 2. instalar dependencias Python
-3. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-4. validar secrets obligatorios
-5. escribir la llave privada en `~/.ssh/deploy_key`
-6. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
-7. poblar `known_hosts` con `ssh-keyscan`
-8. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
-9. `git fetch`
-10. `git reset --hard origin/main`
-11. ejecutar `bash scripts/deploy.sh`
+3. levantar un servicio PostgreSQL 16 para el job `test`
+4. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests` contra PostgreSQL
+5. validar secrets obligatorios
+6. escribir la llave privada en `~/.ssh/deploy_key`
+7. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
+8. poblar `known_hosts` con `ssh-keyscan`
+9. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
+10. `git fetch`
+11. `git reset --hard origin/main`
+12. ejecutar `bash scripts/deploy.sh`
+
+## Base De Datos En CI
+- El entorno `dev` usa PostgreSQL, por lo tanto GitHub Actions debe levantar PostgreSQL para ejecutar tests.
+- El job `test` usa un service container `postgres:16` con:
+  - `POSTGRES_DB=plataforma_elemental_dev`
+  - `POSTGRES_USER=plataforma_user`
+  - `POSTGRES_PASSWORD=plataforma_password`
+  - `POSTGRES_HOST=127.0.0.1`
+  - `POSTGRES_PORT=5432`
+- No se debe volver a SQLite solo para CI; los tests deben correr sobre el mismo motor elegido para desarrollo y produccion.
+
+## SSH En CI
+- El workflow usa exclusivamente `DEPLOY_SSH_KEY` como llave privada directa.
+- No se usa `DEPLOY_SSH_KEY_B64`.
+- La llave se escribe con `printf "%s"` para no agregar saltos de linea extra.
+- La llave pasa por `tr -d '\r'` para remover retornos de carro pegados accidentalmente desde otros sistemas.
+- El comando `ssh` usa `-i ~/.ssh/deploy_key` y `IdentitiesOnly=yes` para no depender de nombres por defecto de OpenSSH.
+- No debe existir un paso de debug que imprima primera o ultima linea de la llave privada.
 
 ## Que hace `scripts/deploy.sh`
 - carga variables desde `DEPLOY_ENV_FILE` si existe

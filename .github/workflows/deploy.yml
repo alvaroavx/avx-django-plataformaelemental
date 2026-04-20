@@ -14,6 +14,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: plataforma_elemental_dev
+          POSTGRES_USER: plataforma_user
+          POSTGRES_PASSWORD: plataforma_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plataforma_user -d plataforma_elemental_dev"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,6 +45,11 @@ jobs:
       - name: Run test suite
         env:
           DJANGO_ENV: dev
+          POSTGRES_DB: plataforma_elemental_dev
+          POSTGRES_USER: plataforma_user
+          POSTGRES_PASSWORD: plataforma_password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
         run: python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
 
   deploy:
@@ -77,13 +97,15 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          printf "%s" "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          # printf "%s" evita agregar un salto de linea extra al final de la llave privada.
+          # tr -d '\r' corrige claves pegadas desde Windows/portapapeles con retornos de carro.
+          # El nombre deploy_key evita depender de nombres por defecto como id_ed25519.
+          printf "%s" "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
           ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null
@@ -91,20 +113,6 @@ jobs:
           touch ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
           ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-
-      - name: Debug SSH key file
-        env:
-          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf "%s" "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          echo "bytes: $(wc -c < ~/.ssh/deploy_key)"
-          echo "first line: $(head -n 1 ~/.ssh/deploy_key)"
-          echo "last line: $(tail -n 1 ~/.ssh/deploy_key)"
-          ssh-keygen -lf ~/.ssh/deploy_key
 
       - name: Deploy to production
         env:
