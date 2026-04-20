@@ -162,8 +162,9 @@ En el archivo de entorno de produccion conviene definir al menos:
 - crea virtualenv si no existe
 - instala dependencias
 - ejecuta `python manage.py migrate --noinput`
+- ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
-- ejecuta `python manage.py check`
+- ejecuta `python manage.py check --deploy`
 - reinicia el servicio systemd
 
 ## Rollback simple
@@ -189,11 +190,11 @@ bash scripts/deploy.sh
 - `gunicorn` no estaba declarado como dependencia de produccion; se agrego a `requirements.txt`.
 - No hay hasta ahora configuracion de `systemd`, `nginx` o proceso WSGI versionada; por eso se agrega el unit file ejemplo.
 - El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
-- `python manage.py check --deploy` no se ejecuta automaticamente porque la configuracion de produccion todavia es minima y podria bloquear deploys hasta cerrar endurecimiento de seguridad.
+- `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
 - Si `DEPLOY_SSH_KEY` contiene una clave con passphrase o una clave mal pegada, el workflow fallara antes de intentar el SSH remoto.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado
 - servir Django detras de Nginx o un proxy equivalente
 - no hacer cambios manuales dentro del clon de produccion
-- revisar luego endurecimiento de `prod.py` para poder pasar a `check --deploy`
+- mantener `DEPLOY_ENV_FILE` apuntando a un archivo real con `DJANGO_ENV=prod`, `POSTGRES_*`, `DJANGO_SECRET_KEY`, hosts permitidos y variables de seguridad de sesion.

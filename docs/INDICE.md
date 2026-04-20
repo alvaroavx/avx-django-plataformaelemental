@@ -1,6 +1,6 @@
 # INDICE
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-04-20
 
 Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta al trabajar sobre el repo.
 
@@ -20,6 +20,10 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
    Resumen humano y puesta en marcha.
 6. [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
    Guia operativa de CI/CD y despliegue.
+7. [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
+   Informacion real del proyecto para planificar migracion de SQLite a PostgreSQL.
+8. [docs/operacion/SEGURIDAD_PRODUCCION.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/SEGURIDAD_PRODUCCION.md)
+   Reglas vigentes de sesiones, cookies, HTTPS y headers para produccion.
 
 ## Como mantenerla
 - Cada decision concreta debe quedar documentada en el mismo cambio de codigo.
@@ -33,6 +37,8 @@ Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta
 - `docs/apps/`: decisiones y criterios por app.
 - `docs/proceso/`: reglas de mantenimiento y documentacion.
 - `docs/operacion/`: guias operativas del proyecto.
+- `docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md`: auditoria de settings, modelos, migraciones, datos y entorno para migracion a PostgreSQL.
+- `docs/operacion/SEGURIDAD_PRODUCCION.md`: configuracion operativa de seguridad para produccion.
 - `docs/apps/ASISTENCIAS.md`: decisiones de la app `asistencias`.
 - `docs/apps/PERSONAS.md`: decisiones de la app `personas`.
 - `docs/apps/FINANZAS.md`: decisiones de la app `finanzas`.

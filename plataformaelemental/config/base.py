@@ -23,6 +23,17 @@ def env_list(var_name: str, default: str = "") -> List[str]:
     return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+def env_bool(var_name: str, default: bool = False) -> bool:
+    """
+    Read a boolean environment variable using explicit common truthy values.
+    """
+
+    raw_value = os.environ.get(var_name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-please-change-me",
@@ -75,13 +86,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "plataformaelemental.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -97,7 +101,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-DEBUG=True
+DEBUG = False
 LANGUAGE_CODE = "es-cl"
 TIME_ZONE = "America/Santiago"
 USE_I18N = True
@@ -114,6 +118,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/asistencias/"
 LOGOUT_REDIRECT_URL = "/accounts/login/"
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

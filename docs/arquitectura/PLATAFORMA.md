@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-04-08
+Fecha de actualizacion: 2026-04-20
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -38,10 +38,22 @@ Adicionalmente existen:
 ## Arquitectura vigente
 - Framework: Django 5
 - API: Django REST Framework
-- Base de datos de desarrollo: SQLite
+- Base de datos: PostgreSQL configurado por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`
 - UI: Bootstrap 5, DataTables y Tom Select via CDN
 - Zona horaria: `America/Santiago`
 - Despliegue minimo versionado: GitHub Actions + SSH + `systemd` + `gunicorn`
+
+## Base de datos
+- `plataformaelemental/config/base.py` no debe declarar `DATABASES`; solo mantiene defaults comunes y helpers de entorno.
+- `plataformaelemental/config/dev.py` declara PostgreSQL con defaults de desarrollo:
+  - `POSTGRES_DB=plataforma_elemental_dev`
+  - `POSTGRES_USER=plataforma_user`
+  - `POSTGRES_PASSWORD=tu_password_dev` definido en `.env.dev`
+  - `POSTGRES_HOST=127.0.0.1`
+  - `POSTGRES_PORT=5432`
+- Para cargar `.env.dev` manualmente en local se debe usar `set -a; source .env.dev; set +a`; valores con caracteres especiales de shell deben ir entre comillas.
+- `plataformaelemental/config/prod.py` declara PostgreSQL con `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` obligatorios mediante `os.environ[...]`; si falta una variable, el arranque debe fallar fuerte.
+- El driver PostgreSQL versionado es `psycopg[binary]==3.2.9`.
 
 ## Apps
 
@@ -177,6 +189,10 @@ Regla vigente:
 - la API externa base usa token de DRF para usuarios y API key de solo lectura para consultas
 - la API tiene rate limiting por usuario, API key o IP, y un throttling mas estricto para login
 - la API key puede enviarse por `X-API-Key` o por `Authorization: ApiKey <clave>`
+- En produccion, las sesiones expiran por inactividad en 2 horas por defecto (`SESSION_COOKIE_AGE=7200`) y se renuevan solo con actividad (`SESSION_SAVE_EVERY_REQUEST=True`).
+- En produccion, la cookie de sesion se llama `elemental_sessionid`; esto invalida cookies historicas `sessionid` despues del deploy.
+- En produccion, `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`, `SECURE_SSL_REDIRECT=True` y HSTS inicia con `SECURE_HSTS_SECONDS=3600`.
+- La guia operativa de seguridad vive en `docs/operacion/SEGURIDAD_PRODUCCION.md`.
 
 ## Deploy
 - El flujo minimo de CI/CD corre en GitHub Actions al hacer push a `main`.

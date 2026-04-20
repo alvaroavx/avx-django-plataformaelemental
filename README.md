@@ -52,7 +52,7 @@ Reglas funcionales vigentes:
 ### Stack
 - Django 5
 - Django REST Framework
-- SQLite en desarrollo
+- PostgreSQL por entorno (`dev` y `prod`)
 - Bootstrap 5
 - DataTables
 - Tom Select
