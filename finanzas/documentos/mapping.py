@@ -216,13 +216,22 @@ def pago_initial_from_normalized(normalized, organizacion_id=None):
     nombre = normalized.get_value("receptor", "razon_social") or ""
     rut = normalized.get_value("receptor", "rut") or ""
     persona = _buscar_persona_sugerida(organizacion_id, rut, nombre)
+    medio_pago = (normalized.get_value("encabezado", "medio_pago") or "").lower()
+    metodo_pago = Payment.Metodo.EFECTIVO
+    if "transfer" in medio_pago:
+        metodo_pago = Payment.Metodo.TRANSFERENCIA
+    elif "tarjeta" in medio_pago:
+        metodo_pago = Payment.Metodo.TARJETA
+    elif medio_pago:
+        metodo_pago = Payment.Metodo.OTRO
+    monto_iva = normalized.get_value("montos", "iva") or Decimal("0")
     return {
         "organizacion": organizacion_id or "",
         "persona": persona.pk if persona else "",
         "fecha_pago": normalized.get_value("encabezado", "fecha_emision", ""),
-        "metodo_pago": Payment.Metodo.EFECTIVO,
+        "metodo_pago": metodo_pago,
         "numero_comprobante": "",
-        "aplica_iva": False,
+        "aplica_iva": bool(monto_iva),
         "monto_incluye_iva": True,
         "monto_referencia": normalized.get_value("montos", "total_bruto") or Decimal("0"),
         "clases_asignadas": 0,

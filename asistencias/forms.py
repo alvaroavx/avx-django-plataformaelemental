@@ -27,7 +27,7 @@ class DisciplinaForm(forms.ModelForm):
 
 class SesionBasicaForm(forms.Form):
     disciplina = forms.ModelChoiceField(
-        queryset=Disciplina.objects.all(),
+        queryset=Disciplina.objects.none(),
         required=True,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
@@ -36,10 +36,24 @@ class SesionBasicaForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     profesores = forms.ModelMultipleChoiceField(
-        queryset=Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
+        queryset=Persona.objects.none(),
         required=False,
         widget=forms.SelectMultiple(attrs={"id": "id_profesores_basica", "class": "form-select"}),
     )
+
+    def __init__(self, *args, organizacion=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        disciplinas_qs = Disciplina.objects.filter(activa=True)
+        profesores_qs = Persona.objects.filter(
+            activo=True,
+            roles__rol__codigo="PROFESOR",
+            roles__activo=True,
+        )
+        if organizacion is not None:
+            disciplinas_qs = disciplinas_qs.filter(organizacion=organizacion)
+            profesores_qs = profesores_qs.filter(roles__organizacion=organizacion)
+        self.fields["disciplina"].queryset = disciplinas_qs.order_by("nombre")
+        self.fields["profesores"].queryset = profesores_qs.distinct().order_by("apellidos", "nombres")
 
 
 class AsistenciaMasivaForm(forms.Form):

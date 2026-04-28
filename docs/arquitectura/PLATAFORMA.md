@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-04-20
+Fecha de actualizacion: 2026-04-28
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -160,6 +160,7 @@ Estado actual:
 - soporte inicial para boleta de honorarios XML
 - PDF fallback basico
 - fallback PDF mejorado para boletas de honorarios electronicas
+- fallback PDF mejorado tambien para boletas de venta electronicas tipo 39 y 41 con glosa libre, medio de pago y total extraible desde PDF
 - fallback PDF con `pdftotext` del sistema cuando no hay parser Python disponible
 - parseo y revision antes del guardado
 - la revision muestra visor inline del archivo temporal para comparar PDF/XML con los campos precargados

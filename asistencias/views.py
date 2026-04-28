@@ -663,7 +663,7 @@ def asistencias_list(request):
         asistentes_ids = set(
             Asistencia.objects.filter(sesion=sesion_seleccionada).values_list("persona_id", flat=True)
         )
-    sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()})
+    sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()}, organizacion=organizacion)
     asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
     persona_form = PersonaRapidaForm()
     open_nueva_persona = False
@@ -672,7 +672,7 @@ def asistencias_list(request):
 
     if request.method == "POST":
         if "crear_sesion" in request.POST:
-            sesion_form = SesionBasicaForm(request.POST)
+            sesion_form = SesionBasicaForm(request.POST, organizacion=organizacion)
             if sesion_form.is_valid():
                 disciplina = sesion_form.cleaned_data["disciplina"]
                 fecha = sesion_form.cleaned_data["fecha"] or timezone.localdate()

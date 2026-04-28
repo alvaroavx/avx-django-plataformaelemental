@@ -347,6 +347,19 @@ class PdfFallbackParser(BaseTaxDocumentParser):
         return ""
 
     @staticmethod
+    def _join_wrapped_lines(parts):
+        resultado = []
+        for parte in parts:
+            texto = re.sub(r"\s+", " ", (parte or "")).strip()
+            if not texto:
+                continue
+            if resultado and resultado[-1] and resultado[-1][-1].isalpha() and texto[0].islower():
+                resultado[-1] = f"{resultado[-1]}{texto}"
+            else:
+                resultado.append(texto)
+        return " ".join(resultado).strip()
+
+    @staticmethod
     def _parse_fee_receipt_pdf(text, normalized):
         raw_lines = [line.rstrip() for line in text.splitlines() if line.strip()]
         lines = [re.sub(r"\s+", " ", line).strip() for line in raw_lines]
@@ -502,6 +515,136 @@ class PdfFallbackParser(BaseTaxDocumentParser):
                 normalized.lineas.append(linea)
 
     @staticmethod
+    def _parse_sales_receipt_pdf(text, normalized):
+        raw_lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+        lines = [re.sub(r"\s+", " ", line).strip() for line in raw_lines]
+        es_exenta = normalized.get_value("encabezado", "tipo_documento_sugerido") == "boleta_venta_exenta"
+        normalized.set_field("encabezado", "tipo_tributario", "41" if es_exenta else "39", "pdf", "high")
+
+        folio_match = re.search(
+            r"BOLETA(?:\s+EXENTA)?\s+ELECTR[ÓO]NICA\s+NUMERO:\s*([\d\.\,]+)",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if not folio_match:
+            folio_match = re.search(
+                r"BOLETA(?:\s+EXENTA)?\s+ELECTR[ÓO]NICA\s+NUMERO:\s*\n+\s*([\d\.\,]+)",
+                text,
+                flags=re.IGNORECASE,
+            )
+        if folio_match:
+            folio = re.sub(r"\D", "", folio_match.group(1))
+            if folio:
+                normalized.set_field("encabezado", "folio", folio, "pdf", "high")
+
+        fecha_match = re.search(r"Fecha:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", text, flags=re.IGNORECASE)
+        if fecha_match:
+            normalized.set_field("encabezado", "fecha_emision", fecha_match.group(1), "pdf", "high")
+
+        rut_index = next(
+            (
+                idx
+                for idx, line in enumerate(lines)
+                if re.fullmatch(r"\d{1,3}(?:\.\d{3}){2}-\s*[\dkK]|\d{7,8}-\s*[\dkK]", line)
+            ),
+            None,
+        )
+        if rut_index is not None:
+            emisor_rut = re.sub(r"\s+", "", lines[rut_index]).upper()
+            normalized.set_field("emisor", "rut", emisor_rut, "pdf", "high")
+            nombre_emisor = " ".join(item for item in lines[:rut_index] if item).strip()
+            if nombre_emisor:
+                normalized.set_field("emisor", "razon_social", nombre_emisor, "pdf", "high")
+
+        giro_index = next((idx for idx, line in enumerate(lines) if line.upper().startswith("GIRO:")), None)
+        if giro_index is not None:
+            giro_lines = []
+            for idx in range(giro_index, len(lines)):
+                line = lines[idx]
+                upper_line = line.upper()
+                if upper_line.startswith("BOLETA ELECTR"):
+                    break
+                if idx == giro_index:
+                    giro_lines.append(line.split(":", 1)[1].strip() if ":" in line else line)
+                    continue
+                giro_lines.append(line)
+            if giro_lines:
+                normalized.set_field("emisor", "giro", " ".join(giro_lines).strip(), "pdf", "medium")
+
+        direccion_index = next((idx for idx, line in enumerate(lines) if line.upper().startswith("DIRECCIÓN:") or line.upper().startswith("DIRECCION:")), None)
+        if direccion_index is not None:
+            direccion = lines[direccion_index].split(":", 1)[1].strip() if ":" in lines[direccion_index] else lines[direccion_index]
+            if direccion:
+                normalized.set_field("receptor", "direccion", direccion, "pdf", "medium")
+
+        medio_index = next((idx for idx, line in enumerate(lines) if line.upper().startswith("MEDIO DE PAGO:")), None)
+        if medio_index is not None:
+            medio_partes = []
+            glosa_partes = []
+            total_bruto = None
+            monto_iva = Decimal("0") if es_exenta else None
+            monto_neto = None
+
+            medio_inicial = lines[medio_index].split(":", 1)[1].strip() if ":" in lines[medio_index] else ""
+            if medio_inicial:
+                medio_partes.append(medio_inicial)
+
+            idx = medio_index + 1
+            while idx < len(lines):
+                line = lines[idx]
+                if re.search(r"\$\s*[\d\.\,]+", line):
+                    total_match = re.search(r"\$\s*([\d\.\,]+)", line)
+                    if total_match:
+                        total_bruto = _money_decimal(total_match.group(1))
+                    idx += 1
+                    break
+                if not glosa_partes and len(line.split()) <= 2 and "-" not in line and "(" not in line and ")" not in line and not any(char.isdigit() for char in line):
+                    medio_partes.append(line)
+                else:
+                    glosa_partes.append(line)
+                idx += 1
+
+            while idx < len(lines):
+                line = lines[idx]
+                if "TIMBRE ELECTR" in _fold_text(line):
+                    break
+                iva_match = re.search(r"de:\s*\$\s*([\d\.\,]+)", line, flags=re.IGNORECASE)
+                if iva_match:
+                    monto_iva = _money_decimal(iva_match.group(1))
+                    break
+                idx += 1
+
+            medio_pago = PdfFallbackParser._join_wrapped_lines(medio_partes)
+            glosa = PdfFallbackParser._join_wrapped_lines(glosa_partes)
+
+            if total_bruto is not None and monto_iva is not None and not es_exenta:
+                monto_neto = total_bruto - monto_iva
+
+            if medio_pago:
+                normalized.set_field("encabezado", "medio_pago", medio_pago, "pdf", "high")
+            if total_bruto is not None:
+                normalized.set_field("montos", "total_bruto", total_bruto, "pdf", "high")
+            if monto_iva is not None:
+                normalized.set_field("montos", "iva", monto_iva, "pdf", "high")
+                normalized.set_field("montos", "tasa_iva", Decimal("0" if es_exenta else "19"), "inferred", "high")
+            if es_exenta:
+                normalized.set_field("montos", "neto", Decimal("0"), "inferred", "high")
+                normalized.set_field("montos", "exento", total_bruto or Decimal("0"), "pdf", "high")
+            else:
+                if monto_neto is not None:
+                    normalized.set_field("montos", "neto", monto_neto, "inferred", "high")
+                normalized.set_field("montos", "exento", Decimal("0"), "inferred", "high")
+
+            if glosa:
+                linea = NormalizedTaxLine()
+                linea.set_field("numero_linea", 1, "pdf", "medium")
+                linea.set_field("descripcion", glosa, "pdf", "high")
+                linea.set_field("cantidad", Decimal("1"), "inferred", "medium")
+                linea.set_field("precio_unitario", total_bruto or monto_neto, "pdf", "medium")
+                linea.set_field("subtotal_linea", total_bruto or monto_neto, "pdf", "medium")
+                normalized.lineas.append(linea)
+
+    @staticmethod
     def _parse_pdf_field_patterns(text, normalized):
         text = PdfFallbackParser._normalize_pdf_text(text)
         upper = text.upper()
@@ -536,6 +679,11 @@ class PdfFallbackParser(BaseTaxDocumentParser):
 
         if tipo_documento == "boleta_honorarios":
             PdfFallbackParser._parse_fee_receipt_pdf(text, normalized)
+            return
+        if tipo_documento in {"boleta_venta_afecta", "boleta_venta_exenta"} and (
+            "EL IVA INCLUIDO EN ESTA BOLETA ES" in upper or "BOLETA EXENTA ELECTR" in upper
+        ):
+            PdfFallbackParser._parse_sales_receipt_pdf(text, normalized)
             return
 
         folio_match = re.search(r"(?:N[º°oO]?|NRO\.?|NUMERO)\s*([0-9]+)", text, flags=re.IGNORECASE)

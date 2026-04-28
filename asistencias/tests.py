@@ -115,6 +115,79 @@ class AsistenciasViewTests(TestCase):
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.CANCELADA)
 
+    def test_nueva_sesion_muestra_solo_disciplinas_y_profesores_activos_de_la_organizacion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Secundaria",
+            razon_social="Org Secundaria SPA",
+            rut="22.222.222-2",
+        )
+        disciplina_inactiva = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Pilates",
+            activa=False,
+        )
+        disciplina_otra_org = Disciplina.objects.create(
+            organizacion=otra_organizacion,
+            nombre="Teatro",
+            activa=True,
+        )
+        profesor_activo = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Activa",
+            email="paula.activa@example.com",
+            activo=True,
+        )
+        profesor_inactivo = Persona.objects.create(
+            nombres="Bruno",
+            apellidos="Inactivo",
+            email="bruno.inactivo@example.com",
+            activo=False,
+        )
+        profesor_otra_org = Persona.objects.create(
+            nombres="Marta",
+            apellidos="Otraorg",
+            email="marta.otraorg@example.com",
+            activo=True,
+        )
+        rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        PersonaRol.objects.create(
+            persona=profesor_activo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=profesor_inactivo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=profesor_otra_org,
+            rol=rol_profesor,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        disciplinas = list(response.context["sesion_form"].fields["disciplina"].queryset)
+        profesores = list(response.context["sesion_form"].fields["profesores"].queryset)
+        self.assertIn(self.disciplina, disciplinas)
+        self.assertNotIn(disciplina_inactiva, disciplinas)
+        self.assertNotIn(disciplina_otra_org, disciplinas)
+        self.assertIn(profesor_activo, profesores)
+        self.assertNotIn(profesor_inactivo, profesores)
+        self.assertNotIn(profesor_otra_org, profesores)
+
     def test_agregar_asistentes_desde_sesion_detail(self):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
         response = self.client.post(

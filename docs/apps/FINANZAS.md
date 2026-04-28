@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-04-08
+Fecha de actualizacion: 2026-04-28
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -45,6 +45,7 @@ Estado actual:
 - soporte inicial para boleta de honorarios XML
 - PDF fallback basico
 - parser PDF con mejora especifica para boletas de honorarios electronicas
+- parser PDF con mejora especifica para boletas de venta electronicas tipo 39 y 41 cuando vienen con `BOLETA ELECTRONICA NUMERO` o `BOLETA EXENTA ELECTRONICA NUMERO`, `Medio de pago`, glosa libre y monto total
 - pantalla de revision antes del guardado
 - la pantalla de revision incluye visor inline del PDF/XML temporal para contrastar el formulario contra el archivo original
 - si no hay libreria Python para leer PDF, se intenta `pdftotext` del sistema
@@ -63,6 +64,20 @@ Reglas:
 - la unicidad operativa de un documento tributario dentro de una organizacion se define por `tipo_documento + folio + rut_emisor`; el folio por si solo no basta, porque distintos emisores pueden repetirlo
 - los datos extraidos desde PDF tienen menor confianza y deben revisarse siempre
 - en facturas y boletas, un monto con punto de miles como `500.000` significa `500000` sin decimales; esa normalizacion aplica tanto al parser PDF como a la confirmacion manual de la carga asistida
+- en boletas de venta electronicas PDF tipo 39 y 41, el parser debe extraer al menos:
+  - folio completo desde `BOLETA ELECTRONICA NUMERO`
+  - fecha
+  - medio de pago
+  - glosa principal
+  - monto bruto
+- para tipo 39 afecta:
+  - IVA incluido
+  - neto calculado como `bruto - IVA`
+- para tipo 41 exenta:
+  - `exento = bruto`
+  - `IVA = 0`
+  - `neto = 0`
+- en esas boletas, el pago sugerido debe heredar el metodo de pago desde el documento cuando venga indicado, por ejemplo `Transferencia Electronica`
 - en la carga asistida, `observaciones` debe precargarse con la glosa o descripcion principal extraida del documento, antes que con warnings tecnicos
 - la pantalla de revision de carga asistida debe mostrar errores generales del formulario cuando el guardado no puede confirmarse
 - las vistas de crear/editar documentos tributarios deben mostrar un error legible si la base rechaza el guardado por un conflicto de unicidad, en vez de exponer un `IntegrityError`

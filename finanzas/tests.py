@@ -851,6 +851,124 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(visor_response["X-Frame-Options"], "SAMEORIGIN")
         self.assertIn("inline;", visor_response["Content-Disposition"])
 
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pdftotext")
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pypdf", return_value="")
+    def test_documento_tributario_importar_precarga_boleta_venta_pdf(
+        self,
+        _extract_text_with_pypdf,
+        extract_text_with_pdftotext,
+    ):
+        extract_text_with_pdftotext.return_value = """
+        ESPACIO CULTURAL Y DEPORTIVO
+        ELEMENTOS SPA
+        77.813.508-6
+        Giro: REALIZACIN DE ACTIVIDADES
+        DEPORTIVAS Y CULTURALES PARA LA
+        COMUNIDAD
+        NUEVA TRES 1020
+        Rengo
+        BOLETA ELECTRÓNICA NUMERO: 20.035
+        REF. VENDEDOR: 17085005-K
+        Fecha: 2026-04-15
+
+        Dirección: Santiago
+
+        Medio de pago: Transferencia
+        Electrónica
+        Taller de Fuerza/Calistenia - Plan
+        2 Clases Semanales (Erika Huerta)
+                                   $ 36.000
+
+        El IVA incluido en esta boleta es
+        de: $ 5.748
+        """
+        pdf = SimpleUploadedFile(
+            "boleta39.pdf",
+            b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+            content_type="application/pdf",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:documento_tributario_importar"),
+            {"accion": "parsear", "archivo": pdf},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="20035"', html=False)
+        self.assertContains(response, 'value="2026-04-15"', html=False)
+        self.assertContains(response, 'value="ESPACIO CULTURAL Y DEPORTIVO ELEMENTOS SPA"', html=False)
+        self.assertContains(response, 'value="77.813.508-6"', html=False)
+        self.assertContains(response, 'value="30252"', html=False)
+        self.assertContains(response, 'value="5748"', html=False)
+        self.assertContains(response, 'value="36000"', html=False)
+        self.assertEqual(
+            response.context["documento_form"].initial["observaciones"],
+            "Taller de Fuerza/Calistenia - Plan 2 Clases Semanales (Erika Huerta)",
+        )
+        self.assertEqual(response.context["pago_form"].initial["metodo_pago"], Payment.Metodo.TRANSFERENCIA)
+        self.assertEqual(response.context["pago_form"].initial["monto_referencia"], Decimal("36000"))
+        self.assertTrue(response.context["pago_form"].initial["aplica_iva"])
+
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pdftotext")
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pypdf", return_value="")
+    def test_documento_tributario_importar_precarga_boleta_venta_exenta_pdf(
+        self,
+        _extract_text_with_pypdf,
+        extract_text_with_pdftotext,
+    ):
+        extract_text_with_pdftotext.return_value = """
+        ESPACIO CULTURAL Y DEPORTIVO
+        ELEMENTOS SPA
+        77.813.508-6
+        Giro: REALIZACIN DE ACTIVIDADES
+        DEPORTIVAS Y CULTURALES PARA LA
+        COMUNIDAD
+        NUEVA TRES 1020
+        Rengo
+        BOLETA EXENTA ELECTRÓNICA NUMERO:
+        25.043
+        REF. VENDEDOR: 17085005-K
+        Fecha: 2026-04-15
+
+        Dirección: Santiago
+
+        Medio de pago: Transferencia
+        Electrónica
+        Taller de Lyra - Plan 2 Clases Sema
+        nales (Josefa Campos)
+                                   $ 36.000
+        Timbre Electrónico SII
+        """
+        pdf = SimpleUploadedFile(
+            "boleta41.pdf",
+            b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+            content_type="application/pdf",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:documento_tributario_importar"),
+            {"accion": "parsear", "archivo": pdf},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="25043"', html=False)
+        self.assertContains(response, 'value="2026-04-15"', html=False)
+        self.assertContains(response, 'value="ESPACIO CULTURAL Y DEPORTIVO ELEMENTOS SPA"', html=False)
+        self.assertContains(response, 'value="77.813.508-6"', html=False)
+        self.assertContains(response, 'value="36000"', html=False)
+        self.assertEqual(
+            response.context["documento_form"].initial["observaciones"],
+            "Taller de Lyra - Plan 2 Clases Semanales (Josefa Campos)",
+        )
+        self.assertEqual(response.context["documento_form"].initial["monto_exento"], Decimal("36000"))
+        self.assertEqual(response.context["documento_form"].initial["monto_iva"], Decimal("0"))
+        self.assertEqual(response.context["documento_form"].initial["monto_neto"], Decimal("0"))
+        self.assertEqual(response.context["pago_form"].initial["metodo_pago"], Payment.Metodo.TRANSFERENCIA)
+        self.assertEqual(response.context["pago_form"].initial["monto_referencia"], Decimal("36000"))
+        self.assertFalse(response.context["pago_form"].initial["aplica_iva"])
+
     def test_documento_tributario_importar_muestra_xml_subido_en_revision(self):
         xml = SimpleUploadedFile(
             "boleta.xml",
@@ -1411,6 +1529,106 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
         self.assertEqual(normalized.get_value("montos", "total_liquido"), Decimal("84750"))
         self.assertEqual(normalized.get_value("montos", "total_bruto"), Decimal("100000"))
         self.assertEqual(normalized.lineas[0].fields["descripcion"].value, "FUNCION LA TAREA MAS DIFICIL - FEBRERO - 2026")
+
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pdftotext")
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pypdf", return_value="")
+    def test_parse_tax_document_boleta_venta_pdf_extrae_glosa_y_totales(
+        self,
+        _extract_text_with_pypdf,
+        extract_text_with_pdftotext,
+    ):
+        extract_text_with_pdftotext.return_value = """
+        ESPACIO CULTURAL Y DEPORTIVO
+        ELEMENTOS SPA
+        77.813.508-6
+        Giro: REALIZACIN DE ACTIVIDADES
+        DEPORTIVAS Y CULTURALES PARA LA
+        COMUNIDAD
+        NUEVA TRES 1020
+        Rengo
+        BOLETA ELECTRÓNICA NUMERO: 20.035
+        REF. VENDEDOR: 17085005-K
+        Fecha: 2026-04-15
+
+        Dirección: Santiago
+
+        Medio de pago: Transferencia
+        Electrónica
+        Taller de Fuerza/Calistenia - Plan
+        2 Clases Semanales (Erika Huerta)
+                                   $ 36.000
+
+        El IVA incluido en esta boleta es
+        de: $ 5.748
+        """
+        normalized = parse_tax_document(
+            pdf_bytes=b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+            pdf_name="boleta39.pdf",
+            organizacion_id=self.org.pk,
+        )
+
+        self.assertEqual(normalized.get_value("encabezado", "tipo_documento_sugerido"), "boleta_venta_afecta")
+        self.assertEqual(normalized.get_value("encabezado", "tipo_tributario"), "39")
+        self.assertEqual(normalized.get_value("encabezado", "folio"), "20035")
+        self.assertEqual(normalized.get_value("encabezado", "fecha_emision"), "2026-04-15")
+        self.assertEqual(normalized.get_value("encabezado", "medio_pago"), "Transferencia Electrónica")
+        self.assertEqual(normalized.get_value("emisor", "razon_social"), "ESPACIO CULTURAL Y DEPORTIVO ELEMENTOS SPA")
+        self.assertEqual(normalized.get_value("emisor", "rut"), "77.813.508-6")
+        self.assertEqual(normalized.get_value("montos", "neto"), Decimal("30252"))
+        self.assertEqual(normalized.get_value("montos", "iva"), Decimal("5748"))
+        self.assertEqual(normalized.get_value("montos", "tasa_iva"), Decimal("19"))
+        self.assertEqual(normalized.get_value("montos", "total_bruto"), Decimal("36000"))
+        self.assertEqual(normalized.lineas[0].fields["descripcion"].value, "Taller de Fuerza/Calistenia - Plan 2 Clases Semanales (Erika Huerta)")
+
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pdftotext")
+    @patch("finanzas.documentos.parsers.PdfFallbackParser._extract_text_with_pypdf", return_value="")
+    def test_parse_tax_document_boleta_venta_exenta_pdf_extrae_glosa_y_totales(
+        self,
+        _extract_text_with_pypdf,
+        extract_text_with_pdftotext,
+    ):
+        extract_text_with_pdftotext.return_value = """
+        ESPACIO CULTURAL Y DEPORTIVO
+        ELEMENTOS SPA
+        77.813.508-6
+        Giro: REALIZACIN DE ACTIVIDADES
+        DEPORTIVAS Y CULTURALES PARA LA
+        COMUNIDAD
+        NUEVA TRES 1020
+        Rengo
+        BOLETA EXENTA ELECTRÓNICA NUMERO:
+        25.043
+        REF. VENDEDOR: 17085005-K
+        Fecha: 2026-04-15
+
+        Dirección: Santiago
+
+        Medio de pago: Transferencia
+        Electrónica
+        Taller de Lyra - Plan 2 Clases Sema
+        nales (Josefa Campos)
+                                   $ 36.000
+        Timbre Electrónico SII
+        """
+        normalized = parse_tax_document(
+            pdf_bytes=b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+            pdf_name="boleta41.pdf",
+            organizacion_id=self.org.pk,
+        )
+
+        self.assertEqual(normalized.get_value("encabezado", "tipo_documento_sugerido"), "boleta_venta_exenta")
+        self.assertEqual(normalized.get_value("encabezado", "tipo_tributario"), "41")
+        self.assertEqual(normalized.get_value("encabezado", "folio"), "25043")
+        self.assertEqual(normalized.get_value("encabezado", "fecha_emision"), "2026-04-15")
+        self.assertEqual(normalized.get_value("encabezado", "medio_pago"), "Transferencia Electrónica")
+        self.assertEqual(normalized.get_value("emisor", "razon_social"), "ESPACIO CULTURAL Y DEPORTIVO ELEMENTOS SPA")
+        self.assertEqual(normalized.get_value("emisor", "rut"), "77.813.508-6")
+        self.assertEqual(normalized.get_value("montos", "neto"), Decimal("0"))
+        self.assertEqual(normalized.get_value("montos", "exento"), Decimal("36000"))
+        self.assertEqual(normalized.get_value("montos", "iva"), Decimal("0"))
+        self.assertEqual(normalized.get_value("montos", "tasa_iva"), Decimal("0"))
+        self.assertEqual(normalized.get_value("montos", "total_bruto"), Decimal("36000"))
+        self.assertEqual(normalized.lineas[0].fields["descripcion"].value, "Taller de Lyra - Plan 2 Clases Semanales (Josefa Campos)")
 
     def test_form_edicion_pago_renderiza_fecha_iso_para_input_date(self):
         pago = Payment.objects.create(
