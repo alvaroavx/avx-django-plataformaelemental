@@ -212,6 +212,8 @@ Obligatorios:
 - `DEPLOY_SSH_KEY_B64`
 - `DEPLOY_PATH`
 - `DEPLOY_SERVICE`
+  - acepta nombre con o sin sufijo `.service`
+  - valor real de producción: `plataforma-elemental`
 
 Opcionales:
 - `DEPLOY_PORT`

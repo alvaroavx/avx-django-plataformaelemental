@@ -5,8 +5,16 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${DEPLOY_VENV_DIR:-$APP_DIR/.venv}"
 PYTHON_BIN="${DEPLOY_PYTHON_BIN:-python3}"
-SERVICE_NAME="${DEPLOY_SERVICE:-plataforma-elemental}"
+SERVICE_NAME_RAW="${DEPLOY_SERVICE:-plataforma-elemental}"
 ENV_FILE="${DEPLOY_ENV_FILE:-}"
+
+if [[ "$SERVICE_NAME_RAW" == *.service ]]; then
+  SERVICE_NAME="${SERVICE_NAME_RAW%.service}"
+else
+  SERVICE_NAME="$SERVICE_NAME_RAW"
+fi
+
+SERVICE_UNIT="${SERVICE_NAME}.service"
 
 cd "$APP_DIR"
 
@@ -39,12 +47,12 @@ python manage.py clearsessions
 python manage.py collectstatic --noinput
 python manage.py check --deploy
 
-if ! systemctl list-unit-files | grep -q "^${SERVICE_NAME}\.service"; then
-  echo "No existe el servicio systemd: ${SERVICE_NAME}.service" >&2
+if [[ "$(systemctl show "$SERVICE_UNIT" --property LoadState --value 2>/dev/null || true)" == "not-found" ]]; then
+  echo "No existe el servicio systemd: ${SERVICE_UNIT}" >&2
   exit 1
 fi
 
-systemctl restart "$SERVICE_NAME"
-systemctl is-active --quiet "$SERVICE_NAME"
+systemctl restart "$SERVICE_UNIT"
+systemctl is-active --quiet "$SERVICE_UNIT"
 
 echo "Deploy completado en el commit $(git rev-parse --short HEAD)"

@@ -20,7 +20,7 @@ Este documento describe el CI/CD minimo del proyecto:
 ## Archivos creados
 - `.github/workflows/deploy.yml`
 - `scripts/deploy.sh`
-- `deploy/systemd/plataformaelemental.service.example`
+- `deploy/systemd/plataforma-elemental.service.example`
 
 ## Secrets de GitHub Actions
 
@@ -38,7 +38,8 @@ Este documento describe el CI/CD minimo del proyecto:
 - `DEPLOY_PATH`
   - ruta absoluta del repo en el servidor, por ejemplo `/srv/plataformaelemental`
 - `DEPLOY_SERVICE`
-  - nombre del servicio systemd, por ejemplo `plataformaelemental`
+  - nombre del servicio systemd, por ejemplo `plataforma-elemental`
+  - el script acepta `plataforma-elemental` o `plataforma-elemental.service`
 
 ### Opcionales
 - `DEPLOY_PORT`
@@ -147,15 +148,15 @@ En el archivo de entorno de produccion conviene definir al menos:
 4. Asegurar que el usuario de despliegue pueda reiniciar el servicio:
    - idealmente con `sudo` sin password para `systemctl restart` y `systemctl is-active`
    - ese mismo usuario debe ser el que figura en `DEPLOY_USER`
-5. Ajustar el unit file desde `deploy/systemd/plataformaelemental.service.example`:
+5. Ajustar el unit file desde `deploy/systemd/plataforma-elemental.service.example`:
    - reemplazar `__SERVICE_USER__`
    - reemplazar `__APP_DIR__`
    - reemplazar `__ENV_FILE__`
    - reemplazar `__VENV_DIR__`
 6. Instalar el servicio:
-   - copiarlo a `/etc/systemd/system/plataformaelemental.service`
+   - copiarlo a `/etc/systemd/system/plataforma-elemental.service`
    - `sudo systemctl daemon-reload`
-   - `sudo systemctl enable plataformaelemental`
+   - `sudo systemctl enable plataforma-elemental`
 7. Ejecutar una primera vez:
    - `cd /srv/plataformaelemental`
    - `bash scripts/deploy.sh`
@@ -200,6 +201,8 @@ En el archivo de entorno de produccion conviene definir al menos:
 - ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
 - ejecuta `python manage.py check --deploy`
+- normaliza `DEPLOY_SERVICE` para aceptar nombre con o sin sufijo `.service`
+- valida que el unit exista con `systemctl show`
 - reinicia el servicio systemd
 
 ## Rollback simple
@@ -227,6 +230,7 @@ bash scripts/deploy.sh
 - El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
 - Si `DEPLOY_SSH_KEY` o `DEPLOY_SSH_KEY_B64` estan mal cargados, el workflow fallara antes de intentar el SSH remoto.
+- Si `DJANGO_SECRET_KEY` es corto, repetitivo o empieza con `django-insecure-`, Django mostrara `security.W009` en deploy; no siempre bloquea, pero debe corregirse en produccion.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado
