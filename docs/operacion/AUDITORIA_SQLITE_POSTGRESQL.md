@@ -1,8 +1,13 @@
 # Auditoria SQLite A PostgreSQL
 
-Fecha de auditoria: 2026-04-18
+Fecha de auditoria: 2026-04-20
 
 Ruta auditada: `/home/alvax/Code/platforms/avx-django-plataformaelemental`
+
+Nota de vigencia:
+- La auditoria se preparo para planificar migracion a PostgreSQL.
+- La configuracion activa del proyecto fue devuelta posteriormente a SQLite en `dev` y `prod`.
+- Los bloques PostgreSQL quedaron comentados en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py` como referencia futura.
 
 ## 1. `requirements.txt` Completo
 

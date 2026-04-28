@@ -38,22 +38,17 @@ Adicionalmente existen:
 ## Arquitectura vigente
 - Framework: Django 5
 - API: Django REST Framework
-- Base de datos: PostgreSQL configurado por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`
+- Base de datos: SQLite activa por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`
 - UI: Bootstrap 5, DataTables y Tom Select via CDN
 - Zona horaria: `America/Santiago`
 - Despliegue minimo versionado: GitHub Actions + SSH + `systemd` + `gunicorn`
 
 ## Base de datos
-- `plataformaelemental/config/base.py` no debe declarar `DATABASES`; solo mantiene defaults comunes y helpers de entorno.
-- `plataformaelemental/config/dev.py` declara PostgreSQL con defaults de desarrollo:
-  - `POSTGRES_DB=plataforma_elemental_dev`
-  - `POSTGRES_USER=plataforma_user`
-  - `POSTGRES_PASSWORD=tu_password_dev` definido en `.env.dev`
-  - `POSTGRES_HOST=127.0.0.1`
-  - `POSTGRES_PORT=5432`
-- Para cargar `.env.dev` manualmente en local se debe usar `set -a; source .env.dev; set +a`; valores con caracteres especiales de shell deben ir entre comillas.
-- `plataformaelemental/config/prod.py` declara PostgreSQL con `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` obligatorios mediante `os.environ[...]`; si falta una variable, el arranque debe fallar fuerte.
-- El driver PostgreSQL versionado es `psycopg[binary]==3.2.9`.
+- `plataformaelemental/config/base.py` no declara `DATABASES`; solo mantiene defaults comunes y helpers de entorno.
+- `plataformaelemental/config/dev.py` declara SQLite activa sobre `BASE_DIR / "db.sqlite3"`.
+- `plataformaelemental/config/prod.py` declara SQLite activa sobre `BASE_DIR / "db.sqlite3"`.
+- Ambos archivos dejan un bloque PostgreSQL comentado como referencia futura para la migracion.
+- `requirements.txt` mantiene `psycopg[binary]==3.2.9` instalado para retomar PostgreSQL sin reinstalar dependencias.
 
 ## Apps
 
@@ -207,7 +202,7 @@ Regla vigente:
 ## Estado reciente validado
 Ultima validacion conocida:
 - `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-- resultado: `75 tests OK`
+- resultado: `99 tests OK`
 
 ## Observaciones tecnicas
 - Sigue existiendo logica de negocio importante en views; no toda esta encapsulada en servicios.

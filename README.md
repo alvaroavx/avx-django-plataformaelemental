@@ -52,7 +52,8 @@ Reglas funcionales vigentes:
 ### Stack
 - Django 5
 - Django REST Framework
-- PostgreSQL por entorno (`dev` y `prod`)
+- SQLite activa en `dev` y `prod`
+- PostgreSQL documentado como alternativa futura comentada en configuración
 - Bootstrap 5
 - DataTables
 - Tom Select
@@ -208,6 +209,7 @@ Obligatorios:
 - `DEPLOY_HOST`
 - `DEPLOY_USER`
 - `DEPLOY_SSH_KEY`
+- `DEPLOY_SSH_KEY_B64`
 - `DEPLOY_PATH`
 - `DEPLOY_SERVICE`
 
@@ -239,13 +241,20 @@ Eso genera:
 Instalacion:
 1. Copia la publica al servidor, al `authorized_keys` del usuario definido en `DEPLOY_USER`.
 2. Copia la privada completa al secret `DEPLOY_SSH_KEY` en GitHub Actions.
-3. Prueba localmente antes del workflow:
+3. Crea tambien el secret `DEPLOY_SSH_KEY_B64` con la misma clave codificada en Base64.
+4. Prueba localmente antes del workflow:
 
 ```bash
 ssh -i ~/.ssh/plataforma_elemental_deploy -o IdentitiesOnly=yes -p 22 USUARIO@HOST
 ```
 
 Si esa prueba local falla, el workflow tambien fallara.
+
+Ejemplo para generar `DEPLOY_SSH_KEY_B64`:
+
+```bash
+base64 < ~/.ssh/plataforma_elemental_deploy | tr -d '\n'
+```
 
 ## Testing
 
@@ -264,7 +273,7 @@ python manage.py test api.tests
 
 Última validación conocida:
 - `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-- resultado: `75 tests OK`
+- resultado: `99 tests OK`
 
 ## Documentación
 

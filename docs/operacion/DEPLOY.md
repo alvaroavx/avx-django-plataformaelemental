@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-04-20
+Fecha de actualizacion: 2026-04-27
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -32,6 +32,9 @@ Este documento describe el CI/CD minimo del proyecto:
 - `DEPLOY_SSH_KEY`
   - clave privada SSH exclusiva para GitHub Actions
   - debe ser una clave nueva de deploy, sin passphrase
+- `DEPLOY_SSH_KEY_B64`
+  - la misma clave privada de deploy, codificada en Base64
+  - hoy el workflow la usa para escribir `~/.ssh/deploy_key`
 - `DEPLOY_PATH`
   - ruta absoluta del repo en el servidor, por ejemplo `/srv/plataformaelemental`
 - `DEPLOY_SERVICE`
@@ -104,6 +107,20 @@ En GitHub:
 -----END OPENSSH PRIVATE KEY-----
 ```
 
+6. Crear tambien `DEPLOY_SSH_KEY_B64` con la misma clave codificada en Base64.
+
+En Linux GNU:
+
+```bash
+base64 -w 0 ~/.ssh/plataforma_elemental_deploy
+```
+
+Alternativa portable:
+
+```bash
+base64 < ~/.ssh/plataforma_elemental_deploy | tr -d '\n'
+```
+
 ### Probar antes del workflow
 
 ```bash
@@ -146,34 +163,33 @@ En el archivo de entorno de produccion conviene definir al menos:
 ## Flujo del workflow
 1. `actions/checkout`
 2. instalar dependencias Python
-3. levantar un servicio PostgreSQL 16 para el job `test`
-4. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests` contra PostgreSQL
-5. validar secrets obligatorios
-6. escribir la llave privada en `~/.ssh/deploy_key`
-7. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
-8. poblar `known_hosts` con `ssh-keyscan`
+3. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+4. validar secrets obligatorios
+5. escribir la llave privada en `~/.ssh/deploy_key`
+6. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
+7. poblar `known_hosts` con `ssh-keyscan`
+8. ejecutar el paso `Debug SSH key file`
 9. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
 10. `git fetch`
 11. `git reset --hard origin/main`
 12. ejecutar `bash scripts/deploy.sh`
 
 ## Base De Datos En CI
-- El entorno `dev` usa PostgreSQL, por lo tanto GitHub Actions debe levantar PostgreSQL para ejecutar tests.
-- El job `test` usa un service container `postgres:16` con:
-  - `POSTGRES_DB=plataforma_elemental_dev`
-  - `POSTGRES_USER=plataforma_user`
-  - `POSTGRES_PASSWORD=plataforma_password`
-  - `POSTGRES_HOST=127.0.0.1`
-  - `POSTGRES_PORT=5432`
-- No se debe volver a SQLite solo para CI; los tests deben correr sobre el mismo motor elegido para desarrollo y produccion.
+- El entorno `dev` usa SQLite nuevamente.
+- El job `test` no necesita un service container adicional para base de datos.
+- PostgreSQL queda documentado en comentarios de configuracion y en la auditoria de migracion, pero no es la base activa del pipeline hoy.
 
 ## SSH En CI
-- El workflow usa exclusivamente `DEPLOY_SSH_KEY` como llave privada directa.
-- No se usa `DEPLOY_SSH_KEY_B64`.
-- La llave se escribe con `printf "%s"` para no agregar saltos de linea extra.
-- La llave pasa por `tr -d '\r'` para remover retornos de carro pegados accidentalmente desde otros sistemas.
+- El workflow valida `DEPLOY_SSH_KEY` como secret obligatorio.
+- El workflow actual escribe `~/.ssh/deploy_key` a partir de `DEPLOY_SSH_KEY_B64`, decodificandolo con `base64 -d`.
+- `DEPLOY_SSH_KEY_B64` debe contener la misma llave privada de deploy, codificada en una sola linea Base64.
 - El comando `ssh` usa `-i ~/.ssh/deploy_key` y `IdentitiesOnly=yes` para no depender de nombres por defecto de OpenSSH.
-- No debe existir un paso de debug que imprima primera o ultima linea de la llave privada.
+- El workflow actual incluye un paso `Debug SSH key file` que imprime:
+  - cantidad de bytes
+  - primera linea
+  - ultima linea
+  - fingerprint de la clave
+- Mientras ese paso exista en el YAML, la documentacion debe asumirlo como parte real del flujo.
 
 ## Que hace `scripts/deploy.sh`
 - carga variables desde `DEPLOY_ENV_FILE` si existe
@@ -210,10 +226,10 @@ bash scripts/deploy.sh
 - No hay hasta ahora configuracion de `systemd`, `nginx` o proceso WSGI versionada; por eso se agrega el unit file ejemplo.
 - El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
-- Si `DEPLOY_SSH_KEY` contiene una clave con passphrase o una clave mal pegada, el workflow fallara antes de intentar el SSH remoto.
+- Si `DEPLOY_SSH_KEY` o `DEPLOY_SSH_KEY_B64` estan mal cargados, el workflow fallara antes de intentar el SSH remoto.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado
 - servir Django detras de Nginx o un proxy equivalente
 - no hacer cambios manuales dentro del clon de produccion
-- mantener `DEPLOY_ENV_FILE` apuntando a un archivo real con `DJANGO_ENV=prod`, `POSTGRES_*`, `DJANGO_SECRET_KEY`, hosts permitidos y variables de seguridad de sesion.
+- mantener `DEPLOY_ENV_FILE` apuntando a un archivo real con `DJANGO_ENV=prod`, `DJANGO_SECRET_KEY`, hosts permitidos y variables de seguridad de sesion.
