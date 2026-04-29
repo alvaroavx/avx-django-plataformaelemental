@@ -362,6 +362,12 @@
     const editModalEl = document.getElementById("editarPagoModal");
     if (editModalEl && {{ edit_form|yesno:"true,false" }}) {
       bootstrap.Modal.getOrCreateInstance(editModalEl).show();
+      editModalEl.addEventListener("hidden.bs.modal", function () {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has("editar_pago")) return;
+        url.searchParams.delete("editar_pago");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      });
     }
   })();
   (function () {

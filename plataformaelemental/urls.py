@@ -40,6 +40,7 @@ urlpatterns = [
         ),
         name="login",
     ),
+    path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += [
@@ -47,4 +48,5 @@ urlpatterns += [
     path("asistencias/", include("asistencias.urls")),
     path("personas/", include("personas.urls")),
     path("finanzas/", include("finanzas.urls")),
+    path("monitor/", include("monitor.urls")),
 ]

@@ -20,6 +20,7 @@ Debe privilegiar:
 - Las asistencias deben poder verse junto con su estado financiero.
 - Los modelos propios de esta app viven en `asistencias.models`; no deben declararse en `database`.
 - El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
+- La barra compartida de apps vive en templates de `asistencias`, incluye `asistencias`, `finanzas`, `personas` y `monitor`, y debe permitir desplazamiento horizontal en mobile si no hay ancho suficiente.
 
 ## Decisiones funcionales vigentes
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.

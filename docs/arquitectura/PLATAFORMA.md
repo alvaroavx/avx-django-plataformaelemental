@@ -12,10 +12,11 @@ Sirve para:
 - tener una foto razonablemente actual del sistema
 
 ## Resumen ejecutivo
-La plataforma opera hoy como un monolito Django modular con tres apps funcionales visibles:
+La plataforma opera hoy como un monolito Django modular con cuatro apps funcionales visibles:
 - `asistencias`
 - `personas`
 - `finanzas`
+- `monitor`
 
 Adicionalmente existen:
 - `database` como namespace legado de migraciones y compatibilidad historica
@@ -27,6 +28,7 @@ Adicionalmente existen:
 - Si no existe filtro explicito en la URL, `periodo_mes` y `periodo_anio` deben partir en la fecha actual; `organizacion` debe partir en `Todas`.
 - Los filtros globales deben autoaplicarse al cambiar un selector; no usan boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` aceptan `Todos`, por lo que el sistema debe soportar filtros parciales como `todos los meses de un año`, `un mismo mes en todos los años` o `todo el historial`.
+- La barra compartida de apps debe mantener enlaces a `asistencias`, `finanzas`, `personas` y `monitor`, arrastrando los filtros globales activos.
 - Los modelos del dominio viven en su app duena:
   - `personas`: personas, roles y organizaciones
   - `asistencias`: disciplinas, sesiones y asistencias
@@ -131,6 +133,18 @@ Reglas vigentes:
 - Las escrituras requieren usuario autenticado.
 - La API key es solo de lectura.
 - La API aplica throttling por usuario, API key o IP.
+
+### `monitor`
+Responsabilidad:
+- agrupar vistas internas de monitoreo operativo
+- servir como punto inicial para futuros indicadores transversales
+
+Rutas principales:
+- `/monitor/`
+
+Reglas vigentes:
+- La pantalla inicial requiere usuario autenticado.
+- La app no define modelos propios en su creacion inicial.
 
 ## Modelo financiero actual
 - `Payment`: cobro academico a estudiante.

@@ -56,7 +56,7 @@
             <span class="navbar-text text-white">
               {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}
             </span>
-            <form method="post" action="{% url 'logout' %}" class="d-inline">
+            <form method="post" action="/accounts/logout/" class="d-inline">
               {% csrf_token %}
               <button class="btn btn-sm btn-outline-light" type="submit" title="Cerrar sesión">
                 <i class="bi bi-box-arrow-right"></i><span class="d-none d-lg-inline ms-1">Cerrar sesión</span>

@@ -1,6 +1,6 @@
 # DECISIONES
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-04-29
 
 ## Proposito
 Este documento define como se mantiene la documentacion viva del repo.
@@ -25,7 +25,9 @@ Toda decision concreta de producto, modelo, navegacion, integracion o flujo oper
    Decisiones y criterios locales de `personas`.
 8. `docs/apps/API.md`
    Decisiones y criterios locales de `api`.
-9. `docs/operacion/DEPLOY.md`
+9. `docs/apps/MONITOR.md`
+   Decisiones y criterios locales de `monitor`.
+10. `docs/operacion/DEPLOY.md`
    Guia operativa de despliegue y CI/CD.
 
 ## Convencion de mantenimiento

@@ -687,9 +687,9 @@ class AsistenciasViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Cerrar sesión")
-        self.assertContains(response, f'action="{reverse("logout")}"')
+        self.assertContains(response, 'action="/accounts/logout/"')
 
-        logout_response = self.client.post(reverse("logout"))
+        logout_response = self.client.post("/accounts/logout/")
 
         self.assertEqual(logout_response.status_code, 302)
         self.assertEqual(logout_response.url, "/accounts/login/")
