@@ -44,8 +44,10 @@
       <form method="post" class="row g-3 mb-3">
         {% csrf_token %}
         <input type="hidden" name="accion" value="agregar_rol">
-        <div class="col-md-5"><label class="form-label">Rol</label>{{ rol_form.rol }}</div>
-        <div class="col-md-5"><label class="form-label">Organizacion</label>{{ rol_form.organizacion }}</div>
+        <div class="col-md-3"><label class="form-label">Rol</label>{{ rol_form.rol }}</div>
+        <div class="col-md-3"><label class="form-label">Organizacion</label>{{ rol_form.organizacion }}</div>
+        <div class="col-md-2"><label class="form-label">Valor clase</label>{{ rol_form.valor_clase }}</div>
+        <div class="col-md-2"><label class="form-label">Retención SII %</label>{{ rol_form.retencion_sii }}</div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-success w-100" type="submit">Agregar</button></div>
       </form>
 
@@ -54,6 +56,38 @@
         <div>
           <div class="fw-semibold">{{ item.rol.nombre }}</div>
           <div class="small text-muted">{{ item.organizacion.nombre }}</div>
+          {% if item.rol.codigo == "PROFESOR" %}
+          <form method="post" class="row g-2 mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="guardar_configuracion_profesor">
+            <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
+            <div class="col-md-5">
+              <input
+                type="number"
+                name="valor_clase"
+                class="form-control form-control-sm"
+                min="0"
+                step="1"
+                value="{% if item.valor_clase %}{{ item.valor_clase|floatformat:0 }}{% endif %}"
+                placeholder="Sin configurar"
+              >
+            </div>
+            <div class="col-md-4">
+              <input
+                type="number"
+                name="retencion_sii"
+                class="form-control form-control-sm"
+                min="0"
+                step="0.01"
+                value="{% if item.retencion_sii %}{{ item.retencion_sii|floatformat:2 }}{% endif %}"
+                placeholder="Retención SII %"
+              >
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-sm btn-outline-primary w-100" type="submit">Guardar tarifa</button>
+            </div>
+          </form>
+          {% endif %}
         </div>
         <form method="post">
           {% csrf_token %}

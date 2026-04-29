@@ -32,8 +32,10 @@
 
             <hr>
             <div class="row g-3">
-              <div class="col-md-6"><label class="form-label">Rol inicial</label>{{ rol_form.rol }}{% if rol_form.rol.errors %}<div class="text-danger small">{{ rol_form.rol.errors|join:", " }}</div>{% endif %}</div>
-              <div class="col-md-6"><label class="form-label">Organizacion inicial</label>{{ rol_form.organizacion }}{% if rol_form.organizacion.errors %}<div class="text-danger small">{{ rol_form.organizacion.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">Rol inicial</label>{{ rol_form.rol }}{% if rol_form.rol.errors %}<div class="text-danger small">{{ rol_form.rol.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-4"><label class="form-label">Organizacion inicial</label>{{ rol_form.organizacion }}{% if rol_form.organizacion.errors %}<div class="text-danger small">{{ rol_form.organizacion.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-2"><label class="form-label">Valor clase</label>{{ rol_form.valor_clase }}{% if rol_form.valor_clase.errors %}<div class="text-danger small">{{ rol_form.valor_clase.errors|join:", " }}</div>{% endif %}</div>
+              <div class="col-md-2"><label class="form-label">Retención SII %</label>{{ rol_form.retencion_sii }}{% if rol_form.retencion_sii.errors %}<div class="text-danger small">{{ rol_form.retencion_sii.errors|join:", " }}</div>{% endif %}</div>
             </div>
 
             {% if form.non_field_errors %}<div class="text-danger small mt-2">{{ form.non_field_errors|join:", " }}</div>{% endif %}

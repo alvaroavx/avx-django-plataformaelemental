@@ -94,7 +94,14 @@
             </td>
             <td>
               {% for rol_asignado in item.roles.all %}
-                <div class="small">{{ rol_asignado.rol.nombre }} · {{ rol_asignado.organizacion.nombre }}</div>
+                <div class="small">
+                  {{ rol_asignado.rol.nombre }} · {{ rol_asignado.organizacion.nombre }}
+                  {% if rol_asignado.activo %}
+                    <span class="badge text-bg-success ms-1">Activo</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary ms-1">Inactivo</span>
+                  {% endif %}
+                </div>
               {% empty %}
                 <span class="text-muted small">Sin roles</span>
               {% endfor %}

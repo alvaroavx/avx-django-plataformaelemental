@@ -1,4 +1,5 @@
 import calendar
+from decimal import Decimal
 
 from django.contrib import messages
 from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch, Q
@@ -20,6 +21,7 @@ from .forms import (
 from .models import Asistencia, Disciplina, SesionClase
 from .periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
 from .utils import ROLE_ADMIN
+from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
 def _nav_context(request):
@@ -52,8 +54,11 @@ def _url_con_filtros(request, nombre_url, **kwargs):
     return f"{url}?{query}" if query else url
 
 
-def _url_actual_con_filtros(request, **extra_params):
+def _url_actual_con_filtros(request, remove_params=None, **extra_params):
     params = request.GET.copy()
+    if remove_params:
+        for key in remove_params:
+            params.pop(key, None)
     for key, value in extra_params.items():
         params[key] = value
     query = params.urlencode()
@@ -614,6 +619,11 @@ def persona_detail(request, pk):
     if es_estudiante:
         context["pagos_estudiante"] = pagos_estudiante
     if es_profesor:
+        roles_profesor_qs = persona.roles.filter(rol__codigo="PROFESOR", activo=True).select_related("organizacion")
+        if organizacion_filtro:
+            roles_profesor_qs = roles_profesor_qs.filter(organizacion=organizacion_filtro)
+        valor_clase_por_org = {item.organizacion_id: item.valor_clase for item in roles_profesor_qs}
+        retencion_sii_por_org = {item.organizacion_id: item.retencion_sii for item in roles_profesor_qs}
         sesiones_realizadas = SesionClase.objects.filter(
             profesores=persona,
             **filtros_periodo("fecha", request=request),
@@ -634,18 +644,50 @@ def persona_detail(request, pk):
             asistencias_org = asistencias_prof.filter(sesion__disciplina__organizacion=org)
             if not sesiones_org.exists() and not asistencias_org.exists():
                 continue
+            valor_clase = valor_clase_por_org.get(org.id)
+            retencion_sii = retencion_sii_por_org.get(org.id)
+            asistencias_total = asistencias_org.count()
+            monto_bruto_estimado = (valor_clase or 0) * asistencias_total if valor_clase is not None else None
+            monto_retencion_sii = None
+            monto_neto = None
+            if monto_bruto_estimado is not None and retencion_sii is not None:
+                monto_retencion_sii = (monto_bruto_estimado * retencion_sii) / Decimal("100")
+                monto_neto = monto_bruto_estimado - monto_retencion_sii
             resumen_por_org.append(
                 {
                     "organizacion": org,
                     "sesiones": sesiones_org.count(),
                     "alumnos": asistencias_org.values("persona_id").distinct().count(),
-                    "asistencias": asistencias_org.count(),
+                    "asistencias": asistencias_total,
+                    "valor_clase": valor_clase,
+                    "retencion_sii": retencion_sii,
+                    "monto_bruto_estimado": monto_bruto_estimado,
+                    "monto_retencion_sii": monto_retencion_sii,
+                    "monto_neto": monto_neto,
                 }
             )
+        mostrar_estimado_total_profesor = any(item["monto_bruto_estimado"] is not None for item in resumen_por_org)
+        estimado_total_profesor = sum(
+            item["monto_bruto_estimado"] for item in resumen_por_org if item["monto_bruto_estimado"] is not None
+        )
+        mostrar_retencion_total_profesor = any(item["monto_retencion_sii"] is not None for item in resumen_por_org)
+        retencion_total_profesor = sum(
+            item["monto_retencion_sii"] for item in resumen_por_org if item["monto_retencion_sii"] is not None
+        )
+        mostrar_neto_total_profesor = any(item["monto_neto"] is not None for item in resumen_por_org)
+        neto_total_profesor = sum(
+            item["monto_neto"] for item in resumen_por_org if item["monto_neto"] is not None
+        )
         context.update(
             {
                 "sesiones_realizadas": sesiones_realizadas,
                 "resumen_profesor": resumen_por_org,
+                "mostrar_estimado_total_profesor": mostrar_estimado_total_profesor,
+                "estimado_total_profesor": estimado_total_profesor,
+                "mostrar_retencion_total_profesor": mostrar_retencion_total_profesor,
+                "retencion_total_profesor": retencion_total_profesor,
+                "mostrar_neto_total_profesor": mostrar_neto_total_profesor,
+                "neto_total_profesor": neto_total_profesor,
             }
         )
     return render(request, "asistencias/persona_detail.html", context)
@@ -666,7 +708,9 @@ def asistencias_list(request):
     sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()}, organizacion=organizacion)
     asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
     persona_form = PersonaRapidaForm()
+    open_nueva_sesion = request.GET.get("open") == "nueva_sesion"
     open_nueva_persona = False
+    open_agregar_asistentes = request.GET.get("open") == "agregar_asistentes"
     estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().order_by("apellidos", "nombres")
     asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
 
@@ -686,7 +730,8 @@ def asistencias_list(request):
                 if profesores:
                     sesion.profesores.set(profesores)
                 messages.success(request, "Sesión creada. Ahora puedes agregar asistentes.")
-                return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk))
+                return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk, open="agregar_asistentes"))
+            open_nueva_sesion = True
         elif "cambiar_estado" in request.POST:
             sesion_id_post = request.POST.get("sesion_id")
             estado = request.POST.get("estado")
@@ -724,7 +769,23 @@ def asistencias_list(request):
                     sesion.estado = SesionClase.Estado.COMPLETADA
                     sesion.save(update_fields=["estado"])
                 messages.success(request, f"Asistencias agregadas: {creados}.")
-                return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk))
+                accion_guardado = request.POST.get("accion_guardado_asistencias", "cerrar")
+                if accion_guardado == "continuar":
+                    return redirect(
+                        _url_actual_con_filtros(
+                            request,
+                            sesion_id=sesion.pk,
+                            open="agregar_asistentes",
+                        )
+                    )
+                return redirect(
+                    _url_actual_con_filtros(
+                        request,
+                        remove_params=["open"],
+                        sesion_id=sesion.pk,
+                    )
+                )
+            open_agregar_asistentes = True
 
     estudiantes_total_disciplina_periodo = 0
     if sesion_seleccionada:
@@ -780,16 +841,17 @@ def asistencias_list(request):
             "sesion_form": sesion_form,
             "asistencia_form": asistencia_form,
             "persona_form": persona_form,
-            "open_nueva_sesion": request.GET.get("open") == "nueva_sesion",
+            "open_nueva_sesion": open_nueva_sesion,
             "open_nueva_persona": open_nueva_persona,
+            "open_agregar_asistentes": open_agregar_asistentes,
             "sesiones": sesiones_list,
             "sesion_seleccionada": sesion_seleccionada,
             "asistentes_ids": asistentes_ids,
             "estudiantes": estudiantes_qs,
             "estudiantes_total": estudiantes_qs.count(),
             "estudiantes_total_disciplina_periodo": estudiantes_total_disciplina_periodo,
-            "disciplinas": Disciplina.objects.filter(organizacion=organizacion) if organizacion else Disciplina.objects.all(),
-            "profesores": Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct().order_by("apellidos", "nombres"),
+            "disciplinas": disciplinas_vigentes_qs(organizacion=organizacion),
+            "profesores": profesores_vigentes_qs(organizacion=organizacion),
             "organizaciones": Organizacion.objects.all(),
         }
     )
@@ -904,20 +966,12 @@ def sesion_edit(request, pk):
     )
     form = SesionBasicaForm(
         request.POST or None,
+        organizacion=sesion.disciplina.organizacion,
         initial={
             "disciplina": sesion.disciplina,
             "fecha": sesion.fecha,
             "profesores": sesion.profesores.all(),
         },
-    )
-    form.fields["disciplina"].queryset = Disciplina.objects.filter(organizacion=sesion.disciplina.organizacion).order_by("nombre")
-    form.fields["profesores"].queryset = (
-        Persona.objects.filter(
-            roles__rol__codigo="PROFESOR",
-            roles__organizacion=sesion.disciplina.organizacion,
-        )
-        .distinct()
-        .order_by("apellidos", "nombres")
     )
 
     if request.method == "POST" and form.is_valid():

@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-04-28
+Fecha de actualizacion: 2026-04-29
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -152,6 +152,7 @@ Regla vigente:
 Regla vigente:
 - una asistencia solo puede consumir clases pagadas del mismo mes y anio
 - las clases no se arrastran entre meses
+- la configuracion operativa de profesor vive en `personas.PersonaRol` para el rol `PROFESOR`, porque depende de persona + organizacion; hoy incluye `valor_clase` y `retencion_sii`, y el perfil de profesor usa esos datos para desglosar `pago bruto`, `retencion SII` y `monto neto` del periodo
 
 ## Carga asistida tributaria
 Estado actual:

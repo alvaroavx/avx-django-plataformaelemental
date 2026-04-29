@@ -2,149 +2,34 @@
 {% block title %}Asistencias{% endblock %}
 {% block content %}
 <div class="mt-4">
+  <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-3">
+    <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaSesionModal">
+      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
+      <span class="d-inline d-md-none ms-1">Nueva sesión</span>
+    </button>
+    <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaPersonaModal">
+      <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
+      <span class="d-inline d-md-none ms-1">Nueva persona</span>
+    </button>
+    <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#agregarAsistentesModal">
+      <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+      <span class="d-inline d-md-none ms-1">Agregar asistentes</span>
+    </button>
+  </div>
+
+  {% if sesion_seleccionada %}
+  <div class="alert alert-light border d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
+    <div>
+      <div class="small text-muted">Sesión seleccionada para asistentes</div>
+      <div class="fw-semibold">{{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}</div>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+      <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar selección</span>
+    </a>
+  </div>
+  {% endif %}
+
   <div class="row g-3">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Nueva sesión</span>
-          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaSesionForm">
-            <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
-          </button>
-        </div>
-        <div class="card-body collapse {% if open_nueva_sesion %}show{% endif %}" id="nuevaSesionForm">
-          <form method="post">
-            {% csrf_token %}
-            <div class="row g-3">
-              <div class="col-md-6">
-                <div class="d-flex flex-column gap-2">
-                  <div>
-                    <label class="form-label" for="id_disciplina">Disciplina</label>
-                    {{ sesion_form.disciplina }}
-                  </div>
-                  <div>
-                    <label class="form-label" for="id_fecha">Fecha</label>
-                    {{ sesion_form.fecha }}
-                  </div>
-                  <div>
-                    <button class="btn btn-success" name="crear_sesion" type="submit">
-                      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Crear sesión</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" for="profesores_search_basica">Buscar profesor</label>
-                <input id="profesores_search_basica" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
-                {{ sesion_form.profesores }}
-              </div>
-            </div>
-            
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Nueva persona</span>
-          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#nuevaPersonaForm">
-            <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
-          </button>
-        </div>
-        <div class="card-body collapse {% if estudiantes_total == 0 or open_nueva_persona %}show{% endif %}" id="nuevaPersonaForm">
-          <form method="post">
-            {% csrf_token %}
-            {% if persona_form.non_field_errors %}
-              <div class="alert alert-danger py-2">
-                {% for error in persona_form.non_field_errors %}
-                  <div>{{ error }}</div>
-                {% endfor %}
-              </div>
-            {% endif %}
-            <div class="row g-2">
-              <div class="col-md-3">
-                <label class="form-label" for="id_nombres">Nombres: </label>
-                {{ persona_form.nombres }}
-                {% for error in persona_form.nombres.errors %}
-                  <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-              </div>
-              <div class="col-md-3">
-                <label class="form-label" for="id_apellidos">Apellidos: </label>
-                {{ persona_form.apellidos }}
-                {% for error in persona_form.apellidos.errors %}
-                  <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-              </div>
-              <div class="col-md-3">
-                <label class="form-label" for="id_telefono">Teléfono: </label>
-                {{ persona_form.telefono }}
-                {% for error in persona_form.telefono.errors %}
-                  <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-              </div>
-              <div class="col-md-3">
-                <button class="btn btn-outline-success" name="agregar_persona" type="submit">
-                  <i class="bi bi-save"></i><span class="d-none d-md-inline ms-1">Guardar persona</span>
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Agregar asistentes</span>
-          <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesForm">
-            <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-          </button>
-        </div>
-        <div class="card-body collapse {% if sesion_seleccionada %}show{% endif %}" id="agregarAsistentesForm">
-          {% if sesion_seleccionada %}
-            <div class="mb-2 text-muted small">
-              Sesión: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
-            </div>
-            <form method="post">
-              {% csrf_token %}
-              {{ asistencia_form.sesion_id }}
-              <label class="form-label" for="estudiantes_search">Buscar estudiante</label>
-              <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
-              <div class="d-flex gap-2 mb-2">
-                <button id="seleccionar_visibles" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
-                <button id="limpiar_seleccion" class="btn btn-sm btn-outline-secondary" type="button">Limpiar selección</button>
-              </div>
-              <div class="border rounded p-2" style="max-height: 320px; overflow-y: auto;">
-                {% for estudiante in estudiantes %}
-                  <div class="form-check mb-1 estudiante-opcion" data-text="{{ estudiante }}">
-                    <input
-                      class="form-check-input estudiante-check"
-                      type="checkbox"
-                      name="estudiantes"
-                      value="{{ estudiante.pk }}"
-                      id="estudiante_{{ estudiante.pk }}"
-                      {% if estudiante.pk in asistentes_ids %}checked{% endif %}
-                    >
-                    <label class="form-check-label" for="estudiante_{{ estudiante.pk }}">{{ estudiante }}</label>
-                  </div>
-                {% empty %}
-                  <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>
-                {% endfor %}
-              </div>
-              <div class="form-text">
-                Total asistencia a {{ sesion_seleccionada.disciplina }}: {{ estudiantes_total_disciplina_periodo }}
-              </div>
-              <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">
-                <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-              </button>
-            </form>
-          {% else %}
-            <div class="text-muted">Crea o selecciona una sesión para agregar asistentes.</div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
     <div class="col-12">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h3 class="mb-0">Sesiones registradas</h3>
@@ -240,7 +125,7 @@
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}" title="Ver">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ item.sesion.pk }}" title="Agregar asistentes">
+                <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ item.sesion.pk }}&open=agregar_asistentes" title="Agregar asistentes">
                   <i class="bi bi-person-plus"></i>
                 </a>
                 <form method="post" class="d-inline">
@@ -268,6 +153,181 @@
   </div>
 </div>
 {% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="nuevaSesionModal" tabindex="-1" aria-labelledby="nuevaSesionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="nuevaSesionModalLabel">Nueva sesión</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="d-flex flex-column gap-2">
+                <div>
+                  <label class="form-label" for="id_disciplina">Disciplina</label>
+                  {{ sesion_form.disciplina }}
+                  {% for error in sesion_form.disciplina.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div>
+                  <label class="form-label" for="id_fecha">Fecha</label>
+                  {{ sesion_form.fecha }}
+                  {% for error in sesion_form.fecha.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="profesores_search_basica">Buscar profesor</label>
+              <input id="profesores_search_basica" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+              {{ sesion_form.profesores }}
+              {% for error in sesion_form.profesores.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-success" name="crear_sesion" type="submit">
+              <i class="bi bi-calendar-plus"></i><span class="ms-1">Crear sesión</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="nuevaPersonaModal" tabindex="-1" aria-labelledby="nuevaPersonaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="nuevaPersonaModalLabel">Nueva persona</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post">
+          {% csrf_token %}
+          {% if persona_form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in persona_form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label" for="id_nombres">Nombres</label>
+              {{ persona_form.nombres }}
+              {% for error in persona_form.nombres.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_apellidos">Apellidos</label>
+              {{ persona_form.apellidos }}
+              {% for error in persona_form.apellidos.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="id_telefono">Teléfono</label>
+              {{ persona_form.telefono }}
+              {% for error in persona_form.telefono.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-outline-success" name="agregar_persona" type="submit">
+              <i class="bi bi-save"></i><span class="ms-1">Guardar persona</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="agregarAsistentesModal" tabindex="-1" aria-labelledby="agregarAsistentesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="agregarAsistentesModalLabel">Agregar asistentes</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body d-flex flex-column" style="min-height: 640px;">
+        {% if sesion_seleccionada %}
+          <div class="mb-2 text-muted small">
+            Sesión: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
+          </div>
+          <form method="post" class="d-flex flex-column flex-grow-1">
+            {% csrf_token %}
+            {{ asistencia_form.sesion_id }}
+            {% for error in asistencia_form.non_field_errors %}
+              <div class="alert alert-danger py-2">{{ error }}</div>
+            {% endfor %}
+            <label class="form-label" for="estudiantes_search">Buscar estudiante</label>
+            <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
+            <div class="d-flex gap-2 mb-2">
+              <button id="seleccionar_visibles" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
+              <button id="limpiar_seleccion" class="btn btn-sm btn-outline-secondary" type="button">Limpiar selección</button>
+            </div>
+            <div class="border rounded p-2 flex-grow-1" style="min-height: 320px; max-height: 320px; overflow-y: auto;">
+              {% for estudiante in estudiantes %}
+                <div class="form-check mb-1 estudiante-opcion" data-text="{{ estudiante }}">
+                  <input
+                    class="form-check-input estudiante-check"
+                    type="checkbox"
+                    name="estudiantes"
+                    value="{{ estudiante.pk }}"
+                    id="estudiante_{{ estudiante.pk }}"
+                    {% if estudiante.pk in asistentes_ids %}checked{% endif %}
+                  >
+                  <label class="form-check-label" for="estudiante_{{ estudiante.pk }}">{{ estudiante }}</label>
+                </div>
+              {% empty %}
+                <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>
+              {% endfor %}
+            </div>
+            {% for error in asistencia_form.estudiantes.errors %}
+              <div class="text-danger small mt-2">{{ error }}</div>
+            {% endfor %}
+            <div class="form-text">
+              Total asistencia a {{ sesion_seleccionada.disciplina }}: {{ estudiantes_total_disciplina_periodo }}
+            </div>
+            <div class="d-flex flex-column flex-md-row gap-2 mt-3">
+              <button class="btn btn-outline-success" name="agregar_asistentes" type="submit" value="1">
+                <i class="bi bi-check2-square"></i><span class="ms-1">Guardar y cerrar</span>
+              </button>
+              <button
+                class="btn btn-success"
+                name="agregar_asistentes"
+                type="submit"
+                value="1"
+                formaction=""
+                onclick="document.getElementById('accion_guardado_asistencias').value='continuar';"
+              >
+                <i class="bi bi-arrow-repeat"></i><span class="ms-1">Guardar y agregar otro</span>
+              </button>
+            </div>
+            <input id="accion_guardado_asistencias" type="hidden" name="accion_guardado_asistencias" value="cerrar">
+          </form>
+        {% else %}
+          <div class="text-muted">Selecciona una sesión desde el listado para agregar asistentes.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block extra_js %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -286,45 +346,44 @@
     const selectVisibleBtn = document.getElementById("seleccionar_visibles");
     const clearBtn = document.getElementById("limpiar_seleccion");
     const rows = Array.from(document.querySelectorAll(".estudiante-opcion"));
-    const nuevaPersona = document.getElementById("nuevaPersonaForm");
-    if (!rows.length) return;
+    const nuevaPersonaModal = document.getElementById("nuevaPersonaModal");
+    if (rows.length) {
+      const aplicarFiltro = function () {
+        const term = normalizeText(input ? input.value : "");
+        let visibles = 0;
+        rows.forEach((row) => {
+          const text = normalizeText(row.dataset.text || "");
+          const visible = !term || text.includes(term);
+          row.style.display = visible ? "" : "none";
+          if (visible) visibles += 1;
+        });
+        if (nuevaPersonaModal && term && visibles === 0 && window.bootstrap) {
+          bootstrap.Modal.getOrCreateInstance(nuevaPersonaModal).show();
+        }
+      };
 
-    const aplicarFiltro = function () {
-      const term = normalizeText(input ? input.value : "");
-      let visibles = 0;
-      rows.forEach((row) => {
-        const text = normalizeText(row.dataset.text || "");
-        const visible = !term || text.includes(term);
-        row.style.display = visible ? "" : "none";
-        if (visible) visibles += 1;
-      });
-      if (nuevaPersona && term && visibles === 0 && window.bootstrap) {
-        const collapse = bootstrap.Collapse.getOrCreateInstance(nuevaPersona);
-        collapse.show();
+      if (input) {
+        input.addEventListener("input", aplicarFiltro);
       }
-    };
 
-    if (input) {
-      input.addEventListener("input", aplicarFiltro);
-    }
-
-    if (selectVisibleBtn) {
-      selectVisibleBtn.addEventListener("click", function () {
-        rows.forEach((row) => {
-          if (row.style.display === "none") return;
-          const check = row.querySelector(".estudiante-check");
-          if (check) check.checked = true;
+      if (selectVisibleBtn) {
+        selectVisibleBtn.addEventListener("click", function () {
+          rows.forEach((row) => {
+            if (row.style.display === "none") return;
+            const check = row.querySelector(".estudiante-check");
+            if (check) check.checked = true;
+          });
         });
-      });
-    }
+      }
 
-    if (clearBtn) {
-      clearBtn.addEventListener("click", function () {
-        rows.forEach((row) => {
-          const check = row.querySelector(".estudiante-check");
-          if (check) check.checked = false;
+      if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+          rows.forEach((row) => {
+            const check = row.querySelector(".estudiante-check");
+            if (check) check.checked = false;
+          });
         });
-      });
+      }
     }
   })();
   (function () {
@@ -367,35 +426,35 @@
     const filtroFecha = document.getElementById("filtro-fecha");
     const limpiarFiltros = document.getElementById("limpiar-filtros");
 
-      if (filtroDisciplina) {
-        filtroDisciplina.value = dt.column(0).search() || "";
-        filtroDisciplina.addEventListener("change", function () {
-          dt.column(0).search(this.value).draw();
-        });
+    if (filtroDisciplina) {
+      filtroDisciplina.value = dt.column(0).search() || "";
+      filtroDisciplina.addEventListener("change", function () {
+        dt.column(0).search(this.value).draw();
+      });
+    }
+    if (filtroProfesor) {
+      filtroProfesor.value = dt.column(1).search() || "";
+      filtroProfesor.addEventListener("change", function () {
+        dt.column(1).search(this.value).draw();
+      });
+    }
+    if (filtroFecha) {
+      const savedDate = dt.column(2).search();
+      if (savedDate && savedDate.includes("/")) {
+        const parts = savedDate.split("/");
+        filtroFecha.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
       }
-      if (filtroProfesor) {
-        filtroProfesor.value = dt.column(1).search() || "";
-        filtroProfesor.addEventListener("change", function () {
-          dt.column(1).search(this.value).draw();
-        });
-      }
-      if (filtroFecha) {
-        const savedDate = dt.column(2).search();
-        if (savedDate && savedDate.includes("/")) {
-          const parts = savedDate.split("/");
-          filtroFecha.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      filtroFecha.addEventListener("change", function () {
+        const val = this.value;
+        if (!val) {
+          dt.column(2).search("").draw();
+          return;
         }
-        filtroFecha.addEventListener("change", function () {
-          const val = this.value;
-          if (!val) {
-            dt.column(2).search("").draw();
-            return;
-          }
-          const parts = val.split("-");
-          const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-          dt.column(2).search(formatted).draw();
-        });
-      }
+        const parts = val.split("-");
+        const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        dt.column(2).search(formatted).draw();
+      });
+    }
     if (limpiarFiltros) {
       limpiarFiltros.addEventListener("click", function () {
         if (filtroDisciplina) filtroDisciplina.value = "";
@@ -404,6 +463,31 @@
         dt.columns().search("").draw();
       });
     }
+  })();
+  (function () {
+    if (!window.bootstrap) return;
+    const limpiarOpenDelQuerystring = function () {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("open")) return;
+      url.searchParams.delete("open");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    };
+
+    ["nuevaSesionModal", "nuevaPersonaModal", "agregarAsistentesModal"].forEach(function (modalId) {
+      const modalElement = document.getElementById(modalId);
+      if (!modalElement) return;
+      modalElement.addEventListener("hidden.bs.modal", limpiarOpenDelQuerystring);
+    });
+
+    {% if open_nueva_sesion %}
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("nuevaSesionModal")).show();
+    {% endif %}
+    {% if open_nueva_persona or estudiantes_total == 0 %}
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("nuevaPersonaModal")).show();
+    {% endif %}
+    {% if open_agregar_asistentes %}
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("agregarAsistentesModal")).show();
+    {% endif %}
   })();
 </script>
 {% endblock %}

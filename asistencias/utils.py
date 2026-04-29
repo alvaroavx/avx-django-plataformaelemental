@@ -1,5 +1,6 @@
 from django.core.exceptions import PermissionDenied
 
+from .models import Disciplina
 from personas.models import Persona, PersonaRol
 
 ROLE_ADMIN = "admin"
@@ -34,3 +35,23 @@ def usuario_tiene_roles(user, roles: list[str]) -> bool:
         activo=True,
         rol__codigo__in=roles,
     ).exists()
+
+
+def disciplinas_vigentes_qs(organizacion=None):
+    """Retorna solo disciplinas vigentes para selección operativa."""
+    queryset = Disciplina.objects.filter(activa=True)
+    if organizacion is not None:
+        queryset = queryset.filter(organizacion=organizacion)
+    return queryset.order_by("nombre", "nivel")
+
+
+def profesores_vigentes_qs(organizacion=None):
+    """Retorna solo profesores vigentes para selección operativa."""
+    queryset = Persona.objects.filter(
+        activo=True,
+        roles__rol__codigo="PROFESOR",
+        roles__activo=True,
+    )
+    if organizacion is not None:
+        queryset = queryset.filter(roles__organizacion=organizacion)
+    return queryset.distinct().order_by("apellidos", "nombres")

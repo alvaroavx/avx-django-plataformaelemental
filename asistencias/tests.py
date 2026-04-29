@@ -60,6 +60,60 @@ class AsistenciasViewTests(TestCase):
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
 
+    def test_agregar_asistentes_guardar_y_cerrar_cierra_modal(self):
+        response = self.client.post(
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+            {
+                "agregar_asistentes": "1",
+                "accion_guardado_asistencias": "cerrar",
+                "sesion_id": str(self.sesion.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}&sesion_id={self.sesion.pk}",
+        )
+
+    def test_agregar_asistentes_guardar_y_cerrar_elimina_flag_open_del_modal(self):
+        response = self.client.post(
+            (
+                f"{reverse('asistencias:asistencias_list')}"
+                f"?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}&open=agregar_asistentes"
+            ),
+            {
+                "agregar_asistentes": "1",
+                "accion_guardado_asistencias": "cerrar",
+                "sesion_id": str(self.sesion.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}&sesion_id={self.sesion.pk}",
+        )
+
+    def test_agregar_asistentes_guardar_y_agregar_otro_reabre_modal(self):
+        response = self.client.post(
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+            {
+                "agregar_asistentes": "1",
+                "accion_guardado_asistencias": "continuar",
+                "sesion_id": str(self.sesion.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}&sesion_id={self.sesion.pk}&open=agregar_asistentes",
+        )
+
     def test_agregar_persona_desde_asistencias_usa_organizacion_filtrada(self):
         response = self.client.post(
             f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
@@ -188,6 +242,79 @@ class AsistenciasViewTests(TestCase):
         self.assertNotIn(profesor_inactivo, profesores)
         self.assertNotIn(profesor_otra_org, profesores)
 
+    def test_asistencias_list_filtros_locales_muestran_solo_disciplinas_y_profesores_vigentes(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Secundaria",
+            razon_social="Org Secundaria SPA",
+            rut="22.222.222-2",
+        )
+        disciplina_inactiva = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Pilates",
+            activa=False,
+        )
+        disciplina_otra_org = Disciplina.objects.create(
+            organizacion=otra_organizacion,
+            nombre="Teatro",
+            activa=True,
+        )
+        profesor_activo = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Activa",
+            email="paula.filtro@example.com",
+            activo=True,
+        )
+        profesor_inactivo = Persona.objects.create(
+            nombres="Bruno",
+            apellidos="Inactivo",
+            email="bruno.filtro@example.com",
+            activo=False,
+        )
+        profesor_otra_org = Persona.objects.create(
+            nombres="Marta",
+            apellidos="Otraorg",
+            email="marta.filtro@example.com",
+            activo=True,
+        )
+        rol_profesor = Rol.objects.get_or_create(nombre="Profesor", codigo="PROFESOR")[0]
+        PersonaRol.objects.create(
+            persona=profesor_activo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=profesor_inactivo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=profesor_otra_org,
+            rol=rol_profesor,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        disciplinas = list(response.context["disciplinas"])
+        profesores = list(response.context["profesores"])
+        self.assertIn(self.disciplina, disciplinas)
+        self.assertNotIn(disciplina_inactiva, disciplinas)
+        self.assertNotIn(disciplina_otra_org, disciplinas)
+        self.assertIn(profesor_activo, profesores)
+        self.assertNotIn(profesor_inactivo, profesores)
+        self.assertNotIn(profesor_otra_org, profesores)
+
     def test_agregar_asistentes_desde_sesion_detail(self):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
         response = self.client.post(
@@ -254,6 +381,55 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Nueva persona")
         self.assertContains(response, 'data-bs-target="#nuevaPersonaSesionModal"', html=False)
+
+    def test_sesion_edit_muestra_solo_disciplinas_y_profesores_vigentes(self):
+        disciplina_inactiva = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Pilates",
+            activa=False,
+        )
+        profesor_activo = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Activa",
+            email="paula.edit@example.com",
+            activo=True,
+        )
+        profesor_inactivo = Persona.objects.create(
+            nombres="Bruno",
+            apellidos="Inactivo",
+            email="bruno.edit@example.com",
+            activo=False,
+        )
+        rol_profesor = Rol.objects.get_or_create(nombre="Profesor", codigo="PROFESOR")[0]
+        PersonaRol.objects.create(
+            persona=profesor_activo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=profesor_inactivo,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:sesion_edit", kwargs={"pk": self.sesion.pk}),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        disciplinas = list(response.context["form"].fields["disciplina"].queryset)
+        profesores = list(response.context["form"].fields["profesores"].queryset)
+        self.assertIn(self.disciplina, disciplinas)
+        self.assertNotIn(disciplina_inactiva, disciplinas)
+        self.assertIn(profesor_activo, profesores)
+        self.assertNotIn(profesor_inactivo, profesores)
 
     def test_sesion_detail_elimina_sesion_y_dependencias(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
@@ -995,6 +1171,52 @@ class AsistenciasViewTests(TestCase):
         consumo.refresh_from_db()
         self.assertEqual(consumo.pago, pago_destino)
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+
+    def test_persona_detail_profesor_muestra_estimado_del_periodo_segun_valor_clase(self):
+        profesor = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Mora",
+            email="paula.valor@example.com",
+        )
+        rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        PersonaRol.objects.create(
+            persona=profesor,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+            valor_clase=5000,
+            retencion_sii=15.25,
+        )
+        self.sesion.profesores.set([profesor])
+        segundo_estudiante = Persona.objects.create(
+            nombres="Luis",
+            apellidos="Rojas",
+            email="luis.profesor@example.com",
+        )
+        rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=segundo_estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        Asistencia.objects.create(sesion=self.sesion, persona=segundo_estudiante)
+
+        response = self.client.get(
+            reverse("asistencias:persona_detail", kwargs={"pk": profesor.pk}),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Monto bruto estimado del período")
+        self.assertContains(response, "$ 10.000")
+        self.assertContains(response, "$ 5.000")
+        self.assertContains(response, "Pago por asistencia")
+        self.assertContains(response, "Retención SII")
+        self.assertContains(response, "$ 1.525")
+        self.assertContains(response, "Valor neto")
+        self.assertContains(response, "$ 8.475")
 
     def test_asistencias_list_colorea_asistentes_por_estado_financiero(self):
         rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")

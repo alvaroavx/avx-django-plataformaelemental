@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
@@ -102,6 +104,22 @@ class PersonaRol(models.Model):
         related_name="persona_roles",
     )
     activo = models.BooleanField(default=True)
+    valor_clase = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Tarifa por asistencia/clase para roles donde aplique, como PROFESOR.",
+    )
+    retencion_sii = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Porcentaje de retencion SII para honorarios, cuando aplique al rol PROFESOR.",
+    )
     asignado_en = models.DateField(auto_now_add=True)
 
     class Meta:
@@ -112,3 +130,7 @@ class PersonaRol(models.Model):
 
     def __str__(self) -> str:
         return f"{self.persona} - {self.rol} ({self.organizacion})"
+
+    @property
+    def valor_clase_normalizado(self):
+        return self.valor_clase if self.valor_clase is not None else Decimal("0")

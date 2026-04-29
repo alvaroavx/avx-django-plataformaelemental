@@ -66,6 +66,24 @@
       <div class="card mt-3">
         <div class="card-header">Resumen Profesor</div>
         <div class="card-body">
+          {% if mostrar_estimado_total_profesor %}
+          <div class="d-flex justify-content-between mb-3">
+            <span>Monto bruto estimado del período</span>
+            <strong>{{ estimado_total_profesor|clp }}</strong>
+          </div>
+          {% endif %}
+          {% if mostrar_retencion_total_profesor %}
+          <div class="d-flex justify-content-between mb-3 small">
+            <span>Retención SII del período</span>
+            <strong>{{ retencion_total_profesor|clp }}</strong>
+          </div>
+          {% endif %}
+          {% if mostrar_neto_total_profesor %}
+          <div class="d-flex justify-content-between mb-3 small">
+            <span>Valor neto del período</span>
+            <strong>{{ neto_total_profesor|clp }}</strong>
+          </div>
+          {% endif %}
           {% for item in resumen_profesor %}
             <div class="mb-2">
               <div class="fw-semibold">{{ item.organizacion.nombre }}</div>
@@ -81,6 +99,34 @@
                 <span>Asistencias</span>
                 <strong>{{ item.asistencias }}</strong>
               </div>
+              {% if item.valor_clase %}
+              <div class="d-flex justify-content-between small">
+                <span>Pago por asistencia</span>
+                <strong>{{ item.valor_clase|clp }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small">
+                <span>Monto bruto estimado</span>
+                <strong>{{ item.monto_bruto_estimado|clp }}</strong>
+              </div>
+              <div class="d-flex justify-content-between small">
+                <span>Retención SII</span>
+                {% if item.monto_retencion_sii is not None %}
+                <strong>{{ item.monto_retencion_sii|clp }}</strong>
+                {% else %}
+                <strong class="text-muted">Sin configurar</strong>
+                {% endif %}
+              </div>
+              <div class="d-flex justify-content-between small">
+                <span>Valor neto</span>
+                {% if item.monto_neto is not None %}
+                <strong>{{ item.monto_neto|clp }}</strong>
+                {% else %}
+                <strong class="text-muted">Sin configurar</strong>
+                {% endif %}
+              </div>
+              {% else %}
+              <div class="small text-muted">Sin pago por asistencia configurado.</div>
+              {% endif %}
             </div>
           {% empty %}
             <div class="text-muted">Sin datos.</div>

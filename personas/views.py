@@ -31,13 +31,46 @@ def _url_con_filtros(request, nombre_url, **kwargs):
     return f"{url}?{query}" if query else url
 
 
+def _guardar_persona_rol_desde_form(persona, rol_form):
+    rol = rol_form.cleaned_data["rol"]
+    organizacion = rol_form.cleaned_data["organizacion"]
+    valor_clase = rol_form.cleaned_data.get("valor_clase")
+    retencion_sii = rol_form.cleaned_data.get("retencion_sii")
+    persona_rol, created = PersonaRol.objects.get_or_create(
+        persona=persona,
+        rol=rol,
+        organizacion=organizacion,
+        defaults={"activo": True, "valor_clase": valor_clase, "retencion_sii": retencion_sii},
+    )
+    cambios = []
+    if not created and not persona_rol.activo:
+        persona_rol.activo = True
+        cambios.append("activo")
+    if rol.codigo == "PROFESOR" and persona_rol.valor_clase != valor_clase:
+        persona_rol.valor_clase = valor_clase
+        cambios.append("valor_clase")
+    if rol.codigo == "PROFESOR" and persona_rol.retencion_sii != retencion_sii:
+        persona_rol.retencion_sii = retencion_sii
+        cambios.append("retencion_sii")
+    if rol.codigo != "PROFESOR" and persona_rol.valor_clase is not None:
+        persona_rol.valor_clase = None
+        cambios.append("valor_clase")
+    if rol.codigo != "PROFESOR" and persona_rol.retencion_sii is not None:
+        persona_rol.retencion_sii = None
+        cambios.append("retencion_sii")
+    if cambios:
+        persona_rol.save(update_fields=cambios)
+    return persona_rol, created
+
+
 def _personas_queryset(organizacion=None):
     queryset = Persona.objects.select_related("user").prefetch_related(
         Prefetch(
             "roles",
-            queryset=PersonaRol.objects.filter(activo=True)
-            .select_related("rol", "organizacion")
-            .order_by("organizacion__nombre", "rol__nombre"),
+            queryset=PersonaRol.objects.select_related("rol", "organizacion").order_by(
+                "organizacion__nombre",
+                "rol__nombre",
+            ),
         )
     )
     if organizacion:
@@ -280,7 +313,7 @@ def personas_list(request):
             | Q(rut__icontains=q)
         )
     if rol:
-        personas_qs = personas_qs.filter(roles__activo=True, roles__rol__codigo=rol)
+        personas_qs = personas_qs.filter(roles__rol__codigo=rol)
     if estado == "activas":
         personas_qs = personas_qs.filter(activo=True)
     elif estado == "inactivas":
@@ -319,17 +352,7 @@ def persona_create(request):
         if persona_valida and rol_valido:
             persona = form.save()
             if rol_valido and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
-                rol = rol_form.cleaned_data["rol"]
-                organizacion = rol_form.cleaned_data["organizacion"]
-                persona_rol, _ = PersonaRol.objects.get_or_create(
-                    persona=persona,
-                    rol=rol,
-                    organizacion=organizacion,
-                    defaults={"activo": True},
-                )
-                if not persona_rol.activo:
-                    persona_rol.activo = True
-                    persona_rol.save(update_fields=["activo"])
+                _guardar_persona_rol_desde_form(persona, rol_form)
             messages.success(request, "Persona creada correctamente.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     context.update(
@@ -375,20 +398,13 @@ def persona_detail(request, pk):
         if accion == "agregar_rol":
             rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form_post.is_valid() and rol_form_post.cleaned_data.get("rol") and rol_form_post.cleaned_data.get("organizacion"):
-                rol = rol_form_post.cleaned_data["rol"]
-                organizacion_rol = rol_form_post.cleaned_data["organizacion"]
-                persona_rol, created = PersonaRol.objects.get_or_create(
-                    persona=persona,
-                    rol=rol,
-                    organizacion=organizacion_rol,
-                    defaults={"activo": True},
-                )
+                persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form_post)
                 if not created and not persona_rol.activo:
-                    persona_rol.activo = True
-                    persona_rol.save(update_fields=["activo"])
                     messages.success(request, "Rol reactivado para la persona.")
                 elif created:
                     messages.success(request, "Rol agregado a la persona.")
+                elif persona_rol.rol.codigo == "PROFESOR":
+                    messages.success(request, "Rol de profesor actualizado para la persona.")
                 else:
                     messages.info(request, "Ese rol ya estaba activo para la persona.")
                 return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
@@ -396,6 +412,18 @@ def persona_detail(request, pk):
                 messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
             else:
                 messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
+        elif accion == "guardar_configuracion_profesor":
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            if persona_rol.rol.codigo != "PROFESOR":
+                messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+            valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
+            retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
+            persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
+            persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
+            persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
+            messages.success(request, "Configuración de honorarios actualizada.")
+            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         elif accion == "toggle_rol":
             persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
             persona_rol.activo = not persona_rol.activo
@@ -425,7 +453,38 @@ def persona_detail(request, pk):
     consumos = aplicar_periodo(consumos, "clase_fecha", request=request)
 
     roles_codigos = {item.rol.codigo for item in roles_asignados if item.activo}
-    finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if "ESTUDIANTE" in roles_codigos else None
+    es_estudiante = "ESTUDIANTE" in roles_codigos
+    es_profesor = "PROFESOR" in roles_codigos
+    documentos_tributarios = [pago.documento_tributario for pago in pagos if pago.documento_tributario_id]
+    finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if es_estudiante else None
+    mostrar_bloque_estudiante = es_estudiante or asistencias.exists() or pagos.exists() or consumos.exists() or bool(documentos_tributarios)
+    mostrar_bloque_profesor = es_profesor or sesiones_profesor.exists()
+    sesiones_profesor_total = sesiones_profesor.count()
+    sesiones_profesor_completadas = sesiones_profesor.filter(estado=SesionClase.Estado.COMPLETADA).count()
+    asistentes_sesiones_profesor = sum(item.asistencias.count() for item in sesiones_profesor)
+    roles_profesor = [item for item in roles_asignados if item.activo and item.rol.codigo == "PROFESOR"]
+    if organizacion:
+        roles_profesor = [item for item in roles_profesor if item.organizacion_id == organizacion.id]
+    valor_clase_por_org = {item.organizacion_id: item.valor_clase for item in roles_profesor}
+    retencion_sii_por_org = {item.organizacion_id: item.retencion_sii for item in roles_profesor}
+    pago_bruto_profesor = Decimal("0")
+    retenciones_configuradas = []
+    for sesion in sesiones_profesor:
+        valor_clase = valor_clase_por_org.get(sesion.disciplina.organizacion_id)
+        if valor_clase is not None:
+            pago_bruto_profesor += valor_clase * sesion.asistencias.count()
+        retencion_item = retencion_sii_por_org.get(sesion.disciplina.organizacion_id)
+        if retencion_item is not None:
+            retenciones_configuradas.append(retencion_item)
+    retenciones_distintas = sorted({item for item in retenciones_configuradas})
+    retencion_sii_profesor = retenciones_distintas[0] if len(retenciones_distintas) == 1 else None
+    retencion_sii_mixta = len(retenciones_distintas) > 1
+    mostrar_pago_estimado_profesor = any(valor is not None for valor in valor_clase_por_org.values())
+    monto_retencion_sii_profesor = None
+    monto_neto_profesor = None
+    if mostrar_pago_estimado_profesor and retencion_sii_profesor is not None:
+        monto_retencion_sii_profesor = (pago_bruto_profesor * retencion_sii_profesor) / Decimal("100")
+        monto_neto_profesor = pago_bruto_profesor - monto_retencion_sii_profesor
 
     context.update(
         {
@@ -436,13 +495,26 @@ def persona_detail(request, pk):
             "pagos": pagos,
             "consumos": consumos,
             "sesiones_profesor": sesiones_profesor,
-            "documentos_tributarios": [pago.documento_tributario for pago in pagos if pago.documento_tributario_id],
+            "documentos_tributarios": documentos_tributarios,
             "finanzas_resumen": finanzas_resumen,
             "monto_pagado": pagos.aggregate(total=Sum("monto_total")).get("total") or 0,
             "consumos_consumidos": consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),
             "consumos_pendientes": consumos.filter(estado=AttendanceConsumption.Estado.PENDIENTE).count(),
             "consumos_deuda": consumos.filter(estado=AttendanceConsumption.Estado.DEUDA).count(),
             "roles_codigos": roles_codigos,
+            "es_estudiante": es_estudiante,
+            "es_profesor": es_profesor,
+            "mostrar_bloque_estudiante": mostrar_bloque_estudiante,
+            "mostrar_bloque_profesor": mostrar_bloque_profesor,
+            "sesiones_profesor_total": sesiones_profesor_total,
+            "sesiones_profesor_completadas": sesiones_profesor_completadas,
+            "asistentes_sesiones_profesor": asistentes_sesiones_profesor,
+            "pago_bruto_profesor": pago_bruto_profesor,
+            "mostrar_pago_estimado_profesor": mostrar_pago_estimado_profesor,
+            "retencion_sii_profesor": retencion_sii_profesor,
+            "retencion_sii_mixta": retencion_sii_mixta,
+            "monto_retencion_sii_profesor": monto_retencion_sii_profesor,
+            "monto_neto_profesor": monto_neto_profesor,
         }
     )
     return render(request, "personas/persona_detail.html", context)
@@ -474,20 +546,13 @@ def persona_edit(request, pk):
         elif accion == "agregar_rol":
             rol_form = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
-                rol = rol_form.cleaned_data["rol"]
-                organizacion = rol_form.cleaned_data["organizacion"]
-                persona_rol, created = PersonaRol.objects.get_or_create(
-                    persona=persona,
-                    rol=rol,
-                    organizacion=organizacion,
-                    defaults={"activo": True},
-                )
+                persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form)
                 if not created and not persona_rol.activo:
-                    persona_rol.activo = True
-                    persona_rol.save(update_fields=["activo"])
                     messages.success(request, "Rol reactivado para la persona.")
                 elif created:
                     messages.success(request, "Rol agregado a la persona.")
+                elif persona_rol.rol.codigo == "PROFESOR":
+                    messages.success(request, "Rol de profesor actualizado para la persona.")
                 else:
                     messages.info(request, "Ese rol ya estaba activo para la persona.")
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
@@ -495,6 +560,18 @@ def persona_edit(request, pk):
                 messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
             else:
                 messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
+        elif accion == "guardar_configuracion_profesor":
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            if persona_rol.rol.codigo != "PROFESOR":
+                messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
+                return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
+            valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
+            retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
+            persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
+            persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
+            persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
+            messages.success(request, "Configuración de honorarios actualizada.")
+            return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "toggle_rol":
             persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
             persona_rol.activo = not persona_rol.activo

@@ -4,6 +4,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from personas.models import Persona
 
 from .models import Disciplina
+from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
 class DisciplinaForm(forms.ModelForm):
@@ -43,17 +44,8 @@ class SesionBasicaForm(forms.Form):
 
     def __init__(self, *args, organizacion=None, **kwargs):
         super().__init__(*args, **kwargs)
-        disciplinas_qs = Disciplina.objects.filter(activa=True)
-        profesores_qs = Persona.objects.filter(
-            activo=True,
-            roles__rol__codigo="PROFESOR",
-            roles__activo=True,
-        )
-        if organizacion is not None:
-            disciplinas_qs = disciplinas_qs.filter(organizacion=organizacion)
-            profesores_qs = profesores_qs.filter(roles__organizacion=organizacion)
-        self.fields["disciplina"].queryset = disciplinas_qs.order_by("nombre")
-        self.fields["profesores"].queryset = profesores_qs.distinct().order_by("apellidos", "nombres")
+        self.fields["disciplina"].queryset = disciplinas_vigentes_qs(organizacion=organizacion)
+        self.fields["profesores"].queryset = profesores_vigentes_qs(organizacion=organizacion)
 
 
 class AsistenciaMasivaForm(forms.Form):
