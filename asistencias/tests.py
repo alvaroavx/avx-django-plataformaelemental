@@ -682,6 +682,18 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["estudiantes_activos_mes"], 2)
 
+    def test_menu_superior_permite_cerrar_sesion(self):
+        response = self.client.get(reverse("asistencias:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cerrar sesión")
+        self.assertContains(response, f'action="{reverse("logout")}"')
+
+        logout_response = self.client.post(reverse("logout"))
+
+        self.assertEqual(logout_response.status_code, 302)
+        self.assertEqual(logout_response.url, "/accounts/login/")
+
     def test_dashboard_sesiones_realizadas_cuenta_solo_completadas_del_mes(self):
         SesionClase.objects.create(
             disciplina=self.disciplina,
@@ -734,6 +746,15 @@ class AsistenciasViewTests(TestCase):
         asistencia_ana_1 = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
         asistencia_ana_2 = Asistencia.objects.create(sesion=sesion_dos, persona=self.estudiante)
         asistencia_luis = Asistencia.objects.create(sesion=self.sesion, persona=otro_estudiante)
+        Payment.objects.create(
+            persona=tercer_estudiante,
+            organizacion=self.organizacion,
+            fecha_pago="2026-02-26",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=30000,
+            clases_asignadas=3,
+        )
         consumo_luis = AttendanceConsumption.objects.get(asistencia=asistencia_luis)
         consumo_luis.estado = AttendanceConsumption.Estado.DEUDA
         consumo_luis.pago = None
@@ -747,10 +768,12 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Estudiantes con deuda")
         self.assertContains(response, "Estudiantes con más asistencia")
+        self.assertContains(response, "Alumnos con clases disponibles")
+        self.assertNotContains(response, "Estudiantes sin asistencia")
         self.assertContains(response, "Luis Rojas")
-        self.assertContains(response, "(1 clases)")
         self.assertContains(response, "Ana Diaz")
-        self.assertContains(response, "(2 clases)")
+        self.assertContains(response, "Marta Lopez")
+        self.assertContains(response, "3 pagadas")
         self.assertIn(otro_estudiante, list(response.context["estudiantes_con_deuda"]))
         self.assertEqual(response.context["estudiantes_con_deuda"][0], self.estudiante)
         self.assertEqual(response.context["estudiantes_con_deuda"][0].clases_deuda, 2)
@@ -758,6 +781,8 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.context["estudiantes_con_deuda"][1].clases_deuda, 1)
         self.assertEqual(response.context["estudiantes_con_mas_asistencia"][0], self.estudiante)
         self.assertEqual(response.context["estudiantes_con_mas_asistencia"][0].total_asistencias_mes, 2)
+        self.assertEqual(response.context["estudiantes_con_clases_restantes"][0]["persona"], tercer_estudiante)
+        self.assertEqual(response.context["estudiantes_con_clases_restantes"][0]["saldo_clases"], 3)
 
     def test_sesiones_list_muestra_mensaje_cancelada_en_vez_de_asistentes_cero(self):
         self.sesion.estado = SesionClase.Estado.CANCELADA
@@ -1217,6 +1242,7 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "$ 1.525")
         self.assertContains(response, "Valor neto")
         self.assertContains(response, "$ 8.475")
+        self.assertContains(response, f"&sesion_id={self.sesion.pk}&open=agregar_asistentes")
 
     def test_asistencias_list_colorea_asistentes_por_estado_financiero(self):
         rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")

@@ -2,7 +2,7 @@ import calendar
 from decimal import Decimal
 
 from django.contrib import messages
-from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch, Q
+from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -117,7 +117,6 @@ def dashboard(request):
     estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct()
     if organizacion:
         estudiantes_qs = estudiantes_qs.filter(roles__organizacion=organizacion).distinct()
-    estudiantes_sin_asistencia = estudiantes_qs.exclude(id__in=asistentes_ids_qs).order_by("apellidos", "nombres")[:5]
     filtro_deuda = Q(
         consumos_asistencia__estado=AttendanceConsumption.Estado.DEUDA,
         **filtros_periodo("consumos_asistencia__clase_fecha", request=request),
@@ -127,7 +126,7 @@ def dashboard(request):
     estudiantes_con_deuda = (
         estudiantes_qs.filter(filtro_deuda)
         .annotate(clases_deuda=Count("consumos_asistencia", filter=filtro_deuda, distinct=True))
-        .order_by("-clases_deuda", "apellidos", "nombres")[:5]
+        .order_by("-clases_deuda", "apellidos", "nombres")
     )
     filtro_asistencia = Q(
         **filtros_periodo("asistencias__sesion__fecha", request=request),
@@ -137,8 +136,53 @@ def dashboard(request):
     estudiantes_con_mas_asistencia = (
         estudiantes_qs.filter(filtro_asistencia)
         .annotate(total_asistencias_mes=Count("asistencias", filter=filtro_asistencia, distinct=True))
-        .order_by("-total_asistencias_mes", "apellidos", "nombres")[:5]
+        .order_by("-total_asistencias_mes", "apellidos", "nombres")
     )
+
+    estudiantes_ids = list(estudiantes_qs.values_list("id", flat=True))
+    pagos_periodo_qs = Payment.objects.filter(
+        persona_id__in=estudiantes_ids,
+        **filtros_periodo("fecha_pago", request=request),
+    )
+    consumos_periodo_qs = AttendanceConsumption.objects.filter(
+        persona_id__in=estudiantes_ids,
+        estado=AttendanceConsumption.Estado.CONSUMIDO,
+        **filtros_periodo("clase_fecha", request=request),
+    )
+    if organizacion:
+        pagos_periodo_qs = pagos_periodo_qs.filter(organizacion=organizacion)
+        consumos_periodo_qs = consumos_periodo_qs.filter(asistencia__sesion__disciplina__organizacion=organizacion)
+
+    clases_pagadas_por_persona = {
+        item["persona_id"]: item["total_clases"] or 0
+        for item in pagos_periodo_qs.values("persona_id").annotate(total_clases=Sum("clases_asignadas"))
+    }
+    clases_consumidas_por_persona = {
+        item["persona_id"]: item["total_consumidas"] or 0
+        for item in consumos_periodo_qs.values("persona_id").annotate(total_consumidas=Count("id"))
+    }
+    personas_por_id = Persona.objects.in_bulk(clases_pagadas_por_persona.keys())
+    estudiantes_con_clases_restantes = []
+    for persona_id, clases_pagadas in clases_pagadas_por_persona.items():
+        clases_consumidas = clases_consumidas_por_persona.get(persona_id, 0)
+        saldo_clases = clases_pagadas - clases_consumidas
+        if saldo_clases <= 0:
+            continue
+        persona = personas_por_id.get(persona_id)
+        if not persona:
+            continue
+        estudiantes_con_clases_restantes.append(
+            {
+                "persona": persona,
+                "clases_pagadas": clases_pagadas,
+                "clases_consumidas": clases_consumidas,
+                "saldo_clases": saldo_clases,
+            }
+        )
+    estudiantes_con_clases_restantes.sort(
+        key=lambda item: (-item["saldo_clases"], item["persona"].apellidos, item["persona"].nombres)
+    )
+
     sesiones_resumen = sesiones_mes.annotate(total_asistentes=Count("asistencias")).order_by("-fecha")[:10]
     context.update(
         {
@@ -146,9 +190,9 @@ def dashboard(request):
             "asistencias_mes": asistencias_mes_qs.count(),
             "estudiantes_activos_mes": estudiantes_activos_mes,
             "sesiones_realizadas_mes": sesiones_realizadas_mes,
-            "estudiantes_sin_asistencia": estudiantes_sin_asistencia,
             "estudiantes_con_deuda": estudiantes_con_deuda,
             "estudiantes_con_mas_asistencia": estudiantes_con_mas_asistencia,
+            "estudiantes_con_clases_restantes": estudiantes_con_clases_restantes,
             "sesiones_resumen": sesiones_resumen,
             "nombre_mes": descripcion_periodo(request=request, corta=True),
         }

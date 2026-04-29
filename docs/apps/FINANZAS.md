@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-04-28
+Fecha de actualizacion: 2026-04-29
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -100,6 +100,7 @@ Reglas:
 - Los cards de resumen en `pagos`, `transacciones` y dashboard deben usar colores suaves y consistentes entre vistas, evitando fondos saturados.
 - Las vistas principales que crean contenido en `finanzas` deben mostrar el boton de alta al nivel del titulo y abrir el formulario en modal, para no desplazar el listado principal.
 - En `pagos`, la edicion tambien debe resolverse dentro del listado mediante modal, y al guardar debe volver al mismo listado filtrado en vez de abrir una pantalla aparte.
+- En `pagos`, al cerrar el modal de edicion con cancelar, equis o click fuera, la URL debe eliminar `editar_pago` del querystring para que un refresh no reabra el modal.
 - En `pagos`, debe existir tambien un alta rapida de `Nueva persona` junto a `Registrar pago`, en modal, usando la organizacion filtrada arriba para asignar automaticamente el rol `ESTUDIANTE`.
 - Si no hay organizacion filtrada al usar `Nueva persona` desde `pagos`, el error debe aparecer dentro del modal indicando que primero se seleccione una organizacion.
 - El listado de `documentos tributarios` prioriza lectura financiera/tributaria: muestra `neto`, `exento`, `IVA`, `retencion` y `total`, y no repite `organizacion` porque ya existe filtro superior.

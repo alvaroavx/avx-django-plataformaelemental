@@ -52,9 +52,17 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:profesores_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Profesores</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'asistencias:disciplinas_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Disciplinas</a></li>
           </ul>
-          <span class="navbar-text text-white">
-            {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}
-          </span>
+          <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2">
+            <span class="navbar-text text-white">
+              {{ request.user.get_username }}{% if persona %} · {{ persona.nombres }}{% endif %}
+            </span>
+            <form method="post" action="{% url 'logout' %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-light" type="submit" title="Cerrar sesión">
+                <i class="bi bi-box-arrow-right"></i><span class="d-none d-lg-inline ms-1">Cerrar sesión</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </nav>

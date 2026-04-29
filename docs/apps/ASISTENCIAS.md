@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-04-28
+Fecha de actualizacion: 2026-04-29
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -19,6 +19,7 @@ Debe privilegiar:
 - El perfil operativo de persona debe respetar siempre el periodo y la organizacion activos.
 - Las asistencias deben poder verse junto con su estado financiero.
 - Los modelos propios de esta app viven en `asistencias.models`; no deben declararse en `database`.
+- El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
 
 ## Decisiones funcionales vigentes
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.
@@ -36,6 +37,7 @@ Debe privilegiar:
 - En `asistencias/asistencias/`, el bloque `Nueva sesion` debe listar solo disciplinas activas y solo profesores activos con rol `PROFESOR` activo dentro de la organizacion filtrada.
 - En toda seleccion operativa dentro de `asistencias`, una disciplina vigente equivale a `Disciplina.activa=True` y un profesor vigente equivale a `Persona.activo=True` mas `PersonaRol.activo=True` con rol `PROFESOR`; no deben aparecer opciones inactivas en filtros ni formularios editables.
 - En `asistencias/asistencias/`, las acciones `Nueva sesion`, `Nueva persona` y `Agregar asistentes` deben mostrarse como una sola fila de botones en escritorio y abrirse en modales, para no desplazar el listado principal; en mobile pueden apilarse, pero mantienen el mismo flujo en modal.
+- Todo enlace interno de la app que lleve a `asistencias/asistencias/` para agregar asistentes a una sesion debe incluir `sesion_id=<id>` y `open=agregar_asistentes`, para abrir el modal vigente y no depender de flujos embebidos antiguos.
 - En `asistencias/asistencias/`, cuando la vista se abre con `open=<modal>` para forzar un modal, al cerrarlo debe limpiarse ese parametro del querystring sin recargar la pagina; esto aplica a `Nueva sesion`, `Nueva persona` y `Agregar asistentes`.
 - En `asistencias/asistencias/`, cuando se selecciona una sesion para agregar asistentes, el selector debe usar checkboxes iguales al detalle de sesion y dejar marcados visualmente los estudiantes ya registrados.
 - En `asistencias/asistencias/`, el modal `Agregar asistentes` debe mantener una altura fija para que la vista no cambie de tamaño segun la cantidad de resultados; el scroll debe ocurrir dentro del listado de estudiantes.
@@ -47,7 +49,7 @@ Debe privilegiar:
 - En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/`, una sesion cancelada debe mostrarse como `sesión cancelada` y no como `asistentes: 0`, para no confundir cancelacion con falta de registro.
 - En `asistencias/sesiones/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
-- En el dashboard de `asistencias`, la ultima seccion debe tener tres columnas: estudiantes sin asistencia, estudiantes con deuda por cantidad de clases, y estudiantes con mas asistencia ordenados de mayor a menor en el periodo.
+- En el dashboard de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
 - En el perfil operativo de profesor, el resumen del periodo debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion y mostrar `pago por asistencia`, `monto bruto estimado`, `retencion SII` en monto y `valor neto`; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en la vista.
 
 ## Relacion con finanzas
