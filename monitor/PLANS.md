@@ -3,19 +3,19 @@
 Fecha de actualizacion: 2026-04-29
 
 ## Foco actual
-Fase 1: construir la columna vertebral de `monitor`.
+Fase 1: primera version implementada, pendiente validacion cruzada y feedback de producto.
 
 ## Fase 1
-- Django base
-- Auth Django
-- Organizaciones, personas, proyectos y sitios
-- Agregar sitio por URL
-- Discovery inicial
-- Configuracion global y por sitio
-- Dashboard general
-- Vista detalle por sitio
-- Tests base
-- UI responsive inicial
+- Django base: implementado
+- Auth Django: implementado
+- Organizaciones, personas, proyectos y sitios: implementado con proyectos y relacion opcional a organizaciones
+- Agregar sitio por URL: implementado
+- Discovery inicial: implementado sin worker externo
+- Configuracion global y por sitio: implementado
+- Dashboard general: implementado
+- Vista detalle por sitio: implementado
+- Tests base: implementado
+- UI responsive inicial: implementado
 
 No entra en fase 1:
 - Alertas reales multicanal

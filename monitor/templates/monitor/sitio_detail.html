@@ -1,0 +1,100 @@
+{% extends "asistencias/base_app.html" %}
+{% load static %}
+
+{% block title %}{{ sitio.nombre }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'monitor/monitor.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="monitor-shell">
+  <div class="monitor-header d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+    <div>
+      <h1 class="monitor-title">{{ sitio.nombre }}</h1>
+      <div class="monitor-domain">{{ sitio.url }}</div>
+    </div>
+    <div class="d-flex flex-column flex-sm-row gap-2 align-items-sm-start">
+      <span class="monitor-status monitor-status-{{ sitio.ultimo_estado }}">{{ sitio.get_ultimo_estado_display }}</span>
+      <a class="btn btn-outline-light" href="{% url 'monitor:sitio_configuracion' sitio.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <i class="bi bi-sliders"></i> Configuracion
+      </a>
+    </div>
+  </div>
+
+  <div class="monitor-detail-grid">
+    <section class="monitor-panel">
+      <h2 class="h5 mb-3">Detalle operativo</h2>
+      <div class="monitor-kv">
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Proyecto</div>
+          <div class="monitor-wrap">{{ sitio.proyecto.nombre }}</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Dominio</div>
+          <div class="monitor-value">{{ sitio.dominio }}</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Ultimo check</div>
+          <div>{% if sitio.ultimo_check_en %}{{ sitio.ultimo_check_en }}{% else %}Pendiente{% endif %}</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Frecuencia</div>
+          <div>{{ configuracion_efectiva.frecuencia_minutos }} minutos</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Timeout</div>
+          <div>{{ configuracion_efectiva.timeout_segundos }} segundos</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="monitor-panel">
+      <h2 class="h5 mb-3">Configuracion efectiva</h2>
+      <div class="monitor-kv">
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Timeout global</div>
+          <div>{{ configuracion_global.timeout_segundos }} segundos</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Frecuencia global</div>
+          <div>{{ configuracion_global.frecuencia_minutos }} minutos</div>
+        </div>
+        <div class="monitor-kv-row">
+          <div class="monitor-muted">Redirecciones</div>
+          <div>{% if configuracion_efectiva.seguir_redirecciones %}Si{% else %}No{% endif %}</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="monitor-panel mt-3">
+    <h2 class="h5 mb-3">Discovery</h2>
+    {% if discoveries %}
+      <div class="monitor-site-list">
+        {% for discovery in discoveries %}
+          <div class="monitor-site-row">
+            <div>
+              <div class="fw-bold">{% if discovery.titulo %}{{ discovery.titulo }}{% else %}Sin titulo detectado{% endif %}</div>
+              <div class="monitor-domain">{{ discovery.url_final|default:sitio.url }}</div>
+            </div>
+            <div>
+              <div class="monitor-muted small">HTTP</div>
+              <div>{{ discovery.estado_http|default:"Sin respuesta" }}</div>
+            </div>
+            <div>
+              <div class="monitor-muted small">Respuesta</div>
+              <div>{% if discovery.tiempo_respuesta_ms %}{{ discovery.tiempo_respuesta_ms }} ms{% else %}-{% endif %}</div>
+            </div>
+          </div>
+          {% if discovery.error %}
+            <div class="alert alert-danger mt-2">{{ discovery.error }}</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="monitor-empty">Sin discovery registrado.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

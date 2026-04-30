@@ -9,6 +9,10 @@
 - Discovery con respuesta exitosa simulada.
 - Discovery con timeout o error simulado.
 
+Estado actual:
+- Cubierto: login de rutas HTML, dashboard vacio, dashboard con sitios, URL valida, URL invalida, sitio duplicado, detalle, configuracion global, configuracion por sitio, redirects con filtros globales, discovery exitoso simulado y discovery con error simulado.
+- Pendiente para endurecer fase 2: casos de redireccion HTTP y validacion visual asistida con navegador.
+
 ## Tipos de tests
 - Unitarios para normalizacion de URL.
 - Unitarios para servicios de discovery.

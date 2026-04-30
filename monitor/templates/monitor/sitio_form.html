@@ -1,0 +1,55 @@
+{% extends "asistencias/base_app.html" %}
+{% load static %}
+
+{% block title %}Agregar sitio{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'monitor/monitor.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="monitor-shell">
+  <div class="monitor-header mb-3">
+    <h1 class="monitor-title">Agregar sitio</h1>
+    <div class="monitor-subtitle">Discovery inicial por URL para activar una nueva senal operativa.</div>
+  </div>
+
+  <form method="post" class="monitor-form-panel" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <label for="{{ form.proyecto.id_for_label }}" class="form-label">{{ form.proyecto.label }}</label>
+        {{ form.proyecto }}
+        {% for error in form.proyecto.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-lg-6">
+        <label for="{{ form.proyecto_nombre.id_for_label }}" class="form-label">{{ form.proyecto_nombre.label }}</label>
+        {{ form.proyecto_nombre }}
+        <div class="form-text">{{ form.proyecto_nombre.help_text }}</div>
+        {% for error in form.proyecto_nombre.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-lg-5">
+        <label for="{{ form.nombre.id_for_label }}" class="form-label">{{ form.nombre.label }}</label>
+        {{ form.nombre }}
+        {% for error in form.nombre.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-lg-7">
+        <label for="{{ form.url.id_for_label }}" class="form-label">{{ form.url.label }}</label>
+        {{ form.url }}
+        {% for error in form.url.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    </div>
+
+    <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+      <button class="btn btn-info" type="submit">
+        <i class="bi bi-radar"></i> Agregar y ejecutar discovery
+      </button>
+      <a class="btn btn-outline-light" href="{% url 'monitor:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

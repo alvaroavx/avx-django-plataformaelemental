@@ -11,6 +11,8 @@ Debe mostrar:
 - Ultimos sitios agregados.
 - Accion principal para agregar sitio.
 
+Estado: implementado.
+
 ## Layout
 Desktop:
 - Cards resumen arriba.

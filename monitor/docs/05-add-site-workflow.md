@@ -15,6 +15,8 @@ Permitir que un usuario agregue un sitio por URL con el menor roce posible y con
 6. Se ejecuta discovery inicial.
 7. Usuario llega al detalle del sitio.
 
+Estado: implementado en `SitioCreateForm`, `monitor.views.sitio_create` y `monitor.services.discovery.ejecutar_discovery_inicial`.
+
 ## Estados
 - `pendiente`: sitio creado sin discovery exitoso.
 - `activo`: discovery respondio correctamente.

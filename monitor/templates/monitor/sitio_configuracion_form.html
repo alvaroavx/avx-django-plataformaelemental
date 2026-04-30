@@ -1,0 +1,49 @@
+{% extends "asistencias/base_app.html" %}
+{% load static %}
+
+{% block title %}Configuracion {{ sitio.nombre }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'monitor/monitor.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="monitor-shell">
+  <div class="monitor-header mb-3">
+    <h1 class="monitor-title">Configuracion de {{ sitio.nombre }}</h1>
+    <div class="monitor-subtitle">Sobrescribe solo los valores que este sitio necesita cambiar.</div>
+  </div>
+
+  <form method="post" class="monitor-form-panel">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label for="{{ form.timeout_segundos.id_for_label }}" class="form-label">{{ form.timeout_segundos.label }}</label>
+        {{ form.timeout_segundos }}
+        {% for error in form.timeout_segundos.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label for="{{ form.frecuencia_minutos.id_for_label }}" class="form-label">{{ form.frecuencia_minutos.label }}</label>
+        {{ form.frecuencia_minutos }}
+        {% for error in form.frecuencia_minutos.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label for="{{ form.seguir_redirecciones.id_for_label }}" class="form-label">{{ form.seguir_redirecciones.label }}</label>
+        {{ form.seguir_redirecciones }}
+        {% for error in form.seguir_redirecciones.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-md-6 d-flex align-items-end">
+        <div class="form-check">
+          {{ form.activo }}
+          <label for="{{ form.activo.id_for_label }}" class="form-check-label">{{ form.activo.label }}</label>
+        </div>
+        {% for error in form.activo.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    </div>
+    <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+      <button class="btn btn-info" type="submit">Guardar configuracion</button>
+      <a class="btn btn-outline-light" href="{% url 'monitor:sitio_detail' sitio.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">Volver</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

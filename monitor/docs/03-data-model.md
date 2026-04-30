@@ -4,6 +4,7 @@
 `monitor` solo modela entidades de monitoreo. Personas, organizaciones, pagos y asistencias siguen viviendo en sus apps duenas.
 
 ## Entidades fase 1
+Estado: implementadas en `monitor.models`.
 
 ### Proyecto
 Agrupa sitios bajo una unidad operativa.
@@ -62,6 +63,9 @@ Campos sugeridos:
 - `tiempo_respuesta_ms`
 - `error`
 - `creado_en`
+
+## Migracion
+La migracion inicial vive en `monitor/migrations/0001_initial.py`.
 
 ## Reglas
 - Dinero no pertenece a `monitor`.

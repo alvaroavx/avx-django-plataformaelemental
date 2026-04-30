@@ -9,6 +9,7 @@
 - `services/`: discovery, checks y normalizacion de URLs.
 - `views.py`: orquestacion HTTP y render de templates.
 - `urls.py`: rutas HTML de la app.
+- `static/monitor/`: estilos propios de monitor.
 - `templates/monitor/`: vistas de usuario.
 - `tests.py` o `tests/`: cobertura de flujo principal.
 
@@ -28,6 +29,7 @@
 - `/monitor/`: dashboard.
 - `/monitor/sitios/nuevo/`: agregar sitio.
 - `/monitor/sitios/<id>/`: detalle de sitio.
+- `/monitor/sitios/<id>/configuracion/`: configuracion por sitio.
 - `/monitor/configuracion/`: configuracion global.
 
 ## Templates

@@ -1,51 +1,79 @@
 {% extends "asistencias/base_app.html" %}
+{% load static %}
 
 {% block title %}Monitor{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'monitor/monitor.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="mt-4">
-  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
-    <h2 class="mb-0">Monitor</h2>
-  </div>
-
-  <div class="row g-3 mb-4">
-    <div class="col-12 col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 text-muted mb-2">
-            <i class="bi bi-activity"></i>
-            <span>Estado</span>
-          </div>
-          <p class="h3 mb-0">Activo</p>
-        </div>
-      </div>
+<div class="monitor-shell">
+  <div class="monitor-header d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+    <div>
+      <h1 class="monitor-title">Monitor</h1>
+      <div class="monitor-subtitle">Cabina operativa para sitios, discovery y estado tecnico.</div>
     </div>
-    <div class="col-12 col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 text-muted mb-2">
-            <i class="bi bi-calendar3"></i>
-            <span>Periodo</span>
-          </div>
-          <p class="h3 mb-0">{{ periodo_mes }}/{{ periodo_anio }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 text-muted mb-2">
-            <i class="bi bi-building"></i>
-            <span>Organización</span>
-          </div>
-          <p class="h3 mb-0">{% if organizacion_id %}Filtrada{% else %}Todas{% endif %}</p>
-        </div>
-      </div>
+    <div class="d-flex flex-column flex-sm-row gap-2">
+      <a class="btn btn-info" href="{% url 'monitor:sitio_create' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <i class="bi bi-plus-circle"></i> Agregar sitio
+      </a>
+      <a class="btn btn-outline-light" href="{% url 'monitor:configuracion' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <i class="bi bi-sliders"></i> Configuracion
+      </a>
     </div>
   </div>
 
-  <div class="alert alert-light border" role="status">
-    Sin indicadores operativos configurados.
+  <div class="monitor-grid mb-3">
+    <div class="monitor-card monitor-card-info">
+      <div class="monitor-card-label">Sitios</div>
+      <div class="monitor-card-value">{{ resumen.total_sitios }}</div>
+    </div>
+    <div class="monitor-card monitor-card-ok">
+      <div class="monitor-card-label">Activos</div>
+      <div class="monitor-card-value">{{ resumen.sitios_activos }}</div>
+    </div>
+    <div class="monitor-card monitor-card-critical">
+      <div class="monitor-card-label">Errores</div>
+      <div class="monitor-card-value">{{ resumen.sitios_error }}</div>
+    </div>
+    <div class="monitor-card monitor-card-warning">
+      <div class="monitor-card-label">Pendientes</div>
+      <div class="monitor-card-value">{{ resumen.sitios_pendientes }}</div>
+    </div>
   </div>
+
+  <section class="monitor-panel">
+    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+      <h2 class="h5 mb-0">Sitios recientes</h2>
+      <span class="monitor-muted">Lectura operativa</span>
+    </div>
+
+    {% if sitios %}
+      <div class="monitor-site-list">
+        {% for sitio in sitios %}
+          <a class="monitor-site-row" href="{% url 'monitor:sitio_detail' sitio.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+            <div>
+              <div class="fw-bold monitor-wrap">{{ sitio.nombre }}</div>
+              <div class="monitor-domain">{{ sitio.dominio }}</div>
+            </div>
+            <div>
+              <div class="monitor-muted small">Proyecto</div>
+              <div class="monitor-wrap">{{ sitio.proyecto.nombre }}</div>
+            </div>
+            <span class="monitor-status monitor-status-{{ sitio.ultimo_estado }}">{{ sitio.get_ultimo_estado_display }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="monitor-empty">
+        <h3 class="h5">Sin sitios monitoreados</h3>
+        <p class="monitor-muted mb-3">Agrega el primer sitio para ejecutar discovery inicial y activar el dashboard.</p>
+        <a class="btn btn-info" href="{% url 'monitor:sitio_create' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+          <i class="bi bi-plus-circle"></i> Agregar sitio
+        </a>
+      </div>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}
