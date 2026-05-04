@@ -2,6 +2,27 @@ from django.db import models
 
 
 class Disciplina(models.Model):
+    class BadgeColor(models.TextChoices):
+        ROJO = "rojo", "Rojo"
+        NARANJO = "naranjo", "Naranjo"
+        AZUL = "azul", "Azul"
+        CELESTE = "celeste", "Celeste"
+        AMARILLO = "amarillo", "Amarillo"
+        VERDE = "verde", "Verde"
+        CAFE = "cafe", "Cafe"
+        MORADO = "morado", "Morado"
+
+    BADGE_COLOR_CLASSES = {
+        BadgeColor.ROJO: "disciplina-badge-rojo",
+        BadgeColor.NARANJO: "disciplina-badge-naranjo",
+        BadgeColor.AZUL: "disciplina-badge-azul",
+        BadgeColor.CELESTE: "disciplina-badge-celeste",
+        BadgeColor.AMARILLO: "disciplina-badge-amarillo",
+        BadgeColor.VERDE: "disciplina-badge-verde",
+        BadgeColor.CAFE: "disciplina-badge-cafe",
+        BadgeColor.MORADO: "disciplina-badge-morado",
+    }
+
     organizacion = models.ForeignKey(
         "personas.Organizacion",
         on_delete=models.CASCADE,
@@ -10,6 +31,12 @@ class Disciplina(models.Model):
     nombre = models.CharField(max_length=150)
     descripcion = models.TextField(blank=True)
     nivel = models.CharField(max_length=100, blank=True)
+    badge_color = models.CharField(
+        "color de badge",
+        max_length=20,
+        choices=BadgeColor.choices,
+        default=BadgeColor.AZUL,
+    )
     activa = models.BooleanField(default=True)
     creada_en = models.DateTimeField(auto_now_add=True)
 
@@ -22,6 +49,21 @@ class Disciplina(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+    @property
+    def badge_class(self) -> str:
+        return f"disciplina-badge {self.BADGE_COLOR_CLASSES.get(self.badge_color, self.BADGE_COLOR_CLASSES[self.BadgeColor.AZUL])}"
+
+    @classmethod
+    def badge_color_options(cls):
+        return [
+            {
+                "value": value,
+                "label": label,
+                "class": f"disciplina-badge {cls.BADGE_COLOR_CLASSES[value]}",
+            }
+            for value, label in cls.BadgeColor.choices
+        ]
 
 
 class BloqueHorario(models.Model):

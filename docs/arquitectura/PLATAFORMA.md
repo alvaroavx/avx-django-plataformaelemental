@@ -58,7 +58,7 @@ Adicionalmente existen:
 Responsabilidad:
 - operacion academica diaria
 - sesiones y registro de asistencia
-- perfiles operativos de estudiantes y profesores
+- enlaces operativos hacia perfiles consolidados en `personas`
 - exponer una base externa de lectura y carga de asistencia via API
 
 Rutas principales:
@@ -66,7 +66,6 @@ Rutas principales:
 - `/asistencias/sesiones/`
 - `/asistencias/sesiones/<id>/`
 - `/asistencias/asistencias/`
-- `/asistencias/personas/<id>/`
 - `/asistencias/estudiantes/`
 - `/asistencias/profesores/`
 - `/asistencias/disciplinas/`

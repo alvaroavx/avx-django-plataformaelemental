@@ -85,7 +85,7 @@
             {% for item in sesiones %}
             <tr>
               <td>
-                {{ item.sesion.disciplina }}
+                <span class="badge {{ item.sesion.disciplina.badge_class }}">{{ item.sesion.disciplina }}</span>
                 <span class="badge text-bg-secondary ms-1">{{ item.sesion.disciplina.organizacion.nombre }}</span>
               </td>
               <td>
@@ -111,7 +111,7 @@
                 {% for asistencia in item.asistentes %}
                   <a
                     class="badge {{ asistencia.badge_finanzas_class }} me-1 text-decoration-none"
-                    href="{% url 'asistencias:persona_detail' asistencia.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
+                    href="{% url 'personas:persona_detail' asistencia.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
                     title="{{ asistencia.badge_finanzas_label }}"
                   >
                     {{ asistencia.persona }}

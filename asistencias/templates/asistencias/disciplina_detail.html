@@ -4,7 +4,9 @@
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
-      <h2 class="mb-1">{{ disciplina.nombre }}</h2>
+      <h2 class="mb-1">
+        <span class="badge {{ disciplina.badge_class }}">{{ disciplina.nombre }}</span>
+      </h2>
       <div class="text-muted">
         {{ disciplina.organizacion.nombre }}{% if disciplina.nivel %} - {{ disciplina.nivel }}{% endif %}
       </div>

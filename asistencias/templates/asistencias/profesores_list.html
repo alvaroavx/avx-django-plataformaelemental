@@ -1,4 +1,5 @@
 {% extends "asistencias/base_app.html" %}
+{% load finanzas_format %}
 {% block title %}Profesores{% endblock %}
 {% block content %}
 <div class="mt-4">
@@ -42,11 +43,13 @@
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Organización</th>
           <th>Disciplinas</th>
           <th>Alumnos únicos</th>
           <th>Sesiones realizadas</th>
           <th>Total asistencias del mes</th>
+          <th>Pago bruto</th>
+          <th>Retención SII</th>
+          <th>Pago neto</th>
           <th></th>
         </tr>
       </thead>
@@ -54,12 +57,12 @@
         {% for item in profesores %}
         <tr>
           <td>
-            <a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
+            <a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
+            <span class="badge text-bg-light ms-1">{{ item.organizacion.nombre }}</span>
           </td>
-          <td><span class="badge text-bg-light">{{ item.organizacion.nombre }}</span></td>
           <td>
             {% for disciplina in item.disciplinas %}
-              <span class="badge text-bg-primary">{{ disciplina.nombre }}</span>
+              <span class="badge {{ disciplina.badge_class }}">{{ disciplina.nombre }}</span>
             {% empty %}
               <span class="text-muted">-</span>
             {% endfor %}
@@ -67,6 +70,9 @@
           <td>{{ item.alumnos_unicos_mes }}</td>
           <td>{{ item.sesiones_mes }}</td>
           <td>{{ item.asistencias_mes }}</td>
+          <td>{% if item.pago_bruto is not None %}{{ item.pago_bruto|clp }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>{% if item.retencion_sii_monto is not None %}{{ item.retencion_sii_monto|clp }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>{% if item.pago_neto is not None %}{{ item.pago_neto|clp }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
           <td class="d-none d-md-table-cell">
             <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
               <i class="bi bi-person-badge"></i><span class="d-none d-md-inline ms-1">Ver perfil</span>
@@ -74,7 +80,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted">Sin profesores registrados.</td></tr>
+        <tr><td colspan="9" class="text-center text-muted">Sin profesores registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>

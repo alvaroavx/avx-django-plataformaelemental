@@ -177,7 +177,7 @@
           <div class="card-body table-responsive">
             {% if asistencias %}
             <table class="table table-sm mb-0">
-              <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th><th>Finanzas</th></tr></thead>
               <tbody>
                 {% for item in asistencias %}
                 <tr>
@@ -185,6 +185,31 @@
                   <td><a href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.sesion.disciplina.nombre }}</a></td>
                   <td>{{ item.sesion.disciplina.organizacion.nombre }}</td>
                   <td>{{ item.get_estado_display }}</td>
+                  <td class="text-nowrap">
+                    <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
+                    {% if item.consumo_financiero_actual and item.consumo_financiero_actual.pago %}
+                      <span class="small ms-2">
+                        <a href="{% url 'finanzas:pago_detail' item.consumo_financiero_actual.pago.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                          Pago {{ item.consumo_financiero_actual.pago.fecha_pago|date:"d/m/Y" }}
+                        </a>
+                      </span>
+                    {% endif %}
+                    {% if item.estado == "presente" and item.pagos_asociables %}
+                      <form method="post" class="d-inline-flex gap-2 ms-2 align-items-center">
+                        {% csrf_token %}
+                        <input type="hidden" name="asociar_pago_asistencia" value="1">
+                        <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                        <select name="pago_id" class="form-select form-select-sm w-auto">
+                          {% for pago in item.pagos_asociables %}
+                            <option value="{{ pago.pk }}" {% if item.consumo_financiero_actual and item.consumo_financiero_actual.pago_id == pago.pk %}selected{% endif %}>
+                              {{ pago.fecha_pago|date:"d/m/Y" }} · {{ pago.organizacion.nombre }} · saldo {{ pago.saldo_clases_total }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Asociar</button>
+                      </form>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -351,7 +376,7 @@
           <div class="card-body table-responsive">
             {% if sesiones_profesor %}
             <table class="table table-sm mb-0">
-              <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th><th>Asistentes</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Disciplina</th><th>Organizacion</th><th>Estado</th><th>Asistentes</th><th class="text-nowrap">Acciones</th></tr></thead>
               <tbody>
                 {% for item in sesiones_profesor %}
                 <tr>
@@ -360,6 +385,19 @@
                   <td>{{ item.disciplina.organizacion.nombre }}</td>
                   <td>{{ item.get_estado_display }}</td>
                   <td>{{ item.asistencias.count }}</td>
+                  <td class="text-nowrap">
+                    {% include "asistencias/_sesion_profesor_acciones.html" with sesion=item %}
+                    <form method="post" class="d-inline-flex gap-1 align-items-center mt-1 mt-md-0">
+                      {% csrf_token %}
+                      <input type="hidden" name="accion" value="cambiar_estado_sesion">
+                      <input type="hidden" name="sesion_id" value="{{ item.pk }}">
+                      <select name="estado" class="form-select form-select-sm w-auto" aria-label="Estado de sesión" onchange="this.form.submit()">
+                        {% for value, label in item.Estado.choices %}
+                          <option value="{{ value }}" {% if value == item.estado %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                    </form>
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>

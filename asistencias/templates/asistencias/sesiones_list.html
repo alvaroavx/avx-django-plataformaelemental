@@ -37,9 +37,18 @@
               <div class="pt-4">
               {% for item in dia.sesiones %}
                 <div class="mb-2 p-2 bg-white border rounded">
-                  <a class="badge {{ item.badge_class }} text-decoration-none mb-1 d-inline-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                    {{ item.sesion.disciplina }}
-                  </a>
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    {% if item.sesion.estado == "cancelada" %}
+                      <i class="bi bi-x-circle-fill text-danger fs-5 flex-shrink-0" title="Cancelada" aria-hidden="true"></i><span class="visually-hidden">Cancelada</span>
+                    {% elif item.sesion.estado == "completada" %}
+                      <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0" title="Completada" aria-hidden="true"></i><span class="visually-hidden">Completada</span>
+                    {% else %}
+                      <i class="bi bi-calendar-event-fill text-info fs-5 flex-shrink-0" title="Programada" aria-hidden="true"></i><span class="visually-hidden">Programada</span>
+                    {% endif %}
+                    <a class="badge {{ item.badge_class }} text-decoration-none" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                      {{ item.sesion.disciplina }}
+                    </a>
+                  </div>
                   <a class="small text-muted text-decoration-none d-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
                     {% if item.sesion.estado == "cancelada" %}
                       sesión cancelada
@@ -87,11 +96,11 @@
               </td>
               <td>
                 {% if sesion.estado == "cancelada" %}
-                  <span class="badge text-bg-danger">Cancelada</span>
+                  <i class="bi bi-x-circle-fill text-danger fs-5" title="Cancelada" aria-hidden="true"></i><span class="visually-hidden">Cancelada</span>
                 {% elif sesion.estado == "completada" %}
-                  <span class="badge text-bg-success">Completada</span>
+                  <i class="bi bi-check-circle-fill text-success fs-5" title="Completada" aria-hidden="true"></i><span class="visually-hidden">Completada</span>
                 {% else %}
-                  <span class="badge text-bg-info">Programada</span>
+                  <i class="bi bi-calendar-event-fill text-info fs-5" title="Programada" aria-hidden="true"></i><span class="visually-hidden">Programada</span>
                 {% endif %}
               </td>
               <td>

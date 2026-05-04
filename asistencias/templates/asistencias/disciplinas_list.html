@@ -36,7 +36,7 @@
           {% for disciplina in disciplinas %}
           <tr>
             <td>
-              <div class="fw-semibold">{{ disciplina.nombre }}</div>
+              <div><span class="badge {{ disciplina.badge_class }}">{{ disciplina.nombre }}</span></div>
               <div class="small text-muted">{{ disciplina.descripcion|default:"Sin descripción"|truncatechars:90 }}</div>
             </td>
             <td>{{ disciplina.organizacion.nombre }}</td>

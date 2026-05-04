@@ -2,8 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from asistencias.models import Disciplina, SesionClase
-from finanzas.models import Payment
+from asistencias.models import Asistencia, Disciplina, SesionClase
+from finanzas.models import AttendanceConsumption, Payment
 
 from .forms import PersonaCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
@@ -128,6 +128,53 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertNotContains(response, "Perfil profesor")
         self.assertContains(response, "Resumen financiero del estudiante")
 
+    def test_persona_detail_estudiante_permite_asociar_pago_a_asistencia(self):
+        sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-03-15",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        asistencia = Asistencia.objects.create(sesion=sesion, persona=self.estudiante)
+        pago_nuevo = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.org,
+            fecha_pago="2026-03-16",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+
+        response = self.client.get(
+            reverse("personas:persona_detail", kwargs={"pk": self.estudiante.pk}),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Finanzas")
+        self.assertContains(response, "Pagada")
+        self.assertContains(response, "Asociar")
+        self.assertContains(response, 'name="asociar_pago_asistencia" value="1"', html=False)
+
+        query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+        post_response = self.client.post(
+            f"{reverse('personas:persona_detail', kwargs={'pk': self.estudiante.pk})}?{query}",
+            {
+                "asociar_pago_asistencia": "1",
+                "asistencia_id": asistencia.pk,
+                "pago_id": pago_nuevo.pk,
+            },
+        )
+
+        self.assertEqual(post_response.status_code, 302)
+        self.assertEqual(
+            post_response.url,
+            f"{reverse('personas:persona_detail', kwargs={'pk': self.estudiante.pk})}?{query}",
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago_nuevo)
+
     def test_persona_detail_profesor_oculta_bloque_estudiante(self):
         self.persona_rol_profesor.valor_clase = 5000
         self.persona_rol_profesor.retencion_sii = 15.25
@@ -147,6 +194,42 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, "$ 0")
         self.assertContains(response, "Retención SII")
         self.assertContains(response, "Monto neto")
+        detalle_sesion = (
+            f'{reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion_profesor.pk})}'
+            f"?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+        )
+        agregar_asistentes = (
+            f'{reverse("asistencias:asistencias_list")}'
+            f"?periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+            f"&sesion_id={self.sesion_profesor.pk}&open=agregar_asistentes"
+        )
+        self.assertContains(response, "Acciones")
+        self.assertContains(response, "Ver sesión")
+        self.assertContains(response, "Agregar asistentes")
+        self.assertContains(response, 'name="accion" value="cambiar_estado_sesion"', html=False)
+        self.assertContains(response, 'onchange="this.form.submit()"', html=False)
+        self.assertNotContains(response, ">Cambiar estado</span>", html=False)
+        self.assertContains(response, f'href="{detalle_sesion}"', html=False)
+        self.assertContains(response, f'href="{agregar_asistentes}"', html=False)
+
+    def test_persona_detail_profesor_permite_cambiar_estado_de_sesion(self):
+        query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+        response = self.client.post(
+            f"{reverse('personas:persona_detail', kwargs={'pk': self.profesor.pk})}?{query}",
+            {
+                "accion": "cambiar_estado_sesion",
+                "sesion_id": self.sesion_profesor.pk,
+                "estado": SesionClase.Estado.CANCELADA,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"{reverse('personas:persona_detail', kwargs={'pk': self.profesor.pk})}?{query}",
+        )
+        self.sesion_profesor.refresh_from_db()
+        self.assertEqual(self.sesion_profesor.estado, SesionClase.Estado.CANCELADA)
 
     def test_persona_detail_permite_guardar_valor_clase_en_rol_profesor(self):
         query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"

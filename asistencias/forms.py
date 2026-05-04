@@ -10,11 +10,12 @@ from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 class DisciplinaForm(forms.ModelForm):
     class Meta:
         model = Disciplina
-        fields = ["organizacion", "nombre", "nivel", "descripcion", "activa"]
+        fields = ["organizacion", "nombre", "nivel", "badge_color", "descripcion", "activa"]
         widgets = {
             "organizacion": forms.Select(attrs={"class": "form-select"}),
             "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nombre de disciplina"}),
             "nivel": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nivel (opcional)"}),
+            "badge_color": forms.Select(attrs={"class": "form-select"}),
             "descripcion": forms.Textarea(
                 attrs={
                     "class": "form-control",

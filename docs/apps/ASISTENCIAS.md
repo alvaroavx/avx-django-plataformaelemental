@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-05-01
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -16,7 +16,7 @@ Debe privilegiar:
 - Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
 - `periodo_mes` y `periodo_anio` deben aceptar la opcion `Todos`, permitiendo filtrar por todos los meses, todos los años, o combinaciones parciales como `todos los meses de un año` y `un mes en todos los años`.
 - La administracion de organizaciones no vive aqui; vive en `personas`.
-- El perfil operativo de persona debe respetar siempre el periodo y la organizacion activos.
+- Los enlaces hacia perfiles de persona deben dirigir a `personas/<id>/` y respetar siempre el periodo y la organizacion activos.
 - Las asistencias deben poder verse junto con su estado financiero.
 - Los modelos propios de esta app viven en `asistencias.models`; no deben declararse en `database`.
 - El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
@@ -25,10 +25,12 @@ Debe privilegiar:
 ## Decisiones funcionales vigentes
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.
 - La vista de profesores debe mostrar cards resumen del periodo con alumnos unicos, sesiones realizadas, asistencias del mes y profesores activos, respetando la organizacion seleccionada.
+- La tabla de profesores debe mostrar la organizacion como badge junto al nombre, no como columna independiente, y debe incluir pago bruto, retencion SII en monto y pago neto calculados desde `PersonaRol.valor_clase` y `PersonaRol.retencion_sii` de esa organizacion.
 - El filtro local de organizacion bajo el titulo de profesores fue eliminado; se usa solo el filtro superior global.
-- En detalle de sesion, el nombre del profesor enlaza a su perfil operativo dentro de `asistencias`.
-- En `asistencias/personas/<id>/` se puede asociar una asistencia a un pago existente.
+- En detalle de sesion, el nombre del profesor enlaza al perfil consolidado en `personas/<id>/`.
+- La app `asistencias` no mantiene vista propia `asistencias/personas/<id>/`; todos los enlaces a personas deben dirigir a `personas/<id>/` preservando filtros globales.
 - En `asistencias/disciplinas/`, las disciplinas deben listarse con activas primero y, dentro de cada grupo, en orden alfabetico.
+- En `asistencias/disciplinas/`, cada disciplina debe permitir elegir un color de badge desde creacion y edicion. Las opciones cerradas son: rojo, naranjo, azul, celeste, amarillo, verde, cafe y morado. El color elegido debe usarse en los badges de disciplina dentro de la app.
 - En `asistencias/disciplinas/<id>/`, los profesores deben mostrarse en la descripcion general de la disciplina para el periodo activo, y la tabla de sesiones debe usar el orden `Fecha`, `Asistentes`, `Asistencias`, `Estado`, sin columnas separadas de presentes, ausentes o justificadas; esa tabla debe permitir orden por columna.
 - En `asistencias/asistencias/`, los asistentes usan colores financieros:
   - amarillo: deuda
@@ -49,9 +51,11 @@ Debe privilegiar:
 - En `asistencias/sesiones/<id>/`, debe existir una opcion para editar la sesion, manteniendo filtros globales y permitiendo actualizar disciplina, fecha y profesores.
 - En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/`, una sesion cancelada debe mostrarse como `sesión cancelada` y no como `asistentes: 0`, para no confundir cancelacion con falta de registro.
+- En `asistencias/sesiones/`, cada sesion debe mostrar un icono unico de estado: programada, completada o cancelada, visible tanto en calendario como en listado. En calendario, el icono debe quedar fuera del badge de disciplina, al mismo nivel visual, para que el estado se identifique rapidamente.
 - En `asistencias/sesiones/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
 - En el dashboard de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
-- En el perfil operativo de profesor, el resumen del periodo debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion y mostrar `pago por asistencia`, `monto bruto estimado`, `retencion SII` en monto y `valor neto`; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en la vista.
+- En el dashboard de `asistencias`, las tablas que usen DataTables deben inicializarse solo cuando tengan filas reales de datos; los estados vacios deben mantener la cantidad real de columnas y no usar una unica fila con `colspan` dentro de la tabla inicializada.
+- El resumen de profesor se consulta desde `personas/<id>/` y debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en vistas de `asistencias`.
 
 ## Relacion con finanzas
 - `asistencias` no define la verdad financiera completa.

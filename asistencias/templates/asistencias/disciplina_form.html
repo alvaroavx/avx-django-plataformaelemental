@@ -53,6 +53,18 @@
               <div class="text-danger small mt-1">{{ error }}</div>
             {% endfor %}
           </div>
+          <div class="col-md-6">
+            <label class="form-label" for="{{ form.badge_color.id_for_label }}">Color del badge</label>
+            {{ form.badge_color }}
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              {% for color in badge_color_options %}
+                <span class="badge {{ color.class }}">{{ color.label }}</span>
+              {% endfor %}
+            </div>
+            {% for error in form.badge_color.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
           <div class="col-md-12">
             <label class="form-label" for="{{ form.descripcion.id_for_label }}">Descripción</label>
             {{ form.descripcion }}

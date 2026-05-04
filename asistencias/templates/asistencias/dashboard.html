@@ -123,7 +123,7 @@
             <tbody>
             {% for persona in estudiantes_con_deuda %}
               <tr>
-                <td><a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></td>
+                <td><a href="{% url 'personas:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></td>
                 <td class="text-end">{{ persona.clases_deuda }}</td>
               </tr>
             {% empty %}
@@ -147,12 +147,15 @@
             </thead>
             <tbody>
             {% for persona in estudiantes_con_mas_asistencia %}
-              <tr>
-                <td><a href="{% url 'asistencias:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></td>
+              <tr data-data-row="true">
+                <td><a href="{% url 'personas:persona_detail' persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ persona }}</a></td>
                 <td class="text-end">{{ persona.total_asistencias_mes }}</td>
               </tr>
             {% empty %}
-              <tr><td colspan="2" class="text-muted">Sin asistencias registradas.</td></tr>
+              <tr data-empty-row="true">
+                <td class="text-muted">Sin asistencias registradas.</td>
+                <td class="text-end text-muted">-</td>
+              </tr>
             {% endfor %}
             </tbody>
           </table>
@@ -174,7 +177,7 @@
             {% for item in estudiantes_con_clases_restantes %}
               <tr>
                 <td>
-                  <a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
+                  <a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
                   <div class="small text-muted">{{ item.clases_pagadas }} pagadas · {{ item.clases_consumidas }} usadas</div>
                 </td>
                 <td class="text-end">{{ item.saldo_clases }}</td>
@@ -196,8 +199,10 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
-    if (!window.jQuery || !jQuery("#tabla-estudiantes-mas-asistencia").length) return;
-    jQuery("#tabla-estudiantes-mas-asistencia").DataTable({
+    if (!window.jQuery) return;
+    const tablaMasAsistencia = jQuery("#tabla-estudiantes-mas-asistencia");
+    if (!tablaMasAsistencia.length || !tablaMasAsistencia.find("tbody tr[data-data-row]").length) return;
+    tablaMasAsistencia.DataTable({
       paging: true,
       pageLength: 10,
       lengthChange: false,

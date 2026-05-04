@@ -2,13 +2,12 @@ import calendar
 from decimal import Decimal
 
 from django.contrib import messages
-from django.db.models import Count, ExpressionWrapper, F, IntegerField, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from finanzas.models import AttendanceConsumption, Payment
-from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante_periodo
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 from .decorators import role_required
@@ -205,15 +204,6 @@ def sesiones_list(request):
     """Vista calendario mensual de sesiones."""
     context = _nav_context(request)
     organizacion = _organizacion_desde_request(request)
-    badge_palette = [
-        "text-bg-primary",
-        "text-bg-success",
-        "text-bg-danger",
-        "text-bg-warning",
-        "text-bg-info",
-        "text-bg-secondary",
-        "text-bg-dark",
-    ]
     periodo = resolver_periodo(request)
     year = periodo["referencia_inicio"].year
     month = periodo["referencia_inicio"].month
@@ -244,11 +234,10 @@ def sesiones_list(request):
     )
     sesiones_por_fecha = {}
     for sesion in sesiones_qs:
-        badge_class = badge_palette[sesion.disciplina_id % len(badge_palette)]
         sesiones_por_fecha.setdefault(sesion.fecha, []).append(
             {
                 "sesion": sesion,
-                "badge_class": badge_class,
+                "badge_class": sesion.disciplina.badge_class,
             }
         )
     semanas = []
@@ -352,6 +341,14 @@ def profesores_list(request):
                 sesiones__profesores=profesor,
                 organizacion=organizacion,
             ).distinct().order_by("nombre")
+            pago_bruto = None
+            retencion_sii_monto = None
+            pago_neto = None
+            if rol_prof.valor_clase is not None:
+                pago_bruto = rol_prof.valor_clase * asistencias_mes
+                if rol_prof.retencion_sii is not None:
+                    retencion_sii_monto = (pago_bruto * rol_prof.retencion_sii) / Decimal("100")
+                    pago_neto = pago_bruto - retencion_sii_monto
             profesores_data.append(
                 {
                     "persona": profesor,
@@ -360,6 +357,9 @@ def profesores_list(request):
                     "asistencias_mes": asistencias_mes,
                     "sesiones_mes": sesiones_mes,
                     "disciplinas": disciplinas_qs,
+                    "pago_bruto": pago_bruto,
+                    "retencion_sii_monto": retencion_sii_monto,
+                    "pago_neto": pago_neto,
                 }
             )
     profesores_data.sort(key=lambda item: (item["persona"].apellidos or "", item["persona"].nombres or "", item["organizacion"].nombre or ""))
@@ -505,6 +505,7 @@ def disciplina_create(request):
         {
             "form": form,
             "modo_formulario": "crear",
+            "badge_color_options": Disciplina.badge_color_options(),
         }
     )
     return render(request, "asistencias/disciplina_form.html", context)
@@ -527,215 +528,10 @@ def disciplina_edit(request, pk):
             "form": form,
             "disciplina": disciplina,
             "modo_formulario": "editar",
+            "badge_color_options": Disciplina.badge_color_options(),
         }
     )
     return render(request, "asistencias/disciplina_form.html", context)
-
-
-@role_required(ROLE_ADMIN)
-def persona_detail(request, pk):
-    """Perfil de estudiante o profesor con detalle de asistencias por período."""
-    context = _nav_context(request)
-    organizacion_filtro = _organizacion_desde_request(request)
-    persona = get_object_or_404(Persona, pk=pk)
-    roles_codigos = set(persona.roles.values_list("rol__codigo", flat=True))
-    es_estudiante = "ESTUDIANTE" in roles_codigos
-    es_profesor = "PROFESOR" in roles_codigos
-    if request.method == "POST":
-        if "asociar_pago_asistencia" in request.POST:
-            asistencia = get_object_or_404(
-                Asistencia.objects.select_related("sesion__disciplina", "consumo_financiero__pago"),
-                pk=request.POST.get("asistencia_id"),
-                persona=persona,
-            )
-            pago = get_object_or_404(
-                Payment,
-                pk=request.POST.get("pago_id"),
-                persona=persona,
-                **filtros_periodo("fecha_pago", request=request),
-            )
-            if organizacion_filtro and pago.organizacion_id != organizacion_filtro.id:
-                messages.error(request, "El pago seleccionado no pertenece a la organizacion filtrada.")
-                return redirect(_url_con_filtros(request, "asistencias:persona_detail", pk=persona.pk))
-            try:
-                asociar_asistencia_a_pago(asistencia, pago)
-            except ValueError as exc:
-                messages.error(request, str(exc))
-            else:
-                messages.success(request, "Asistencia asociada al pago correctamente.")
-            return redirect(_url_con_filtros(request, "asistencias:persona_detail", pk=persona.pk))
-        sesion_id_post = request.POST.get("sesion_id")
-        estado = request.POST.get("estado")
-        if sesion_id_post and estado in dict(SesionClase.Estado.choices):
-            sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
-            sesion.estado = estado
-            sesion.save(update_fields=["estado"])
-            messages.success(request, "Estado de la sesión actualizado.")
-            return redirect(_url_con_filtros(request, "asistencias:persona_detail", pk=persona.pk))
-
-    asistencias_qs = (
-        persona.asistencias.select_related(
-            "sesion",
-            "sesion__disciplina",
-            "sesion__disciplina__organizacion",
-            "consumo_financiero__pago",
-        )
-        .order_by("-registrada_en")
-    )
-    asistencias_periodo = asistencias_qs.filter(**filtros_periodo("sesion__fecha", request=request))
-    if organizacion_filtro:
-        asistencias_periodo = asistencias_periodo.filter(sesion__disciplina__organizacion=organizacion_filtro)
-
-    pagos_estudiante = Payment.objects.none()
-    finanzas_resumen = None
-    asistencias_estudiante = list(asistencias_periodo) if es_estudiante else []
-    if es_estudiante:
-        pagos_estudiante = (
-            Payment.objects.filter(
-                persona=persona,
-                **filtros_periodo("fecha_pago", request=request),
-            )
-            .select_related("organizacion", "plan", "documento_tributario")
-            .annotate(
-                clases_consumidas_total=Count(
-                    "consumos",
-                    filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
-                    distinct=True,
-                )
-            )
-            .annotate(
-                saldo_clases_total=ExpressionWrapper(
-                    F("clases_asignadas") - F("clases_consumidas_total"),
-                    output_field=IntegerField(),
-                )
-            )
-            .order_by("-fecha_pago", "-id")
-        )
-        if organizacion_filtro:
-            pagos_estudiante = pagos_estudiante.filter(organizacion=organizacion_filtro)
-        pagos_estudiante = list(pagos_estudiante)
-        periodo_actual = resolver_periodo(request)
-        finanzas_resumen = resumen_financiero_estudiante_periodo(
-            persona,
-            mes=periodo_actual["mes"],
-            anio=periodo_actual["anio"],
-            organizacion=organizacion_filtro,
-        )
-        for asistencia in asistencias_estudiante:
-            consumo = getattr(asistencia, "consumo_financiero", None)
-            pago_actual_id = consumo.pago_id if consumo and consumo.pago_id else None
-            pagos_asociables = []
-            for pago in pagos_estudiante:
-                if pago.organizacion_id != asistencia.sesion.disciplina.organizacion_id:
-                    continue
-                if pago.saldo_clases_total > 0 or pago.pk == pago_actual_id:
-                    pagos_asociables.append(pago)
-            asistencia.consumo_financiero_actual = consumo
-            asistencia.pagos_asociables = pagos_asociables
-            if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
-                asistencia.estado_financiero_label = "Pagada"
-                asistencia.estado_financiero_clase = "success"
-            elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
-                asistencia.estado_financiero_label = "Deuda"
-                asistencia.estado_financiero_clase = "danger"
-            elif consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
-                asistencia.estado_financiero_label = "Sin cobro"
-                asistencia.estado_financiero_clase = "secondary"
-            else:
-                asistencia.estado_financiero_label = "Sin consumo"
-                asistencia.estado_financiero_clase = "light"
-
-    disciplinas_asistidas = sorted({a.sesion.disciplina.nombre for a in (asistencias_estudiante if es_estudiante else asistencias_periodo)})
-    context.update(
-        {
-            "persona": persona,
-            "roles_asignados": persona.roles.select_related("rol", "organizacion"),
-            "asistencias": asistencias_estudiante if es_estudiante else asistencias_periodo,
-            "es_estudiante": es_estudiante,
-            "es_profesor": es_profesor,
-            "asistencias_mes": len(asistencias_estudiante) if es_estudiante else asistencias_periodo.count(),
-            "disciplinas_asistidas": disciplinas_asistidas,
-            "asistencia_estados": Asistencia.Estado.choices,
-            "finanzas_resumen": finanzas_resumen,
-            "back_url": request.META.get("HTTP_REFERER") or _url_con_filtros(request, "asistencias:dashboard"),
-        }
-    )
-    if es_estudiante:
-        context["pagos_estudiante"] = pagos_estudiante
-    if es_profesor:
-        roles_profesor_qs = persona.roles.filter(rol__codigo="PROFESOR", activo=True).select_related("organizacion")
-        if organizacion_filtro:
-            roles_profesor_qs = roles_profesor_qs.filter(organizacion=organizacion_filtro)
-        valor_clase_por_org = {item.organizacion_id: item.valor_clase for item in roles_profesor_qs}
-        retencion_sii_por_org = {item.organizacion_id: item.retencion_sii for item in roles_profesor_qs}
-        sesiones_realizadas = SesionClase.objects.filter(
-            profesores=persona,
-            **filtros_periodo("fecha", request=request),
-        ).select_related("disciplina", "disciplina__organizacion").order_by("-fecha")
-        if organizacion_filtro:
-            sesiones_realizadas = sesiones_realizadas.filter(disciplina__organizacion=organizacion_filtro)
-        asistencias_prof = Asistencia.objects.filter(
-            sesion__profesores=persona,
-            **filtros_periodo("sesion__fecha", request=request),
-        ).select_related("sesion__disciplina", "sesion__disciplina__organizacion")
-        if organizacion_filtro:
-            asistencias_prof = asistencias_prof.filter(sesion__disciplina__organizacion=organizacion_filtro)
-        sesiones_resumen_qs = sesiones_realizadas
-        resumen_por_org = []
-        organizaciones_resumen = [organizacion_filtro] if organizacion_filtro else Organizacion.objects.all()
-        for org in organizaciones_resumen:
-            sesiones_org = sesiones_resumen_qs.filter(disciplina__organizacion=org)
-            asistencias_org = asistencias_prof.filter(sesion__disciplina__organizacion=org)
-            if not sesiones_org.exists() and not asistencias_org.exists():
-                continue
-            valor_clase = valor_clase_por_org.get(org.id)
-            retencion_sii = retencion_sii_por_org.get(org.id)
-            asistencias_total = asistencias_org.count()
-            monto_bruto_estimado = (valor_clase or 0) * asistencias_total if valor_clase is not None else None
-            monto_retencion_sii = None
-            monto_neto = None
-            if monto_bruto_estimado is not None and retencion_sii is not None:
-                monto_retencion_sii = (monto_bruto_estimado * retencion_sii) / Decimal("100")
-                monto_neto = monto_bruto_estimado - monto_retencion_sii
-            resumen_por_org.append(
-                {
-                    "organizacion": org,
-                    "sesiones": sesiones_org.count(),
-                    "alumnos": asistencias_org.values("persona_id").distinct().count(),
-                    "asistencias": asistencias_total,
-                    "valor_clase": valor_clase,
-                    "retencion_sii": retencion_sii,
-                    "monto_bruto_estimado": monto_bruto_estimado,
-                    "monto_retencion_sii": monto_retencion_sii,
-                    "monto_neto": monto_neto,
-                }
-            )
-        mostrar_estimado_total_profesor = any(item["monto_bruto_estimado"] is not None for item in resumen_por_org)
-        estimado_total_profesor = sum(
-            item["monto_bruto_estimado"] for item in resumen_por_org if item["monto_bruto_estimado"] is not None
-        )
-        mostrar_retencion_total_profesor = any(item["monto_retencion_sii"] is not None for item in resumen_por_org)
-        retencion_total_profesor = sum(
-            item["monto_retencion_sii"] for item in resumen_por_org if item["monto_retencion_sii"] is not None
-        )
-        mostrar_neto_total_profesor = any(item["monto_neto"] is not None for item in resumen_por_org)
-        neto_total_profesor = sum(
-            item["monto_neto"] for item in resumen_por_org if item["monto_neto"] is not None
-        )
-        context.update(
-            {
-                "sesiones_realizadas": sesiones_realizadas,
-                "resumen_profesor": resumen_por_org,
-                "mostrar_estimado_total_profesor": mostrar_estimado_total_profesor,
-                "estimado_total_profesor": estimado_total_profesor,
-                "mostrar_retencion_total_profesor": mostrar_retencion_total_profesor,
-                "retencion_total_profesor": retencion_total_profesor,
-                "mostrar_neto_total_profesor": mostrar_neto_total_profesor,
-                "neto_total_profesor": neto_total_profesor,
-            }
-        )
-    return render(request, "asistencias/persona_detail.html", context)
-
 
 @role_required(ROLE_ADMIN)
 def asistencias_list(request):

@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-05-01
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -27,8 +27,10 @@ Debe concentrar:
 - En `personas/listado`, el filtro por `rol` debe considerar asignaciones activas e inactivas; el filtro `estado` controla el estado de la `Persona`, no la vigencia del rol. La tabla debe mostrar si cada rol esta activo o inactivo.
 - El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.
+- En `personas/<id>/`, el bloque `Perfil estudiante` debe permitir asociar pagos disponibles a asistencias presentes, respetando periodo, organizacion, saldo del pago y las validaciones de `finanzas`.
 - La configuracion de honorarios de un profesor no debe hardcodearse ni vivir en organizacion global: `valor por clase` y `retencion SII` deben guardarse en `PersonaRol` para el rol `PROFESOR`, porque dependen de la combinacion persona + organizacion.
 - En `personas/<id>/`, el bloque `Perfil profesor` debe mostrar el resumen economico del periodo con cards separadas para `pago bruto`, `retencion SII` en monto y `monto neto`; el porcentaje de retencion se configura en el rol, pero no se muestra como card principal.
+- En `personas/<id>/`, la tabla de sesiones del `Perfil profesor` debe ofrecer acciones operativas de sesion para `Ver sesion`, `Agregar asistentes` y cambiar estado de sesion desde un selector autoaplicado, manteniendo los filtros globales y abriendo el modal vigente de asistentes.
 - `personas` no reemplaza la operacion diaria de `asistencias`; cumple una funcion administrativa y transversal.
 
 ## Relacion con otras apps

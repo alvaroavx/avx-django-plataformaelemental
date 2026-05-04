@@ -38,7 +38,7 @@
           <div>
             {% if sesion.profesores.all %}
               {% for profe in sesion.profesores.all %}
-                <a href="{% url 'asistencias:persona_detail' profe.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ profe }}</a>{% if not forloop.last %}, {% endif %}
+                <a href="{% url 'personas:persona_detail' profe.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ profe }}</a>{% if not forloop.last %}, {% endif %}
               {% endfor %}
             {% else %}
               -
@@ -135,7 +135,7 @@
         <tbody>
           {% for item in asistencias %}
           <tr>
-            <td><a href="{% url 'asistencias:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
+            <td><a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
             <td>{{ item.get_estado_display }}</td>
             <td><span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span></td>
             <td>{{ item.registrada_en|date:"H:i" }}</td>

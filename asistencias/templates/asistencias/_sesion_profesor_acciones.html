@@ -1,0 +1,6 @@
+<a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:sesion_detail' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+  <i class="bi bi-eye"></i><span class="d-none d-md-inline ms-1">Ver sesión</span>
+</a>
+<a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ sesion.pk }}&open=agregar_asistentes">
+  <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+</a>

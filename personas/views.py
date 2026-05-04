@@ -1,7 +1,7 @@
 ﻿from decimal import Decimal
 
 from django.contrib import messages
-from django.db.models import Count, DateField, DecimalField, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -12,7 +12,7 @@ from asistencias.periodo import aplicar_periodo, descripcion_periodo, filtros_pe
 from asistencias.utils import ROLE_ADMIN
 from asistencias.views import _nav_context, _organizacion_desde_request
 from finanzas.models import AttendanceConsumption, Payment
-from finanzas.services import resumen_financiero_estudiante
+from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
 
 from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
@@ -377,7 +377,10 @@ def persona_detail(request, pk):
             ),
             Prefetch(
                 "asistencias",
-                queryset=Asistencia.objects.select_related("sesion__disciplina__organizacion").order_by("-sesion__fecha"),
+                queryset=Asistencia.objects.select_related(
+                    "sesion__disciplina__organizacion",
+                    "consumo_financiero__pago",
+                ).order_by("-sesion__fecha"),
             ),
             Prefetch(
                 "pagos_financieros",
@@ -395,6 +398,28 @@ def persona_detail(request, pk):
     )
     if request.method == "POST":
         accion = request.POST.get("accion")
+        if "asociar_pago_asistencia" in request.POST:
+            asistencia = get_object_or_404(
+                Asistencia.objects.select_related("sesion__disciplina", "consumo_financiero__pago"),
+                pk=request.POST.get("asistencia_id"),
+                persona=persona,
+            )
+            pago = get_object_or_404(
+                Payment,
+                pk=request.POST.get("pago_id"),
+                persona=persona,
+                **filtros_periodo("fecha_pago", request=request),
+            )
+            if organizacion and pago.organizacion_id != organizacion.id:
+                messages.error(request, "El pago seleccionado no pertenece a la organizacion filtrada.")
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+            try:
+                asociar_asistencia_a_pago(asistencia, pago)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, "Asistencia asociada al pago correctamente.")
+            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         if accion == "agregar_rol":
             rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form_post.is_valid() and rol_form_post.cleaned_data.get("rol") and rol_form_post.cleaned_data.get("organizacion"):
@@ -423,6 +448,23 @@ def persona_detail(request, pk):
             persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
             persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
             messages.success(request, "Configuración de honorarios actualizada.")
+            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+        elif accion == "cambiar_estado_sesion":
+            estado = request.POST.get("estado")
+            if estado not in dict(SesionClase.Estado.choices):
+                messages.warning(request, "Estado de sesión inválido.")
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+            sesion = get_object_or_404(
+                SesionClase.objects.select_related("disciplina__organizacion"),
+                pk=request.POST.get("sesion_id"),
+                profesores=persona,
+            )
+            if organizacion and sesion.disciplina.organizacion_id != organizacion.id:
+                messages.error(request, "La sesión no pertenece a la organización filtrada.")
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+            sesion.estado = estado
+            sesion.save(update_fields=["estado"])
+            messages.success(request, "Estado de la sesión actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         elif accion == "toggle_rol":
             persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
@@ -457,6 +499,45 @@ def persona_detail(request, pk):
     es_profesor = "PROFESOR" in roles_codigos
     documentos_tributarios = [pago.documento_tributario for pago in pagos if pago.documento_tributario_id]
     finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if es_estudiante else None
+    if es_estudiante:
+        pagos_asociables_periodo = list(
+            pagos.annotate(
+                clases_consumidas_total=Count(
+                    "consumos",
+                    filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
+                    distinct=True,
+                )
+            )
+            .annotate(
+                saldo_clases_total=ExpressionWrapper(
+                    F("clases_asignadas") - F("clases_consumidas_total"),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-fecha_pago", "-id")
+        )
+        for asistencia in asistencias:
+            consumo = getattr(asistencia, "consumo_financiero", None)
+            pago_actual_id = consumo.pago_id if consumo and consumo.pago_id else None
+            asistencia.pagos_asociables = [
+                pago
+                for pago in pagos_asociables_periodo
+                if pago.organizacion_id == asistencia.sesion.disciplina.organizacion_id
+                and (pago.saldo_clases_total > 0 or pago.pk == pago_actual_id)
+            ]
+            asistencia.consumo_financiero_actual = consumo
+            if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
+                asistencia.estado_financiero_label = "Pagada"
+                asistencia.estado_financiero_clase = "success"
+            elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
+                asistencia.estado_financiero_label = "Deuda"
+                asistencia.estado_financiero_clase = "danger"
+            elif consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
+                asistencia.estado_financiero_label = "Sin cobro"
+                asistencia.estado_financiero_clase = "secondary"
+            else:
+                asistencia.estado_financiero_label = "Sin consumo"
+                asistencia.estado_financiero_clase = "light"
     mostrar_bloque_estudiante = es_estudiante or asistencias.exists() or pagos.exists() or consumos.exists() or bool(documentos_tributarios)
     mostrar_bloque_profesor = es_profesor or sesiones_profesor.exists()
     sesiones_profesor_total = sesiones_profesor.count()

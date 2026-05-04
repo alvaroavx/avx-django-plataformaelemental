@@ -7,8 +7,8 @@ from .models import Asistencia, BloqueHorario, Disciplina, SesionClase
 
 @admin.register(Disciplina)
 class DisciplinaAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "organizacion", "nivel", "activa", "creada_en")
-    list_filter = ("organizacion", "activa", "nivel")
+    list_display = ("nombre", "organizacion", "nivel", "badge_color", "activa", "creada_en")
+    list_filter = ("organizacion", "activa", "badge_color", "nivel")
     search_fields = ("nombre", "nivel", "descripcion")
     list_per_page = 25
 
