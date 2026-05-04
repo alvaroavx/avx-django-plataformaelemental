@@ -7,9 +7,11 @@ from .base import *  # noqa: F401,F403
 DEBUG = False
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")  # type: ignore[name-defined]
-if "app.espacioelementos.cl" not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append("app.espacioelementos.cl")
+if "apps.avx.cl" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("apps.avx.cl")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")  # type: ignore[name-defined]
+if "https://apps.avx.cl" not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append("https://apps.avx.cl")
 
 # Make sure Django knows when it is running behind a load balancer or proxy.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

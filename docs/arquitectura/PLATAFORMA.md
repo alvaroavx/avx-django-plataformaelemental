@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-05-03
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -205,6 +205,8 @@ Regla vigente:
 - La guia operativa de seguridad vive en `docs/operacion/SEGURIDAD_PRODUCCION.md`.
 
 ## Deploy
+- Dominio publico vigente: `apps.avx.cl`.
+- En produccion, `plataformaelemental/config/prod.py` garantiza `apps.avx.cl` en `ALLOWED_HOSTS` y `https://apps.avx.cl` en `CSRF_TRUSTED_ORIGINS`, incluso si el archivo de entorno no los declara explicitamente.
 - El flujo minimo de CI/CD corre en GitHub Actions al hacer push a `main`.
 - La estrategia vigente es:
   - tests en GitHub Actions

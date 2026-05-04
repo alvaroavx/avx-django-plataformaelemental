@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-04-27
+Fecha de actualizacion: 2026-05-03
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -136,6 +136,17 @@ En el archivo de entorno de produccion conviene definir al menos:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
+
+Dominio publico vigente:
+- `apps.avx.cl`
+
+Valores recomendados:
+- `DJANGO_ALLOWED_HOSTS=apps.avx.cl`
+- `DJANGO_CSRF_TRUSTED_ORIGINS=https://apps.avx.cl`
+
+Nota operativa:
+- `DEPLOY_HOST` es el host/IP usado para SSH por GitHub Actions. No necesariamente debe ser el mismo dominio publico de Django.
+- El workflow `.github/workflows/deploy.yml` y `scripts/deploy.sh` no tienen dominio publico hardcodeado; el dominio publico se controla desde settings y variables de entorno del servidor.
 
 ## Instalacion inicial en el servidor
 1. Instalar dependencias base del sistema:
