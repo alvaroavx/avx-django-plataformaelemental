@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-05-07
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -85,6 +85,7 @@ Reglas:
 
 ## UI y navegacion
 - Todas las vistas de `finanzas` deben mantener `periodo_mes`, `periodo_anio` y `organizacion`.
+- El contexto global de filtros, persona navegante y organizacion activa debe importarse desde `plataformaelemental.context`, no desde `asistencias.views`.
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales de `mes`, `anio` y `organizacion` deben autoaplicarse al cambiar, sin boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` deben ofrecer la opcion `Todos`, permitiendo ver todos los meses de un año, un mismo mes en todos los años o todo el historial, segun combinacion.

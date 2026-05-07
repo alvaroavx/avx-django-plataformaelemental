@@ -8,11 +8,17 @@ from django.urls import reverse
 
 from asistencias.decorators import role_required
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from asistencias.periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
 from asistencias.utils import ROLE_ADMIN
-from asistencias.views import _nav_context, _organizacion_desde_request
 from finanzas.models import AttendanceConsumption, Payment
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
+from plataformaelemental.context import (
+    aplicar_periodo,
+    descripcion_periodo,
+    filtros_periodo,
+    nav_context,
+    organizacion_desde_request,
+    resolver_periodo,
+)
 
 from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
@@ -22,7 +28,7 @@ MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
 
 
 def _base_context(request):
-    return _nav_context(request)
+    return nav_context(request)
 
 
 def _url_con_filtros(request, nombre_url, **kwargs):
@@ -175,7 +181,7 @@ def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=No
 def dashboard(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
 
     personas_qs = _annotate_personas_resumen(
         _personas_queryset(organizacion),
@@ -219,7 +225,7 @@ def dashboard(request):
 def organizaciones_list(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion_filtro = _organizacion_desde_request(request)
+    organizacion_filtro = organizacion_desde_request(request)
     organizaciones_qs = Organizacion.objects.order_by("nombre")
     if organizacion_filtro:
         organizaciones_qs = organizaciones_qs.filter(pk=organizacion_filtro.pk)
@@ -290,7 +296,7 @@ def organizacion_edit(request, pk):
 def personas_list(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     personas_qs = _annotate_personas_resumen(
         _personas_queryset(organizacion),
         mes=periodo["mes"],
@@ -368,7 +374,7 @@ def persona_create(request):
 def persona_detail(request, pk):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     persona = get_object_or_404(
         Persona.objects.select_related("user").prefetch_related(
             Prefetch(

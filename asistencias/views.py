@@ -9,6 +9,14 @@ from django.utils import timezone
 
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from plataformaelemental.context import (
+    aplicar_periodo,
+    descripcion_periodo,
+    filtros_periodo,
+    nav_context,
+    organizacion_desde_request,
+    resolver_periodo,
+)
 
 from .decorators import role_required
 from .forms import (
@@ -18,32 +26,14 @@ from .forms import (
     SesionBasicaForm,
 )
 from .models import Asistencia, Disciplina, SesionClase
-from .periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
 from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
-
-
-def _nav_context(request):
-    """Contexto base de navegación para vistas autenticadas de asistencias."""
-    persona = getattr(request.user, "persona", None)
-    roles = []
-    if persona:
-        roles = list(persona.roles.filter(activo=True).values_list("rol__codigo", flat=True))
-    return {"persona": persona, "roles_usuario": roles}
 
 
 def _periodo(request):
     """Retorna un periodo de referencia para vistas que requieren una fecha base visible."""
     periodo = resolver_periodo(request)
     return periodo["referencia_inicio"], periodo["referencia_fin"]
-
-
-def _organizacion_desde_request(request):
-    """Retorna la organización seleccionada desde el filtro global, o `None`."""
-    org_id = request.GET.get("organizacion")
-    if not org_id:
-        return None
-    return Organizacion.objects.filter(pk=org_id).first()
 
 
 def _url_con_filtros(request, nombre_url, **kwargs):
@@ -98,8 +88,8 @@ def _crear_persona_estudiante_en_organizacion(persona_form, organizacion):
 @role_required(ROLE_ADMIN)
 def dashboard(request):
     """Panel principal con métricas operativas según período y organización."""
-    context = _nav_context(request)
-    organizacion = _organizacion_desde_request(request)
+    context = nav_context(request)
+    organizacion = organizacion_desde_request(request)
     sesiones_mes = (
         aplicar_periodo(SesionClase.objects.all(), "fecha", request=request)
         .select_related("disciplina")
@@ -202,8 +192,8 @@ def dashboard(request):
 @role_required(ROLE_ADMIN)
 def sesiones_list(request):
     """Vista calendario mensual de sesiones."""
-    context = _nav_context(request)
-    organizacion = _organizacion_desde_request(request)
+    context = nav_context(request)
+    organizacion = organizacion_desde_request(request)
     periodo = resolver_periodo(request)
     year = periodo["referencia_inicio"].year
     month = periodo["referencia_inicio"].month
@@ -265,7 +255,7 @@ def sesiones_list(request):
 @role_required(ROLE_ADMIN)
 def estudiantes_list(request):
     """Listado de estudiantes con estado de asistencia del período seleccionado."""
-    context = _nav_context(request)
+    context = nav_context(request)
     estudiantes = (
         Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
         .distinct()
@@ -311,10 +301,10 @@ def estudiantes_list(request):
 @role_required(ROLE_ADMIN)
 def profesores_list(request):
     """Listado de profesores agrupado por organización y período seleccionado."""
-    context = _nav_context(request)
+    context = nav_context(request)
     profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
     org_id = request.GET.get("organizacion")
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     profesores_data = []
     for profesor in profesores:
         organizaciones_prof = profesor.roles.filter(rol__codigo="PROFESOR").select_related("organizacion")
@@ -390,8 +380,8 @@ def profesores_list(request):
 @role_required(ROLE_ADMIN)
 def disciplinas_list(request):
     """Resumen de disciplinas con métricas operativas del período."""
-    context = _nav_context(request)
-    organizacion = _organizacion_desde_request(request)
+    context = nav_context(request)
+    organizacion = organizacion_desde_request(request)
 
     disciplinas_qs = Disciplina.objects.select_related("organizacion")
     if organizacion:
@@ -436,7 +426,7 @@ def disciplinas_list(request):
 @role_required(ROLE_ADMIN)
 def disciplina_detail(request, pk):
     """Detalle de disciplina con métricas de sesiones y asistencias por período."""
-    context = _nav_context(request)
+    context = nav_context(request)
     disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
 
     sesiones = (
@@ -490,7 +480,7 @@ def disciplina_detail(request, pk):
 @role_required(ROLE_ADMIN)
 def disciplina_create(request):
     """Crea una disciplina."""
-    context = _nav_context(request)
+    context = nav_context(request)
     initial = {}
     if request.GET.get("organizacion"):
         initial["organizacion"] = request.GET.get("organizacion")
@@ -514,7 +504,7 @@ def disciplina_create(request):
 @role_required(ROLE_ADMIN)
 def disciplina_edit(request, pk):
     """Edita una disciplina existente."""
-    context = _nav_context(request)
+    context = nav_context(request)
     disciplina = get_object_or_404(Disciplina, pk=pk)
     form = DisciplinaForm(request.POST or None, instance=disciplina)
 
@@ -536,9 +526,9 @@ def disciplina_edit(request, pk):
 @role_required(ROLE_ADMIN)
 def asistencias_list(request):
     """Pantalla operativa para crear sesiones y registrar asistencias en bloque."""
-    context = _nav_context(request)
+    context = nav_context(request)
     sesion_id = request.GET.get("sesion_id")
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     sesion_seleccionada = SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None
     asistentes_ids = set()
     if sesion_seleccionada:
@@ -701,7 +691,7 @@ def asistencias_list(request):
 @role_required(ROLE_ADMIN)
 def sesion_detail(request, pk):
     """Detalle de la sesión y estado de sus asistentes."""
-    context = _nav_context(request)
+    context = nav_context(request)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
@@ -799,7 +789,7 @@ def sesion_detail(request, pk):
 @role_required(ROLE_ADMIN)
 def sesion_edit(request, pk):
     """Edita una sesión existente."""
-    context = _nav_context(request)
+    context = nav_context(request)
     sesion = get_object_or_404(
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores"),
         pk=pk,

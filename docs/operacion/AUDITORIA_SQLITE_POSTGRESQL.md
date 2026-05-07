@@ -6,8 +6,9 @@ Ruta auditada: `/home/alvax/Code/platforms/avx-django-plataformaelemental`
 
 Nota de vigencia:
 - La auditoria se preparo para planificar migracion a PostgreSQL.
-- La configuracion activa del proyecto fue devuelta posteriormente a SQLite en `dev` y `prod`.
-- Los bloques PostgreSQL quedaron comentados en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py` como referencia futura.
+- La configuracion activa del proyecto volvio a PostgreSQL en `dev` y `prod` el 2026-05-04.
+- SQLite queda comentado en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py` como fallback local/manual.
+- La configuracion PostgreSQL activa usa variables `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT`.
 
 ## 1. `requirements.txt` Completo
 
@@ -126,11 +127,11 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "plataforma_elemental_dev"),
-        "USER": os.environ.get("POSTGRES_USER", "plataforma_user"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "NAME": os.environ["POSTGRES_DB"],
+        "USER": os.environ["POSTGRES_USER"],
+        "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+        "HOST": os.environ["POSTGRES_HOST"],
+        "PORT": os.environ["POSTGRES_PORT"],
     }
 }
 ```
@@ -162,8 +163,8 @@ DATABASES = {
         "NAME": os.environ["POSTGRES_DB"],
         "USER": os.environ["POSTGRES_USER"],
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "HOST": os.environ["POSTGRES_HOST"],
+        "PORT": os.environ["POSTGRES_PORT"],
     }
 }
 ```
@@ -178,11 +179,11 @@ Fuente: `plataformaelemental/config/dev.py`
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "plataforma_elemental_dev"),
-        "USER": os.environ.get("POSTGRES_USER", "plataforma_user"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "NAME": os.environ["POSTGRES_DB"],
+        "USER": os.environ["POSTGRES_USER"],
+        "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+        "HOST": os.environ["POSTGRES_HOST"],
+        "PORT": os.environ["POSTGRES_PORT"],
     }
 }
 ```
@@ -196,8 +197,8 @@ DATABASES = {
         "NAME": os.environ["POSTGRES_DB"],
         "USER": os.environ["POSTGRES_USER"],
         "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "HOST": os.environ["POSTGRES_HOST"],
+        "PORT": os.environ["POSTGRES_PORT"],
     }
 }
 ```
@@ -222,8 +223,8 @@ Valores reconocidos:
 
 Si DJANGO_ENV no existe o no coincide, cae a dev.
 DATABASES cambia por entorno:
-- dev: PostgreSQL con defaults locales y variables opcionales.
-- prod: PostgreSQL con `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` obligatorios.
+- dev: PostgreSQL con variables `POSTGRES_*` obligatorias.
+- prod: PostgreSQL con variables `POSTGRES_*` obligatorias.
 ```
 
 ## 4. Apps Instaladas
@@ -1917,6 +1918,6 @@ Existe configuracion de variables PostgreSQL en `.env.example`, `.env.dev`, `pla
 No existe DATABASE_URL.
 El driver PostgreSQL versionado es `psycopg[binary]==3.2.9`.
 No existe .env.prod.
-`.env.dev` define `POSTGRES_PASSWORD=tu_password_dev` para desarrollo local.
+`.env.dev` define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` para desarrollo local.
 Para cargar `.env.dev` desde shell se debe usar `set -a; source .env.dev; set +a`; secretos con caracteres especiales deben ir entre comillas.
 ```

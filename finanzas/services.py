@@ -1,9 +1,9 @@
 from django.db.models import Count, Q, Sum
 from django.utils.dateparse import parse_date
 
-from asistencias.periodo import aplicar_periodo
 from asistencias.models import Asistencia
 from personas.models import Persona
+from plataformaelemental.context import aplicar_periodo
 
 from .models import AttendanceConsumption, Payment
 

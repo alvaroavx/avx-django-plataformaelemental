@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import DEFAULT_DB_ALIAS, IntegrityError, connections, transaction
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -9,8 +12,253 @@ from unittest.mock import patch
 from api.models import ApiAccessKey
 from api.throttles import ApiBurstRateThrottle
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from finanzas.models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from finanzas.models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from monitor.models import ConfiguracionMonitor, ConfiguracionSitio, DiscoverySitio, Proyecto, Sitio
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+
+
+class PostgreSQLDatabaseConnectionTests(APITestCase):
+    def test_default_database_usa_postgresql_y_responde_consulta_basica(self):
+        connection = connections[DEFAULT_DB_ALIAS]
+
+        self.assertEqual(connection.vendor, "postgresql")
+        with connection.cursor() as cursor:
+            cursor.execute("select current_database(), current_user")
+            database_name, database_user = cursor.fetchone()
+
+        self.assertTrue(database_name)
+        self.assertTrue(database_user)
+
+    def test_tablas_migradas_de_todas_las_apps_estan_disponibles(self):
+        connection = connections[DEFAULT_DB_ALIAS]
+        table_names = set(connection.introspection.table_names())
+        expected_models = [
+            Organizacion,
+            Persona,
+            Rol,
+            PersonaRol,
+            Disciplina,
+            SesionClase,
+            Asistencia,
+            PaymentPlan,
+            Payment,
+            DocumentoTributario,
+            AttendanceConsumption,
+            Category,
+            Transaction,
+            ApiAccessKey,
+            Proyecto,
+            Sitio,
+            ConfiguracionMonitor,
+            ConfiguracionSitio,
+            DiscoverySitio,
+        ]
+
+        missing_tables = [
+            model._meta.db_table
+            for model in expected_models
+            if model._meta.db_table not in table_names
+        ]
+
+        self.assertEqual(missing_tables, [])
+
+
+class CrossAppPostgreSQLModelTests(APITestCase):
+    def setUp(self):
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org PostgreSQL",
+            razon_social="Org PostgreSQL SpA",
+            rut="76.543.210-K",
+        )
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        self.rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        self.estudiante = Persona.objects.create(
+            nombres="Data",
+            apellidos="Estudiante",
+            email="data.estudiante@example.com",
+            rut="12.345.678-5",
+        )
+        self.profesor = Persona.objects.create(
+            nombres="Data",
+            apellidos="Profesor",
+            email="data.profesor@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=self.estudiante,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.rol_profesor_asignado = PersonaRol.objects.create(
+            persona=self.profesor,
+            rol=self.rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+            valor_clase=Decimal("15000.00"),
+            retencion_sii=Decimal("13.75"),
+        )
+        self.disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="PostgreSQL Funcional",
+            badge_color=Disciplina.BadgeColor.VERDE,
+        )
+        self.sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-05-04",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        self.sesion.profesores.set([self.profesor])
+        self.asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+        )
+        self.plan = PaymentPlan.objects.create(
+            organizacion=self.organizacion,
+            nombre="Plan PostgreSQL",
+            num_clases=4,
+            precio=Decimal("40000.00"),
+            precio_incluye_iva=True,
+        )
+        self.documento = DocumentoTributario.objects.create(
+            organizacion=self.organizacion,
+            tipo_documento=DocumentoTributario.TipoDocumento.BOLETA_VENTA_AFECTA,
+            folio="PG-1",
+            fecha_emision="2026-05-04",
+            nombre_emisor="Org PostgreSQL SpA",
+            rut_emisor=self.organizacion.rut,
+            nombre_receptor=self.estudiante.nombre_completo,
+            rut_receptor=self.estudiante.rut,
+            monto_neto=Decimal("33613.45"),
+            monto_iva=Decimal("6386.55"),
+            monto_total=Decimal("40000.00"),
+            persona_relacionada=self.estudiante,
+            metadata_extra={"origen": "test-postgresql", "items": ["clase"]},
+        )
+        self.pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            plan=self.plan,
+            documento_tributario=self.documento,
+            fecha_pago="2026-05-04",
+            monto_referencia=Decimal("40000.00"),
+        )
+        self.consumo = AttendanceConsumption.objects.get(asistencia=self.asistencia)
+        self.categoria = Category.objects.create(nombre="Ingreso PostgreSQL", tipo=Category.Tipo.INGRESO)
+        self.transaccion = Transaction.objects.create(
+            organizacion=self.organizacion,
+            categoria=self.categoria,
+            fecha="2026-05-04",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=Decimal("40000.00"),
+            descripcion="Pago validado en PostgreSQL",
+        )
+        self.transaccion.documentos_tributarios.set([self.documento])
+        self.api_key, self.api_key_plana = ApiAccessKey.crear_con_clave(nombre="postgresql-integracion")
+        self.proyecto = Proyecto.objects.create(nombre="PostgreSQL Monitor", organizacion=self.organizacion)
+        self.sitio = Sitio.objects.create(
+            proyecto=self.proyecto,
+            nombre="Apps AVX",
+            url="https://apps.avx.cl/asistencias/",
+        )
+        self.configuracion_sitio = ConfiguracionSitio.objects.create(
+            sitio=self.sitio,
+            timeout_segundos=15,
+            seguir_redirecciones=None,
+        )
+        self.discovery = DiscoverySitio.objects.create(
+            sitio=self.sitio,
+            estado_http=200,
+            url_final="https://apps.avx.cl/asistencias/",
+            titulo="Plataforma Elemental",
+            ssl_valido=True,
+            tiempo_respuesta_ms=120,
+        )
+
+    def test_relaciones_transversales_persisten_y_consultan_correctamente(self):
+        sesion = (
+            SesionClase.objects.select_related("disciplina__organizacion")
+            .prefetch_related("profesores", "asistencias__persona")
+            .get(pk=self.sesion.pk)
+        )
+        pago = Payment.objects.select_related("persona", "plan", "documento_tributario").get(pk=self.pago.pk)
+        transaccion = Transaction.objects.prefetch_related("documentos_tributarios").get(pk=self.transaccion.pk)
+        sitio = Sitio.objects.select_related("proyecto__organizacion", "configuracion").get(pk=self.sitio.pk)
+
+        self.assertEqual(sesion.disciplina.organizacion, self.organizacion)
+        self.assertEqual(list(sesion.profesores.all()), [self.profesor])
+        self.assertEqual(sesion.asistencias.get().persona, self.estudiante)
+        self.assertEqual(pago.clases_consumidas, 1)
+        self.assertEqual(pago.saldo_clases, 3)
+        self.assertEqual(pago.documento_tributario.metadata_extra["origen"], "test-postgresql")
+        self.assertEqual(list(transaccion.documentos_tributarios.all()), [self.documento])
+        self.assertEqual(sitio.dominio, "apps.avx.cl")
+        self.assertEqual(sitio.configuracion.timeout_resuelto(ConfiguracionMonitor.actual()), 15)
+        self.assertEqual(self.rol_profesor_asignado.valor_clase_normalizado, Decimal("15000.00"))
+        self.assertEqual(ApiAccessKey.desde_clave_plana(self.api_key_plana), self.api_key)
+
+    def test_constraints_unicos_clave_se_aplican_en_postgresql(self):
+        duplicate_cases = [
+            lambda: Organizacion.objects.create(nombre="Org duplicada", rut=self.organizacion.rut),
+            lambda: Persona.objects.create(nombres="Email", apellidos="Duplicado", email=self.estudiante.email),
+            lambda: Rol.objects.create(nombre="Estudiante Duplicado", codigo=self.rol_estudiante.codigo),
+            lambda: PersonaRol.objects.create(
+                persona=self.estudiante,
+                rol=self.rol_estudiante,
+                organizacion=self.organizacion,
+            ),
+            lambda: Disciplina.objects.create(organizacion=self.organizacion, nombre=self.disciplina.nombre),
+            lambda: Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante),
+            lambda: PaymentPlan.objects.create(
+                organizacion=self.organizacion,
+                nombre=self.plan.nombre,
+                precio=Decimal("10000.00"),
+            ),
+            lambda: DocumentoTributario.objects.create(
+                organizacion=self.organizacion,
+                tipo_documento=self.documento.tipo_documento,
+                folio=self.documento.folio,
+                rut_emisor=self.documento.rut_emisor,
+                monto_total=Decimal("1.00"),
+            ),
+            lambda: AttendanceConsumption.objects.create(
+                asistencia=self.asistencia,
+                persona=self.estudiante,
+                clase_fecha=self.sesion.fecha,
+            ),
+            lambda: ApiAccessKey.objects.create(
+                nombre=self.api_key.nombre,
+                prefijo="duplicado",
+                hash_clave="0" * 64,
+            ),
+            lambda: Sitio.objects.create(
+                proyecto=self.proyecto,
+                nombre="Sitio duplicado",
+                url=self.sitio.url,
+            ),
+        ]
+
+        for duplicate_factory in duplicate_cases:
+            with self.subTest(duplicate_factory=duplicate_factory):
+                with self.assertRaises(IntegrityError):
+                    with transaction.atomic():
+                        duplicate_factory()
+
+    def test_delete_cascade_y_set_null_se_comportan_entre_apps(self):
+        documento_id = self.documento.pk
+        asistencia_id = self.asistencia.pk
+
+        self.pago.delete()
+        self.consumo.refresh_from_db()
+        self.assertIsNone(self.consumo.pago_id)
+        self.assertTrue(DocumentoTributario.objects.filter(pk=documento_id).exists())
+
+        self.asistencia.delete()
+        self.assertFalse(AttendanceConsumption.objects.filter(asistencia_id=asistencia_id).exists())
+
+        self.documento.delete()
+        self.transaccion.refresh_from_db()
+        self.assertEqual(self.transaccion.documentos_tributarios.count(), 0)
 
 
 class HealthEndpointTests(APITestCase):

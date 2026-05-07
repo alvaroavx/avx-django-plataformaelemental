@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-05-03
+Fecha de actualizacion: 2026-05-04
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -136,6 +136,11 @@ En el archivo de entorno de produccion conviene definir al menos:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
 
 Dominio publico vigente:
 - `apps.avx.cl`
@@ -187,9 +192,10 @@ Nota operativa:
 12. ejecutar `bash scripts/deploy.sh`
 
 ## Base De Datos En CI
-- El entorno `dev` usa SQLite nuevamente.
-- El job `test` no necesita un service container adicional para base de datos.
-- PostgreSQL queda documentado en comentarios de configuracion y en la auditoria de migracion, pero no es la base activa del pipeline hoy.
+- El entorno `dev` usa PostgreSQL.
+- El job `test` necesita variables `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT`, ademas de un servicio PostgreSQL disponible.
+- Mientras el workflow no tenga un service container PostgreSQL, los tests de CI fallaran al intentar conectar a la base.
+- SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
 
 ## SSH En CI
 - El workflow valida `DEPLOY_SSH_KEY` como secret obligatorio.

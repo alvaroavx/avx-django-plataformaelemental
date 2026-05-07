@@ -52,8 +52,8 @@ Reglas funcionales vigentes:
 ### Stack
 - Django 5
 - Django REST Framework
-- SQLite activa en `dev` y `prod`
-- PostgreSQL documentado como alternativa futura comentada en configuración
+- PostgreSQL activo en `dev` y `prod`
+- SQLite queda comentado como fallback local/manual en configuración
 - Bootstrap 5
 - DataTables
 - Tom Select

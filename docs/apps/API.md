@@ -1,6 +1,6 @@
 # API
 
-Fecha de actualizacion: 2026-04-01
+Fecha de actualizacion: 2026-05-04
 
 ## Proposito
 La app `api` expone una capa externa consumible por clientes fuera del frontend Django, incluyendo una base para futuras apps moviles de profesores.
@@ -78,6 +78,10 @@ Ejemplos:
   - header `X-API-Key: <clave>`
   - header `Authorization: ApiKey <clave>`
 - Los endpoints de escritura deben seguir usando usuario autenticado por token DRF.
+
+## Pruebas De Base De Datos
+- `api.tests` contiene el set transversal de validacion PostgreSQL porque este modulo ya forma parte del comando principal de tests.
+- Estas pruebas validan que la conexion default use PostgreSQL, que existan las tablas migradas de todas las apps funcionales y que las relaciones, constraints unicos, JSONField, DecimalField, many-to-many, one-to-one, cascadas y `SET_NULL` funcionen sobre la base real.
 
 ## Seguridad actual
 - `ApiKeyAuthentication` para lectura externa.

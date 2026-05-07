@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-05-03
+Fecha de actualizacion: 2026-05-07
 
 ## Proposito
 Este documento resume el estado tecnico vigente de Plataforma Elemental.
@@ -29,6 +29,7 @@ Adicionalmente existen:
 - Los filtros globales deben autoaplicarse al cambiar un selector; no usan boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` aceptan `Todos`, por lo que el sistema debe soportar filtros parciales como `todos los meses de un año`, `un mismo mes en todos los años` o `todo el historial`.
 - La barra compartida de apps debe mantener enlaces a `asistencias`, `finanzas`, `personas` y `monitor`, arrastrando los filtros globales activos.
+- El contexto global de UI, periodo y organizacion activa vive en `plataformaelemental.context`; ninguna app debe importar helpers desde `asistencias.views`.
 - Los modelos del dominio viven en su app duena:
   - `personas`: personas, roles y organizaciones
   - `asistencias`: disciplinas, sesiones y asistencias
@@ -40,17 +41,19 @@ Adicionalmente existen:
 ## Arquitectura vigente
 - Framework: Django 5
 - API: Django REST Framework
-- Base de datos: SQLite activa por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`
+- Base de datos: PostgreSQL activa por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`
 - UI: Bootstrap 5, DataTables y Tom Select via CDN
 - Zona horaria: `America/Santiago`
 - Despliegue minimo versionado: GitHub Actions + SSH + `systemd` + `gunicorn`
 
 ## Base de datos
 - `plataformaelemental/config/base.py` no declara `DATABASES`; solo mantiene defaults comunes y helpers de entorno.
-- `plataformaelemental/config/dev.py` declara SQLite activa sobre `BASE_DIR / "db.sqlite3"`.
-- `plataformaelemental/config/prod.py` declara SQLite activa sobre `BASE_DIR / "db.sqlite3"`.
-- Ambos archivos dejan un bloque PostgreSQL comentado como referencia futura para la migracion.
-- `requirements.txt` mantiene `psycopg[binary]==3.2.9` instalado para retomar PostgreSQL sin reinstalar dependencias.
+- `plataformaelemental/config/dev.py` declara PostgreSQL activo usando exclusivamente variables `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT`.
+- `plataformaelemental/config/prod.py` declara PostgreSQL activo usando las mismas variables `POSTGRES_*`; en produccion todas son obligatorias y deben venir desde el archivo de entorno del servidor.
+- Ambos archivos dejan SQLite comentado como fallback local/manual, no como base activa.
+- Desarrollo local usa como referencia `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432`; la clave queda en `POSTGRES_PASSWORD`.
+- `requirements.txt` mantiene `psycopg[binary]==3.2.9` como driver PostgreSQL.
+- La suite `api.tests` incluye pruebas transversales de PostgreSQL que validan backend activo, tablas migradas, relaciones entre apps, constraints unicos y reglas de cascada/SET_NULL sobre modelos de `personas`, `asistencias`, `finanzas`, `api` y `monitor`.
 
 ## Apps
 

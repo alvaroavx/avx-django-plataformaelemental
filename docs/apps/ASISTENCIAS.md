@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-05-01
+Fecha de actualizacion: 2026-05-07
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -12,6 +12,7 @@ Debe privilegiar:
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
+- La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
 - `periodo_mes` y `periodo_anio` deben aceptar la opcion `Todos`, permitiendo filtrar por todos los meses, todos los años, o combinaciones parciales como `todos los meses de un año` y `un mes en todos los años`.

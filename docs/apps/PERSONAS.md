@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-05-01
+Fecha de actualizacion: 2026-05-07
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -14,6 +14,7 @@ Debe concentrar:
 ## Reglas vigentes
 - La administracion de organizaciones vive en esta app y no en `asistencias`.
 - Los perfiles de persona deben mantener filtros globales de periodo y organizacion.
+- El contexto global de filtros, persona navegante y organizacion activa debe importarse desde `plataformaelemental.context`, no desde vistas de otra app.
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` deben aceptar `Todos` y reflejar esa seleccion tanto en los listados como en los resumentes de organizaciones y personas.

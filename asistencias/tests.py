@@ -1,13 +1,59 @@
 ﻿from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from plataformaelemental.context import nav_context, organizacion_desde_request, periodo_context
 
 from .models import Asistencia, Disciplina, SesionClase
+
+
+class ContextoGlobalTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Contexto",
+            razon_social="Org Contexto SPA",
+            rut="22.222.222-2",
+        )
+
+    def test_periodo_context_usa_fecha_actual_y_todas_las_organizaciones_por_defecto(self):
+        request = self.factory.get("/")
+        contexto = periodo_context(request)
+        hoy = timezone.localdate()
+
+        self.assertEqual(contexto["periodo_mes"], str(hoy.month))
+        self.assertEqual(contexto["periodo_anio"], str(hoy.year))
+        self.assertEqual(contexto["organizacion_id"], "")
+        self.assertIn(("todos", "Todos"), contexto["periodo_meses"])
+        self.assertIn(self.organizacion, list(contexto["organizaciones_global"]))
+
+    def test_organizacion_desde_request_respeta_filtro_global(self):
+        request = self.factory.get("/", {"organizacion": self.organizacion.pk})
+
+        self.assertEqual(organizacion_desde_request(request), self.organizacion)
+        self.assertIsNone(organizacion_desde_request(self.factory.get("/")))
+        self.assertIsNone(organizacion_desde_request(self.factory.get("/", {"organizacion": "99999"})))
+
+    def test_nav_context_expone_persona_y_roles_activos(self):
+        User = get_user_model()
+        user = User.objects.create_user(username="contexto", password="secret123")
+        persona = Persona.objects.create(nombres="Clara", apellidos="Contexto", user=user)
+        rol_activo = Rol.objects.create(nombre="Administrador", codigo="ADMIN")
+        rol_inactivo = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        PersonaRol.objects.create(persona=persona, rol=rol_activo, organizacion=self.organizacion, activo=True)
+        PersonaRol.objects.create(persona=persona, rol=rol_inactivo, organizacion=self.organizacion, activo=False)
+        request = self.factory.get("/")
+        request.user = user
+
+        contexto = nav_context(request)
+
+        self.assertEqual(contexto["persona"], persona)
+        self.assertEqual(contexto["roles_usuario"], ["ADMIN"])
 
 
 class AsistenciasViewTests(TestCase):

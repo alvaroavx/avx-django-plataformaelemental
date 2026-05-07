@@ -16,9 +16,15 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia
-from asistencias.periodo import aplicar_periodo, descripcion_periodo, filtros_periodo, resolver_periodo
-from asistencias.views import _nav_context, _organizacion_desde_request
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from plataformaelemental.context import (
+    aplicar_periodo,
+    descripcion_periodo,
+    filtros_periodo,
+    nav_context,
+    organizacion_desde_request,
+    resolver_periodo,
+)
 
 from .documentos.dtos import NormalizedTaxDocument
 from .documentos.services import build_review_payload, parse_tax_document
@@ -43,7 +49,7 @@ from .models import AttendanceConsumption, Category, DocumentoTributario, Paymen
 
 
 def _base_context(request):
-    context = _nav_context(request)
+    context = nav_context(request)
     context["organizaciones"] = Organizacion.objects.all().order_by("nombre")
     return context
 
@@ -190,7 +196,7 @@ def _clasificar_archivo_tributario(archivo_subido):
 
 
 def _review_context_from_payload(request, payload, *, token_importacion=None, documento_data=None, pago_data=None):
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     documento_form = _documento_revision_form(
         data=documento_data,
         initial=payload.get("documento_initial"),
@@ -342,7 +348,7 @@ def _subquery_disciplina_principal(*, mes=None, anio=None):
 @admin_finanzas_required
 def dashboard(request):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
 
     pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
     trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
@@ -384,7 +390,7 @@ def dashboard(request):
 @admin_finanzas_required
 def planes_list(request):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
         "organizacion__nombre",
         "-es_por_defecto",
@@ -414,7 +420,7 @@ def planes_list(request):
 @admin_finanzas_required
 def plan_edit(request, pk):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     plan = get_object_or_404(PaymentPlan, pk=pk)
     planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
         "organizacion__nombre",
@@ -461,7 +467,7 @@ def plan_delete(request, pk):
 def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, persona_form=None, open_nueva_persona=False):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     disciplina_principal_historica = _subquery_disciplina_principal(mes=periodo["mes"], anio=periodo["anio"])
 
     pagos_qs = (
@@ -550,7 +556,7 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
 
 @admin_finanzas_required
 def pagos_list(request):
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     form = PaymentForm(
         request.POST if request.method == "POST" and "guardar_pago" in request.POST else None,
         initial={"organizacion": organizacion.pk} if organizacion else None,
@@ -643,7 +649,7 @@ def pago_delete(request, pk):
 @admin_finanzas_required
 def documentos_tributarios_list(request):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     documentos_qs = DocumentoTributario.objects.select_related(
         "organizacion",
         "documento_relacionado",
@@ -785,7 +791,7 @@ def documento_tributario_importar(request):
         else:
             xml_bytes = xml_file.read() if xml_file else None
             pdf_bytes = pdf_file.read() if pdf_file else None
-            organizacion = _organizacion_desde_request(request)
+            organizacion = organizacion_desde_request(request)
             normalized = parse_tax_document(
                 xml_bytes=xml_bytes,
                 xml_name=xml_file.name if xml_file else None,
@@ -838,7 +844,7 @@ def documento_tributario_parse_preview(request):
         )
     xml_bytes = xml_file.read() if xml_file else None
     pdf_bytes = pdf_file.read() if pdf_file else None
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     normalized = parse_tax_document(
         xml_bytes=xml_bytes,
         xml_name=xml_file.name if xml_file else None,
@@ -1012,7 +1018,7 @@ def categoria_delete(request, pk):
 @admin_finanzas_required
 def transacciones_list(request):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
 
     trans_qs = (
         Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios")
@@ -1124,7 +1130,7 @@ def transaccion_delete(request, pk):
 @admin_finanzas_required
 def reporte_categorias(request):
     context = _base_context(request)
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
     if organizacion:
         trans_qs = trans_qs.filter(organizacion=organizacion)
@@ -1146,7 +1152,7 @@ def reporte_categorias(request):
 
 @admin_finanzas_required
 def export_pagos_csv(request):
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     pagos = aplicar_periodo(
         Payment.objects.select_related("persona", "organizacion"),
         "fecha_pago",
@@ -1177,7 +1183,7 @@ def export_pagos_csv(request):
 
 @admin_finanzas_required
 def export_transacciones_csv(request):
-    organizacion = _organizacion_desde_request(request)
+    organizacion = organizacion_desde_request(request)
     transacciones = aplicar_periodo(
         Transaction.objects.select_related("categoria", "organizacion"),
         "fecha",
