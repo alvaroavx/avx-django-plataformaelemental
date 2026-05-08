@@ -39,6 +39,20 @@ Debe concentrar:
 - `finanzas` mantiene la logica de cobros, documentos y caja.
 - `personas` conecta ambas vistas desde una perspectiva administrativa.
 
+## Rol transversal
+`personas` puede consolidar informacion academica y financiera para lectura administrativa.
+
+Permitido:
+- consultar resumen academico
+- consultar resumen de cobranza
+- mostrar pagos, consumos y documentos relacionados
+
+No permitido:
+- implementar reglas de imputacion
+- calcular deuda directamente en views/templates
+- editar documentos tributarios desde perfiles
+- importar helpers privados desde otras apps
+
 ## API externa base
 - `personas` expone una base de consumo externo en:
   - `/api/v1/personas/organizaciones/`

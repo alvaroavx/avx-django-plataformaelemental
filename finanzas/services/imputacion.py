@@ -5,7 +5,7 @@ from asistencias.models import Asistencia
 from personas.models import Persona
 from plataformaelemental.context import aplicar_periodo
 
-from .models import AttendanceConsumption, Payment
+from ..models import AttendanceConsumption, Payment
 
 
 def _filtro_mismo_periodo_mensual(fecha, prefijo_campo):

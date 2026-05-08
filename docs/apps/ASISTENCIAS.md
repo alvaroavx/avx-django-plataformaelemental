@@ -64,6 +64,21 @@ Debe privilegiar:
 - La logica global de pagos, documentos y caja vive en `finanzas`.
 - Los consumos de clases y deudas usan modelos de `finanzas`, pero las entidades academicas base son propias de `asistencias`.
 
+## Limite financiero
+`asistencias` puede mostrar estado financiero operacional, pero no calcula contabilidad.
+
+Permitido:
+- consultar estado de pago/deuda de una asistencia
+- mostrar si una clase esta pagada, adeudada, liberada o sin cobro
+- llamar servicios de cobranza para casos de uso explicitos
+
+No permitido:
+- calcular IVA
+- parsear documentos tributarios
+- clasificar transacciones
+- modificar pagos directamente desde templates
+- depender de helpers internos de `finanzas.views` o `personas.views`
+
 ## API externa base
 - `asistencias` expone una base de consumo externo en:
   - `/api/v1/asistencias/disciplinas/`

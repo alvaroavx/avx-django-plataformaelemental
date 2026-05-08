@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-05-04
+Fecha de actualizacion: 2026-05-08
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -142,6 +142,8 @@ En el archivo de entorno de produccion conviene definir al menos:
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 
+El deploy en produccion usa estas mismas variables para ejecutar un backup con `pg_dump` antes de aplicar migraciones.
+
 Dominio publico vigente:
 - `apps.avx.cl`
 
@@ -180,21 +182,24 @@ Nota operativa:
 ## Flujo del workflow
 1. `actions/checkout`
 2. instalar dependencias Python
-3. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-4. validar secrets obligatorios
-5. escribir la llave privada en `~/.ssh/deploy_key`
-6. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
-7. poblar `known_hosts` con `ssh-keyscan`
-8. ejecutar el paso `Debug SSH key file`
-9. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
-10. `git fetch`
-11. `git reset --hard origin/main`
-12. ejecutar `bash scripts/deploy.sh`
+3. instalar dependencias de desarrollo para lint
+4. correr `ruff check .`
+5. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+6. validar secrets obligatorios
+7. escribir la llave privada en `~/.ssh/deploy_key`
+8. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
+9. poblar `known_hosts` con `ssh-keyscan`
+10. ejecutar el paso `Debug SSH key file`
+11. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
+12. `git fetch`
+13. `git reset --hard origin/main`
+14. ejecutar `bash scripts/deploy.sh`
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
-- El job `test` necesita variables `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT`, ademas de un servicio PostgreSQL disponible.
-- Mientras el workflow no tenga un service container PostgreSQL, los tests de CI fallaran al intentar conectar a la base.
+- El job `test` levanta un service container `postgres:16`.
+- El workflow define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=postgres`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
+- Las credenciales de CI no son credenciales productivas; existen solo dentro del runner.
 - SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
 
 ## SSH En CI
@@ -214,6 +219,7 @@ Nota operativa:
 - fuerza `DJANGO_ENV=prod` por defecto
 - crea virtualenv si no existe
 - instala dependencias
+- si `DJANGO_ENV=prod`, ejecuta backup PostgreSQL previo a migraciones usando `pg_dump`
 - ejecuta `python manage.py migrate --noinput`
 - ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
@@ -221,6 +227,15 @@ Nota operativa:
 - normaliza `DEPLOY_SERVICE` para aceptar nombre con o sin sufijo `.service`
 - valida que el unit exista con `systemctl show`
 - reinicia el servicio systemd
+
+## Backup PostgreSQL Previo A Migraciones
+- Solo corre cuando `DJANGO_ENV=prod`.
+- Usa `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT` cargadas desde `DEPLOY_ENV_FILE` o desde el entorno del proceso.
+- Guarda los archivos en `$APP_DIR/backups/postgres`.
+- El nombre del archivo incluye base de datos, timestamp y commit corto, por ejemplo `plataforma_elemental_20260508_153000_abc1234.dump`.
+- El formato es `custom` de `pg_dump`, pensado para restaurar con `pg_restore`.
+- Si `pg_dump` falla, el deploy aborta antes de ejecutar migraciones.
+- El script no imprime la password; la entrega a `pg_dump` mediante `PGPASSWORD`.
 
 ## Rollback simple
 En el servidor:

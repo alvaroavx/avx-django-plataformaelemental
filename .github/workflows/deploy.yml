@@ -13,6 +13,28 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_ENV: dev
+      POSTGRES_DB: plataforma_elemental_dev
+      POSTGRES_USER: elementos
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: plataforma_elemental_dev
+          POSTGRES_USER: elementos
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U elementos -d plataforma_elemental_dev"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -27,9 +49,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install development dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run lint
+        run: ruff check .
+
       - name: Run test suite
-        env:
-          DJANGO_ENV: dev
         run: python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
 
   deploy:

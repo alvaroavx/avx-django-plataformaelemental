@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-05-07
+Fecha de actualizacion: 2026-05-08
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -20,6 +20,41 @@ Debe servir para operar varias organizaciones y tambien debe poder escalar a fin
 - `Category`: clasificacion de transacciones para reportes.
 - `PaymentPlan`: estructura comercial de clases y precio.
 - Los modelos financieros viven en `finanzas.models`; `database` ya no concentra modelos de runtime y queda solo como compatibilidad historica de migraciones.
+
+## Subdominios internos
+`finanzas` contiene por ahora dos subdominios distintos.
+
+### Cobranza operacional
+Incluye:
+- `PaymentPlan`
+- `Payment`
+- `AttendanceConsumption`
+- imputacion de pagos contra asistencias
+- deuda por clases
+- saldo de clases
+
+Responde preguntas como:
+- quien debe clases
+- quien pago
+- cuantas clases quedan disponibles
+- que asistencia fue consumida por que pago
+
+### Finanzas / contabilidad
+Incluye:
+- `DocumentoTributario`
+- `Transaction`
+- `Category`
+- reportes financieros
+- respaldos para contadora
+
+Responde preguntas como:
+- que ingreso o egreso existio
+- que documento tributario respalda una operacion
+- que categoria contable corresponde
+- que informacion necesita la contadora
+
+Regla:
+- Cobranza operacional puede alimentar finanzas/contabilidad, pero no debe mezclarse con parsing tributario ni conciliacion contable dentro de views.
 
 ## Reglas de uso
 - Un ingreso puede existir como `Transaction` y tambien como `DocumentoTributario`, pero cada entidad cumple un rol distinto.
@@ -116,6 +151,9 @@ Reglas:
 - Filtro de planes por organizacion en el formulario de pagos.
 - Gestion de planes con marca `por defecto` por organizacion y precarga automatica en el alta de pagos.
 - `finanzas/planes/<id>/editar` reutiliza el mismo listado de planes y abre una edicion inline dentro de la tabla, en vez de navegar a una pantalla separada.
+- Los querysets y agregaciones de lectura para planes, pagos, documentos tributarios, transacciones, dashboard, categorias y exportaciones viven en `finanzas/selectors.py`; las views no deben volver a concentrar esos calculos si solo leen datos.
+- Los helpers de contexto base, ayudas UI, URLs con querystring, redirects con querystring, clasificacion visual de archivos y error legible por conflicto de documento viven en `finanzas/forms_helpers.py`.
+- `finanzas.services` es un paquete; la imputacion de pagos y consumos vive en `finanzas/services/imputacion.py`, y `finanzas/services/__init__.py` reexporta la API publica historica para mantener imports existentes.
 - Boton volver en editar pago prioriza la pagina anterior.
 - Visor embebido en detalle de transacciones para PDF e imagenes; otros archivos siguen abriendose externamente.
 - Separacion clara entre `Documentos tributarios` y `Transacciones`.

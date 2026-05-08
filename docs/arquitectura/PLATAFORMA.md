@@ -38,6 +38,16 @@ Adicionalmente existen:
 - El codigo debe mantenerse en espanol siempre que no complique artificialmente la comprension.
 - La plataforma debe funcionar aunque no existan documentos tributarios; estos son opcionales y no la fuente obligatoria de verdad del sistema.
 
+## Politica de dependencias internas
+- Las apps pueden importar modelos de otras apps cuando sea necesario para representar relaciones reales del dominio.
+- Las apps no deben importar funciones desde `views.py` de otra app.
+- La logica compartida de filtros globales, periodo, organizacion activa y navegacion vive en un modulo neutral del proyecto.
+- Las views son capa HTTP: leen request, validan formularios, llaman servicios/selectors y renderizan respuestas.
+- Los templates no calculan deuda, saldo, imputacion ni estados financieros.
+- Los selectors contienen consultas y agregaciones sin efectos secundarios.
+- Los services contienen reglas de negocio y pueden coordinar modelos de varias apps cuando representen un caso de uso claro.
+- Los signals solo pueden usarse para automatismos simples y documentados; si una regla es critica, debe existir tambien como servicio explicito testeable.
+
 ## Arquitectura vigente
 - Framework: Django 5
 - API: Django REST Framework

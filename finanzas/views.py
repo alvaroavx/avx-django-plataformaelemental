@@ -7,21 +7,15 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.files import File
 from django.db import IntegrityError
-from django.db.models import CharField, Count, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
-from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from asistencias.forms import PersonaRapidaForm
-from asistencias.models import Asistencia
-from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.models import Persona, PersonaRol, Rol
 from plataformaelemental.context import (
-    aplicar_periodo,
     descripcion_periodo,
-    filtros_periodo,
-    nav_context,
     organizacion_desde_request,
     resolver_periodo,
 )
@@ -45,86 +39,32 @@ from .forms import (
     PaymentPlanForm,
     TransactionForm,
 )
+from .forms_helpers import (
+    agregar_error_conflicto_documento as _agregar_error_conflicto_documento,
+    ayuda_finanzas as _ayuda_finanzas,
+    base_context as _base_context,
+    redirect_with_query as _redirect_with_query,
+    tipo_visualizacion_archivo as _tipo_visualizacion_archivo,
+    url_pagos_list_con_edicion as _url_pagos_list_con_edicion,
+    url_with_query as _url_with_query,
+)
 from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
-
-
-def _base_context(request):
-    context = nav_context(request)
-    context["organizaciones"] = Organizacion.objects.all().order_by("nombre")
-    return context
-
-
-def _ayuda_finanzas(clave):
-    ayudas = {
-        "dashboard": {
-            "titulo": "Que ves aqui",
-            "texto": (
-                "Este tablero mezcla pagos de alumnos con transacciones de caja del periodo filtrado. "
-                "Sirve para revisar ingresos, egresos y balance general sin reemplazar tu contabilidad tributaria."
-            ),
-        },
-        "planes": {
-            "titulo": "Que es un plan",
-            "texto": (
-                "Un plan define clases y precio para cobrar a estudiantes. No representa un documento tributario ni un movimiento bancario."
-            ),
-        },
-        "pagos": {
-            "titulo": "Que registrar aqui",
-            "texto": (
-                "Un pago representa lo que un estudiante paga por sus clases. Puedes asociarlo manualmente al documento tributario emitido al cliente."
-            ),
-        },
-        "documentos": {
-            "titulo": "Que registrar aqui",
-            "texto": (
-                "Aqui se guardan documentos tributarios extraidos del SII o cargados manualmente: facturas, boletas de venta, boletas de honorarios y otros."
-            ),
-        },
-        "categorias": {
-            "titulo": "Que es una categoria",
-            "texto": (
-                "Las categorias ordenan ingresos y egresos para reportes. No guardan documentos ni comprobantes; solo clasifican transacciones."
-            ),
-        },
-        "transacciones": {
-            "titulo": "Que registrar aqui",
-            "texto": (
-                "Una transaccion representa un movimiento real de caja, banco o tarjeta. El archivo adjunto debe ser el respaldo del movimiento, "
-                "como transferencia, cartola o comprobante."
-            ),
-        },
-        "reporte_categorias": {
-            "titulo": "Como leer este reporte",
-            "texto": (
-                "Este consolidado agrupa transacciones por categoria dentro del periodo filtrado. Te sirve para analizar caja, no para reemplazar libros tributarios."
-            ),
-        },
-    }
-    return ayudas.get(clave)
-
-
-def _url_with_query(request, route_name, **kwargs):
-    query = request.GET.urlencode()
-    url = reverse(route_name, kwargs=kwargs or None)
-    if query:
-        url = f"{url}?{query}"
-    return url
-
-
-def _redirect_with_query(request, route_name, **kwargs):
-    url = _url_with_query(request, route_name, **kwargs)
-    return redirect(url)
-
-
-def _url_pagos_list_con_edicion(request, pago_id):
-    params = request.GET.copy()
-    params["editar_pago"] = str(pago_id)
-    query = params.urlencode()
-    url = reverse("finanzas:pagos_list")
-    if query:
-        url = f"{url}?{query}"
-    return url
+from .selectors import (
+    categorias_queryset,
+    consolidado_categorias_queryset,
+    dashboard_querysets,
+    documentos_tributarios_queryset,
+    pago_detail_queryset,
+    pagos_export_queryset,
+    pagos_queryset,
+    planes_queryset,
+    resumen_dashboard,
+    resumen_documentos_tributarios,
+    resumen_pagos,
+    resumen_transacciones,
+    transacciones_export_queryset,
+    transacciones_queryset,
+)
 
 
 def _crear_persona_estudiante_desde_filtro(*, form, organizacion):
@@ -270,13 +210,6 @@ def _metadata_extra_como_dict(value):
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _agregar_error_conflicto_documento(form):
-    form.add_error(
-        None,
-        "No se pudo guardar el documento por un conflicto de unicidad. Revisa organizacion, tipo, folio y RUT emisor.",
-    )
-
-
 def _normalizar_rut_basico(value):
     return (value or "").replace(".", "").replace("-", "").replace(" ", "").upper().strip()
 
@@ -316,69 +249,18 @@ def _rol_financiero_documento(documento):
     return "sin_clasificar"
 
 
-def _tipo_visualizacion_archivo(nombre_archivo):
-    if not nombre_archivo:
-        return {"es_pdf": False, "es_imagen": False}
-    content_type, _ = mimetypes.guess_type(nombre_archivo)
-    nombre = nombre_archivo.lower()
-    es_pdf = bool(content_type == "application/pdf" or nombre.endswith(".pdf"))
-    es_imagen = bool(
-        (content_type and content_type.startswith("image/"))
-        or nombre.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"))
-    )
-    return {"es_pdf": es_pdf, "es_imagen": es_imagen}
-
-
-def _subquery_disciplina_principal(*, mes=None, anio=None):
-    filtros = {
-        "persona_id": OuterRef("persona_id"),
-        "sesion__disciplina__organizacion_id": OuterRef("organizacion_id"),
-        "estado": Asistencia.Estado.PRESENTE,
-    }
-    filtros.update(filtros_periodo("sesion__fecha", mes=mes, anio=anio))
-    return (
-        Asistencia.objects.filter(**filtros)
-        .values("sesion__disciplina__nombre")
-        .annotate(total=Count("id"))
-        .order_by("-total", "sesion__disciplina__nombre")
-        .values("sesion__disciplina__nombre")[:1]
-    )
-
-
 @admin_finanzas_required
 def dashboard(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-
-    pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
-    trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
-    if organizacion:
-        pagos_qs = pagos_qs.filter(organizacion=organizacion)
-        trans_qs = trans_qs.filter(organizacion=organizacion)
-
-    ingresos_pagos = pagos_qs.aggregate(total=Sum("monto_total")).get("total") or 0
-    ingresos_trans = (
-        trans_qs.filter(tipo=Transaction.Tipo.INGRESO).aggregate(total=Sum("monto")).get("total") or 0
-    )
-    egresos = (
-        trans_qs.filter(tipo=Transaction.Tipo.EGRESO).aggregate(total=Sum("monto")).get("total") or 0
-    )
-    iva_debito = pagos_qs.aggregate(total=Sum("monto_iva")).get("total") or 0
-    ingresos_exentos = pagos_qs.filter(monto_iva=0).aggregate(total=Sum("monto_total")).get("total") or 0
-    categorias_totales = (
-        trans_qs.values("categoria__nombre", "categoria__tipo").annotate(total=Sum("monto")).order_by("-total")
-    )
+    pagos_qs, trans_qs = dashboard_querysets(request, organizacion=organizacion)
+    resumen = resumen_dashboard(pagos_qs, trans_qs)
 
     context.update(
         {
-            "ingresos_totales": ingresos_pagos + ingresos_trans,
-            "egresos_totales": egresos,
-            "balance": (ingresos_pagos + ingresos_trans) - egresos,
-            "iva_debito": iva_debito,
-            "ingresos_exentos": ingresos_exentos,
+            **resumen,
             "pagos_recientes": pagos_qs.select_related("persona", "organizacion")[:10],
             "transacciones_recientes": trans_qs.select_related("categoria", "organizacion")[:10],
-            "categorias_totales": categorias_totales,
             "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
             "organizacion_filtro": organizacion,
             "ayuda_seccion": _ayuda_finanzas("dashboard"),
@@ -391,13 +273,7 @@ def dashboard(request):
 def planes_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
-        "organizacion__nombre",
-        "-es_por_defecto",
-        "nombre",
-    )
-    if organizacion:
-        planes_qs = planes_qs.filter(organizacion=organizacion)
+    planes_qs = planes_queryset(organizacion=organizacion)
 
     form = PaymentPlanForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -422,13 +298,7 @@ def plan_edit(request, pk):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
     plan = get_object_or_404(PaymentPlan, pk=pk)
-    planes_qs = PaymentPlan.objects.select_related("organizacion").order_by(
-        "organizacion__nombre",
-        "-es_por_defecto",
-        "nombre",
-    )
-    if organizacion:
-        planes_qs = planes_qs.filter(organizacion=organizacion)
+    planes_qs = planes_queryset(organizacion=organizacion)
 
     form_creacion = PaymentPlanForm()
     form_edicion = PaymentPlanForm(request.POST or None, instance=plan)
@@ -468,48 +338,11 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     context = _base_context(request)
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
-    disciplina_principal_historica = _subquery_disciplina_principal(mes=periodo["mes"], anio=periodo["anio"])
-
-    pagos_qs = (
-        Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario")
-        .annotate(
-            clases_consumidas_calculadas=Count(
-                "consumos",
-                filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
-                distinct=True,
-            )
-        )
-        .annotate(
-            saldo_clases_calculado=ExpressionWrapper(
-                F("clases_asignadas") - F("clases_consumidas_calculadas"),
-                output_field=IntegerField(),
-            )
-        )
-        .annotate(
-            disciplina_principal_nombre=Coalesce(
-                Subquery(disciplina_principal_historica, output_field=CharField()),
-                Value("Sin disciplina", output_field=CharField()),
-            )
-        )
-        .order_by("-fecha_pago", "-id")
-    )
-    pagos_qs = aplicar_periodo(pagos_qs, "fecha_pago", request=request)
-    if organizacion:
-        pagos_qs = pagos_qs.filter(organizacion=organizacion)
-
+    pagos_qs = pagos_queryset(request, organizacion=organizacion, mes=periodo["mes"], anio=periodo["anio"])
     q = request.GET.get("q")
     metodo = request.GET.get("metodo")
-    if q:
-        pagos_qs = pagos_qs.filter(Q(persona__nombres__icontains=q) | Q(persona__apellidos__icontains=q))
-    if metodo:
-        pagos_qs = pagos_qs.filter(metodo_pago=metodo)
 
-    resumen_pagos = pagos_qs.aggregate(
-        total_pagos_monto=Sum("monto_total"),
-        total_iva_monto=Sum("monto_iva"),
-        total_clases_pagadas=Sum("clases_asignadas"),
-        total_saldo_clases=Sum("saldo_clases_calculado"),
-    )
+    resumen_pagos_data = resumen_pagos(pagos_qs)
     pagos = list(pagos_qs)
     for pago in pagos:
         disciplina = pago.disciplina_principal_nombre or "Sin disciplina"
@@ -540,10 +373,10 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             "metodos_pago": Payment.Metodo.choices,
             "q": q or "",
             "metodo": metodo or "",
-            "total_pagos_monto": resumen_pagos["total_pagos_monto"] or 0,
-            "total_iva_monto": resumen_pagos["total_iva_monto"] or 0,
-            "total_clases_pagadas": resumen_pagos["total_clases_pagadas"] or 0,
-            "total_saldo_clases": resumen_pagos["total_saldo_clases"] or 0,
+            "total_pagos_monto": resumen_pagos_data["total_pagos_monto"] or 0,
+            "total_iva_monto": resumen_pagos_data["total_iva_monto"] or 0,
+            "total_clases_pagadas": resumen_pagos_data["total_clases_pagadas"] or 0,
+            "total_saldo_clases": resumen_pagos_data["total_saldo_clases"] or 0,
             "edit_form": edit_form,
             "edit_pago": edit_pago,
             "persona_form": persona_form,
@@ -601,18 +434,7 @@ def pago_edit(request, pk):
 @admin_finanzas_required
 def pago_detail(request, pk):
     context = _base_context(request)
-    pago = get_object_or_404(
-        Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario").prefetch_related(
-            Prefetch(
-                "consumos",
-                queryset=AttendanceConsumption.objects.select_related(
-                    "asistencia__sesion__disciplina",
-                    "asistencia__sesion__disciplina__organizacion",
-                ).order_by("-clase_fecha", "-id"),
-            )
-        ),
-        pk=pk,
-    )
+    pago = get_object_or_404(pago_detail_queryset(), pk=pk)
     consumos = list(pago.consumos.all())
     consumos_consumidos = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.CONSUMIDO)
     consumos_pendientes = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.PENDIENTE)
@@ -650,28 +472,8 @@ def pago_delete(request, pk):
 def documentos_tributarios_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    documentos_qs = DocumentoTributario.objects.select_related(
-        "organizacion",
-        "documento_relacionado",
-        "persona_relacionada",
-        "organizacion_relacionada",
-    ).annotate(
-        pagos_asociados_total=Count("pagos_asociados", distinct=True),
-        transacciones_asociadas_total=Count("transacciones_asociadas", distinct=True),
-    )
-    documentos_qs = aplicar_periodo(documentos_qs, "fecha_emision", request=request)
-    if organizacion:
-        documentos_qs = documentos_qs.filter(organizacion=organizacion)
-    documentos_qs = documentos_qs.order_by("-fecha_emision", "-id")
-
-    resumen_documentos = documentos_qs.aggregate(
-        total_documentos=Count("id"),
-        monto_total_documentos=Sum("monto_total"),
-        monto_total_iva=Sum("monto_iva"),
-        monto_total_retencion=Sum("retencion_monto"),
-        total_pagos_asociados=Sum("pagos_asociados_total"),
-        total_transacciones_asociadas=Sum("transacciones_asociadas_total"),
-    )
+    documentos_qs = documentos_tributarios_queryset(request, organizacion=organizacion)
+    resumen_documentos = resumen_documentos_tributarios(documentos_qs)
     documentos = list(documentos_qs)
     monto_total_ingresos_documentales = Decimal("0")
     monto_total_egresos_documentales = Decimal("0")
@@ -976,7 +778,7 @@ def documento_tributario_delete(request, pk):
 @admin_finanzas_required
 def categorias_list(request):
     context = _base_context(request)
-    categorias_qs = Category.objects.order_by("tipo", "nombre")
+    categorias_qs = categorias_queryset()
     form = CategoryForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -1019,22 +821,10 @@ def categoria_delete(request, pk):
 def transacciones_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-
-    trans_qs = (
-        Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios")
-        .order_by("-fecha", "-id")
-    )
-    trans_qs = aplicar_periodo(trans_qs, "fecha", request=request)
-    if organizacion:
-        trans_qs = trans_qs.filter(organizacion=organizacion)
-
-    resumen_transacciones = trans_qs.aggregate(
-        total_transacciones=Count("id"),
-        total_ingresos=Sum("monto", filter=Q(tipo=Transaction.Tipo.INGRESO)),
-        total_egresos=Sum("monto", filter=Q(tipo=Transaction.Tipo.EGRESO)),
-    )
-    total_ingresos = resumen_transacciones["total_ingresos"] or 0
-    total_egresos = resumen_transacciones["total_egresos"] or 0
+    trans_qs = transacciones_queryset(request, organizacion=organizacion)
+    resumen_transacciones_data = resumen_transacciones(trans_qs)
+    total_ingresos = resumen_transacciones_data["total_ingresos"] or 0
+    total_egresos = resumen_transacciones_data["total_egresos"] or 0
 
     form = TransactionForm(
         request.POST or None,
@@ -1050,7 +840,7 @@ def transacciones_list(request):
         {
             "transacciones": trans_qs,
             "form": form,
-            "total_transacciones": resumen_transacciones["total_transacciones"] or 0,
+            "total_transacciones": resumen_transacciones_data["total_transacciones"] or 0,
             "total_ingresos": total_ingresos,
             "total_egresos": total_egresos,
             "balance_transacciones": total_ingresos - total_egresos,
@@ -1131,15 +921,7 @@ def transaccion_delete(request, pk):
 def reporte_categorias(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    trans_qs = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
-    if organizacion:
-        trans_qs = trans_qs.filter(organizacion=organizacion)
-    consolidado = (
-        trans_qs.values("categoria__nombre", "categoria__tipo")
-        .annotate(total=Sum("monto"))
-        .order_by("categoria__tipo", "-total")
-    )
-    consolidado = list(consolidado)
+    consolidado = list(consolidado_categorias_queryset(request, organizacion=organizacion))
     context.update(
         {
             "consolidado": consolidado,
@@ -1153,13 +935,7 @@ def reporte_categorias(request):
 @admin_finanzas_required
 def export_pagos_csv(request):
     organizacion = organizacion_desde_request(request)
-    pagos = aplicar_periodo(
-        Payment.objects.select_related("persona", "organizacion"),
-        "fecha_pago",
-        request=request,
-    )
-    if organizacion:
-        pagos = pagos.filter(organizacion=organizacion)
+    pagos = pagos_export_queryset(request, organizacion=organizacion)
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="pagos_finanzas.csv"'
@@ -1184,13 +960,7 @@ def export_pagos_csv(request):
 @admin_finanzas_required
 def export_transacciones_csv(request):
     organizacion = organizacion_desde_request(request)
-    transacciones = aplicar_periodo(
-        Transaction.objects.select_related("categoria", "organizacion"),
-        "fecha",
-        request=request,
-    )
-    if organizacion:
-        transacciones = transacciones.filter(organizacion=organizacion)
+    transacciones = transacciones_export_queryset(request, organizacion=organizacion)
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="transacciones_finanzas.csv"'

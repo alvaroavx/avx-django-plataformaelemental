@@ -31,6 +31,37 @@ fi
 
 export DJANGO_ENV="${DJANGO_ENV:-prod}"
 
+backup_postgresql_prod() {
+  if [[ "$DJANGO_ENV" != "prod" ]]; then
+    return 0
+  fi
+
+  : "${POSTGRES_DB:?Falta POSTGRES_DB para backup PostgreSQL}"
+  : "${POSTGRES_USER:?Falta POSTGRES_USER para backup PostgreSQL}"
+  : "${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD para backup PostgreSQL}"
+  : "${POSTGRES_HOST:?Falta POSTGRES_HOST para backup PostgreSQL}"
+  : "${POSTGRES_PORT:?Falta POSTGRES_PORT para backup PostgreSQL}"
+
+  local backup_dir timestamp commit_short backup_file
+  backup_dir="$APP_DIR/backups/postgres"
+  timestamp="$(date +%Y%m%d_%H%M%S)"
+  commit_short="$(git rev-parse --short HEAD)"
+  backup_file="${backup_dir}/${POSTGRES_DB}_${timestamp}_${commit_short}.dump"
+
+  mkdir -p "$backup_dir"
+  echo "Creando backup PostgreSQL previo a migraciones: ${backup_file}"
+
+  PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \
+    --host "$POSTGRES_HOST" \
+    --port "$POSTGRES_PORT" \
+    --username "$POSTGRES_USER" \
+    --format custom \
+    --no-owner \
+    --no-acl \
+    --file "$backup_file" \
+    "$POSTGRES_DB"
+}
+
 if [[ ! -d "$VENV_DIR" ]] || [[ ! -x "$VENV_DIR/bin/python" ]]; then
   rm -rf "$VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -42,6 +73,7 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
+backup_postgresql_prod
 python manage.py migrate --noinput
 python manage.py clearsessions
 python manage.py collectstatic --noinput

@@ -2,7 +2,7 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from decimal import Decimal
 from unittest.mock import patch
@@ -23,6 +23,23 @@ from finanzas.models import (
     PaymentPlan,
     Transaction,
 )
+
+
+class FinanzasServicesCompatibilityTests(SimpleTestCase):
+    def test_imports_publicos_antiguos_siguen_disponibles(self):
+        from finanzas.services import (
+            asignar_consumo_asistencia,
+            asociar_asistencia_a_pago,
+            imputar_pago_a_deudas,
+            resumen_financiero_estudiante,
+            resumen_financiero_estudiante_periodo,
+        )
+
+        self.assertTrue(callable(asignar_consumo_asistencia))
+        self.assertTrue(callable(asociar_asistencia_a_pago))
+        self.assertTrue(callable(imputar_pago_a_deudas))
+        self.assertTrue(callable(resumen_financiero_estudiante))
+        self.assertTrue(callable(resumen_financiero_estudiante_periodo))
 
 
 class FinanzasAccessTests(TestCase):
