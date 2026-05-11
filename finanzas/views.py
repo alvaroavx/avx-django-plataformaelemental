@@ -13,7 +13,6 @@ from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from asistencias.forms import PersonaRapidaForm
-from personas.models import Persona, PersonaRol, Rol
 from plataformaelemental.context import (
     descripcion_periodo,
     organizacion_desde_request,
@@ -48,7 +47,7 @@ from .forms_helpers import (
     url_pagos_list_con_edicion as _url_pagos_list_con_edicion,
     url_with_query as _url_with_query,
 )
-from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 from .selectors import (
     categorias_queryset,
     consolidado_categorias_queryset,
@@ -58,42 +57,25 @@ from .selectors import (
     pagos_export_queryset,
     pagos_queryset,
     planes_queryset,
-    resumen_dashboard,
     resumen_documentos_tributarios,
     resumen_pagos,
     resumen_transacciones,
     transacciones_export_queryset,
     transacciones_queryset,
 )
-
-
-def _crear_persona_estudiante_desde_filtro(*, form, organizacion):
-    rol_estudiante = Rol.objects.filter(codigo="ESTUDIANTE").first()
-    if not organizacion:
-        form.add_error(
-            None,
-            "Debes seleccionar una organizacion en el filtro superior antes de crear a la persona.",
-        )
-        return None
-    if not rol_estudiante:
-        form.add_error(
-            None,
-            "No existe el rol ESTUDIANTE configurado para asignar a la nueva persona.",
-        )
-        return None
-
-    persona = Persona.objects.create(
-        nombres=form.cleaned_data["nombres"].strip(),
-        apellidos=form.cleaned_data.get("apellidos", "").strip(),
-        telefono=form.cleaned_data.get("telefono", "").strip(),
-    )
-    PersonaRol.objects.get_or_create(
-        persona=persona,
-        rol=rol_estudiante,
-        organizacion=organizacion,
-        defaults={"activo": True},
-    )
-    return persona
+from .services.pagos import (
+    crear_persona_estudiante_desde_modal,
+    enriquecer_pagos_para_listado,
+    resumen_consumos_pago,
+)
+from .services.reportes import (
+    PAGOS_CSV_HEADERS,
+    TRANSACCIONES_CSV_HEADERS,
+    armar_dashboard_financiero,
+    armar_reporte_categorias,
+    filas_export_pagos,
+    filas_export_transacciones,
+)
 
 
 def _documento_revision_form(*, data=None, initial=None):
@@ -254,18 +236,15 @@ def dashboard(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
     pagos_qs, trans_qs = dashboard_querysets(request, organizacion=organizacion)
-    resumen = resumen_dashboard(pagos_qs, trans_qs)
-
     context.update(
-        {
-            **resumen,
-            "pagos_recientes": pagos_qs.select_related("persona", "organizacion")[:10],
-            "transacciones_recientes": trans_qs.select_related("categoria", "organizacion")[:10],
-            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
-            "organizacion_filtro": organizacion,
-            "ayuda_seccion": _ayuda_finanzas("dashboard"),
-        }
+        armar_dashboard_financiero(
+            pagos_qs=pagos_qs,
+            transacciones_qs=trans_qs,
+            periodo_descripcion=descripcion_periodo(request=request, corta=False),
+            organizacion=organizacion,
+        )
     )
+    context["ayuda_seccion"] = _ayuda_finanzas("dashboard")
     return render(request, "finanzas/dashboard.html", context)
 
 
@@ -343,16 +322,7 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     metodo = request.GET.get("metodo")
 
     resumen_pagos_data = resumen_pagos(pagos_qs)
-    pagos = list(pagos_qs)
-    for pago in pagos:
-        disciplina = pago.disciplina_principal_nombre or "Sin disciplina"
-        nombre_plan = pago.plan.nombre if pago.plan_id else "Sin plan"
-        pago.estado_fiscal_label = "Afecta" if pago.monto_iva else "Exenta"
-        pago.estado_fiscal_badge_class = "text-bg-primary" if pago.monto_iva else "text-bg-secondary"
-        pago.texto_copia = f"Taller de {disciplina} - {nombre_plan} ({pago.persona.nombre_completo})"
-        pago.monto_neto_copia = str(int(pago.monto_neto or 0))
-        pago.monto_iva_copia = str(int(pago.monto_iva or 0))
-        pago.monto_total_copia = str(int(pago.monto_total or 0))
+    pagos = enriquecer_pagos_para_listado(list(pagos_qs))
     if form is None:
         form = PaymentForm(initial={"organizacion": organizacion.pk} if organizacion else None)
     if persona_form is None:
@@ -403,7 +373,7 @@ def pagos_list(request):
         if "agregar_persona" in request.POST:
             open_nueva_persona = True
             if persona_form.is_valid():
-                persona = _crear_persona_estudiante_desde_filtro(form=persona_form, organizacion=organizacion)
+                persona = crear_persona_estudiante_desde_modal(form=persona_form, organizacion=organizacion)
                 if persona:
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     return _redirect_with_query(request, "finanzas:pagos_list")
@@ -435,19 +405,15 @@ def pago_edit(request, pk):
 def pago_detail(request, pk):
     context = _base_context(request)
     pago = get_object_or_404(pago_detail_queryset(), pk=pk)
-    consumos = list(pago.consumos.all())
-    consumos_consumidos = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.CONSUMIDO)
-    consumos_pendientes = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.PENDIENTE)
-    consumos_deuda = sum(1 for item in consumos if item.estado == AttendanceConsumption.Estado.DEUDA)
-    saldo_clases = pago.clases_asignadas - consumos_consumidos
+    resumen_consumos = resumen_consumos_pago(pago)
     context.update(
         {
             "pago": pago,
-            "consumos": consumos,
-            "consumos_consumidos": consumos_consumidos,
-            "consumos_pendientes": consumos_pendientes,
-            "consumos_deuda": consumos_deuda,
-            "saldo_clases": saldo_clases,
+            "consumos": resumen_consumos["consumos"],
+            "consumos_consumidos": resumen_consumos["consumos_consumidos"],
+            "consumos_pendientes": resumen_consumos["consumos_pendientes"],
+            "consumos_deuda": resumen_consumos["consumos_deuda"],
+            "saldo_clases": resumen_consumos["saldo_clases"],
             "back_url": request.META.get("HTTP_REFERER") or _url_with_query(request, "finanzas:pagos_list"),
         }
     )
@@ -921,14 +887,13 @@ def transaccion_delete(request, pk):
 def reporte_categorias(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    consolidado = list(consolidado_categorias_queryset(request, organizacion=organizacion))
     context.update(
-        {
-            "consolidado": consolidado,
-            "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
-            "ayuda_seccion": _ayuda_finanzas("reporte_categorias"),
-        }
+        armar_reporte_categorias(
+            consolidado_qs=consolidado_categorias_queryset(request, organizacion=organizacion),
+            periodo_descripcion=descripcion_periodo(request=request, corta=False),
+        )
     )
+    context["ayuda_seccion"] = _ayuda_finanzas("reporte_categorias")
     return render(request, "finanzas/reporte_categorias.html", context)
 
 
@@ -940,20 +905,8 @@ def export_pagos_csv(request):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="pagos_finanzas.csv"'
     writer = csv.writer(response)
-    writer.writerow(["Fecha", "Organizacion", "Persona", "Metodo", "Neto", "IVA", "Total", "Clases"])
-    for pago in pagos:
-        writer.writerow(
-            [
-                pago.fecha_pago,
-                pago.organizacion.nombre,
-                pago.persona.nombre_completo,
-                pago.get_metodo_pago_display(),
-                pago.monto_neto,
-                pago.monto_iva,
-                pago.monto_total,
-                pago.clases_asignadas,
-            ]
-        )
+    writer.writerow(PAGOS_CSV_HEADERS)
+    writer.writerows(filas_export_pagos(pagos))
     return response
 
 
@@ -965,18 +918,8 @@ def export_transacciones_csv(request):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="transacciones_finanzas.csv"'
     writer = csv.writer(response)
-    writer.writerow(["Fecha", "Organizacion", "Tipo", "Categoria", "Monto", "Descripcion"])
-    for item in transacciones:
-        writer.writerow(
-            [
-                item.fecha,
-                item.organizacion.nombre,
-                item.get_tipo_display(),
-                item.categoria.nombre,
-                item.monto,
-                item.descripcion,
-            ]
-        )
+    writer.writerow(TRANSACCIONES_CSV_HEADERS)
+    writer.writerows(filas_export_transacciones(transacciones))
     return response
 
 # Create your views here.

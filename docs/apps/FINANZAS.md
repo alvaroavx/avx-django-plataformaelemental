@@ -154,6 +154,8 @@ Reglas:
 - Los querysets y agregaciones de lectura para planes, pagos, documentos tributarios, transacciones, dashboard, categorias y exportaciones viven en `finanzas/selectors.py`; las views no deben volver a concentrar esos calculos si solo leen datos.
 - Los helpers de contexto base, ayudas UI, URLs con querystring, redirects con querystring, clasificacion visual de archivos y error legible por conflicto de documento viven en `finanzas/forms_helpers.py`.
 - `finanzas.services` es un paquete; la imputacion de pagos y consumos vive en `finanzas/services/imputacion.py`, y `finanzas/services/__init__.py` reexporta la API publica historica para mantener imports existentes.
+- La logica operacional de pagos que no depende de documentos tributarios vive en `finanzas/services/pagos.py`: alta rapida de estudiante desde pagos, enriquecimiento de filas del listado, texto copiable, resumen de consumos y saldo de clases.
+- La logica de armado de reportes y exportaciones vive en `finanzas/services/reportes.py`: contexto final del dashboard financiero, contexto del reporte de categorias y filas CSV de pagos/transacciones. Las queries puras siguen en `finanzas/selectors.py`.
 - Boton volver en editar pago prioriza la pagina anterior.
 - Visor embebido en detalle de transacciones para PDF e imagenes; otros archivos siguen abriendose externamente.
 - Separacion clara entre `Documentos tributarios` y `Transacciones`.

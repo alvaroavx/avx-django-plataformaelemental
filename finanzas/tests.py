@@ -1,3 +1,5 @@
+import csv
+from datetime import date
 from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,8 +12,15 @@ from unittest.mock import patch
 from finanzas.documentos.services import parse_tax_document
 from finanzas.documentos.temp_storage import SESSION_KEY
 from finanzas.forms import DocumentoTributarioForm, PaymentForm, TransactionForm
-from finanzas.services import asociar_asistencia_a_pago
+from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
+from finanzas.services.pagos import (
+    crear_persona_estudiante_desde_modal,
+    enriquecer_pagos_para_listado,
+    resumen_consumos_pago,
+    texto_copiable_operativo_pago,
+)
 
+from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
@@ -319,6 +328,95 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, 'canvas id="categoriasChart"', html=False)
         self.assertContains(response, "Chart(", html=False)
         self.assertContains(response, "Arriendo sala")
+
+    def test_export_pagos_csv_mantiene_headers_y_filas_filtradas(self):
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-25",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            numero_comprobante="FEB-1",
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=2,
+        )
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-03-01",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=5000,
+            clases_asignadas=1,
+        )
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:export_pagos_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = list(csv.reader(response.content.decode().splitlines()))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="pagos_finanzas.csv"')
+        self.assertEqual(rows[0], ["Fecha", "Organizacion", "Persona", "Metodo", "Neto", "IVA", "Total", "Clases"])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            rows[1],
+            [
+                "2026-02-25",
+                "Org Finanzas",
+                "No Admin",
+                "Transferencia",
+                "10000.00",
+                "0.00",
+                "10000.00",
+                "2",
+            ],
+        )
+
+    def test_export_transacciones_csv_mantiene_headers_y_filas_filtradas(self):
+        categoria_ingreso = Category.objects.create(nombre="Ventas clases", tipo=Category.Tipo.INGRESO, activa=True)
+        categoria_egreso = Category.objects.create(nombre="Arriendo sala", tipo=Category.Tipo.EGRESO, activa=True)
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_ingreso,
+            fecha="2026-02-25",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Ingreso febrero",
+        )
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_egreso,
+            fecha="2026-03-01",
+            tipo=Transaction.Tipo.EGRESO,
+            monto=12000,
+            descripcion="Egreso marzo",
+        )
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:export_transacciones_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = list(csv.reader(response.content.decode().splitlines()))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="transacciones_finanzas.csv"')
+        self.assertEqual(rows[0], ["Fecha", "Organizacion", "Tipo", "Categoria", "Monto", "Descripcion"])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            rows[1],
+            [
+                "2026-02-25",
+                "Org Finanzas",
+                "Ingreso",
+                "Ventas clases",
+                "25000.00",
+                "Ingreso febrero",
+            ],
+        )
 
     def test_payment_plan_primer_plan_queda_por_defecto_y_se_puede_reasignar(self):
         plan_1 = PaymentPlan.objects.create(
@@ -1226,102 +1324,124 @@ class FinanzasIntegrationTests(TestCase):
             estado=SesionClase.Estado.PROGRAMADA,
         )
 
+    def _crear_pago(self, fecha_pago="2026-02-25", clases_asignadas=1, numero_comprobante="PAGO-1"):
+        return Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.org,
+            fecha_pago=fecha_pago,
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            numero_comprobante=numero_comprobante,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=clases_asignadas,
+        )
+
+    def _crear_sesion(self, fecha):
+        return SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=fecha,
+            estado=SesionClase.Estado.PROGRAMADA,
+        )
+
+    def _crear_asistencia_presente(self, sesion):
+        return Asistencia.objects.create(
+            sesion=sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+        )
+
     def test_asistencia_sin_pago_queda_como_deuda(self):
-        asistencia = Asistencia.objects.create(sesion=self.sesion_1, persona=self.estudiante)
+        asistencia = self._crear_asistencia_presente(self.sesion_1)
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+
+        self.assertEqual(consumo.persona, self.estudiante)
+        self.assertEqual(consumo.clase_fecha, date(2026, 2, 26))
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
         self.assertIsNone(consumo.pago)
 
     def test_asistencia_con_pago_disponible_queda_consumida(self):
-        Payment.objects.create(
-            persona=self.estudiante,
-            organizacion=self.org,
-            fecha_pago="2026-02-25",
-            metodo_pago=Payment.Metodo.TRANSFERENCIA,
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
-        asistencia = Asistencia.objects.create(sesion=self.sesion_2, persona=self.estudiante)
-        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
-        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
-        self.assertIsNotNone(consumo.pago)
+        pago = self._crear_pago(clases_asignadas=1)
 
-    def test_asistencia_no_consume_pago_de_otro_mes(self):
-        Payment.objects.create(
-            persona=self.estudiante,
-            organizacion=self.org,
-            fecha_pago="2026-01-25",
-            metodo_pago=Payment.Metodo.TRANSFERENCIA,
-            numero_comprobante="ENE-1",
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
-
-        asistencia = Asistencia.objects.create(sesion=self.sesion_2, persona=self.estudiante)
+        asistencia = self._crear_asistencia_presente(self.sesion_2)
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
 
-        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
-        self.assertIsNone(consumo.pago)
-
-    def test_pago_nuevo_imputa_deudas_previas(self):
-        asistencia = Asistencia.objects.create(sesion=self.sesion_1, persona=self.estudiante)
-        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
-        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
-        self.assertIsNone(consumo.pago)
-
-        pago = Payment.objects.create(
-            persona=self.estudiante,
-            organizacion=self.org,
-            fecha_pago="2026-02-28",
-            metodo_pago=Payment.Metodo.TRANSFERENCIA,
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
-
-        consumo.refresh_from_db()
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
         self.assertEqual(consumo.pago, pago)
+        self.assertEqual(pago.clases_consumidas, 1)
+        self.assertEqual(pago.saldo_clases, 0)
+
+    def test_asistencia_no_consume_pago_de_otro_mes(self):
+        pago_enero = self._crear_pago(fecha_pago="2026-01-25", numero_comprobante="ENE-1")
+
+        asistencia = self._crear_asistencia_presente(self.sesion_2)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+        self.assertEqual(pago_enero.saldo_clases, 1)
+
+    def test_pago_nuevo_imputa_deudas_previas(self):
+        asistencia_febrero = self._crear_asistencia_presente(self.sesion_1)
+        asistencia_marzo = self._crear_asistencia_presente(self._crear_sesion("2026-03-01"))
+        consumo_febrero = AttendanceConsumption.objects.get(asistencia=asistencia_febrero)
+        consumo_marzo = AttendanceConsumption.objects.get(asistencia=asistencia_marzo)
+        self.assertEqual(consumo_febrero.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertEqual(consumo_marzo.estado, AttendanceConsumption.Estado.DEUDA)
+
+        pago = self._crear_pago(fecha_pago="2026-02-28", clases_asignadas=2, numero_comprobante="FEB-1")
+
+        consumo_febrero.refresh_from_db()
+        consumo_marzo.refresh_from_db()
+        self.assertEqual(consumo_febrero.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo_febrero.pago, pago)
+        self.assertEqual(consumo_marzo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo_marzo.pago)
+        self.assertEqual(pago.clases_consumidas, 1)
+        self.assertEqual(pago.saldo_clases, 1)
 
     def test_pago_no_imputa_deuda_de_otro_mes(self):
-        asistencia = Asistencia.objects.create(sesion=self.sesion_1, persona=self.estudiante)
+        asistencia = self._crear_asistencia_presente(self.sesion_1)
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
 
-        Payment.objects.create(
-            persona=self.estudiante,
-            organizacion=self.org,
-            fecha_pago="2026-03-05",
-            metodo_pago=Payment.Metodo.TRANSFERENCIA,
-            numero_comprobante="MAR-1",
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
+        pago_marzo = self._crear_pago(fecha_pago="2026-03-05", numero_comprobante="MAR-1")
 
         consumo.refresh_from_db()
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
         self.assertIsNone(consumo.pago)
+        self.assertEqual(pago_marzo.saldo_clases, 1)
 
     def test_asociar_asistencia_a_pago_rechaza_pago_de_otro_mes(self):
-        pago_otro_mes = Payment.objects.create(
-            persona=self.estudiante,
-            organizacion=self.org,
-            fecha_pago="2026-03-05",
-            metodo_pago=Payment.Metodo.EFECTIVO,
-            aplica_iva=False,
-            monto_referencia=10000,
-            clases_asignadas=1,
-        )
-        asistencia = Asistencia.objects.create(sesion=self.sesion_1, persona=self.estudiante)
+        pago_otro_mes = self._crear_pago(fecha_pago="2026-03-05", numero_comprobante="MAR-2")
+        asistencia = self._crear_asistencia_presente(self.sesion_1)
 
         with self.assertRaisesMessage(
             ValueError,
             "Solo se pueden asociar pagos del mismo mes y anio de la asistencia.",
         ):
             asociar_asistencia_a_pago(asistencia, pago_otro_mes)
+
+    def test_resumen_financiero_estudiante_refleja_pagadas_consumidas_deuda_y_saldo(self):
+        pago = self._crear_pago(fecha_pago="2026-02-25", clases_asignadas=3)
+        asistencia_consumida = self._crear_asistencia_presente(self.sesion_1)
+        asistencia_deuda = self._crear_asistencia_presente(self.sesion_2)
+        consumo_consumido = AttendanceConsumption.objects.get(asistencia=asistencia_consumida)
+        consumo_deuda = AttendanceConsumption.objects.get(asistencia=asistencia_deuda)
+
+        consumo_consumido.pago = pago
+        consumo_consumido.estado = AttendanceConsumption.Estado.CONSUMIDO
+        consumo_consumido.save(update_fields=["pago", "estado"])
+        consumo_deuda.pago = None
+        consumo_deuda.estado = AttendanceConsumption.Estado.DEUDA
+        consumo_deuda.save(update_fields=["pago", "estado"])
+
+        resumen = resumen_financiero_estudiante(self.estudiante, organizacion=self.org)
+
+        self.assertEqual(resumen["clases_pagadas"], 3)
+        self.assertEqual(resumen["clases_consumidas"], 1)
+        self.assertEqual(resumen["deuda_pendiente"], 1)
+        self.assertEqual(resumen["saldo_clases"], 2)
+        self.assertEqual(resumen["fecha_ultimo_pago"], date(2026, 2, 25))
 
     def test_pago_con_plan_respeta_monto_referencia_editable(self):
         plan = PaymentPlan.objects.create(
@@ -1915,3 +2035,86 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
         pago = next(item for item in response.context["pagos"] if item.plan_id)
         self.assertEqual(pago.disciplina_principal_nombre, "Yoga")
         self.assertEqual(pago.texto_copia, "Taller de Yoga - Plan Mensual (Ana Diaz)")
+
+    def test_servicio_pagos_enriquece_filas_para_listado(self):
+        plan = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan Mensual",
+            num_clases=4,
+            precio=10000,
+            activo=True,
+        )
+        pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.org,
+            plan=plan,
+            fecha_pago="2026-02-25",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=True,
+            monto_referencia=10000,
+            clases_asignadas=4,
+        )
+        pago.disciplina_principal_nombre = "Yoga"
+
+        pagos = enriquecer_pagos_para_listado([pago])
+
+        self.assertEqual(pagos[0].estado_fiscal_label, "Afecta")
+        self.assertEqual(pagos[0].estado_fiscal_badge_class, "text-bg-primary")
+        self.assertEqual(pagos[0].texto_copia, "Taller de Yoga - Plan Mensual (Ana Diaz)")
+        self.assertEqual(pagos[0].monto_neto_copia, "10000")
+        self.assertEqual(pagos[0].monto_iva_copia, "1900")
+        self.assertEqual(pagos[0].monto_total_copia, "11900")
+
+    def test_servicio_pagos_crea_persona_estudiante_desde_modal(self):
+        form = PersonaRapidaForm(
+            data={
+                "nombres": "Lucia",
+                "apellidos": "Perez",
+                "telefono": "999999",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+        persona = crear_persona_estudiante_desde_modal(form=form, organizacion=self.org)
+
+        self.assertEqual(persona.nombres, "Lucia")
+        self.assertEqual(persona.apellidos, "Perez")
+        self.assertTrue(
+            PersonaRol.objects.filter(
+                persona=persona,
+                rol=self.rol_estudiante,
+                organizacion=self.org,
+                activo=True,
+            ).exists()
+        )
+
+    def test_servicio_pagos_resume_consumos_y_saldo(self):
+        pago = self._crear_pago(fecha_pago="2026-02-25", clases_asignadas=3)
+        asistencia_consumida = self._crear_asistencia_presente(self.sesion_1)
+        asistencia_deuda = self._crear_asistencia_presente(self.sesion_2)
+        consumo_consumido = AttendanceConsumption.objects.get(asistencia=asistencia_consumida)
+        consumo_deuda = AttendanceConsumption.objects.get(asistencia=asistencia_deuda)
+
+        consumo_consumido.pago = pago
+        consumo_consumido.estado = AttendanceConsumption.Estado.CONSUMIDO
+        consumo_consumido.save(update_fields=["pago", "estado"])
+        consumo_deuda.pago = pago
+        consumo_deuda.estado = AttendanceConsumption.Estado.DEUDA
+        consumo_deuda.save(update_fields=["pago", "estado"])
+
+        resumen = resumen_consumos_pago(pago)
+
+        self.assertEqual(resumen["consumos"], [consumo_deuda, consumo_consumido])
+        self.assertEqual(resumen["consumos_consumidos"], 1)
+        self.assertEqual(resumen["consumos_pendientes"], 0)
+        self.assertEqual(resumen["consumos_deuda"], 1)
+        self.assertEqual(resumen["saldo_clases"], 2)
+
+    def test_servicio_pagos_texto_copiable_usa_fallbacks_operativos(self):
+        pago = self._crear_pago(fecha_pago="2026-02-25", clases_asignadas=1)
+        pago.disciplina_principal_nombre = ""
+
+        self.assertEqual(
+            texto_copiable_operativo_pago(pago),
+            "Taller de Sin disciplina - Sin plan (Ana Diaz)",
+        )
