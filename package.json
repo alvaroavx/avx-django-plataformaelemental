@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "test:mermaid": "python3 scripts/validate_mermaid.py"
+  },
   "dependencies": {
     "django": "^99.99.99"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.14.0"
   }
 }

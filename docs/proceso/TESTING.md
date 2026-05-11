@@ -35,6 +35,12 @@ Para produccion:
 python manage.py check --deploy
 ```
 
+Para diagramas Mermaid en documentacion:
+
+```bash
+npm run test:mermaid
+```
+
 ## Estrategia Por Tipo De Cambio
 
 ### Modelos y migraciones
@@ -133,7 +139,7 @@ Cambios solo documentales no requieren tests de Django.
 En ese caso se debe:
 - revisar enlaces,
 - revisar rutas locales accidentales,
-- si se modifican diagramas Mermaid, revisar render en GitHub o validar con `mmdc` cuando este disponible,
+- si se modifican diagramas Mermaid, ejecutar `npm run test:mermaid` o revisar render en GitHub si `mmdc` no esta disponible,
 - mantener fechas de actualizacion,
 - verificar que el documento duenio sea el correcto.
 
