@@ -16,3 +16,4 @@ La app `monitor` agrupa vistas internas de monitoreo operativo de la plataforma.
 - Los indicadores futuros deben consumir datos desde las apps duenas del dominio, sin duplicar modelos.
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse activos en las vistas HTML de monitor.
 - Cualquier indicador que mezcle datos de varias apps debe documentar su criterio de calculo en este archivo.
+- La estrategia transversal para crecimiento de indicadores y observabilidad vive en `docs/arquitectura/OBSERVABILIDAD.md`.

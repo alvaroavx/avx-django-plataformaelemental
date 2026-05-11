@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-05-07
+Fecha de actualizacion: 2026-05-11
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -9,6 +9,111 @@ Debe privilegiar:
 - velocidad de registro
 - claridad operativa
 - visibilidad academica y financiera inmediata
+
+## Diagramas
+
+### Modelo Local
+Este diagrama muestra los modelos usados por `asistencias` y sus dependencias principales con `personas`.
+
+```mermaid
+erDiagram
+    ORGANIZACION ||--o{ DISCIPLINA : contiene
+    ORGANIZACION ||--o{ BLOQUE_HORARIO : contiene
+    DISCIPLINA ||--o{ BLOQUE_HORARIO : referencia
+    DISCIPLINA ||--o{ SESION_CLASE : programa
+    BLOQUE_HORARIO ||--o{ SESION_CLASE : sugiere_horario
+    PERSONA }o--o{ SESION_CLASE : profesores
+    SESION_CLASE ||--o{ ASISTENCIA : registra
+    PERSONA ||--o{ ASISTENCIA : asiste
+
+    ORGANIZACION {
+        int id PK
+        string nombre
+    }
+    PERSONA {
+        int id PK
+        string nombre_completo
+        boolean activo
+    }
+    DISCIPLINA {
+        int id PK
+        string nombre
+        boolean activa
+        string badge_color
+    }
+    BLOQUE_HORARIO {
+        int id PK
+        int disciplina_id FK
+        int dia_semana
+    }
+    SESION_CLASE {
+        int id PK
+        int disciplina_id FK
+        date fecha
+        string estado
+    }
+    ASISTENCIA {
+        int id PK
+        int sesion_id FK
+        int persona_id FK
+        string estado
+    }
+```
+
+### Flujo Actual De Registro De Asistencia
+Este flujo resume la operacion diaria conocida: filtros globales, modales, registro y consulta del estado financiero operativo.
+
+```mermaid
+flowchart TD
+    A["Seleccionar periodo y organizacion"] --> B{"Existe sesion?"}
+    B -- "No" --> C["Crear sesion en modal"]
+    C --> D["Sesion disponible"]
+    B -- "Si" --> D
+    D --> E{"Persona existe?"}
+    E -- "No" --> F["Crear persona rapida como ESTUDIANTE"]
+    F --> G["Agregar asistentes en modal"]
+    E -- "Si" --> G
+    G --> H["Registrar asistencia"]
+    H --> I["Consultar estado financiero operativo"]
+    I --> J{"Estado de clase"}
+    J --> K["Pagada"]
+    J --> L["Adeudada"]
+    J --> M["Liberada"]
+    J --> N["Sin cobro"]
+```
+
+### Estados De Sesion
+Este flujo muestra el ciclo operativo conocido de una sesion y el caso de eliminacion con confirmacion.
+
+```mermaid
+flowchart TD
+    A["Sesion programada"] --> B{"Accion operativa"}
+    B -- "Registrar asistencia final" --> C["Sesion completada"]
+    B -- "Cancelar clase" --> D["Sesion cancelada"]
+    B -- "Eliminar sesion" --> E["Confirmacion explicita"]
+    E --> F{"Confirmada?"}
+    F -- "No" --> A
+    F -- "Si" --> G["Eliminar sesion"]
+    G --> H["Cascade: asistencias y dependencias asociadas"]
+```
+
+### Flujo Academico-Financiero
+Este flujo conecta `asistencias` con la cobranza operacional de `finanzas`. La regla vigente limita el consumo al mismo mes y anio.
+
+```mermaid
+flowchart TD
+    A["Asistencia presente"] --> B["Buscar Payment del mismo mes y anio"]
+    B --> C{"Hay saldo disponible?"}
+    C -- "Si" --> D["Crear AttendanceConsumption consumido"]
+    D --> E["Asociar Payment"]
+    E --> F["Reducir saldo de clases"]
+    C -- "No" --> G["Crear AttendanceConsumption deuda"]
+    G --> H["Pago posterior"]
+    H --> I["Imputar deudas del mismo mes y anio"]
+    I --> J{"Existe deuda compatible?"}
+    J -- "Si" --> D
+    J -- "No" --> K["Pago queda con saldo disponible del periodo"]
+```
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.

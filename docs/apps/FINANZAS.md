@@ -1,11 +1,143 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-05-08
+Fecha de actualizacion: 2026-05-11
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
 
 Debe servir para operar varias organizaciones y tambien debe poder escalar a finanzas no academicas sin asumir una sola logica de negocio.
+
+## Diagramas
+
+### Modelo Local
+Este diagrama muestra las entidades financieras y sus relaciones principales con `personas` y `asistencias`.
+
+```mermaid
+erDiagram
+    ORGANIZACION ||--o{ PAYMENT_PLAN : ofrece
+    ORGANIZACION ||--o{ PAYMENT : recibe
+    ORGANIZACION ||--o{ DOCUMENTO_TRIBUTARIO : registra
+    ORGANIZACION ||--o{ TRANSACTION : registra
+    PERSONA ||--o{ PAYMENT : paga
+    PAYMENT_PLAN ||--o{ PAYMENT : define_clases
+    PAYMENT ||--o{ ATTENDANCE_CONSUMPTION : consume
+    ASISTENCIA ||--|| ATTENDANCE_CONSUMPTION : genera
+    PERSONA ||--o{ ATTENDANCE_CONSUMPTION : acumula
+    DOCUMENTO_TRIBUTARIO ||--o{ PAYMENT : respalda
+    PERSONA ||--o{ DOCUMENTO_TRIBUTARIO : contraparte_persona
+    ORGANIZACION ||--o{ DOCUMENTO_TRIBUTARIO : contraparte_organizacion
+    CATEGORY ||--o{ TRANSACTION : clasifica
+    TRANSACTION }o--o{ DOCUMENTO_TRIBUTARIO : respalda
+
+    ORGANIZACION {
+        int id PK
+        string nombre
+        boolean es_exenta_iva
+    }
+    PERSONA {
+        int id PK
+        string nombre_completo
+    }
+    ASISTENCIA {
+        int id PK
+        string estado
+    }
+    PAYMENT_PLAN {
+        int id PK
+        int organizacion_id FK
+        int num_clases
+        decimal precio
+    }
+    PAYMENT {
+        int id PK
+        int persona_id FK
+        int organizacion_id FK
+        decimal monto_total
+        int clases_asignadas
+    }
+    ATTENDANCE_CONSUMPTION {
+        int id PK
+        int asistencia_id FK
+        int pago_id FK
+        string estado
+    }
+    DOCUMENTO_TRIBUTARIO {
+        int id PK
+        string tipo_documento
+        string folio
+        decimal monto_total
+    }
+    TRANSACTION {
+        int id PK
+        int categoria_id FK
+        string tipo
+        decimal monto
+    }
+    CATEGORY {
+        int id PK
+        string nombre
+        string tipo
+    }
+```
+
+### Flujo De Pagos
+Este flujo muestra la cobranza operacional. `Payment` no reemplaza a `Transaction` ni a `DocumentoTributario`.
+
+```mermaid
+flowchart TD
+    A["Seleccionar organizacion y periodo"] --> B["Registrar pago"]
+    B --> C["Precargar PaymentPlan por defecto"]
+    C --> D["Calcular neto, IVA y total"]
+    D --> E["Asignar clases del plan o formulario"]
+    E --> F["Guardar Payment"]
+    F --> G["Imputar deudas del mismo mes y anio"]
+    G --> H["Actualizar saldo de clases"]
+    H --> I["Payment operacional"]
+    I -. "puede asociarse" .-> J["DocumentoTributario"]
+    I -. "no es lo mismo que" .-> K["Transaction"]
+```
+
+### Flujo De Carga Tributaria Asistida
+Este flujo actual conocido exige revision humana: subir un archivo no guarda un documento definitivo.
+
+```mermaid
+flowchart TD
+    A["Subir PDF o XML"] --> B["Detectar tipo de archivo"]
+    B --> C{"XML?"}
+    C -- "Si" --> D["Parser XML-first"]
+    C -- "No" --> E["Fallback PDF"]
+    E --> F{"PDF con texto seleccionable?"}
+    F -- "No" --> G["No parseable confiablemente sin OCR"]
+    F -- "Si" --> H["Extraer datos"]
+    D --> H
+    H --> I["Pantalla de revision"]
+    I --> J["Sugerir contraparte por RUT"]
+    I --> K["Advertir duplicados"]
+    J --> L["Revision humana obligatoria"]
+    K --> L
+    L --> M{"Confirmar guardado?"}
+    M -- "No" --> N["No se crea registro definitivo"]
+    M -- "Si" --> O["Crear o actualizar DocumentoTributario"]
+```
+
+### Flujo De Transacciones
+Este flujo separa el movimiento financiero real de documentos tributarios y pagos operacionales.
+
+```mermaid
+flowchart TD
+    A["Crear transaccion"] --> B["Seleccionar categoria"]
+    B --> C["Derivar tipo ingreso/egreso desde categoria"]
+    C --> D["Ingresar monto y descripcion"]
+    D --> E{"Asociar DocumentoTributario?"}
+    E -- "Si" --> F["Vincular documento opcional"]
+    E -- "No" --> G["Continuar sin documento"]
+    F --> H{"Adjuntar respaldo?"}
+    G --> H
+    H -- "Si" --> I["Guardar archivo de respaldo"]
+    H -- "No" --> J["Guardar Transaction"]
+    I --> J
+    J --> K["Reflejar en reportes"]
+```
 
 ## Regla conceptual principal
 - `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas.

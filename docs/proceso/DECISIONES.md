@@ -1,6 +1,6 @@
 # DECISIONES
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-05-11
 
 ## Proposito
 Este documento define como se mantiene la documentacion viva del repo.
@@ -8,27 +8,18 @@ Este documento define como se mantiene la documentacion viva del repo.
 ## Regla principal
 Toda decision concreta de producto, modelo, navegacion, integracion o flujo operativo debe persistirse en Markdown dentro del mismo cambio de codigo que la implementa.
 
-## Jerarquia documental
-1. `README.md`
-   Uso humano. Debe explicar rapidamente que es la plataforma, como levantarla y donde esta la documentacion relevante.
-2. `AGENTS.md`
-   Reglas operativas del agente sobre este repo.
-3. `docs/INDICE.md`
-   Indice y orden de lectura de la documentacion viva.
-4. `docs/arquitectura/PLATAFORMA.md`
-   Estado tecnico transversal y arquitectura vigente.
-5. `docs/apps/FINANZAS.md`
-   Decisiones y criterios locales de `finanzas`.
-6. `docs/apps/ASISTENCIAS.md`
-   Decisiones y criterios locales de `asistencias`.
-7. `docs/apps/PERSONAS.md`
-   Decisiones y criterios locales de `personas`.
-8. `docs/apps/API.md`
-   Decisiones y criterios locales de `api`.
-9. `docs/apps/MONITOR.md`
-   Decisiones y criterios locales de `monitor`.
-10. `docs/operacion/DEPLOY.md`
-   Guia operativa de despliegue y CI/CD.
+Antes de cerrar un cambio, aplicar [docs/proceso/CHECKLIST_CAMBIOS.md](CHECKLIST_CAMBIOS.md).
+
+## Jerarquia de autoridad documental
+Si hay conflicto entre documentos, aplicar este orden de autoridad:
+
+1. Codigo y tests vigentes.
+2. `AGENTS.md` para reglas operativas del agente.
+3. `docs/proceso/DECISIONES.md` para gobernanza documental.
+4. `docs/arquitectura/PLATAFORMA.md` para arquitectura transversal.
+5. `docs/apps/*.md` para decisiones locales de app.
+6. `docs/operacion/*.md` para operacion y despliegue.
+7. `README.md` para resumen humano.
 
 ## Convencion de mantenimiento
 - Si una decision afecta solo una app, actualizar el `.md` de esa app.
@@ -36,6 +27,7 @@ Toda decision concreta de producto, modelo, navegacion, integracion o flujo oper
 - Si cambia la forma de trabajar del agente o la gobernanza documental, actualizar `AGENTS.md` y este archivo.
 - Si cambia la explicacion general para humanos, actualizar `README.md`.
 - Si cambia la operacion del proyecto en servidor o CI/CD, actualizar `docs/operacion/`.
+- Si se acepta deuda tecnica consciente, registrarla en `docs/arquitectura/DEUDA_TECNICA.md`.
 - Todo cambio de UI debe considerar comportamiento responsive especifico; mobile no debe ser una copia reducida de desktop, sino una resolucion adecuada de la misma necesidad.
 
 ## Criterios de calidad

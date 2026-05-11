@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-05-08
+Fecha de actualizacion: 2026-05-11
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -180,6 +180,35 @@ Nota operativa:
    - `bash scripts/deploy.sh`
 
 ## Flujo del workflow
+Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh`.
+
+```mermaid
+flowchart TD
+    A["Push a main"] --> B["GitHub Actions"]
+    B --> C["Instalar dependencias Python"]
+    C --> D["Instalar dependencias dev"]
+    D --> E["ruff check ."]
+    E --> F["Tests Django"]
+    F --> G["Validar secrets"]
+    G --> H["Preparar llave SSH y known_hosts"]
+    H --> I["SSH al servidor"]
+    I --> J["git fetch"]
+    J --> K["git reset --hard origin/main"]
+    K --> L["scripts/deploy.sh"]
+    L --> M["Cargar DEPLOY_ENV_FILE"]
+    M --> N["Crear o usar virtualenv"]
+    N --> O["Instalar requirements"]
+    O --> P{"DJANGO_ENV=prod?"}
+    P -- "Si" --> Q["Backup PostgreSQL con pg_dump"]
+    P -- "No" --> R["Omitir backup prod"]
+    Q --> S["migrate --noinput"]
+    R --> S
+    S --> T["clearsessions"]
+    T --> U["collectstatic"]
+    U --> V["check --deploy"]
+    V --> W["Restart systemd"]
+```
+
 1. `actions/checkout`
 2. instalar dependencias Python
 3. instalar dependencias de desarrollo para lint
@@ -238,6 +267,19 @@ Nota operativa:
 - El script no imprime la password; la entrega a `pg_dump` mediante `PGPASSWORD`.
 
 ## Rollback simple
+Este flujo muestra el rollback manual simple documentado. Asume acceso SSH al servidor y un commit conocido.
+
+```mermaid
+flowchart TD
+    A["Entrar al servidor"] --> B["cd DEPLOY_PATH"]
+    B --> C["git fetch --prune origin"]
+    C --> D["git reset --hard commit_sha"]
+    D --> E["bash scripts/deploy.sh"]
+    E --> F["Backup si DJANGO_ENV=prod"]
+    F --> G["Migraciones y collectstatic"]
+    G --> H["Restart systemd"]
+```
+
 En el servidor:
 
 ```bash

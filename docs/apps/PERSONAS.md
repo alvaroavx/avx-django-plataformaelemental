@@ -38,6 +38,7 @@ Debe concentrar:
 - `asistencias` usa perfiles operativos y flujos rapidos.
 - `finanzas` mantiene la logica de cobros, documentos y caja.
 - `personas` conecta ambas vistas desde una perspectiva administrativa.
+- El criterio transversal de roles y permisos vive en `docs/arquitectura/PERMISOS_Y_ROLES.md`.
 
 ## Rol transversal
 `personas` puede consolidar informacion academica y financiera para lectura administrativa.
