@@ -5,25 +5,27 @@ Fecha de actualizacion: 2026-04-29
 Esta carpeta ordena la documentacion que Codex y el equipo deben tomar en cuenta al trabajar sobre el repo.
 
 ## Orden recomendado de lectura
-1. [AGENTS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/AGENTS.md)
+1. [AGENTS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/AGENTS.md)
    Reglas operativas del repo y criterios generales de desarrollo.
-2. [docs/proceso/DECISIONES.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/proceso/DECISIONES.md)
+2. [docs/proceso/DECISIONES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/DECISIONES.md)
    Regla de mantenimiento documental y jerarquia de archivos.
-3. [docs/arquitectura/PLATAFORMA.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/arquitectura/PLATAFORMA.md)
+3. [docs/arquitectura/PLATAFORMA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PLATAFORMA.md)
    Estado tecnico transversal y arquitectura vigente.
-4. Documento local de la app que vayas a tocar:
-   - [docs/apps/ASISTENCIAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/ASISTENCIAS.md)
-   - [docs/apps/PERSONAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/PERSONAS.md)
-   - [docs/apps/FINANZAS.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/FINANZAS.md)
-   - [docs/apps/API.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/API.md)
-   - [docs/apps/MONITOR.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/apps/MONITOR.md)
-5. [README.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/README.md)
+4. [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md)
+   Inventario de reglas de negocio y referencias de codigo.
+5. Documento local de la app que vayas a tocar:
+   - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md)
+   - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md)
+   - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md)
+   - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md)
+   - [docs/apps/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/MONITOR.md)
+6. [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md)
    Resumen humano y puesta en marcha.
-6. [docs/operacion/DEPLOY.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/DEPLOY.md)
+7. [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
    Guia operativa de CI/CD y despliegue.
-7. [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
+8. [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
    Informacion real del proyecto para planificar migracion de SQLite a PostgreSQL.
-8. [docs/operacion/SEGURIDAD_PRODUCCION.md](/home/alvax/Code/platforms/avx-django-plataformaelemental/docs/operacion/SEGURIDAD_PRODUCCION.md)
+9. [docs/operacion/SEGURIDAD_PRODUCCION.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/SEGURIDAD_PRODUCCION.md)
    Reglas vigentes de sesiones, cookies, HTTPS y headers para produccion.
 
 ## Como mantenerla

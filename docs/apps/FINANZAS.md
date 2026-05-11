@@ -169,6 +169,20 @@ Reglas:
 - Flujo de conciliacion mas asistido entre pagos, documentos y transacciones.
 - Evaluar una entidad superior de evento/proyecto si el control financiero por presentacion se vuelve necesario.
 
+## Corte de refactor financiero
+Se completo una primera separacion interna de `finanzas`:
+- selectors de lectura en `finanzas/selectors.py`
+- helpers UI/form en `finanzas/forms_helpers.py`
+- imputacion en `finanzas/services/imputacion.py`
+- pagos operacionales en `finanzas/services/pagos.py`
+- reportes/exportaciones en `finanzas/services/reportes.py`
+
+Queda pendiente, no urgente:
+- extraer helpers puros de documentos tributarios
+- extraer flujo de importacion tributaria por etapas
+- evaluar constraints de integridad
+- separar CI de deploy productivo cuando produccion migre a PostgreSQL
+
 ## API externa base
 - `finanzas` expone una base de consumo externo en:
   - `/api/v1/finanzas/planes/`

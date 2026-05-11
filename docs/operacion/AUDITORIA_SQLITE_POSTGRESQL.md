@@ -2,7 +2,7 @@
 
 Fecha de auditoria: 2026-04-20
 
-Ruta auditada: `/home/alvax/Code/platforms/avx-django-plataformaelemental`
+Ruta auditada: `https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main`
 
 Nota de vigencia:
 - La auditoria se preparo para planificar migracion a PostgreSQL.
@@ -206,7 +206,7 @@ DATABASES = {
 ### Ruta del archivo SQLite existente antes de completar la migracion
 
 ```text
-/home/alvax/Code/platforms/avx-django-plataformaelemental/plataformaelemental/db.sqlite3
+https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/plataformaelemental/db.sqlite3
 ```
 
 ### Logica condicional por entorno
@@ -1066,7 +1066,7 @@ sessions
 ### Salida de `python manage.py makemigrations --check --dry-run`
 
 ```text
-/home/alvax/Code/platforms/avx-django-plataformaelemental/.venv/lib/python3.13/site-packages/django/core/management/commands/makemigrations.py:161: RuntimeWarning: Got an error checking a consistent migration history performed for database connection 'default': connection is bad: no error details available
+https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/.venv/lib/python3.13/site-packages/django/core/management/commands/makemigrations.py:161: RuntimeWarning: Got an error checking a consistent migration history performed for database connection 'default': connection is bad: no error details available
   warnings.warn(
 No changes detected
 ```
