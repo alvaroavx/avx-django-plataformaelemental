@@ -133,6 +133,7 @@ Cambios solo documentales no requieren tests de Django.
 En ese caso se debe:
 - revisar enlaces,
 - revisar rutas locales accidentales,
+- si se modifican diagramas Mermaid, revisar render en GitHub o validar con `mmdc` cuando este disponible,
 - mantener fechas de actualizacion,
 - verificar que el documento duenio sea el correcto.
 

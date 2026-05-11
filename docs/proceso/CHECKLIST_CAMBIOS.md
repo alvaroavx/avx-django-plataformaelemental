@@ -88,6 +88,7 @@ python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
 ## Documentacion
 - Si el cambio es local, actualizar el `.md` de la app.
 - Si el cambio es transversal, actualizar `docs/arquitectura/PLATAFORMA.md` o el documento especializado correspondiente.
+- Si se modifican diagramas Mermaid, revisar render en GitHub o validar con `mmdc` cuando este disponible.
 - Si cambia la forma de trabajar, actualizar `docs/proceso/DECISIONES.md` y este checklist.
 - Si crea deuda tecnica consciente, registrarla en [docs/arquitectura/DEUDA_TECNICA.md](../arquitectura/DEUDA_TECNICA.md).
 - Si resuelve deuda tecnica registrada, eliminarla o actualizar su estado.
