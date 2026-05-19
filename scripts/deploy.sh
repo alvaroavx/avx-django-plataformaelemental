@@ -18,18 +18,50 @@ SERVICE_UNIT="${SERVICE_NAME}.service"
 
 cd "$APP_DIR"
 
-if [[ -n "$ENV_FILE" ]]; then
-  if [[ ! -f "$ENV_FILE" ]]; then
-    echo "No existe el archivo de entorno: $ENV_FILE" >&2
-    exit 1
-  fi
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
+if [[ ! -f "$APP_DIR/manage.py" ]]; then
+  echo "No existe manage.py en APP_DIR: $APP_DIR" >&2
+  exit 1
 fi
 
-export DJANGO_ENV="${DJANGO_ENV:-prod}"
+if [[ -z "$ENV_FILE" ]]; then
+  echo "DEPLOY_ENV_FILE es obligatorio para deploy productivo." >&2
+  exit 1
+fi
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "No existe el archivo de entorno: $ENV_FILE" >&2
+  exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+validate_prod_environment() {
+  : "${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD para deploy productivo}"
+
+  if [[ "${DJANGO_ENV:-}" != "prod" ]]; then
+    echo "DJANGO_ENV debe ser prod para deploy productivo." >&2
+    exit 1
+  fi
+  if [[ "${POSTGRES_DB:-}" != "plataforma_elemental_prod" ]]; then
+    echo "POSTGRES_DB no corresponde a la base productiva esperada." >&2
+    exit 1
+  fi
+  if [[ "${POSTGRES_USER:-}" != "elementos" ]]; then
+    echo "POSTGRES_USER no corresponde al usuario productivo esperado." >&2
+    exit 1
+  fi
+  if [[ "${POSTGRES_HOST:-}" != "127.0.0.1" ]]; then
+    echo "POSTGRES_HOST no corresponde al host productivo esperado." >&2
+    exit 1
+  fi
+  if [[ "${POSTGRES_PORT:-}" != "5432" ]]; then
+    echo "POSTGRES_PORT no corresponde al puerto productivo esperado." >&2
+    exit 1
+  fi
+}
 
 backup_postgresql_prod() {
   if [[ "$DJANGO_ENV" != "prod" ]]; then
@@ -73,6 +105,7 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
+validate_prod_environment
 backup_postgresql_prod
 python manage.py migrate --noinput
 python manage.py clearsessions

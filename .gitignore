@@ -13,6 +13,13 @@ venv/
 # Django
 media/
 staticfiles/
+*.sqlite3
+db.sqlite3
+plataformaelemental/db.sqlite3
+data.json
+data_sqlite.json
+*.dump
+backups/
 
 # Environment files
 .env

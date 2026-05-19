@@ -68,7 +68,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_SERVICE: ${{ secrets.DEPLOY_SERVICE }}
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
@@ -80,7 +80,7 @@ jobs:
           missing=0
 
           # Validamos antes de abrir SSH para fallar con un mensaje claro cuando falte un secret esencial.
-          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_PATH DEPLOY_SERVICE; do
+          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY_B64 DEPLOY_PATH DEPLOY_SERVICE DEPLOY_ENV_FILE; do
             if [[ -z "${!required_var:-}" ]]; then
               echo "Falta el secret requerido ${required_var}. El deploy no puede continuar sin ese valor." >&2
               missing=1
@@ -91,7 +91,6 @@ jobs:
           # y aplica defaults internos.
           # DEPLOY_PORT tambien es opcional: si no existe, el workflow usa el puerto 22.
           # Opcionales:
-          # - DEPLOY_ENV_FILE
           # - DEPLOY_VENV_DIR
           # - DEPLOY_PYTHON_BIN
           if [[ "$missing" -ne 0 ]]; then
@@ -102,7 +101,6 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
         run: |
           set -euo pipefail
@@ -117,20 +115,6 @@ jobs:
           touch ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
           ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          
-      - name: Debug SSH key file
-        env:
-          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf "%s" "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          echo "bytes: $(wc -c < ~/.ssh/deploy_key)"
-          echo "first line: $(head -n 1 ~/.ssh/deploy_key)"
-          echo "last line: $(tail -n 1 ~/.ssh/deploy_key)"
-          ssh-keygen -lf ~/.ssh/deploy_key
 
       - name: Deploy to production
         env:
@@ -166,3 +150,8 @@ jobs:
           export DEPLOY_PYTHON_BIN="${DEPLOY_PYTHON_BIN}"
           bash scripts/deploy.sh
           EOF
+
+      - name: Healthcheck production
+        run: |
+          set -euo pipefail
+          curl -fsSI --retry 5 --retry-delay 2 --retry-all-errors https://apps.avx.cl/ >/dev/null
