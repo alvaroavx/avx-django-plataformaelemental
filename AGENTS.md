@@ -29,12 +29,13 @@ asistencias/ aplicacion de asistencias
 4.Los filtros del menu superior: mes, ano y organizacion. Seran arrastrados en toda la aplicacion y seran siempre mantenidos activos.
 5.No duplicar codigo, no reinventar lo que ya hay.
 6.Cada cambio visual o funcional en desktop debe considerar su equivalente responsive. No se trata de replicar exactamente la misma interfaz, sino de resolver bien la misma necesidad en mobile.
+7.Cada cambio de modelo o migracion debe asumir que produccion ya tiene datos reales. La primera opcion siempre es preservar esos datos. Si una solicitud implica borrar, sobrescribir, recalcular destructivamente o volver inaccesible data productiva, se debe alertar antes de implementar y proponer caminos alternativos seguros.
 
 ## Definición de hecho
 Un cambio se considera terminado solo si:
 - `python manage.py check` pasa.
 - Los tests relevantes pasan.
-- Si toca modelos, incluye migración revisada.
+- Si toca modelos, incluye migración revisada y compatible con datos existentes de produccion.
 - Si toca lógica financiera, incluye test de regla.
 - Si toca UI desktop, revisa mobile.
 - Si mueve una responsabilidad, actualiza docs.

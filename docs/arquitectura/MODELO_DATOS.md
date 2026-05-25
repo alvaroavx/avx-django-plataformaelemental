@@ -1,6 +1,6 @@
 # Modelo De Datos
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-05-25
 
 ## Proposito
 Este documento resume el mapa relacional vigente de Plataforma Elemental.
@@ -207,6 +207,13 @@ Estado actual:
 - `Transaction.documentos_tributarios` permite asociar uno o mas respaldos tributarios a un movimiento.
 
 ## Reglas De Integridad
+
+### Preservacion de datos productivos
+- Todo cambio de modelo o migracion debe partir de la premisa de que produccion contiene datos reales que deben conservarse.
+- La opcion por defecto es mantener datos existentes y adaptar el cambio a ellos mediante migraciones compatibles, backfills seguros, defaults explicitos o pasos progresivos.
+- No se deben eliminar tablas, campos, relaciones ni valores productivos sin una alerta previa y confirmacion explicita.
+- Si una solicitud implica perdida, sobrescritura, recalculo destructivo o inaccesibilidad de datos productivos, se debe detener la implementacion y proponer alternativas seguras.
+- Antes de aplicar migraciones riesgosas, debe existir un camino de rollback o respaldo claro. En produccion, el deploy debe respaldar PostgreSQL antes de `migrate`.
 
 ### Unicidades
 - `Organizacion.rut` es unico.
