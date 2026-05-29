@@ -3,7 +3,7 @@ from django.contrib.auth.forms import AuthenticationForm
 
 from personas.models import Persona
 
-from .models import Disciplina
+from .models import BloqueHorario, Disciplina
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
@@ -47,6 +47,40 @@ class SesionBasicaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["disciplina"].queryset = disciplinas_vigentes_qs(organizacion=organizacion)
         self.fields["profesores"].queryset = profesores_vigentes_qs(organizacion=organizacion)
+
+
+class SesionesMasivasForm(forms.Form):
+    disciplina = forms.ModelChoiceField(
+        queryset=Disciplina.objects.none(),
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    dias_semana = forms.MultipleChoiceField(
+        choices=BloqueHorario.Dia.choices,
+        required=True,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        label="Dias de la semana",
+    )
+    max_sesiones = forms.IntegerField(
+        min_value=1,
+        required=False,
+        label="Maximo de sesiones",
+        help_text="Dejar vacio para crear todas las fechas del mes seleccionado.",
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "Ej: 1"}),
+    )
+    profesores = forms.ModelMultipleChoiceField(
+        queryset=Persona.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"id": "id_profesores_masivo", "class": "form-select"}),
+    )
+
+    def __init__(self, *args, organizacion=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["disciplina"].queryset = disciplinas_vigentes_qs(organizacion=organizacion)
+        self.fields["profesores"].queryset = profesores_vigentes_qs(organizacion=organizacion)
+
+    def clean_dias_semana(self):
+        return [int(dia) for dia in self.cleaned_data["dias_semana"]]
 
 
 class AsistenciaMasivaForm(forms.Form):

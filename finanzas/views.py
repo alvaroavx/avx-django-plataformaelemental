@@ -43,8 +43,10 @@ from .forms_helpers import (
     ayuda_finanzas as _ayuda_finanzas,
     base_context as _base_context,
     redirect_with_query as _redirect_with_query,
+    url_pago_edit_sin_edicion as _url_pago_edit_sin_edicion,
     tipo_visualizacion_archivo as _tipo_visualizacion_archivo,
     url_pagos_list_con_edicion as _url_pagos_list_con_edicion,
+    url_pagos_list_sin_edicion as _url_pagos_list_sin_edicion,
     url_with_query as _url_with_query,
 )
 from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
@@ -323,6 +325,8 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
 
     resumen_pagos_data = resumen_pagos(pagos_qs)
     pagos = enriquecer_pagos_para_listado(list(pagos_qs))
+    for pago in pagos:
+        pago.url_edicion = _url_pagos_list_con_edicion(request, pago.pk)
     if form is None:
         form = PaymentForm(initial={"organizacion": organizacion.pk} if organizacion else None)
     if persona_form is None:
@@ -349,6 +353,8 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             "total_saldo_clases": resumen_pagos_data["total_saldo_clases"] or 0,
             "edit_form": edit_form,
             "edit_pago": edit_pago,
+            "edit_pago_action_url": _url_pago_edit_sin_edicion(request, edit_pago.pk) if edit_pago else "",
+            "pagos_list_url_sin_edicion": _url_pagos_list_sin_edicion(request),
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,
             "ayuda_seccion": _ayuda_finanzas("pagos"),
@@ -396,7 +402,7 @@ def pago_edit(request, pk):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Pago actualizado.")
-        return _redirect_with_query(request, "finanzas:pagos_list")
+        return redirect(_url_pagos_list_sin_edicion(request))
     context = _contexto_pagos_list(request, edit_form=form, edit_pago=pago)
     return render(request, "finanzas/pagos_list.html", context)
 

@@ -184,7 +184,7 @@
               <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Detalle">
                 <i class="bi bi-eye"></i><span class="finanzas-btn-label">Detalle</span>
               </a>
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}editar_pago={{ pago.pk }}" title="Editar">
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ pago.url_edicion }}" title="Editar">
                 <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
               </a>
               <a class="btn btn-sm btn-outline-danger finanzas-btn" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}" title="Eliminar">
@@ -307,7 +307,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
-        <form method="post" action="{% url 'finanzas:pago_edit' edit_pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
+        <form method="post" action="{{ edit_pago_action_url }}">
           {% csrf_token %}
           <div class="row g-2">
             {% for field in edit_form %}
@@ -328,7 +328,7 @@
           <div class="mt-3 d-flex justify-content-end gap-2">
             <a
               class="btn btn-outline-secondary finanzas-btn"
-              href="?{% for key, value in request.GET.items %}{% if key != 'editar_pago' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}"
+              href="{{ pagos_list_url_sin_edicion }}"
               title="Cancelar"
             >
               <i class="bi bi-x-circle"></i><span class="finanzas-btn-label">Cancelar</span>
@@ -363,10 +363,10 @@
     if (editModalEl && {{ edit_form|yesno:"true,false" }}) {
       bootstrap.Modal.getOrCreateInstance(editModalEl).show();
       editModalEl.addEventListener("hidden.bs.modal", function () {
-        const url = new URL(window.location.href);
-        if (!url.searchParams.has("editar_pago")) return;
-        url.searchParams.delete("editar_pago");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        const cleanUrl = "{{ pagos_list_url_sin_edicion|escapejs }}";
+        if (cleanUrl) {
+          window.history.replaceState({}, "", cleanUrl);
+        }
       });
     }
   })();

@@ -1,19 +1,35 @@
 {% extends "asistencias/base_app.html" %}
-{% block title %}Sesiones{% endblock %}
+{% block title %}Calendario{% endblock %}
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>
       {% if mostrar_calendario %}
-        Sesiones - {{ mes_actual|date:"F Y" }}
+        Calendario - {{ mes_actual|date:"F Y" }}
       {% else %}
-        Sesiones - {{ periodo_descripcion_vista }}
+        Calendario - {{ periodo_descripcion_vista }}
       {% endif %}
     </h2>
-    <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
-      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
-    </a>
+    <div class="d-flex flex-wrap gap-2 justify-content-end">
+      <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
+        <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
+      </a>
+      <button
+        class="btn btn-success"
+        type="button"
+        data-bs-toggle="modal"
+        data-bs-target="#sesionesMasivasModal"
+        {% if not mostrar_calendario %}disabled{% endif %}
+      >
+        <i class="bi bi-calendar-week"></i><span class="d-none d-md-inline ms-1">Sesiones masivas</span>
+      </button>
+    </div>
   </div>
+  {% if not mostrar_calendario %}
+    <div class="alert alert-info">
+      La creación masiva requiere seleccionar un mes y año específicos.
+    </div>
+  {% endif %}
   {% if mostrar_calendario %}
     <div class="table-responsive">
       <table class="table table-bordered align-middle">
@@ -127,4 +143,89 @@
     </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="sesionesMasivasModal" tabindex="-1" aria-labelledby="sesionesMasivasModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sesionesMasivasModalLabel">Agregar sesiones masivas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post">
+          {% csrf_token %}
+          {% if sesiones_masivas_form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in sesiones_masivas_form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ sesiones_masivas_form.disciplina.id_for_label }}">Disciplina</label>
+            {{ sesiones_masivas_form.disciplina }}
+            {% for error in sesiones_masivas_form.disciplina.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <div class="form-label">Días de la semana</div>
+            <div class="row g-2">
+              {% for checkbox in sesiones_masivas_form.dias_semana %}
+                <div class="col-6 col-md-3">
+                  <label class="form-check border rounded p-2 h-100">
+                    {{ checkbox.tag }}
+                    <span class="form-check-label">{{ checkbox.choice_label }}</span>
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+            {% for error in sesiones_masivas_form.dias_semana.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ sesiones_masivas_form.max_sesiones.id_for_label }}">Máximo de sesiones</label>
+            {{ sesiones_masivas_form.max_sesiones }}
+            {% if sesiones_masivas_form.max_sesiones.help_text %}
+              <div class="form-text">{{ sesiones_masivas_form.max_sesiones.help_text }}</div>
+            {% endif %}
+            {% for error in sesiones_masivas_form.max_sesiones.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ sesiones_masivas_form.profesores.id_for_label }}">Profesores</label>
+            {{ sesiones_masivas_form.profesores }}
+            {% for error in sesiones_masivas_form.profesores.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="small text-muted">
+            Se crearán sesiones programadas dentro del mes visible. Si una fecha ya tiene una sesión de la misma disciplina, se omitirá.
+          </div>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button class="btn btn-success" name="crear_sesiones_masivas" type="submit">Crear sesiones</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if open_sesiones_masivas %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const modalEl = document.getElementById("sesionesMasivasModal");
+    if (modalEl && window.bootstrap) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

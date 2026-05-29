@@ -71,6 +71,17 @@ def url_with_query(request, route_name, **kwargs):
     return url
 
 
+def url_with_query_without(request, route_name, *, remove_params=None, **kwargs):
+    params = request.GET.copy()
+    for param in remove_params or []:
+        params.pop(param, None)
+    query = params.urlencode()
+    url = reverse(route_name, kwargs=kwargs or None)
+    if query:
+        url = f"{url}?{query}"
+    return url
+
+
 def redirect_with_query(request, route_name, **kwargs):
     url = url_with_query(request, route_name, **kwargs)
     return redirect(url)
@@ -78,12 +89,26 @@ def redirect_with_query(request, route_name, **kwargs):
 
 def url_pagos_list_con_edicion(request, pago_id):
     params = request.GET.copy()
+    params.pop("editar_pago", None)
     params["editar_pago"] = str(pago_id)
     query = params.urlencode()
     url = reverse("finanzas:pagos_list")
     if query:
         url = f"{url}?{query}"
     return url
+
+
+def url_pagos_list_sin_edicion(request):
+    return url_with_query_without(request, "finanzas:pagos_list", remove_params=["editar_pago"])
+
+
+def url_pago_edit_sin_edicion(request, pago_id):
+    return url_with_query_without(
+        request,
+        "finanzas:pago_edit",
+        remove_params=["editar_pago"],
+        pk=pago_id,
+    )
 
 
 def agregar_error_conflicto_documento(form):

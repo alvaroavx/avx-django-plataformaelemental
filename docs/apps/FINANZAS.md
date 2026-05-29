@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-05-29
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -200,6 +200,7 @@ Regla:
 - El primer plan creado en una organizacion queda por defecto automaticamente.
 - El plan por defecto se puede cambiar desde gestion de planes y es el que aparece preseleccionado al registrar un nuevo pago.
 - Al registrar un nuevo pago, el checkbox `aplica IVA` debe precargarse segun `Organizacion.es_exenta_iva`: organizaciones exentas parten sin IVA, las demas con IVA activo.
+- Al editar un pago desde modal, el parametro `editar_pago` solo debe usarse para abrir el modal. Al cancelar, cerrar o guardar correctamente, la URL debe volver al listado preservando filtros, pero sin `editar_pago`, para evitar que el modal se reabra.
 - Las clases pagadas no se arrastran entre meses.
 - Una asistencia solo puede consumirse contra pagos del mismo mes y anio de la clase.
 - Si no existe pago del mismo mes con saldo disponible, la asistencia debe generar deuda.

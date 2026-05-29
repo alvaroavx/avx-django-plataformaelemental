@@ -1,4 +1,5 @@
 import calendar
+from datetime import date
 from decimal import Decimal
 
 from django.contrib import messages
@@ -24,6 +25,7 @@ from .forms import (
     DisciplinaForm,
     PersonaRapidaForm,
     SesionBasicaForm,
+    SesionesMasivasForm,
 )
 from .models import Asistencia, Disciplina, SesionClase
 from .utils import ROLE_ADMIN
@@ -118,6 +120,18 @@ def _reactivar_estudiante_para_asistencia(persona, organizacion):
         rol__codigo="ESTUDIANTE",
         organizacion=organizacion,
     ).update(activo=True)
+
+
+def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
+    _, ultimo_dia = calendar.monthrange(year, month)
+    fechas = [
+        date(year, month, dia)
+        for dia in range(1, ultimo_dia + 1)
+        if date(year, month, dia).weekday() in dias_semana
+    ]
+    if max_sesiones:
+        return fechas[:max_sesiones]
+    return fechas
 
 
 @role_required(ROLE_ADMIN)
@@ -232,6 +246,8 @@ def sesiones_list(request):
     periodo = resolver_periodo(request)
     year = periodo["referencia_inicio"].year
     month = periodo["referencia_inicio"].month
+    sesiones_masivas_form = SesionesMasivasForm(organizacion=organizacion)
+    open_sesiones_masivas = False
     sesiones_qs = (
         SesionClase.objects.select_related("disciplina")
         .prefetch_related("profesores")
@@ -240,12 +256,52 @@ def sesiones_list(request):
     sesiones_qs = aplicar_periodo(sesiones_qs, "fecha", request=request)
     if organizacion:
         sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
+
+    if request.method == "POST" and "crear_sesiones_masivas" in request.POST:
+        sesiones_masivas_form = SesionesMasivasForm(request.POST, organizacion=organizacion)
+        open_sesiones_masivas = True
+        if periodo["mes"] is None or periodo["anio"] is None:
+            sesiones_masivas_form.add_error(
+                None,
+                "Debes seleccionar un mes y año específicos para crear sesiones masivas.",
+            )
+        elif sesiones_masivas_form.is_valid():
+            disciplina = sesiones_masivas_form.cleaned_data["disciplina"]
+            profesores = list(sesiones_masivas_form.cleaned_data["profesores"])
+            fechas = _fechas_del_mes_para_dias(
+                year,
+                month,
+                sesiones_masivas_form.cleaned_data["dias_semana"],
+                sesiones_masivas_form.cleaned_data["max_sesiones"],
+            )
+            creadas = 0
+            omitidas = 0
+            for fecha in fechas:
+                if SesionClase.objects.filter(disciplina=disciplina, fecha=fecha).exists():
+                    omitidas += 1
+                    continue
+                sesion = SesionClase.objects.create(
+                    disciplina=disciplina,
+                    fecha=fecha,
+                    notas=f"{disciplina.nombre} - {fecha}",
+                )
+                if profesores:
+                    sesion.profesores.set(profesores)
+                creadas += 1
+            messages.success(
+                request,
+                f"Sesiones creadas: {creadas}. Fechas omitidas por duplicado: {omitidas}.",
+            )
+            return redirect(request.get_full_path())
+
     if periodo["mes"] is None or periodo["anio"] is None:
         context.update(
             {
                 "mostrar_calendario": False,
                 "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
                 "sesiones_listado": sesiones_qs,
+                "sesiones_masivas_form": sesiones_masivas_form,
+                "open_sesiones_masivas": open_sesiones_masivas,
             }
         )
         return render(request, "asistencias/sesiones_list.html", context)
@@ -282,9 +338,18 @@ def sesiones_list(request):
             "mostrar_calendario": True,
             "semanas": semanas,
             "mes_actual": inicio_mes,
+            "sesiones_masivas_form": sesiones_masivas_form,
+            "open_sesiones_masivas": open_sesiones_masivas,
         }
     )
     return render(request, "asistencias/sesiones_list.html", context)
+
+
+@role_required(ROLE_ADMIN)
+def sesiones_legacy_redirect(request):
+    url = reverse("asistencias:sesiones_list")
+    query = request.GET.urlencode()
+    return redirect(f"{url}?{query}" if query else url)
 
 
 @role_required(ROLE_ADMIN)

@@ -1,4 +1,5 @@
-﻿from decimal import Decimal
+﻿from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -1010,6 +1011,71 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, 'bi-x-circle-fill', html=False)
         self.assertContains(response, 'text-danger fs-5 flex-shrink-0', html=False)
         self.assertContains(response, 'title="Cancelada"', html=False)
+
+    def test_calendario_usa_url_calendario_y_redirige_url_legacy_sesiones(self):
+        self.assertEqual(reverse("asistencias:sesiones_list"), "/asistencias/calendario/")
+
+        response = self.client.get(
+            "/asistencias/sesiones/",
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"/asistencias/calendario/?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+        )
+
+    def test_calendario_crea_sesiones_masivas_en_mes_seleccionado(self):
+        response = self.client.post(
+            (
+                f"{reverse('asistencias:sesiones_list')}"
+                f"?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
+            ),
+            {
+                "crear_sesiones_masivas": "1",
+                "disciplina": str(self.disciplina.pk),
+                "dias_semana": ["1", "3"],
+                "max_sesiones": "",
+                "profesores": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        fechas = set(
+            SesionClase.objects.filter(
+                disciplina=self.disciplina,
+                fecha__year=2026,
+                fecha__month=2,
+            ).values_list("fecha", flat=True)
+        )
+        self.assertEqual(len(fechas), 8)
+        self.assertIn(date(2026, 2, 3), fechas)
+        self.assertIn(date(2026, 2, 26), fechas)
+
+    def test_calendario_creacion_masiva_respeta_maximo_de_sesiones(self):
+        disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Danza",
+        )
+
+        response = self.client.post(
+            (
+                f"{reverse('asistencias:sesiones_list')}"
+                f"?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
+            ),
+            {
+                "crear_sesiones_masivas": "1",
+                "disciplina": str(disciplina.pk),
+                "dias_semana": ["1", "3"],
+                "max_sesiones": "1",
+                "profesores": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(SesionClase.objects.filter(disciplina=disciplina).count(), 1)
+        self.assertTrue(SesionClase.objects.filter(disciplina=disciplina, fecha="2026-02-03").exists())
 
     def test_disciplinas_list_muestra_resumen_operativo(self):
         self.disciplina.badge_color = Disciplina.BadgeColor.CAFE

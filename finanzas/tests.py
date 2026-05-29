@@ -143,7 +143,45 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(response.context["edit_pago"], pago)
         self.assertIsNotNone(response.context["edit_form"])
         self.assertContains(response, 'id="editarPagoModal"', html=False)
-        self.assertContains(response, f'action="{reverse("finanzas:pago_edit", kwargs={"pk": pago.pk})}?periodo_mes=2&amp;periodo_anio=2026&amp;organizacion={self.org.pk}&amp;editar_pago={pago.pk}"', html=False)
+        self.assertContains(response, f'action="{reverse("finanzas:pago_edit", kwargs={"pk": pago.pk})}?periodo_mes=2&amp;periodo_anio=2026&amp;organizacion={self.org.pk}"', html=False)
+        self.assertContains(response, f'href="{reverse("finanzas:pagos_list")}?periodo_mes=2&amp;periodo_anio=2026&amp;organizacion={self.org.pk}"', html=False)
+
+    def test_pago_edit_post_valido_redirige_sin_editar_pago(self):
+        pago = Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-27",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            (
+                f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}"
+                f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}&editar_pago={pago.pk}"
+            ),
+            {
+                "edit_pago-organizacion": str(self.org.pk),
+                "edit_pago-persona": str(self.persona_no_admin.pk),
+                "edit_pago-plan": "",
+                "edit_pago-documento_tributario": "",
+                "edit_pago-fecha_pago": "2026-02-28",
+                "edit_pago-metodo_pago": Payment.Metodo.EFECTIVO,
+                "edit_pago-numero_comprobante": "",
+                "edit_pago-monto_referencia": "12000",
+                "edit_pago-clases_asignadas": "2",
+                "edit_pago-observaciones": "Pago actualizado",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"{reverse('finanzas:pagos_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+        )
 
     def test_pagos_list_crea_persona_rapida_como_estudiante_en_organizacion_filtrada(self):
         self.client.force_login(self.user_admin)
