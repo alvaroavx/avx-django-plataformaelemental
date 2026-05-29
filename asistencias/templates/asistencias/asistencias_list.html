@@ -290,7 +290,13 @@
                     id="estudiante_{{ estudiante.pk }}"
                     {% if estudiante.pk in asistentes_ids %}checked{% endif %}
                   >
-                  <label class="form-check-label" for="estudiante_{{ estudiante.pk }}">{{ estudiante }}</label>
+                  <label class="form-check-label" for="estudiante_{{ estudiante.pk }}">
+                    {{ estudiante }}
+                    {% if estudiante.asistencia_inactivo %}
+                      <span class="badge text-bg-warning ms-1">Inactivo</span>
+                      <span class="text-muted small ms-1">se reactivará al agregarlo</span>
+                    {% endif %}
+                  </label>
                 </div>
               {% empty %}
                 <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>

@@ -85,6 +85,41 @@ def _crear_persona_estudiante_en_organizacion(persona_form, organizacion):
     return persona
 
 
+def _estudiantes_para_asistencia_qs(organizacion):
+    """Lista estudiantes de la organizacion, incluyendo inactivos para reactivacion operativa."""
+    queryset = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
+    if organizacion:
+        queryset = queryset.filter(roles__organizacion=organizacion)
+    return queryset.distinct().order_by("apellidos", "nombres")
+
+
+def _estudiantes_con_estado_operativo(estudiantes_qs, organizacion):
+    estudiantes = list(estudiantes_qs)
+    estudiantes_ids = [estudiante.pk for estudiante in estudiantes]
+    roles_activos_qs = PersonaRol.objects.filter(
+        persona_id__in=estudiantes_ids,
+        rol__codigo="ESTUDIANTE",
+        activo=True,
+    )
+    if organizacion:
+        roles_activos_qs = roles_activos_qs.filter(organizacion=organizacion)
+    roles_activos_ids = set(roles_activos_qs.values_list("persona_id", flat=True))
+    for estudiante in estudiantes:
+        estudiante.asistencia_inactivo = not estudiante.activo or estudiante.pk not in roles_activos_ids
+    return estudiantes
+
+
+def _reactivar_estudiante_para_asistencia(persona, organizacion):
+    if not persona.activo:
+        persona.activo = True
+        persona.save(update_fields=["activo"])
+    PersonaRol.objects.filter(
+        persona=persona,
+        rol__codigo="ESTUDIANTE",
+        organizacion=organizacion,
+    ).update(activo=True)
+
+
 @role_required(ROLE_ADMIN)
 def dashboard(request):
     """Panel principal con métricas operativas según período y organización."""
@@ -529,7 +564,11 @@ def asistencias_list(request):
     context = nav_context(request)
     sesion_id = request.GET.get("sesion_id")
     organizacion = organizacion_desde_request(request)
-    sesion_seleccionada = SesionClase.objects.filter(pk=sesion_id).first() if sesion_id else None
+    sesiones_disponibles_qs = SesionClase.objects.select_related("disciplina", "disciplina__organizacion")
+    if organizacion:
+        sesiones_disponibles_qs = sesiones_disponibles_qs.filter(disciplina__organizacion=organizacion)
+    sesion_seleccionada = sesiones_disponibles_qs.filter(pk=sesion_id).first() if sesion_id else None
+    organizacion_estudiantes = sesion_seleccionada.disciplina.organizacion if sesion_seleccionada else organizacion
     asistentes_ids = set()
     if sesion_seleccionada:
         asistentes_ids = set(
@@ -541,7 +580,8 @@ def asistencias_list(request):
     open_nueva_sesion = request.GET.get("open") == "nueva_sesion"
     open_nueva_persona = False
     open_agregar_asistentes = request.GET.get("open") == "agregar_asistentes"
-    estudiantes_qs = Persona.objects.filter(roles__rol__codigo="ESTUDIANTE").distinct().order_by("apellidos", "nombres")
+    estudiantes_qs = _estudiantes_para_asistencia_qs(organizacion_estudiantes)
+    estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, organizacion_estudiantes)
     asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
 
     if request.method == "POST":
@@ -581,13 +621,23 @@ def asistencias_list(request):
                     open_nueva_persona = False
                     return redirect(_url_actual_con_filtros(request))
         elif "agregar_asistentes" in request.POST:
+            sesion = get_object_or_404(
+                sesiones_disponibles_qs,
+                pk=request.POST.get("sesion_id"),
+            )
+            sesion_seleccionada = sesion
+            estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+            estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
+            asistentes_ids = set(
+                Asistencia.objects.filter(sesion=sesion).values_list("persona_id", flat=True)
+            )
             asistencia_form = AsistenciaMasivaForm(request.POST)
             asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
             if asistencia_form.is_valid():
-                sesion = get_object_or_404(SesionClase, pk=asistencia_form.cleaned_data["sesion_id"])
-                estudiantes = list(asistencia_form.cleaned_data["estudiantes"])
+                estudiantes_seleccionados = list(asistencia_form.cleaned_data["estudiantes"])
                 creados = 0
-                for persona in estudiantes:
+                for persona in estudiantes_seleccionados:
+                    _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
                     _, created = Asistencia.objects.get_or_create(
                         sesion=sesion,
                         persona=persona,
@@ -595,7 +645,7 @@ def asistencias_list(request):
                     )
                     if created:
                         creados += 1
-                if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+                if estudiantes_seleccionados and sesion.estado == SesionClase.Estado.PROGRAMADA:
                     sesion.estado = SesionClase.Estado.COMPLETADA
                     sesion.save(update_fields=["estado"])
                 messages.success(request, f"Asistencias agregadas: {creados}.")
@@ -677,7 +727,7 @@ def asistencias_list(request):
             "sesiones": sesiones_list,
             "sesion_seleccionada": sesion_seleccionada,
             "asistentes_ids": asistentes_ids,
-            "estudiantes": estudiantes_qs,
+            "estudiantes": estudiantes,
             "estudiantes_total": estudiantes_qs.count(),
             "estudiantes_total_disciplina_periodo": estudiantes_total_disciplina_periodo,
             "disciplinas": disciplinas_vigentes_qs(organizacion=organizacion),
@@ -697,14 +747,8 @@ def sesion_detail(request, pk):
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
         pk=pk,
     )
-    estudiantes_qs = (
-        Persona.objects.filter(
-            roles__rol__codigo="ESTUDIANTE",
-            roles__organizacion=sesion.disciplina.organizacion,
-        )
-        .distinct()
-        .order_by("apellidos", "nombres")
-    )
+    estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+    estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
     open_nueva_persona = False
     if request.method == "POST":
@@ -739,9 +783,10 @@ def sesion_detail(request, pk):
                 return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "agregar_asistentes" in request.POST:
             estudiantes_ids = request.POST.getlist("estudiantes")
-            estudiantes = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
+            estudiantes_seleccionados = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
             creados = 0
-            for persona in estudiantes:
+            for persona in estudiantes_seleccionados:
+                _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
                 _, created = Asistencia.objects.get_or_create(
                     sesion=sesion,
                     persona=persona,
@@ -749,7 +794,7 @@ def sesion_detail(request, pk):
                 )
                 if created:
                     creados += 1
-            if estudiantes and sesion.estado == SesionClase.Estado.PROGRAMADA:
+            if estudiantes_seleccionados and sesion.estado == SesionClase.Estado.PROGRAMADA:
                 sesion.estado = SesionClase.Estado.COMPLETADA
                 sesion.save(update_fields=["estado"])
             messages.success(request, f"Asistencias agregadas: {creados}.")
@@ -776,7 +821,7 @@ def sesion_detail(request, pk):
             "sesion": sesion,
             "asistencias": asistencias,
             "total_asistentes": asistencias.count(),
-            "estudiantes": estudiantes_qs,
+            "estudiantes": estudiantes,
             "asistentes_ids": asistentes_ids,
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,

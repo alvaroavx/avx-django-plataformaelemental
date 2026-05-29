@@ -162,6 +162,118 @@ class AsistenciasViewTests(TestCase):
             f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}&sesion_id={self.sesion.pk}&open=agregar_asistentes",
         )
 
+    def test_agregar_asistentes_lista_solo_estudiantes_de_la_organizacion_de_la_sesion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="22.222.222-2",
+        )
+        estudiante_otra_org = Persona.objects.create(
+            nombres="Bruno",
+            apellidos="Otraorg",
+            email="bruno.otraorg@example.com",
+        )
+        rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=estudiante_otra_org,
+            rol=rol_estudiante,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+                "sesion_id": self.sesion.pk,
+                "open": "agregar_asistentes",
+            },
+        )
+
+        estudiantes = list(response.context["estudiantes"])
+        self.assertIn(self.estudiante, estudiantes)
+        self.assertNotIn(estudiante_otra_org, estudiantes)
+        self.assertContains(response, self.estudiante.nombre_completo)
+        self.assertNotContains(response, estudiante_otra_org.nombre_completo)
+
+    def test_agregar_asistentes_rechaza_estudiante_de_otra_organizacion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="22.222.222-2",
+        )
+        estudiante_otra_org = Persona.objects.create(
+            nombres="Bruno",
+            apellidos="Otraorg",
+            email="bruno.rechazo@example.com",
+        )
+        rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=estudiante_otra_org,
+            rol=rol_estudiante,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.post(
+            reverse("asistencias:asistencias_list"),
+            {
+                "agregar_asistentes": "1",
+                "sesion_id": str(self.sesion.pk),
+                "estudiantes": [str(estudiante_otra_org.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            Asistencia.objects.filter(sesion=self.sesion, persona=estudiante_otra_org).exists()
+        )
+
+    def test_agregar_asistentes_muestra_inactivos_y_los_reactiva_al_agregar(self):
+        self.estudiante.activo = False
+        self.estudiante.save(update_fields=["activo"])
+        persona_rol = PersonaRol.objects.get(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            rol__codigo="ESTUDIANTE",
+        )
+        persona_rol.activo = False
+        persona_rol.save(update_fields=["activo"])
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+                "sesion_id": self.sesion.pk,
+                "open": "agregar_asistentes",
+            },
+        )
+
+        self.assertContains(response, self.estudiante.nombre_completo)
+        self.assertContains(response, "Inactivo")
+
+        response = self.client.post(
+            reverse("asistencias:asistencias_list"),
+            {
+                "agregar_asistentes": "1",
+                "sesion_id": str(self.sesion.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.estudiante.refresh_from_db()
+        persona_rol.refresh_from_db()
+        self.assertTrue(self.estudiante.activo)
+        self.assertTrue(persona_rol.activo)
+        self.assertTrue(
+            Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists()
+        )
+
     def test_agregar_persona_desde_asistencias_usa_organizacion_filtrada(self):
         response = self.client.post(
             f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
