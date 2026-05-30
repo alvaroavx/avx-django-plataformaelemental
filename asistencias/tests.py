@@ -1,10 +1,12 @@
 ﻿from datetime import date
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
@@ -94,6 +96,72 @@ class AsistenciasViewTests(TestCase):
             organizacion=self.organizacion,
             activo=True,
         )
+
+    def _xlsx_rows(self, response):
+        workbook = load_workbook(BytesIO(response.content))
+        return list(workbook.active.iter_rows(values_only=True))
+
+    def test_export_asistencias_xlsx_respeta_periodo_y_organizacion(self):
+        otra_org = Organizacion.objects.create(
+            nombre="Org Export",
+            razon_social="Org Export SPA",
+            rut="77.777.777-7",
+        )
+        otra_disciplina = Disciplina.objects.create(organizacion=otra_org, nombre="Otra disciplina")
+        sesion_otro_periodo = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-03-02",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        sesion_otra_org = SesionClase.objects.create(
+            disciplina=otra_disciplina,
+            fecha="2026-02-02",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+            comentario="Incluida",
+        )
+        Asistencia.objects.create(
+            sesion=sesion_otro_periodo,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+            comentario="Fuera periodo",
+        )
+        Asistencia.objects.create(
+            sesion=sesion_otra_org,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+            comentario="Fuera organizacion",
+        )
+
+        response = self.client.get(
+            reverse("asistencias:export_asistencias_xlsx"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        rows = self._xlsx_rows(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rows[0][0], "Fecha sesion")
+        self.assertIn("Periodo", rows[0])
+        contenido = str(rows)
+        self.assertIn("Incluida", contenido)
+        self.assertNotIn("Fuera periodo", contenido)
+        self.assertNotIn("Fuera organizacion", contenido)
+
+    def test_export_asistencias_xlsx_bloquea_usuario_sin_permiso(self):
+        User = get_user_model()
+        usuario = User.objects.create_user("sin_permiso_export", password="secret123")
+        self.client.force_login(usuario)
+
+        response = self.client.get(
+            reverse("asistencias:export_asistencias_xlsx"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_agregar_asistentes_cambia_estado_a_completada(self):
         response = self.client.post(

@@ -1,8 +1,10 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
+from .utils import normalizar_telefono, tiene_identidad_minima
 from .validators import formatear_rut_chileno, validar_rut_chileno
 
 
@@ -74,8 +76,18 @@ class Persona(models.Model):
     def tiene_rol(self, codigo):
         return codigo in self.roles.filter(activo=True).values_list("rol__codigo", flat=True)
 
+    def clean(self):
+        super().clean()
+        rut = formatear_rut_chileno(self.rut)
+        telefono = normalizar_telefono(self.telefono)
+        if not tiene_identidad_minima(rut=rut, email=self.email, telefono=telefono):
+            raise ValidationError("Debes registrar al menos RUT, email o telefono.")
+        if rut and Persona.objects.filter(rut__iexact=rut).exclude(pk=self.pk).exists():
+            raise ValidationError({"rut": "Ya existe una persona con este RUT."})
+
     def save(self, *args, **kwargs):
         self.rut = formatear_rut_chileno(self.rut)
+        self.telefono = normalizar_telefono(self.telefono)
         super().save(*args, **kwargs)
 
 

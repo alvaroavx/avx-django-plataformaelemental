@@ -18,6 +18,12 @@ from plataformaelemental.context import (
     organizacion_desde_request,
     resolver_periodo,
 )
+from plataformaelemental.exports import periodo_sufijo_archivo, xlsx_response
+from asistencias.selectors import resumen_profesores_periodo_queryset
+from asistencias.services.exportaciones import (
+    PAGOS_PROFESORES_XLSX_HEADERS,
+    filas_export_pagos_profesores,
+)
 
 from .documentos.dtos import NormalizedTaxDocument
 from .documentos.services import build_review_payload, parse_tax_document
@@ -28,7 +34,13 @@ from .documentos.temp_storage import (
     eliminar_importacion_temporal,
     guardar_importacion_temporal,
 )
-from .decorators import admin_finanzas_required
+from .decorators import (
+    documentos_required,
+    exportar_finanzas_required,
+    finanzas_read_required,
+    pagos_required,
+    transacciones_required,
+)
 from .forms import (
     CategoryForm,
     DocumentoTributarioForm,
@@ -55,6 +67,7 @@ from .selectors import (
     consolidado_categorias_queryset,
     dashboard_querysets,
     documentos_tributarios_queryset,
+    libro_caja_queryset,
     pago_detail_queryset,
     pagos_export_queryset,
     pagos_queryset,
@@ -71,12 +84,18 @@ from .services.pagos import (
     resumen_consumos_pago,
 )
 from .services.reportes import (
+    PAGOS_ALUMNOS_XLSX_HEADERS,
     PAGOS_CSV_HEADERS,
     TRANSACCIONES_CSV_HEADERS,
+    TRANSACCIONES_XLSX_HEADERS,
     armar_dashboard_financiero,
     armar_reporte_categorias,
+    LIBRO_CAJA_CSV_HEADERS,
+    filas_export_libro_caja,
     filas_export_pagos,
+    filas_export_pagos_alumnos_xlsx,
     filas_export_transacciones,
+    filas_export_transacciones_xlsx,
 )
 
 
@@ -121,6 +140,7 @@ def _clasificar_archivo_tributario(archivo_subido):
 
 def _review_context_from_payload(request, payload, *, token_importacion=None, documento_data=None, pago_data=None):
     organizacion = organizacion_desde_request(request)
+    periodo = resolver_periodo(request)
     documento_form = _documento_revision_form(
         data=documento_data,
         initial=payload.get("documento_initial"),
@@ -132,6 +152,9 @@ def _review_context_from_payload(request, payload, *, token_importacion=None, do
             data=pago_data,
             initial=pago_inicial,
             prefix="pago",
+            periodo_mes=periodo["mes"],
+            periodo_anio=periodo["anio"],
+            organizacion=organizacion,
         )
     archivo_pdf_url = ""
     archivo_xml_url = ""
@@ -233,24 +256,29 @@ def _rol_financiero_documento(documento):
     return "sin_clasificar"
 
 
-@admin_finanzas_required
+@finanzas_read_required
 def dashboard(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    pagos_qs, trans_qs = dashboard_querysets(request, organizacion=organizacion)
+    periodo = resolver_periodo(request)
+    pagos_qs, trans_qs, documentos_qs, consumos_qs = dashboard_querysets(request, organizacion=organizacion)
     context.update(
         armar_dashboard_financiero(
             pagos_qs=pagos_qs,
             transacciones_qs=trans_qs,
+            documentos_qs=documentos_qs,
+            consumos_qs=consumos_qs,
             periodo_descripcion=descripcion_periodo(request=request, corta=False),
             organizacion=organizacion,
+            mes=periodo["mes"],
+            anio=periodo["anio"],
         )
     )
     context["ayuda_seccion"] = _ayuda_finanzas("dashboard")
     return render(request, "finanzas/dashboard.html", context)
 
 
-@admin_finanzas_required
+@pagos_required
 def planes_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
@@ -274,7 +302,7 @@ def planes_list(request):
     return render(request, "finanzas/planes_list.html", context)
 
 
-@admin_finanzas_required
+@pagos_required
 def plan_edit(request, pk):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
@@ -300,7 +328,7 @@ def plan_edit(request, pk):
     return render(request, "finanzas/planes_list.html", context)
 
 
-@admin_finanzas_required
+@pagos_required
 def plan_delete(request, pk):
     plan = get_object_or_404(PaymentPlan, pk=pk)
     if request.method == "POST":
@@ -314,7 +342,6 @@ def plan_delete(request, pk):
     )
 
 
-@admin_finanzas_required
 def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, persona_form=None, open_nueva_persona=False):
     context = _base_context(request)
     periodo = resolver_periodo(request)
@@ -328,7 +355,12 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     for pago in pagos:
         pago.url_edicion = _url_pagos_list_con_edicion(request, pago.pk)
     if form is None:
-        form = PaymentForm(initial={"organizacion": organizacion.pk} if organizacion else None)
+        form = PaymentForm(
+            initial={"organizacion": organizacion.pk} if organizacion else None,
+            periodo_mes=periodo["mes"],
+            periodo_anio=periodo["anio"],
+            organizacion=organizacion,
+        )
     if persona_form is None:
         persona_form = PersonaRapidaForm()
 
@@ -338,7 +370,13 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"),
             pk=editar_pago_id,
         )
-        edit_form = PaymentForm(instance=edit_pago, prefix="edit_pago")
+        edit_form = PaymentForm(
+            instance=edit_pago,
+            prefix="edit_pago",
+            periodo_mes=periodo["mes"],
+            periodo_anio=periodo["anio"],
+            organizacion=organizacion,
+        )
 
     context.update(
         {
@@ -363,12 +401,16 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     return context
 
 
-@admin_finanzas_required
+@pagos_required
 def pagos_list(request):
     organizacion = organizacion_desde_request(request)
+    periodo = resolver_periodo(request)
     form = PaymentForm(
         request.POST if request.method == "POST" and "guardar_pago" in request.POST else None,
         initial={"organizacion": organizacion.pk} if organizacion else None,
+        periodo_mes=periodo["mes"],
+        periodo_anio=periodo["anio"],
+        organizacion=organizacion,
     )
     persona_form = PersonaRapidaForm(
         request.POST if request.method == "POST" and "agregar_persona" in request.POST else None
@@ -392,13 +434,22 @@ def pagos_list(request):
     return render(request, "finanzas/pagos_list.html", context)
 
 
-@admin_finanzas_required
+@pagos_required
 def pago_edit(request, pk):
     pago = get_object_or_404(Payment, pk=pk)
     if request.method == "GET":
         return redirect(_url_pagos_list_con_edicion(request, pago.pk))
 
-    form = PaymentForm(request.POST or None, instance=pago, prefix="edit_pago")
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    form = PaymentForm(
+        request.POST or None,
+        instance=pago,
+        prefix="edit_pago",
+        periodo_mes=periodo["mes"],
+        periodo_anio=periodo["anio"],
+        organizacion=organizacion,
+    )
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Pago actualizado.")
@@ -407,7 +458,7 @@ def pago_edit(request, pk):
     return render(request, "finanzas/pagos_list.html", context)
 
 
-@admin_finanzas_required
+@finanzas_read_required
 def pago_detail(request, pk):
     context = _base_context(request)
     pago = get_object_or_404(pago_detail_queryset(), pk=pk)
@@ -426,7 +477,7 @@ def pago_detail(request, pk):
     return render(request, "finanzas/pago_detail.html", context)
 
 
-@admin_finanzas_required
+@pagos_required
 def pago_delete(request, pk):
     pago = get_object_or_404(Payment, pk=pk)
     if request.method == "POST":
@@ -440,7 +491,7 @@ def pago_delete(request, pk):
     )
 
 
-@admin_finanzas_required
+@documentos_required
 def documentos_tributarios_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
@@ -484,7 +535,7 @@ def documentos_tributarios_list(request):
     return render(request, "finanzas/documentos_tributarios_list.html", context)
 
 
-@admin_finanzas_required
+@documentos_required
 def documento_tributario_importar(request):
     context = _base_context(request)
     if request.method == "POST" and request.POST.get("accion") == "confirmar":
@@ -499,7 +550,15 @@ def documento_tributario_importar(request):
         pago_form = None
         guardar_pago = bool(request.POST.get("guardar_pago_sugerido")) and bool(payload.get("pago_initial"))
         if guardar_pago:
-            pago_form = PaymentForm(data=request.POST, prefix="pago")
+            periodo = resolver_periodo(request)
+            organizacion = organizacion_desde_request(request)
+            pago_form = PaymentForm(
+                data=request.POST,
+                prefix="pago",
+                periodo_mes=periodo["mes"],
+                periodo_anio=periodo["anio"],
+                organizacion=organizacion,
+            )
         formularios_validos = confirm_form.is_valid() and documento_form.is_valid() and (
             not guardar_pago or (pago_form is not None and pago_form.is_valid())
         )
@@ -600,7 +659,7 @@ def documento_tributario_importar(request):
     return render(request, "finanzas/documento_tributario_importar.html", context)
 
 
-@admin_finanzas_required
+@documentos_required
 def documento_tributario_parse_preview(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "Metodo no permitido."}, status=405)
@@ -637,7 +696,7 @@ def documento_tributario_parse_preview(request):
     return JsonResponse(response_payload)
 
 
-@admin_finanzas_required
+@documentos_required
 @xframe_options_sameorigin
 def documento_tributario_importacion_archivo(request, token, tipo_archivo):
     if tipo_archivo not in {"pdf", "xml"}:
@@ -658,7 +717,7 @@ def documento_tributario_importacion_archivo(request, token, tipo_archivo):
     return response
 
 
-@admin_finanzas_required
+@finanzas_read_required
 def documento_tributario_detail(request, pk):
     context = _base_context(request)
     documento = get_object_or_404(
@@ -687,7 +746,7 @@ def documento_tributario_detail(request, pk):
     return render(request, "finanzas/documento_tributario_detail.html", context)
 
 
-@admin_finanzas_required
+@finanzas_read_required
 @xframe_options_sameorigin
 def documento_tributario_archivo(request, pk, tipo_archivo):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
@@ -706,7 +765,7 @@ def documento_tributario_archivo(request, pk, tipo_archivo):
     return response
 
 
-@admin_finanzas_required
+@documentos_required
 def documento_tributario_edit(request, pk):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None, instance=documento)
@@ -729,7 +788,7 @@ def documento_tributario_edit(request, pk):
     )
 
 
-@admin_finanzas_required
+@documentos_required
 def documento_tributario_delete(request, pk):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
     if request.method == "POST":
@@ -747,7 +806,7 @@ def documento_tributario_delete(request, pk):
     )
 
 
-@admin_finanzas_required
+@transacciones_required
 def categorias_list(request):
     context = _base_context(request)
     categorias_qs = categorias_queryset()
@@ -760,7 +819,7 @@ def categorias_list(request):
     return render(request, "finanzas/categorias_list.html", context)
 
 
-@admin_finanzas_required
+@transacciones_required
 def categoria_edit(request, pk):
     categoria = get_object_or_404(Category, pk=pk)
     form = CategoryForm(request.POST or None, instance=categoria)
@@ -775,7 +834,7 @@ def categoria_edit(request, pk):
     )
 
 
-@admin_finanzas_required
+@transacciones_required
 def categoria_delete(request, pk):
     categoria = get_object_or_404(Category, pk=pk)
     if request.method == "POST":
@@ -789,10 +848,11 @@ def categoria_delete(request, pk):
     )
 
 
-@admin_finanzas_required
+@transacciones_required
 def transacciones_list(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
+    periodo = resolver_periodo(request)
     trans_qs = transacciones_queryset(request, organizacion=organizacion)
     resumen_transacciones_data = resumen_transacciones(trans_qs)
     total_ingresos = resumen_transacciones_data["total_ingresos"] or 0
@@ -802,6 +862,9 @@ def transacciones_list(request):
         request.POST or None,
         request.FILES or None,
         initial={"organizacion": organizacion.pk} if organizacion else None,
+        periodo_mes=periodo["mes"],
+        periodo_anio=periodo["anio"],
+        organizacion=organizacion,
     )
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -822,7 +885,7 @@ def transacciones_list(request):
     return render(request, "finanzas/transacciones_list.html", context)
 
 
-@admin_finanzas_required
+@finanzas_read_required
 def transaccion_detail(request, pk):
     context = _base_context(request)
     transaccion = get_object_or_404(
@@ -842,7 +905,7 @@ def transaccion_detail(request, pk):
     return render(request, "finanzas/transaccion_detail.html", context)
 
 
-@admin_finanzas_required
+@finanzas_read_required
 @xframe_options_sameorigin
 def transaccion_archivo(request, pk):
     transaccion = get_object_or_404(Transaction, pk=pk)
@@ -860,10 +923,19 @@ def transaccion_archivo(request, pk):
     return response
 
 
-@admin_finanzas_required
+@transacciones_required
 def transaccion_edit(request, pk):
     transaccion = get_object_or_404(Transaction, pk=pk)
-    form = TransactionForm(request.POST or None, request.FILES or None, instance=transaccion)
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    form = TransactionForm(
+        request.POST or None,
+        request.FILES or None,
+        instance=transaccion,
+        periodo_mes=periodo["mes"],
+        periodo_anio=periodo["anio"],
+        organizacion=organizacion,
+    )
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Transaccion actualizada.")
@@ -875,7 +947,7 @@ def transaccion_edit(request, pk):
     )
 
 
-@admin_finanzas_required
+@transacciones_required
 def transaccion_delete(request, pk):
     transaccion = get_object_or_404(Transaction, pk=pk)
     if request.method == "POST":
@@ -889,7 +961,7 @@ def transaccion_delete(request, pk):
     )
 
 
-@admin_finanzas_required
+@finanzas_read_required
 def reporte_categorias(request):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
@@ -903,7 +975,7 @@ def reporte_categorias(request):
     return render(request, "finanzas/reporte_categorias.html", context)
 
 
-@admin_finanzas_required
+@exportar_finanzas_required
 def export_pagos_csv(request):
     organizacion = organizacion_desde_request(request)
     pagos = pagos_export_queryset(request, organizacion=organizacion)
@@ -916,7 +988,20 @@ def export_pagos_csv(request):
     return response
 
 
-@admin_finanzas_required
+@exportar_finanzas_required
+def export_pagos_alumnos_xlsx(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    pagos = pagos_export_queryset(request, organizacion=organizacion)
+    return xlsx_response(
+        filename=f"pagos_alumnos_{periodo_sufijo_archivo(periodo)}.xlsx",
+        sheet_title="Pagos alumnos",
+        headers=PAGOS_ALUMNOS_XLSX_HEADERS,
+        rows=filas_export_pagos_alumnos_xlsx(pagos),
+    )
+
+
+@exportar_finanzas_required
 def export_transacciones_csv(request):
     organizacion = organizacion_desde_request(request)
     transacciones = transacciones_export_queryset(request, organizacion=organizacion)
@@ -926,6 +1011,61 @@ def export_transacciones_csv(request):
     writer = csv.writer(response)
     writer.writerow(TRANSACCIONES_CSV_HEADERS)
     writer.writerows(filas_export_transacciones(transacciones))
+    return response
+
+
+@exportar_finanzas_required
+def export_transacciones_xlsx(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    transacciones = transacciones_export_queryset(request, organizacion=organizacion)
+    return xlsx_response(
+        filename=f"transacciones_{periodo_sufijo_archivo(periodo)}.xlsx",
+        sheet_title="Transacciones",
+        headers=TRANSACCIONES_XLSX_HEADERS,
+        rows=filas_export_transacciones_xlsx(transacciones),
+    )
+
+
+@exportar_finanzas_required
+def export_pagos_profesores_xlsx(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    roles, asistencias_por_profesor, sesiones_por_profesor, disciplinas_por_profesor = (
+        resumen_profesores_periodo_queryset(request, organizacion=organizacion)
+    )
+    return xlsx_response(
+        filename=f"pagos_profesores_{periodo_sufijo_archivo(periodo)}.xlsx",
+        sheet_title="Pagos profesores",
+        headers=PAGOS_PROFESORES_XLSX_HEADERS,
+        rows=filas_export_pagos_profesores(
+            roles,
+            asistencias_por_profesor=asistencias_por_profesor,
+            sesiones_por_profesor=sesiones_por_profesor,
+            disciplinas_por_profesor=disciplinas_por_profesor,
+            periodo_descripcion=descripcion_periodo(request=request, corta=True),
+        ),
+    )
+
+
+@exportar_finanzas_required
+def export_libro_caja_csv(request):
+    periodo = resolver_periodo(request)
+    if periodo["mes"] is None or periodo["anio"] is None:
+        return HttpResponse(
+            "El libro de caja requiere seleccionar un mes y un año especificos.",
+            status=400,
+            content_type="text/plain; charset=utf-8",
+        )
+    organizacion = organizacion_desde_request(request)
+    transacciones = libro_caja_queryset(request, organizacion=organizacion)
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="libro_caja.csv"'
+    response.write("\ufeff")
+    writer = csv.writer(response)
+    writer.writerow(LIBRO_CAJA_CSV_HEADERS)
+    writer.writerows(filas_export_libro_caja(transacciones))
     return response
 
 # Create your views here.

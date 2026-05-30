@@ -1,35 +1,39 @@
-from functools import wraps
-
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
-
-from personas.models import PersonaRol
-
-
-ADMIN_CODES = {"ADMINISTRADOR", "ADMIN", "admin"}
+from personas.permissions import (
+    ACCION_EXPORTAR_DATOS,
+    ACCION_OPERAR_DOCUMENTOS,
+    ACCION_OPERAR_PAGOS,
+    ACCION_OPERAR_TRANSACCIONES,
+    ACCION_VER_FINANZAS,
+    permiso_requerido,
+    usuario_tiene_permiso,
+)
 
 
 def usuario_es_admin_finanzas(user) -> bool:
-    if not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-    persona = getattr(user, "persona", None)
-    if not persona:
-        return False
-    return PersonaRol.objects.filter(
-        persona=persona,
-        activo=True,
-        rol__codigo__in=ADMIN_CODES,
-    ).exists()
+    return usuario_tiene_permiso(user, ACCION_OPERAR_PAGOS)
 
 
-def admin_finanzas_required(view_func):
-    @login_required
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not usuario_es_admin_finanzas(request.user):
-            raise PermissionDenied("Debes tener rol ADMINISTRADOR para acceder a finanzas.")
-        return view_func(request, *args, **kwargs)
-
-    return _wrapped
+finanzas_read_required = permiso_requerido(
+    ACCION_VER_FINANZAS,
+    mensaje="Debes tener permiso de lectura financiera para acceder a finanzas.",
+)
+pagos_required = permiso_requerido(
+    ACCION_OPERAR_PAGOS,
+    accion_lectura=ACCION_VER_FINANZAS,
+    mensaje="Debes tener permiso de pagos para modificar finanzas.",
+)
+documentos_required = permiso_requerido(
+    ACCION_OPERAR_DOCUMENTOS,
+    accion_lectura=ACCION_VER_FINANZAS,
+    mensaje="Debes tener permiso de documentos tributarios para modificar finanzas.",
+)
+transacciones_required = permiso_requerido(
+    ACCION_OPERAR_TRANSACCIONES,
+    accion_lectura=ACCION_VER_FINANZAS,
+    mensaje="Debes tener permiso de transacciones para modificar finanzas.",
+)
+exportar_finanzas_required = permiso_requerido(
+    ACCION_EXPORTAR_DATOS,
+    mensaje="Debes tener permiso de exportacion para descargar datos.",
+)
+admin_finanzas_required = pagos_required

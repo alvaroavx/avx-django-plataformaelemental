@@ -9,6 +9,28 @@ from personas.models import Organizacion, Persona, PersonaRol
 from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
+def _documentos_para_asociacion(*, organizacion=None, periodo_mes=None, periodo_anio=None, documentos_actuales=None):
+    queryset = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
+    if organizacion is not None:
+        queryset = queryset.filter(organizacion=organizacion)
+    if periodo_anio is not None:
+        queryset = queryset.filter(fecha_emision__year=periodo_anio)
+    if periodo_mes is not None:
+        queryset = queryset.filter(fecha_emision__month=periodo_mes)
+    documentos_actuales = [pk for pk in (documentos_actuales or []) if pk]
+    if documentos_actuales:
+        queryset = DocumentoTributario.objects.filter(Q(pk__in=queryset.values("pk")) | Q(pk__in=documentos_actuales))
+    return queryset.order_by("-fecha_emision", "-id")
+
+
+def _documento_fuera_periodo(documento, *, periodo_mes=None, periodo_anio=None):
+    if periodo_anio is not None and documento.fecha_emision.year != periodo_anio:
+        return True
+    if periodo_mes is not None and documento.fecha_emision.month != periodo_mes:
+        return True
+    return False
+
+
 class PersonaOrganizacionSelect(forms.Select):
     def __init__(self, *args, persona_orgs=None, **kwargs):
         self.persona_orgs = persona_orgs or {}
@@ -112,7 +134,10 @@ class PaymentForm(forms.ModelForm):
             "observaciones": forms.Textarea(attrs={"rows": 2}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, periodo_mes=None, periodo_anio=None, organizacion=None, **kwargs):
+        self.periodo_mes = periodo_mes
+        self.periodo_anio = periodo_anio
+        self.organizacion_filtro = organizacion
         super().__init__(*args, **kwargs)
         if not self.is_bound and not self.initial.get("fecha_pago"):
             self.initial["fecha_pago"] = timezone.localdate()
@@ -177,11 +202,12 @@ class PaymentForm(forms.ModelForm):
                 plan_org = organizaciones_qs.filter(pk=organizacion_id).first()
                 if plan_org is not None:
                     self.initial["aplica_iva"] = not plan_org.es_exenta_iva
-        documentos_qs = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
-        if self.instance.pk and self.instance.documento_tributario_id:
-            documentos_qs = DocumentoTributario.objects.filter(
-                Q(pk=self.instance.documento_tributario_id) | Q(pk__in=documentos_qs.values("pk"))
-            ).order_by("-fecha_emision", "-id")
+        documentos_qs = _documentos_para_asociacion(
+            organizacion=organizacion,
+            periodo_mes=periodo_mes,
+            periodo_anio=periodo_anio,
+            documentos_actuales=[self.instance.documento_tributario_id] if self.instance.pk else None,
+        )
         self.fields["documento_tributario"].queryset = documentos_qs
         self.fields["documento_tributario"].label = "Documento tributario"
         self.fields["documento_tributario"].help_text = "Asocia el documento emitido al cliente si ya fue cargado."
@@ -219,6 +245,17 @@ class PaymentForm(forms.ModelForm):
                 "documento_tributario",
                 "El documento tributario seleccionado no pertenece a la organizacion indicada.",
             )
+        if documento_tributario and _documento_fuera_periodo(
+            documento_tributario,
+            periodo_mes=self.periodo_mes,
+            periodo_anio=self.periodo_anio,
+        ):
+            es_documento_actual = self.instance.pk and self.instance.documento_tributario_id == documento_tributario.pk
+            if not es_documento_actual:
+                self.add_error(
+                    "documento_tributario",
+                    "El documento tributario seleccionado no pertenece al periodo filtrado.",
+                )
         return cleaned
 
 
@@ -378,9 +415,21 @@ class TransactionForm(forms.ModelForm):
             "documentos_tributarios": forms.SelectMultiple(attrs={"size": 6}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, periodo_mes=None, periodo_anio=None, organizacion=None, **kwargs):
+        self.periodo_mes = periodo_mes
+        self.periodo_anio = periodo_anio
+        self.organizacion_filtro = organizacion
         super().__init__(*args, **kwargs)
-        queryset_documentos = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
+        documentos_actuales = []
+        if self.instance.pk:
+            documentos_actuales = list(self.instance.documentos_tributarios.values_list("pk", flat=True))
+        queryset_documentos = _documentos_para_asociacion(
+            organizacion=organizacion,
+            periodo_mes=periodo_mes,
+            periodo_anio=periodo_anio,
+            documentos_actuales=documentos_actuales,
+        )
+        self.documentos_actuales_ids = set(documentos_actuales)
         self.fields["documentos_tributarios"] = DocumentoTributarioMultipleChoiceField(
             queryset=queryset_documentos,
             required=False,
@@ -411,6 +460,13 @@ class TransactionForm(forms.ModelForm):
                     "Todos los documentos tributarios deben pertenecer a la misma organizacion de la transaccion.",
                 )
                 break
+            if _documento_fuera_periodo(documento, periodo_mes=self.periodo_mes, periodo_anio=self.periodo_anio):
+                if documento.pk not in self.documentos_actuales_ids:
+                    self.add_error(
+                        "documentos_tributarios",
+                        "Todos los documentos tributarios nuevos deben pertenecer al periodo filtrado.",
+                    )
+                    break
         return cleaned
 
 

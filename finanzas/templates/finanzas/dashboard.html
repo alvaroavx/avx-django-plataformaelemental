@@ -5,12 +5,24 @@
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0 finanzas-help-title">Dashboard Financiero {% include "finanzas/_help_tooltip.html" %}</h2>
-    <div>
+    <div class="d-flex flex-wrap justify-content-end gap-2">
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}" title="Exportar pagos CSV">
         <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar pagos CSV</span>
       </a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_alumnos_xlsx' %}?{{ request.GET.urlencode }}" title="Pagos alumnos Excel">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Pagos alumnos XLSX</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_profesores_xlsx' %}?{{ request.GET.urlencode }}" title="Pagos profesores Excel">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Pagos profesores XLSX</span>
+      </a>
+      <a class="btn btn-sm btn-primary finanzas-btn" href="{% url 'finanzas:export_libro_caja_csv' %}?{{ request.GET.urlencode }}" title="Exportar libro de caja CSV">
+        <i class="bi bi-journal-arrow-down"></i><span class="finanzas-btn-label">Libro de caja CSV</span>
+      </a>
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}" title="Exportar transacciones CSV">
         <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar transacciones CSV</span>
+      </a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_transacciones_xlsx' %}?{{ request.GET.urlencode }}" title="Transacciones Excel">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Transacciones XLSX</span>
       </a>
     </div>
   </div>
@@ -19,34 +31,103 @@
     <div class="col-md-3">
       <div class="card border-0 shadow-sm bg-success-subtle">
         <div class="card-body">
-          <div class="card-title text-muted small text-uppercase">Ingresos</div>
-          <div class="display-6">{{ ingresos_totales|clp }}</div>
+          <div class="card-title text-muted small text-uppercase">Ingresos contables</div>
+          <div class="display-6">{{ ingresos_contables|clp }}</div>
+          <div class="small">Fuente: transacciones</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card border-0 shadow-sm bg-danger-subtle">
         <div class="card-body">
-          <div class="card-title text-muted small text-uppercase">Egresos</div>
-          <div class="display-6">{{ egresos_totales|clp }}</div>
+          <div class="card-title text-muted small text-uppercase">Egresos contables</div>
+          <div class="display-6">{{ egresos_contables|clp }}</div>
+          <div class="small">Fuente: transacciones</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card border-0 shadow-sm bg-primary-subtle">
         <div class="card-body">
-          <div class="card-title text-muted small text-uppercase">Balance</div>
-          <div class="display-6">{{ balance|clp }}</div>
+          <div class="card-title text-muted small text-uppercase">Saldo neto</div>
+          <div class="display-6">{{ saldo_contable|clp }}</div>
+          <div class="small">{{ total_transacciones }} transacciones</div>
         </div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="card border-0 shadow-sm bg-warning-subtle">
         <div class="card-body">
-          <div class="card-title text-muted small text-uppercase">IVA debito</div>
-          <div class="display-6">{{ iva_debito|clp }}</div>
-          <div class="small">Exentos: {{ ingresos_exentos|clp }}</div>
+          <div class="card-title text-muted small text-uppercase">Documentos</div>
+          <div class="display-6">{{ total_documentos_periodo }}</div>
+          <div class="small">{{ documentos_con_transaccion }} asociados a transacciones</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="card-title text-muted small text-uppercase">Pagos alumnos</div>
+          <div class="h3">{{ pagos_operacionales_monto|clp }}</div>
+          <div class="small">{{ total_pagos_operacionales }} pagos operacionales</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="card-title text-muted small text-uppercase">Clases pagadas</div>
+          <div class="h3">{{ clases_pagadas|default:0 }}</div>
+          <div class="small">Saldo disponible: {{ saldo_clases|default:0 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="card-title text-muted small text-uppercase">Deuda alumnos</div>
+          <div class="h3">{{ deuda_clases|default:0 }}</div>
+          <div class="small">Clases pendientes de cobro</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="card-title text-muted small text-uppercase">IVA operacional</div>
+          <div class="h3">{{ iva_debito|clp }}</div>
+          <div class="small">Desde pagos, no libro de caja</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">Alertas de cierre mensual</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="small text-muted">Transacciones sin documento</div>
+          <strong>{{ transacciones_sin_documento }}</strong>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Transacciones con documento fuera de periodo</div>
+          <strong>{{ transacciones_con_documento_fuera_periodo }}</strong>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Pagos con documento fuera de periodo</div>
+          <strong>{{ pagos_con_documento_fuera_periodo }}</strong>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Pagos no contables automaticamente</div>
+          <strong>{{ pagos_operacionales_no_contables }}</strong>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        El libro de caja se alimenta desde transacciones. Los pagos de alumnos son operacion de clases y no se suman como ingresos contables para evitar doble conteo.
       </div>
     </div>
   </div>

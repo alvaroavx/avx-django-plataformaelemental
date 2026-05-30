@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.permissions import ACCION_EXPORTAR_DATOS, permiso_requerido
 from plataformaelemental.context import (
     aplicar_periodo,
     descripcion_periodo,
@@ -18,6 +19,7 @@ from plataformaelemental.context import (
     organizacion_desde_request,
     resolver_periodo,
 )
+from plataformaelemental.exports import periodo_sufijo_archivo, xlsx_response
 
 from .decorators import role_required
 from .forms import (
@@ -28,6 +30,8 @@ from .forms import (
     SesionesMasivasForm,
 )
 from .models import Asistencia, Disciplina, SesionClase
+from .selectors import asistencias_export_queryset
+from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
 from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
@@ -56,6 +60,22 @@ def _url_actual_con_filtros(request, remove_params=None, **extra_params):
     return f"{request.path}?{query}" if query else request.path
 
 
+@permiso_requerido(ACCION_EXPORTAR_DATOS)
+def export_asistencias_xlsx(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    asistencias = asistencias_export_queryset(request, organizacion=organizacion)
+    return xlsx_response(
+        filename=f"asistencias_{periodo_sufijo_archivo(periodo)}.xlsx",
+        sheet_title="Asistencias",
+        headers=ASISTENCIAS_XLSX_HEADERS,
+        rows=filas_export_asistencias(
+            asistencias,
+            periodo_descripcion=descripcion_periodo(request=request, corta=True),
+        ),
+    )
+
+
 def _crear_persona_estudiante_en_organizacion(persona_form, organizacion):
     """Crea una persona rapida y la asigna como ESTUDIANTE a la organizacion indicada."""
     if not organizacion:
@@ -76,7 +96,7 @@ def _crear_persona_estudiante_en_organizacion(persona_form, organizacion):
     persona = Persona.objects.create(
         nombres=persona_form.cleaned_data["nombres"].strip(),
         apellidos=persona_form.cleaned_data.get("apellidos", "").strip(),
-        telefono=persona_form.cleaned_data.get("telefono", "").strip(),
+        telefono=persona_form.cleaned_data.get("telefono", ""),
     )
     PersonaRol.objects.get_or_create(
         persona=persona,

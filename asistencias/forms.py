@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
 from personas.models import Persona
+from personas.utils import normalizar_telefono
 
 from .models import BloqueHorario, Disciplina
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
@@ -108,6 +109,15 @@ class PersonaRapidaForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Telefono"}),
     )
+
+    def clean_telefono(self):
+        return normalizar_telefono(self.cleaned_data.get("telefono", ""))
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("telefono"):
+            raise forms.ValidationError("Debes ingresar al menos un telefono para crear una persona.")
+        return cleaned
 
 
 class CustomLoginForm(AuthenticationForm):

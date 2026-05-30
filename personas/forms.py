@@ -1,6 +1,7 @@
 from django import forms
 
 from .models import Organizacion, Persona, PersonaRol, Rol
+from .utils import normalizar_telefono, tiene_identidad_minima
 from .validators import formatear_rut_chileno
 
 
@@ -59,7 +60,23 @@ class PersonaCRMForm(forms.ModelForm):
         self.fields["rut"].widget.attrs["placeholder"] = "12.345.678-5"
 
     def clean_rut(self):
-        return formatear_rut_chileno(self.cleaned_data.get("rut", ""))
+        rut = formatear_rut_chileno(self.cleaned_data.get("rut", ""))
+        if rut and Persona.objects.filter(rut__iexact=rut).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Ya existe una persona con este RUT.")
+        return rut
+
+    def clean_telefono(self):
+        return normalizar_telefono(self.cleaned_data.get("telefono", ""))
+
+    def clean(self):
+        cleaned = super().clean()
+        if not tiene_identidad_minima(
+            rut=cleaned.get("rut", ""),
+            email=cleaned.get("email", ""),
+            telefono=cleaned.get("telefono", ""),
+        ):
+            raise forms.ValidationError("Debes registrar al menos RUT, email o telefono.")
+        return cleaned
 
 
 class PersonaRolCRMForm(forms.Form):

@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-05-07
+Fecha de actualizacion: 2026-05-30
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -20,11 +20,17 @@ Debe concentrar:
 - `periodo_mes` y `periodo_anio` deben aceptar `Todos` y reflejar esa seleccion tanto en los listados como en los resumentes de organizaciones y personas.
 - Desde aqui se debe poder ver actividad academica y financiera relevante de cada persona dentro del periodo seleccionado.
 - El `RUT` de una persona se edita solo desde `personas`, es opcional y debe validarse como RUT chileno.
+- Para crear o editar una persona debe existir al menos un dato de identidad operacional: `RUT`, email o telefono.
+- El telefono se normaliza en backend para uso operacional; no es unico porque puede compartirse entre familia, apoderados o contactos.
 - Los modelos propios de personas, roles y organizaciones viven en `personas.models`; no deben declararse en `database`.
 
 ## Decisiones funcionales vigentes
 - Debe existir listado, detalle, creacion y edicion de organizaciones.
 - `Persona.identificador` fue reemplazado por `Persona.rut`; el valor se normaliza y guarda formateado como RUT chileno cuando se ingresa desde formularios CRM.
+- `Persona.email` mantiene una restriccion unica existente en base de datos; no se endurece ni se relaja en v1.0 sin auditoria previa.
+- `Persona.rut` se valida como unico global en formularios y validacion de modelo cuando existe, pero no se agrego constraint de base de datos hasta auditar y corregir datos productivos existentes.
+- Las altas rapidas desde `asistencias` y `finanzas` deben capturar telefono como identidad minima y guardarlo normalizado.
+- El comando `python manage.py auditar_datos_v1` revisa datos existentes sin modificar la base: personas sin identidad, duplicados de RUT/email/telefono, telefonos inconsistentes y posibles duplicados por nombre.
 - En `personas/listado`, el filtro por `rol` debe considerar asignaciones activas e inactivas; el filtro `estado` controla el estado de la `Persona`, no la vigencia del rol. La tabla debe mostrar si cada rol esta activo o inactivo.
 - El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.

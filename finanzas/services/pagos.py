@@ -21,7 +21,7 @@ def crear_persona_estudiante_desde_modal(*, form, organizacion):
     persona = Persona.objects.create(
         nombres=form.cleaned_data["nombres"].strip(),
         apellidos=form.cleaned_data.get("apellidos", "").strip(),
-        telefono=form.cleaned_data.get("telefono", "").strip(),
+        telefono=form.cleaned_data.get("telefono", ""),
     )
     PersonaRol.objects.get_or_create(
         persona=persona,

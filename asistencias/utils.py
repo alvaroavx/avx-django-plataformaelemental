@@ -2,6 +2,7 @@ from django.core.exceptions import PermissionDenied
 
 from .models import Disciplina
 from personas.models import Persona, PersonaRol
+from personas.permissions import normalizar_codigo_rol
 
 ROLE_ADMIN = "admin"
 ROLE_STAFF_ASISTENCIA = "staff_asistencia"
@@ -27,10 +28,18 @@ def usuario_tiene_roles(user, roles: list[str]) -> bool:
         return True
     if user.is_staff:
         return True
+    roles_normalizados = {normalizar_codigo_rol(rol) for rol in roles}
     persona = getattr(user, "persona", None)
     if not persona:
         return False
-    return PersonaRol.objects.filter(
+    roles_usuario = {
+        normalizar_codigo_rol(codigo)
+        for codigo in PersonaRol.objects.filter(
+            persona=persona,
+            activo=True,
+        ).values_list("rol__codigo", flat=True)
+    }
+    return bool(roles_usuario.intersection(roles_normalizados)) or PersonaRol.objects.filter(
         persona=persona,
         activo=True,
         rol__codigo__in=roles,

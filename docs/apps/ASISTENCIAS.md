@@ -173,6 +173,13 @@ flowchart TD
 - La logica global de pagos, documentos y caja vive en `finanzas`.
 - Los consumos de clases y deudas usan modelos de `finanzas`, pero las entidades academicas base son propias de `asistencias`.
 
+## Exportaciones Excel v1.0
+- `asistencias_YYYY_MM.xlsx` exporta asistencias operativas desde `Asistencia`, `SesionClase`, `Disciplina` y `Persona`.
+- El archivo incluye fecha, disciplina, estudiante, estado de asistencia, profesores, organizacion, observacion y periodo.
+- La exportacion respeta periodo, organizacion activa y filtro local de disciplina cuando existe.
+- La exportacion usa permiso transversal `exportar_datos`; no habilita exportacion para profesores ni solo lectura.
+- Esta exportacion es academica/operacional: no reemplaza reportes financieros ni libro de caja.
+
 ## Limite financiero
 `asistencias` puede mostrar estado financiero operacional, pero no calcula contabilidad.
 

@@ -1,7 +1,11 @@
+from io import StringIO
+
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from finanzas.models import AttendanceConsumption, Payment
 
@@ -276,37 +280,84 @@ class PersonasOrganizacionesTests(TestCase):
 
 
 class PersonasRutFormTests(TestCase):
+    def _data_persona(self, **overrides):
+        data = {
+            "nombres": "Julia",
+            "apellidos": "Perez",
+            "email": "",
+            "telefono": "",
+            "rut": "",
+            "fecha_nacimiento": "",
+            "activo": "on",
+            "user": "",
+        }
+        data.update(overrides)
+        return data
+
     def test_persona_form_valida_y_formatea_rut_chileno(self):
-        form = PersonaCRMForm(
-            data={
-                "nombres": "Julia",
-                "apellidos": "Perez",
-                "email": "",
-                "telefono": "",
-                "rut": "12345678-5",
-                "fecha_nacimiento": "",
-                "activo": "on",
-                "user": "",
-            }
-        )
+        form = PersonaCRMForm(data=self._data_persona(rut="12345678-5"))
 
         self.assertTrue(form.is_valid(), form.errors)
         persona = form.save()
         self.assertEqual(persona.rut, "12.345.678-5")
 
     def test_persona_form_rechaza_rut_chileno_invalido(self):
-        form = PersonaCRMForm(
-            data={
-                "nombres": "Julia",
-                "apellidos": "Perez",
-                "email": "",
-                "telefono": "",
-                "rut": "12.345.678-9",
-                "fecha_nacimiento": "",
-                "activo": "on",
-                "user": "",
-            }
-        )
+        form = PersonaCRMForm(data=self._data_persona(rut="12.345.678-9"))
 
         self.assertFalse(form.is_valid())
         self.assertIn("rut", form.errors)
+
+    def test_persona_form_rechaza_persona_sin_identidad_minima(self):
+        form = PersonaCRMForm(data=self._data_persona())
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+    def test_persona_form_acepta_solo_email(self):
+        form = PersonaCRMForm(data=self._data_persona(email="julia@example.com"))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_persona_form_acepta_solo_telefono_y_normaliza(self):
+        form = PersonaCRMForm(data=self._data_persona(telefono="(9) 1234-5678"))
+
+        self.assertTrue(form.is_valid(), form.errors)
+        persona = form.save()
+        self.assertEqual(persona.telefono, "+56912345678")
+
+    def test_persona_form_no_bloquea_telefono_repetido(self):
+        Persona.objects.create(nombres="Ana", apellidos="Uno", telefono="+56911111111")
+        form = PersonaCRMForm(data=self._data_persona(telefono="9 1111-1111"))
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_persona_form_bloquea_rut_duplicado(self):
+        Persona.objects.create(nombres="Ana", apellidos="Uno", rut="12.345.678-5")
+        form = PersonaCRMForm(data=self._data_persona(rut="12345678-5"))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("rut", form.errors)
+
+    def test_alta_rapida_exige_identidad_minima_y_normaliza_telefono(self):
+        form = PersonaRapidaForm(data={"nombres": "Julia", "apellidos": "Perez", "telefono": ""})
+        self.assertFalse(form.is_valid())
+        self.assertIn("__all__", form.errors)
+
+        form = PersonaRapidaForm(data={"nombres": "Julia", "apellidos": "Perez", "telefono": "(9) 1234-5678"})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["telefono"], "+56912345678")
+
+
+class AuditarDatosV1CommandTests(TestCase):
+    def test_auditoria_corre_sin_modificar_datos(self):
+        persona = Persona.objects.create(nombres="Sin", apellidos="Identidad")
+        before = list(Persona.objects.values_list("id", "nombres", "apellidos", "telefono", "rut", "email"))
+        out = StringIO()
+
+        call_command("auditar_datos_v1", stdout=out)
+
+        after = list(Persona.objects.values_list("id", "nombres", "apellidos", "telefono", "rut", "email"))
+        self.assertEqual(before, after)
+        self.assertIn("Personas sin RUT, email ni telefono: 1", out.getvalue())
+        self.assertIn(str(persona.id), out.getvalue())
+        self.assertIn("No se modificaron datos.", out.getvalue())

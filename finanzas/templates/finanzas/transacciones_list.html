@@ -18,6 +18,9 @@
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_transacciones_csv' %}?{{ request.GET.urlencode }}" title="Exportar CSV">
         <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar CSV</span>
       </a>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_transacciones_xlsx' %}?{{ request.GET.urlencode }}" title="Exportar Excel">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Exportar Excel</span>
+      </a>
     </div>
   </div>
 

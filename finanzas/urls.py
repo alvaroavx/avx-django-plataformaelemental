@@ -57,6 +57,10 @@ urlpatterns = [
     path("transacciones/<int:pk>/editar/", views.transaccion_edit, name="transaccion_edit"),
     path("transacciones/<int:pk>/eliminar/", views.transaccion_delete, name="transaccion_delete"),
     path("reportes/categorias/", views.reporte_categorias, name="reporte_categorias"),
+    path("export/libro-caja.csv", views.export_libro_caja_csv, name="export_libro_caja_csv"),
     path("export/pagos.csv", views.export_pagos_csv, name="export_pagos_csv"),
+    path("export/pagos-alumnos.xlsx", views.export_pagos_alumnos_xlsx, name="export_pagos_alumnos_xlsx"),
+    path("export/pagos-profesores.xlsx", views.export_pagos_profesores_xlsx, name="export_pagos_profesores_xlsx"),
     path("export/transacciones.csv", views.export_transacciones_csv, name="export_transacciones_csv"),
+    path("export/transacciones.xlsx", views.export_transacciones_xlsx, name="export_transacciones_xlsx"),
 ]

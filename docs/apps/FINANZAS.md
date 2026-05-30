@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-05-29
+Fecha de actualizacion: 2026-05-30
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -144,6 +144,76 @@ flowchart TD
 - `DocumentoTributario` no es obligatorio para que la plataforma funcione.
 - El documento tributario actua como respaldo y como ingreso asistido de informacion cuando existe.
 - La plataforma debe seguir operando aunque no exista documento tributario.
+- Al asociar documentos tributarios a pagos o transacciones, el selector debe respetar organizacion y periodo filtrado.
+- En edicion, documentos ya asociados fuera del periodo filtrado siguen visibles para no ocultar datos existentes.
+- Si el periodo esta en `Todos`, el selector no filtra por ese componente temporal; si organizacion esta en `Todas`, el POST sigue validando la organizacion seleccionada en el formulario.
+
+## Separacion Contable Y Operacional
+
+### Payment / Pago
+`Payment` representa cobranza operacional de clases.
+
+Alimenta:
+- estado operacional del estudiante
+- clases pagadas
+- clases consumidas
+- saldo de clases
+- deuda por asistencias
+
+No alimenta directamente el libro de caja para evitar doble conteo.
+
+### Transaction / Transaccion
+`Transaction` representa el movimiento financiero contable/exportable.
+
+Alimenta:
+- libro de caja
+- ingresos contables
+- egresos contables
+- saldo neto del periodo
+- reportes por categoria
+
+Regla: el libro de caja usa `Transaction` como unica fuente.
+
+### DocumentoTributario
+`DocumentoTributario` es respaldo fiscal/documental.
+
+Puede respaldar:
+- pagos operacionales cuando existe documento emitido al estudiante
+- transacciones contables cuando existe documento de respaldo
+
+No debe contarse como ingreso o egreso por si solo.
+
+## Libro De Caja
+- Fuente unica: `Transaction`.
+- Orden de exportacion: `fecha` ascendente + `id` ascendente.
+- El CSV bloquea periodos con mes o año en `Todos`; se debe seleccionar un mes y año especificos.
+- La columna `Msg` se construye desde datos de la transaccion: fecha, tipo, categoria, descripcion y documentos asociados.
+- `Payment` no se exporta en libro de caja salvo que exista una relacion explicita futura con `Transaction`.
+
+## Exportaciones Excel v1.0
+- `pagos_alumnos_YYYY_MM.xlsx`: fuente `Payment`; export operacional de cobranza/clases, no ingreso contable.
+- `pagos_profesores_YYYY_MM.xlsx`: fuente calculada desde sesiones/asistencias y `PersonaRol.valor_clase`/`retencion_sii`; es estimacion operacional, no `Transaction`.
+- `transacciones_YYYY_MM.xlsx`: fuente `Transaction`; export contable alineado con libro de caja, sin incluir pagos operacionales directamente.
+- Todas las exportaciones respetan periodo y organizacion activa.
+- Las exportaciones financieras usan el permiso `exportar_datos`; rol `admin` y rol `finanzas` pueden exportar, profesor y solo lectura no.
+- No existe aun una relacion formal `Payment -> Transaction`; por eso los pagos de alumnos no aparecen en transacciones salvo que exista una `Transaction` real creada aparte.
+
+## Prevencion De Doble Conteo
+- El dashboard separa bloque contable y bloque operacional.
+- El bloque contable suma solo `Transaction`.
+- El bloque operacional muestra `Payment`, saldos y deuda de clases como informacion de cobranza, no como caja.
+- Los documentos tributarios se muestran como respaldo disponible/asociado, no como movimiento financiero.
+
+## Limitaciones Actuales
+- No existe relacion directa `Payment -> Transaction`.
+- Los pagos de alumnos no generan transacciones automaticamente.
+- Los pagos a profesores no tienen modelo contable propio; pueden registrarse como `Transaction` de egreso si corresponde.
+- Las alertas de cierre reportan inconsistencias visibles, pero no corrigen datos automaticamente.
+
+## Decisiones Pendientes
+- Definir si un `Payment` debe crear o sugerir una `Transaction` en un flujo futuro.
+- Definir conciliacion formal entre pagos operacionales, cartola bancaria y transacciones.
+- Definir reglas de categorias contables obligatorias para libro de caja.
 
 ## Modelo funcional vigente
 - `Payment`: cobro academico a estudiante por clases o planes.

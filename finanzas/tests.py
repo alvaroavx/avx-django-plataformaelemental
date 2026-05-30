@@ -1,4 +1,5 @@
 import csv
+from io import BytesIO
 from datetime import date
 from pathlib import Path
 from django.contrib.auth import get_user_model
@@ -7,6 +8,7 @@ from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from decimal import Decimal
+from openpyxl import load_workbook
 from unittest.mock import patch
 
 from finanzas.documentos.services import parse_tax_document
@@ -61,6 +63,9 @@ class FinanzasAccessTests(TestCase):
         )
         self.rol_admin = Rol.objects.create(nombre="Administrador", codigo="ADMINISTRADOR")
         self.rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        self.rol_finanzas = Rol.objects.create(nombre="Finanzas", codigo="FINANZAS")
+        self.rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        self.rol_solo_lectura = Rol.objects.create(nombre="Solo lectura", codigo="SOLO_LECTURA")
 
         self.user_admin = User.objects.create_user("admin_fin", password="secret123")
         self.persona_admin = Persona.objects.create(
@@ -89,6 +94,52 @@ class FinanzasAccessTests(TestCase):
             organizacion=self.org,
             activo=True,
         )
+        self.user_finanzas = User.objects.create_user("finanzas_user", password="secret123")
+        self.persona_finanzas = Persona.objects.create(
+            nombres="Finanzas",
+            apellidos="User",
+            email="finanzas@example.com",
+            user=self.user_finanzas,
+        )
+        PersonaRol.objects.create(
+            persona=self.persona_finanzas,
+            rol=self.rol_finanzas,
+            organizacion=self.org,
+            activo=True,
+        )
+        self.user_profesor = User.objects.create_user("profesor_fin", password="secret123")
+        self.persona_profesor = Persona.objects.create(
+            nombres="Profesor",
+            apellidos="Fin",
+            email="profesorfin@example.com",
+            user=self.user_profesor,
+        )
+        PersonaRol.objects.create(
+            persona=self.persona_profesor,
+            rol=self.rol_profesor,
+            organizacion=self.org,
+            activo=True,
+        )
+        self.user_solo_lectura = User.objects.create_user("lectura_fin", password="secret123")
+        self.persona_solo_lectura = Persona.objects.create(
+            nombres="Lectura",
+            apellidos="Fin",
+            email="lecturafin@example.com",
+            user=self.user_solo_lectura,
+        )
+        PersonaRol.objects.create(
+            persona=self.persona_solo_lectura,
+            rol=self.rol_solo_lectura,
+            organizacion=self.org,
+            activo=True,
+        )
+        self.user_sin_rol = User.objects.create_user("sinrol_fin", password="secret123")
+        self.persona_sin_rol = Persona.objects.create(
+            nombres="Sin",
+            apellidos="Rol",
+            email="sinrolfin@example.com",
+            user=self.user_sin_rol,
+        )
 
     def test_finanzas_dashboard_requiere_admin(self):
         self.client.force_login(self.user_no_admin)
@@ -99,6 +150,385 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
         response = self.client.get(reverse("finanzas:dashboard"))
         self.assertEqual(response.status_code, 200)
+
+    def test_usuario_finanzas_accede_a_pagos_documentos_y_transacciones(self):
+        self.client.force_login(self.user_finanzas)
+        for url_name in (
+            "finanzas:pagos_list",
+            "finanzas:documentos_tributarios_list",
+            "finanzas:transacciones_list",
+        ):
+            response = self.client.get(reverse(url_name), {"organizacion": self.org.pk})
+            self.assertEqual(response.status_code, 200)
+
+    def test_profesor_no_accede_a_finanzas_completa(self):
+        self.client.force_login(self.user_profesor)
+        response = self.client.get(reverse("finanzas:dashboard"), {"organizacion": self.org.pk})
+        self.assertEqual(response.status_code, 403)
+
+    def test_solo_lectura_no_puede_hacer_post_sensible(self):
+        self.client.force_login(self.user_solo_lectura)
+        response = self.client.post(reverse("finanzas:pagos_list"), {"organizacion": self.org.pk})
+        self.assertEqual(response.status_code, 403)
+
+    def test_usuario_sin_rol_no_accede_a_vistas_sensibles(self):
+        self.client.force_login(self.user_sin_rol)
+        response = self.client.get(reverse("finanzas:pagos_list"), {"organizacion": self.org.pk})
+        self.assertEqual(response.status_code, 403)
+
+    def test_permiso_finanzas_considera_organizacion_filtrada(self):
+        otra_org = Organizacion.objects.create(
+            nombre="Org Sin Permiso",
+            razon_social="Org Sin Permiso SPA",
+            rut="99.999.999-9",
+        )
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(reverse("finanzas:pagos_list"), {"organizacion": otra_org.pk})
+        self.assertEqual(response.status_code, 403)
+
+    def test_dashboard_mensual_usa_transacciones_como_fuente_contable(self):
+        categoria_ingreso = Category.objects.create(nombre="Ingreso dashboard", tipo=Category.Tipo.INGRESO, activa=True)
+        categoria_egreso = Category.objects.create(nombre="Egreso dashboard", tipo=Category.Tipo.EGRESO, activa=True)
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-10",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=100000,
+            clases_asignadas=4,
+        )
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_ingreso,
+            fecha="2026-02-10",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Ingreso contable",
+        )
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_egreso,
+            fecha="2026-02-11",
+            tipo=Transaction.Tipo.EGRESO,
+            monto=5000,
+            descripcion="Egreso contable",
+        )
+
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["ingresos_contables"], 25000)
+        self.assertEqual(response.context["egresos_contables"], 5000)
+        self.assertEqual(response.context["saldo_contable"], 20000)
+        self.assertEqual(response.context["pagos_operacionales_monto"], 100000)
+        self.assertEqual(response.context["total_transacciones"], 2)
+
+    def test_dashboard_mensual_respeta_organizacion_y_periodo(self):
+        categoria = Category.objects.create(nombre="Ingreso filtro dashboard", tipo=Category.Tipo.INGRESO, activa=True)
+        otra_org = Organizacion.objects.create(nombre="Org Dashboard", razon_social="Org Dashboard SPA", rut="98.888.888-8")
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-10",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Incluida",
+        )
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-03-10",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=99999,
+            descripcion="Fuera periodo",
+        )
+        Transaction.objects.create(
+            organizacion=otra_org,
+            categoria=categoria,
+            fecha="2026-02-10",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=99999,
+            descripcion="Fuera organizacion",
+        )
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["ingresos_contables"], 25000)
+        self.assertEqual(response.context["total_transacciones"], 1)
+
+    def test_libro_caja_csv_exporta_solo_transacciones_ordenadas(self):
+        categoria_ingreso = Category.objects.create(nombre="Ingreso libro", tipo=Category.Tipo.INGRESO, activa=True)
+        categoria_egreso = Category.objects.create(nombre="Egreso libro", tipo=Category.Tipo.EGRESO, activa=True)
+        documento = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="LC-1",
+            fecha_emision="2026-02-02",
+            monto_total=15000,
+        )
+        transaccion_2 = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_egreso,
+            fecha="2026-02-03",
+            tipo=Transaction.Tipo.EGRESO,
+            monto=5000,
+            descripcion="Egreso libro",
+        )
+        transaccion_1 = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria_ingreso,
+            fecha="2026-02-02",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=15000,
+            descripcion="Ingreso libro",
+        )
+        transaccion_1.documentos_tributarios.add(documento)
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-02",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=99000,
+            clases_asignadas=1,
+        )
+
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = list(csv.reader(response.content.decode("utf-8-sig").splitlines()))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rows[0][0], "numero correlativo")
+        self.assertIn("Msg", rows[0])
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[1][0], "1")
+        self.assertEqual(rows[2][0], "2")
+        self.assertEqual(rows[1][1], "2026-02-02")
+        self.assertEqual(rows[1][4], "Ingreso libro")
+        self.assertIn("Factura afecta #LC-1", rows[1][7])
+        self.assertIn("Ingreso libro", rows[1][8])
+        self.assertEqual(rows[2][1], "2026-02-03")
+        self.assertNotIn("99000", response.content.decode("utf-8-sig"))
+
+    def test_libro_caja_csv_respeta_organizacion_y_periodo(self):
+        categoria = Category.objects.create(nombre="Ingreso libro filtros", tipo=Category.Tipo.INGRESO, activa=True)
+        otra_org = Organizacion.objects.create(nombre="Org Libro", razon_social="Org Libro SPA", rut="97.777.777-7")
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-02",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=15000,
+            descripcion="Incluida",
+        )
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-03-02",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=99000,
+            descripcion="Fuera periodo",
+        )
+        Transaction.objects.create(
+            organizacion=otra_org,
+            categoria=categoria,
+            fecha="2026-02-02",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=88000,
+            descripcion="Fuera organizacion",
+        )
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        contenido = response.content.decode("utf-8-sig")
+        rows = list(csv.reader(contenido.splitlines()))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(rows), 2)
+        self.assertIn("Incluida", contenido)
+        self.assertNotIn("Fuera periodo", contenido)
+        self.assertNotIn("Fuera organizacion", contenido)
+
+    def test_libro_caja_csv_bloquea_periodo_todos(self):
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": "todos", "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "requiere seleccionar un mes y un año", status_code=400)
+
+    def test_libro_caja_csv_permisos(self):
+        self.client.force_login(self.user_sin_rol)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(self.user_profesor)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:export_libro_caja_csv"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def _xlsx_rows(self, response):
+        workbook = load_workbook(BytesIO(response.content))
+        return list(workbook.active.iter_rows(values_only=True))
+
+    def test_export_pagos_alumnos_xlsx_respeta_periodo_organizacion_y_no_es_contable(self):
+        otra_org = Organizacion.objects.create(nombre="Org Pagos XLSX", razon_social="Org Pagos XLSX SPA", rut="76.111.111-1")
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-04",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            aplica_iva=False,
+            monto_referencia=45000,
+            clases_asignadas=4,
+            observaciones="Pago incluido",
+        )
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-03-04",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            aplica_iva=False,
+            monto_referencia=99000,
+            clases_asignadas=4,
+            observaciones="Fuera periodo",
+        )
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=otra_org,
+            fecha_pago="2026-02-04",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            aplica_iva=False,
+            monto_referencia=88000,
+            clases_asignadas=4,
+            observaciones="Fuera organizacion",
+        )
+
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:export_pagos_alumnos_xlsx"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = self._xlsx_rows(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rows[0][0], "Fecha pago")
+        self.assertIn("Estado", rows[0])
+        contenido = str(rows)
+        self.assertIn("Pago incluido", contenido)
+        self.assertNotIn("Fuera periodo", contenido)
+        self.assertNotIn("Fuera organizacion", contenido)
+
+    def test_export_transacciones_xlsx_es_contable_y_no_duplica_pagos(self):
+        categoria = Category.objects.create(nombre="Ingreso XLSX", tipo=Category.Tipo.INGRESO, activa=True)
+        Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-05",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=12000,
+            descripcion="Transaccion real",
+        )
+        Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-02-05",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=99000,
+            clases_asignadas=1,
+            observaciones="Pago operacional no contable",
+        )
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("finanzas:export_transacciones_xlsx"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = self._xlsx_rows(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rows[0][0], "Fecha")
+        self.assertIn("Msg", rows[0])
+        contenido = str(rows)
+        self.assertIn("Transaccion real", contenido)
+        self.assertNotIn("Pago operacional no contable", contenido)
+
+    def test_export_pagos_profesores_xlsx_usa_fuente_operacional_existente(self):
+        disciplina = Disciplina.objects.create(organizacion=self.org, nombre="Danza XLSX")
+        sesion = SesionClase.objects.create(
+            disciplina=disciplina,
+            fecha="2026-02-06",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        sesion.profesores.add(self.persona_profesor)
+        PersonaRol.objects.filter(persona=self.persona_profesor, rol=self.rol_profesor, organizacion=self.org).update(
+            valor_clase=Decimal("10000"),
+            retencion_sii=Decimal("10"),
+        )
+        Asistencia.objects.create(sesion=sesion, persona=self.persona_no_admin, estado=Asistencia.Estado.PRESENTE)
+
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:export_pagos_profesores_xlsx"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        rows = self._xlsx_rows(response)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rows[0][0], "Periodo")
+        contenido = str(rows)
+        self.assertIn("Profesor Fin", contenido)
+        self.assertIn("Estimado operacional", contenido)
+        self.assertIn("9000", contenido)
+
+    def test_exports_financieros_xlsx_bloquean_roles_no_autorizados(self):
+        for url_name in (
+            "finanzas:export_pagos_alumnos_xlsx",
+            "finanzas:export_pagos_profesores_xlsx",
+            "finanzas:export_transacciones_xlsx",
+        ):
+            self.client.force_login(self.user_solo_lectura)
+            response = self.client.get(reverse(url_name), {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk})
+            self.assertEqual(response.status_code, 403)
+
+            self.client.force_login(self.user_profesor)
+            response = self.client.get(reverse(url_name), {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk})
+            self.assertEqual(response.status_code, 403)
+
+            self.client.force_login(self.user_finanzas)
+            response = self.client.get(reverse(url_name), {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk})
+            self.assertEqual(response.status_code, 200)
 
     def test_pago_edit_get_redirige_a_listado_con_modal(self):
         pago = Payment.objects.create(
@@ -1576,6 +2006,174 @@ class FinanzasIntegrationTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("documento_tributario", form.errors)
+
+    def test_payment_form_filtra_documentos_por_organizacion_y_periodo(self):
+        documento_febrero = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="FEB-1",
+            fecha_emision="2026-02-10",
+            monto_total=10000,
+        )
+        documento_marzo = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="MAR-1",
+            fecha_emision="2026-03-10",
+            monto_total=10000,
+        )
+        otra_org = Organizacion.objects.create(nombre="Org Otra", razon_social="Org Otra SPA", rut="66.666.666-6")
+        documento_otra_org = DocumentoTributario.objects.create(
+            organizacion=otra_org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="OTRA-1",
+            fecha_emision="2026-02-10",
+            monto_total=10000,
+        )
+
+        form = PaymentForm(
+            initial={"organizacion": self.org.pk},
+            periodo_mes=2,
+            periodo_anio=2026,
+            organizacion=self.org,
+        )
+
+        queryset = form.fields["documento_tributario"].queryset
+        self.assertIn(documento_febrero, queryset)
+        self.assertNotIn(documento_marzo, queryset)
+        self.assertNotIn(documento_otra_org, queryset)
+
+    def test_payment_form_edicion_muestra_documento_actual_fuera_de_periodo(self):
+        documento_marzo = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="MAR-EDIT",
+            fecha_emision="2026-03-10",
+            monto_total=10000,
+        )
+        pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.org,
+            documento_tributario=documento_marzo,
+            fecha_pago="2026-02-28",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+
+        form = PaymentForm(instance=pago, periodo_mes=2, periodo_anio=2026, organizacion=self.org)
+
+        self.assertIn(documento_marzo, form.fields["documento_tributario"].queryset)
+
+    def test_payment_form_rechaza_documento_fuera_de_periodo_en_creacion(self):
+        documento_marzo = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="MAR-POST",
+            fecha_emision="2026-03-10",
+            monto_total=10000,
+        )
+
+        form = PaymentForm(
+            data={
+                "organizacion": self.org.pk,
+                "persona": self.estudiante.pk,
+                "documento_tributario": documento_marzo.pk,
+                "fecha_pago": "2026-02-28",
+                "metodo_pago": "efectivo",
+                "monto_referencia": "10000",
+                "clases_asignadas": "1",
+            },
+            periodo_mes=2,
+            periodo_anio=2026,
+            organizacion=self.org,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("documento_tributario", form.errors)
+
+    def test_transaction_form_filtra_documentos_por_organizacion_y_periodo(self):
+        documento_febrero = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="TX-FEB",
+            fecha_emision="2026-02-10",
+            monto_total=10000,
+        )
+        documento_marzo = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="TX-MAR",
+            fecha_emision="2026-03-10",
+            monto_total=10000,
+        )
+        otra_org = Organizacion.objects.create(nombre="Org Docs TX", razon_social="Org Docs TX SPA", rut="77.777.777-7")
+        documento_otra_org = DocumentoTributario.objects.create(
+            organizacion=otra_org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="TX-OTRA",
+            fecha_emision="2026-02-10",
+            monto_total=10000,
+        )
+
+        form = TransactionForm(periodo_mes=2, periodo_anio=2026, organizacion=self.org)
+
+        queryset = form.fields["documentos_tributarios"].queryset
+        self.assertIn(documento_febrero, queryset)
+        self.assertNotIn(documento_marzo, queryset)
+        self.assertNotIn(documento_otra_org, queryset)
+
+    def test_transaction_form_edicion_muestra_documento_actual_fuera_de_periodo(self):
+        categoria = Category.objects.create(nombre="Ingreso TX", tipo=Category.Tipo.INGRESO)
+        documento_marzo = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="TX-MAR-EDIT",
+            fecha_emision="2026-03-10",
+            monto_total=10000,
+        )
+        transaccion = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-28",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=10000,
+            descripcion="Movimiento",
+        )
+        transaccion.documentos_tributarios.add(documento_marzo)
+
+        form = TransactionForm(instance=transaccion, periodo_mes=2, periodo_anio=2026, organizacion=self.org)
+
+        self.assertIn(documento_marzo, form.fields["documentos_tributarios"].queryset)
+
+    def test_transaction_form_rechaza_documento_de_otra_organizacion(self):
+        categoria = Category.objects.create(nombre="Ingreso Otra Org", tipo=Category.Tipo.INGRESO)
+        otra_org = Organizacion.objects.create(nombre="Org Docs Mal", razon_social="Org Docs Mal SPA", rut="88.888.888-8")
+        documento_otra_org = DocumentoTributario.objects.create(
+            organizacion=otra_org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="TX-MAL",
+            fecha_emision="2026-02-10",
+            monto_total=10000,
+        )
+
+        form = TransactionForm(
+            data={
+                "organizacion": self.org.pk,
+                "categoria": categoria.pk,
+                "fecha": "2026-02-28",
+                "tipo": "",
+                "monto": "10000",
+                "descripcion": "Movimiento",
+                "documentos_tributarios": [documento_otra_org.pk],
+            },
+            periodo_mes=2,
+            periodo_anio=2026,
+            organizacion=self.org,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("documentos_tributarios", form.errors)
 
     def test_parse_tax_document_dte_xml_normaliza_boleta_venta(self):
         xml = b"""
