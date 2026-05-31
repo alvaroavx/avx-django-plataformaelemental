@@ -12,8 +12,8 @@
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_alumnos_xlsx' %}?{{ request.GET.urlencode }}" title="Pagos alumnos Excel">
         <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Pagos alumnos XLSX</span>
       </a>
-      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_profesores_xlsx' %}?{{ request.GET.urlencode }}" title="Pagos profesores Excel">
-        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Pagos profesores XLSX</span>
+      <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_profesores_xlsx' %}?{{ request.GET.urlencode }}" title="Estimación pagos profesores Excel">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="finanzas-btn-label">Estimación profesores XLSX</span>
       </a>
       <a class="btn btn-sm btn-primary finanzas-btn" href="{% url 'finanzas:export_libro_caja_csv' %}?{{ request.GET.urlencode }}" title="Exportar libro de caja CSV">
         <i class="bi bi-journal-arrow-down"></i><span class="finanzas-btn-label">Libro de caja CSV</span>
@@ -26,6 +26,36 @@
       </a>
     </div>
   </div>
+
+  {% if puede_operar_pagos or puede_operar_documentos or puede_operar_transacciones %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <div>
+          <div class="text-muted small text-uppercase">Acciones operativas</div>
+          <div class="fw-semibold">Iniciar registros principales del periodo seleccionado</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          {% if puede_operar_pagos %}
+            <a class="btn btn-success finanzas-btn" href="{{ agregar_pago_url }}" title="Agregar pago">
+              <i class="bi bi-cash-coin"></i><span class="finanzas-btn-label">Agregar pago</span>
+            </a>
+          {% endif %}
+          {% if puede_operar_documentos %}
+            <a class="btn btn-outline-primary finanzas-btn" href="{{ agregar_documento_url }}" title="Agregar documento">
+              <i class="bi bi-file-earmark-text"></i><span class="finanzas-btn-label">Agregar documento</span>
+            </a>
+          {% endif %}
+          {% if puede_operar_transacciones %}
+            <a class="btn btn-outline-success finanzas-btn" href="{{ agregar_transaccion_url }}" title="Agregar transacción">
+              <i class="bi bi-arrow-left-right"></i><span class="finanzas-btn-label">Agregar transacción</span>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="row g-3">
     <div class="col-md-3">

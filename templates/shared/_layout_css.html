@@ -1,0 +1,110 @@
+<style>
+  :root {
+    --ea-sidebar-bg: #111827;
+    --ea-sidebar-text: #e5e7eb;
+    --ea-sidebar-muted: #9ca3af;
+    --ea-accent: #0f766e;
+    --ea-surface: #f6f7f9;
+  }
+
+  body.elemental-shell {
+    min-height: 100vh;
+    background: var(--ea-surface);
+  }
+
+  .elemental-layout {
+    min-height: 100vh;
+  }
+
+  .elemental-sidebar-desktop {
+    width: 280px;
+    min-height: 100vh;
+    background: var(--ea-sidebar-bg);
+    color: var(--ea-sidebar-text);
+    position: sticky;
+    top: 0;
+  }
+
+  .elemental-main {
+    min-width: 0;
+  }
+
+  .elemental-brand {
+    color: #fff;
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+
+  .elemental-nav-link {
+    color: var(--ea-sidebar-text);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    border-radius: 0.85rem;
+    padding: 0.7rem 0.85rem;
+  }
+
+  .elemental-nav-link:hover,
+  .elemental-nav-link.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .elemental-nav-child {
+    color: var(--ea-sidebar-muted);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.7rem;
+    padding: 0.45rem 0.65rem 0.45rem 2.15rem;
+    font-size: 0.92rem;
+  }
+
+  .elemental-nav-child:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .elemental-context-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+  }
+
+  .elemental-content {
+    padding: 1rem;
+  }
+
+  .elemental-footer {
+    color: #6b7280;
+    font-size: 0.85rem;
+  }
+
+  .elemental-app-card {
+    border: 0;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .elemental-app-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  }
+
+  @media (min-width: 992px) {
+    .elemental-content {
+      padding: 1.5rem;
+    }
+  }
+
+  @media (max-width: 991.98px) {
+    .elemental-context-bar {
+      position: sticky;
+      top: 0;
+    }
+  }
+</style>

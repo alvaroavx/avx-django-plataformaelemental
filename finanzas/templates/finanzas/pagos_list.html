@@ -359,7 +359,7 @@
       bootstrap.Modal.getOrCreateInstance(personaModalEl).show();
     }
     const createModalEl = document.getElementById("registrarPagoModal");
-    if (createModalEl && {{ form.errors|yesno:"true,false" }}) {
+    if (createModalEl && ({{ form.errors|yesno:"true,false" }} || {{ open_registrar_pago|yesno:"true,false" }})) {
       bootstrap.Modal.getOrCreateInstance(createModalEl).show();
     }
     const editModalEl = document.getElementById("editarPagoModal");

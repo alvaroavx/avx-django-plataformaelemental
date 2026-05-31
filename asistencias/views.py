@@ -10,7 +10,13 @@ from django.utils import timezone
 
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
-from personas.permissions import ACCION_EXPORTAR_DATOS, permiso_requerido
+from personas.permissions import (
+    ACCION_EXPORTAR_DATOS,
+    ACCION_OPERAR_PAGOS,
+    ACCION_VER_FINANZAS,
+    permiso_requerido,
+    usuario_tiene_permiso,
+)
 from plataformaelemental.context import (
     aplicar_periodo,
     descripcion_periodo,
@@ -30,7 +36,7 @@ from .forms import (
     SesionesMasivasForm,
 )
 from .models import Asistencia, Disciplina, SesionClase
-from .selectors import asistencias_export_queryset
+from .selectors import asistencias_export_queryset, estudiantes_operativos_periodo
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
 from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
@@ -58,6 +64,15 @@ def _url_actual_con_filtros(request, remove_params=None, **extra_params):
         params[key] = value
     query = params.urlencode()
     return f"{request.path}?{query}" if query else request.path
+
+
+def _url_con_filtros_extra(request, nombre_url, **extra_params):
+    url = reverse(nombre_url)
+    params = request.GET.copy()
+    for key, value in extra_params.items():
+        params[key] = value
+    query = params.urlencode()
+    return f"{url}?{query}" if query else url
 
 
 @permiso_requerido(ACCION_EXPORTAR_DATOS)
@@ -376,41 +391,29 @@ def sesiones_legacy_redirect(request):
 def estudiantes_list(request):
     """Listado de estudiantes con estado de asistencia del período seleccionado."""
     context = nav_context(request)
-    estudiantes = (
-        Persona.objects.filter(roles__rol__codigo="ESTUDIANTE")
-        .distinct()
-        .prefetch_related("roles__organizacion", "roles__rol")
-    )
+    organizacion = organizacion_desde_request(request)
     org_id = request.GET.get("organizacion")
-    if org_id:
-        estudiantes = estudiantes.filter(roles__organizacion_id=org_id).distinct()
-
-    contexto = []
-    for persona in estudiantes:
-        asistencias_mes_qs = Asistencia.objects.filter(
-            persona=persona,
-            **filtros_periodo("sesion__fecha", request=request),
-        )
-        if org_id:
-            asistencias_mes_qs = asistencias_mes_qs.filter(sesion__disciplina__organizacion_id=org_id)
-        asistencias_mes = asistencias_mes_qs.count()
-        ultima_asistencia = (
-            Asistencia.objects.filter(persona=persona)
-            .select_related("sesion")
-            .order_by("-sesion__fecha")
-            .first()
-        )
-        contexto.append(
-            {
-                "persona": persona,
-                "asistencias_mes": asistencias_mes,
-                "ultima_asistencia": ultima_asistencia.sesion.fecha if ultima_asistencia else None,
-                "activo_mes": asistencias_mes > 0,
-            }
-        )
+    contexto = estudiantes_operativos_periodo(request, organizacion=organizacion)
     if request.GET.get("sin_asistencia") == "1":
         contexto = [item for item in contexto if not item["activo_mes"]]
+    puede_operar_pagos = usuario_tiene_permiso(request.user, ACCION_OPERAR_PAGOS, organizacion=organizacion)
+    puede_ver_finanzas = usuario_tiene_permiso(request.user, ACCION_VER_FINANZAS, organizacion=organizacion)
+    for item in contexto:
+        item["perfil_url"] = _url_con_filtros(request, "personas:persona_detail", pk=item["persona"].pk)
+        item["registrar_pago_url"] = _url_con_filtros_extra(
+            request,
+            "finanzas:pagos_list",
+            persona=item["persona"].pk,
+            open="registrar_pago",
+        )
+        item["asistencias_url"] = _url_con_filtros_extra(
+            request,
+            "asistencias:asistencias_list",
+            q=item["persona"].nombre_completo,
+        )
     context["estudiantes"] = contexto
+    context["puede_operar_pagos"] = puede_operar_pagos
+    context["puede_ver_finanzas"] = puede_ver_finanzas
     context["filtros"] = {
         "organizacion": org_id,
         "sin_asistencia": request.GET.get("sin_asistencia"),
@@ -851,7 +854,22 @@ def sesion_detail(request, pk):
                     sesion.disciplina.organizacion,
                 )
                 if persona:
-                    messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
+                    agregar_a_sesion = request.POST.get("agregar_a_sesion") == "1"
+                    if agregar_a_sesion:
+                        _, created = Asistencia.objects.get_or_create(
+                            sesion=sesion,
+                            persona=persona,
+                            defaults={"estado": Asistencia.Estado.PRESENTE},
+                        )
+                        if sesion.estado == SesionClase.Estado.PROGRAMADA:
+                            sesion.estado = SesionClase.Estado.COMPLETADA
+                            sesion.save(update_fields=["estado"])
+                        if created:
+                            messages.success(request, "Persona creada y agregada a la asistencia.")
+                        else:
+                            messages.success(request, "Persona creada; la asistencia ya existía para esta sesión.")
+                    else:
+                        messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
                     return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "eliminar_asistente" in request.POST:
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)

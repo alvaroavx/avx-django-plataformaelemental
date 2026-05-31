@@ -41,6 +41,12 @@ from .decorators import (
     pagos_required,
     transacciones_required,
 )
+from personas.permissions import (
+    ACCION_OPERAR_DOCUMENTOS,
+    ACCION_OPERAR_PAGOS,
+    ACCION_OPERAR_TRANSACCIONES,
+    usuario_tiene_permiso,
+)
 from .forms import (
     CategoryForm,
     DocumentoTributarioForm,
@@ -256,6 +262,15 @@ def _rol_financiero_documento(documento):
     return "sin_clasificar"
 
 
+def _url_dashboard_accion(request, nombre_url, **extra_params):
+    url = reverse(nombre_url)
+    params = request.GET.copy()
+    for key, value in extra_params.items():
+        params[key] = value
+    query = params.urlencode()
+    return f"{url}?{query}" if query else url
+
+
 @finanzas_read_required
 def dashboard(request):
     context = _base_context(request)
@@ -275,6 +290,28 @@ def dashboard(request):
         )
     )
     context["ayuda_seccion"] = _ayuda_finanzas("dashboard")
+    context["puede_operar_pagos"] = usuario_tiene_permiso(
+        request.user,
+        ACCION_OPERAR_PAGOS,
+        organizacion=organizacion,
+    )
+    context["puede_operar_documentos"] = usuario_tiene_permiso(
+        request.user,
+        ACCION_OPERAR_DOCUMENTOS,
+        organizacion=organizacion,
+    )
+    context["puede_operar_transacciones"] = usuario_tiene_permiso(
+        request.user,
+        ACCION_OPERAR_TRANSACCIONES,
+        organizacion=organizacion,
+    )
+    context["agregar_pago_url"] = _url_dashboard_accion(request, "finanzas:pagos_list", open="registrar_pago")
+    context["agregar_documento_url"] = _url_dashboard_accion(request, "finanzas:documento_tributario_importar")
+    context["agregar_transaccion_url"] = _url_dashboard_accion(
+        request,
+        "finanzas:transacciones_list",
+        open="nueva_transaccion",
+    )
     return render(request, "finanzas/dashboard.html", context)
 
 
@@ -349,14 +386,18 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     pagos_qs = pagos_queryset(request, organizacion=organizacion, mes=periodo["mes"], anio=periodo["anio"])
     q = request.GET.get("q")
     metodo = request.GET.get("metodo")
+    persona_id = request.GET.get("persona")
 
     resumen_pagos_data = resumen_pagos(pagos_qs)
     pagos = enriquecer_pagos_para_listado(list(pagos_qs))
     for pago in pagos:
         pago.url_edicion = _url_pagos_list_con_edicion(request, pago.pk)
     if form is None:
+        form_initial = {"organizacion": organizacion.pk} if organizacion else {}
+        if persona_id:
+            form_initial["persona"] = persona_id
         form = PaymentForm(
-            initial={"organizacion": organizacion.pk} if organizacion else None,
+            initial=form_initial or None,
             periodo_mes=periodo["mes"],
             periodo_anio=periodo["anio"],
             organizacion=organizacion,
@@ -395,6 +436,7 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             "pagos_list_url_sin_edicion": _url_pagos_list_sin_edicion(request),
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,
+            "open_registrar_pago": request.GET.get("open") == "registrar_pago",
             "ayuda_seccion": _ayuda_finanzas("pagos"),
         }
     )
@@ -405,9 +447,12 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
 def pagos_list(request):
     organizacion = organizacion_desde_request(request)
     periodo = resolver_periodo(request)
+    form_initial = {"organizacion": organizacion.pk} if organizacion else {}
+    if request.GET.get("persona"):
+        form_initial["persona"] = request.GET.get("persona")
     form = PaymentForm(
         request.POST if request.method == "POST" and "guardar_pago" in request.POST else None,
-        initial={"organizacion": organizacion.pk} if organizacion else None,
+        initial=form_initial or None,
         periodo_mes=periodo["mes"],
         periodo_anio=periodo["anio"],
         organizacion=organizacion,
@@ -879,6 +924,7 @@ def transacciones_list(request):
             "total_ingresos": total_ingresos,
             "total_egresos": total_egresos,
             "balance_transacciones": total_ingresos - total_egresos,
+            "open_nueva_transaccion": request.GET.get("open") == "nueva_transaccion",
             "ayuda_seccion": _ayuda_finanzas("transacciones"),
         }
     )
@@ -1035,8 +1081,8 @@ def export_pagos_profesores_xlsx(request):
         resumen_profesores_periodo_queryset(request, organizacion=organizacion)
     )
     return xlsx_response(
-        filename=f"pagos_profesores_{periodo_sufijo_archivo(periodo)}.xlsx",
-        sheet_title="Pagos profesores",
+        filename=f"estimacion_pagos_profesores_{periodo_sufijo_archivo(periodo)}.xlsx",
+        sheet_title="Estimacion profesores",
         headers=PAGOS_PROFESORES_XLSX_HEADERS,
         rows=filas_export_pagos_profesores(
             roles,

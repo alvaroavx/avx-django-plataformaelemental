@@ -183,6 +183,17 @@ Puede respaldar:
 
 No debe contarse como ingreso o egreso por si solo.
 
+## Dashboard Financiero Operativo
+- El dashboard financiero expone accesos rapidos para iniciar las tres acciones principales del periodo activo:
+  - `Agregar pago`: abre el flujo de `Payment` en `finanzas:pagos_list` con `open=registrar_pago`.
+  - `Agregar documento`: usa el flujo existente de importacion/revision de `DocumentoTributario` en `finanzas:documento_tributario_importar`.
+  - `Agregar transaccion`: abre el flujo de `Transaction` en `finanzas:transacciones_list` con `open=nueva_transaccion`.
+- Los enlaces preservan `periodo_mes`, `periodo_anio` y `organizacion`.
+- Los botones solo se muestran a usuarios con permisos mutables del subdominio correspondiente: admin y finanzas.
+- Solo lectura puede ver dashboard financiero si tiene permiso de lectura, pero no ve accesos mutables.
+- Profesor no accede a finanzas completa ni ve acciones financieras.
+- Estos accesos no mezclan responsabilidades: crear un `Payment` no crea una `Transaction`, crear una `Transaction` no crea un `Payment`, y un `DocumentoTributario` no se trata como movimiento financiero.
+
 ## Libro De Caja
 - Fuente unica: `Transaction`.
 - Orden de exportacion: `fecha` ascendente + `id` ascendente.
@@ -192,11 +203,13 @@ No debe contarse como ingreso o egreso por si solo.
 
 ## Exportaciones Excel v1.0
 - `pagos_alumnos_YYYY_MM.xlsx`: fuente `Payment`; export operacional de cobranza/clases, no ingreso contable.
-- `pagos_profesores_YYYY_MM.xlsx`: fuente calculada desde sesiones/asistencias y `PersonaRol.valor_clase`/`retencion_sii`; es estimacion operacional, no `Transaction`.
+- `estimacion_pagos_profesores_YYYY_MM.xlsx`: fuente calculada desde sesiones/asistencias y `PersonaRol.valor_clase`/`retencion_sii`; es estimacion operacional, no `Transaction`.
 - `transacciones_YYYY_MM.xlsx`: fuente `Transaction`; export contable alineado con libro de caja, sin incluir pagos operacionales directamente.
 - Todas las exportaciones respetan periodo y organizacion activa.
 - Las exportaciones financieras usan el permiso `exportar_datos`; rol `admin` y rol `finanzas` pueden exportar, profesor y solo lectura no.
 - No existe aun una relacion formal `Payment -> Transaction`; por eso los pagos de alumnos no aparecen en transacciones salvo que exista una `Transaction` real creada aparte.
+- La estimacion de pagos a profesores no equivale a egreso contable cerrado ni reemplaza una `Transaction`; si se paga efectivamente, debe registrarse como movimiento contable separado.
+- Las metricas financieras visibles en la tabla operacional de estudiantes vienen de `Payment` y `AttendanceConsumption`; son cobranza operacional y no deben sumarse al bloque contable.
 
 ## Prevencion De Doble Conteo
 - El dashboard separa bloque contable y bloque operacional.

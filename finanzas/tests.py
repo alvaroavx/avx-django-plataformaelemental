@@ -266,6 +266,77 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(response.context["ingresos_contables"], 25000)
         self.assertEqual(response.context["total_transacciones"], 1)
 
+    def test_dashboard_finanzas_admin_y_finanzas_ven_acciones_operativas(self):
+        params = {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk}
+        for usuario in (self.user_admin, self.user_finanzas):
+            self.client.force_login(usuario)
+            response = self.client.get(reverse("finanzas:dashboard"), params)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Agregar pago")
+            self.assertContains(response, "Agregar documento")
+            self.assertContains(response, "Agregar transacción")
+            self.assertContains(response, reverse("finanzas:pagos_list"))
+            self.assertContains(response, "open=registrar_pago")
+            self.assertContains(response, reverse("finanzas:documento_tributario_importar"))
+            self.assertContains(response, reverse("finanzas:transacciones_list"))
+            self.assertContains(response, "open=nueva_transaccion")
+            self.assertContains(response, f"periodo_mes={params['periodo_mes']}")
+            self.assertContains(response, f"periodo_anio={params['periodo_anio']}")
+            self.assertContains(response, f"organizacion={params['organizacion']}")
+
+    def test_dashboard_finanzas_solo_lectura_no_ve_acciones_mutables(self):
+        self.client.force_login(self.user_solo_lectura)
+        response = self.client.get(
+            reverse("finanzas:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Agregar pago")
+        self.assertNotContains(response, "Agregar documento")
+        self.assertNotContains(response, "Agregar transacción")
+
+    def test_dashboard_finanzas_profesor_no_accede_a_acciones_financieras(self):
+        self.client.force_login(self.user_profesor)
+        response = self.client.get(
+            reverse("finanzas:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_transacciones_list_abre_modal_desde_dashboard(self):
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:transacciones_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "open": "nueva_transaccion",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["open_nueva_transaccion"])
+
+    def test_acciones_dashboard_no_crean_modelos_al_abrir_flujos(self):
+        self.client.force_login(self.user_finanzas)
+        acciones = [
+            (reverse("finanzas:pagos_list"), {"open": "registrar_pago"}),
+            (reverse("finanzas:transacciones_list"), {"open": "nueva_transaccion"}),
+            (reverse("finanzas:documento_tributario_importar"), {}),
+        ]
+        for url, extra in acciones:
+            params = {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk, **extra}
+            response = self.client.get(url, params)
+            self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(Payment.objects.count(), 0)
+        self.assertEqual(Transaction.objects.count(), 0)
+        self.assertEqual(DocumentoTributario.objects.count(), 0)
+
     def test_libro_caja_csv_exporta_solo_transacciones_ordenadas(self):
         categoria_ingreso = Category.objects.create(nombre="Ingreso libro", tipo=Category.Tipo.INGRESO, activa=True)
         categoria_egreso = Category.objects.create(nombre="Egreso libro", tipo=Category.Tipo.EGRESO, activa=True)
@@ -529,6 +600,23 @@ class FinanzasAccessTests(TestCase):
             self.client.force_login(self.user_finanzas)
             response = self.client.get(reverse(url_name), {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk})
             self.assertEqual(response.status_code, 200)
+
+    def test_pagos_list_permita_abrir_modal_con_estudiante_preseleccionado(self):
+        self.client.force_login(self.user_finanzas)
+        response = self.client.get(
+            reverse("finanzas:pagos_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "persona": self.persona_no_admin.pk,
+                "open": "registrar_pago",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["open_registrar_pago"])
+        self.assertEqual(str(response.context["form"].initial["persona"]), str(self.persona_no_admin.pk))
 
     def test_pago_edit_get_redirige_a_listado_con_modal(self):
         pago = Payment.objects.create(

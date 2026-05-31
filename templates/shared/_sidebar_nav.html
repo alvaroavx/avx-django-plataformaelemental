@@ -1,0 +1,23 @@
+{% load static %}
+<div class="p-3">
+  <a class="elemental-brand d-flex align-items-center gap-2 mb-4" href="{% url 'elemental_apps' %}">
+    <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
+    <span class="fw-bold">Elemental Apps</span>
+  </a>
+  <nav class="d-flex flex-column gap-1">
+    {% for item in elemental_nav_items %}
+      <a class="elemental-nav-link {% if item.active %}active{% endif %}" href="{{ item.url }}">
+        <i class="bi {{ item.icon }}"></i><span>{{ item.label }}</span>
+      </a>
+      {% if item.children and item.active %}
+        <div class="d-flex flex-column mb-2">
+          {% for child in item.children %}
+            <a class="elemental-nav-child" href="{{ child.url }}">
+              <i class="bi {{ child.icon }}"></i><span>{{ child.label }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </nav>
+</div>

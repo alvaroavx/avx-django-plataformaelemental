@@ -22,6 +22,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from asistencias.forms import CustomLoginForm
+from .views import elemental_apps
 from django.utils.translation import gettext_lazy as _
 
 admin.site.site_header = _("Administración Plataforma Elemental")
@@ -29,7 +30,7 @@ admin.site.site_title = _("Panel de control")
 admin.site.index_title = _("Gestión de operaciones")
 
 urlpatterns = [
-    path("", RedirectView.as_view(url="/asistencias/", permanent=False)),
+    path("", elemental_apps, name="elemental_apps"),
     path("admin/", admin.site.urls),
     path(
         "accounts/login/",
@@ -44,7 +45,7 @@ urlpatterns = [
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += [
-    path("app/", RedirectView.as_view(url="/asistencias/", permanent=False)),
+    path("app/", RedirectView.as_view(url="/", permanent=False)),
     path("asistencias/", include("asistencias.urls")),
     path("personas/", include("personas.urls")),
     path("finanzas/", include("finanzas.urls")),

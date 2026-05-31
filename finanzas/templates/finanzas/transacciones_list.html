@@ -143,7 +143,7 @@
 <script>
   (function () {
     const modalEl = document.getElementById("nuevaTransaccionModal");
-    if (modalEl && {{ form.errors|yesno:"true,false" }}) {
+    if (modalEl && ({{ form.errors|yesno:"true,false" }} || {{ open_nueva_transaccion|yesno:"true,false" }})) {
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
   })();

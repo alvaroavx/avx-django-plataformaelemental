@@ -207,6 +207,11 @@
               <div class="text-danger small">{{ error }}</div>
             {% endfor %}
           </div>
+          <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="agregar_a_sesion" name="agregar_a_sesion" value="1" checked>
+            <label class="form-check-label" for="agregar_a_sesion">Agregar a esta sesión</label>
+            <div class="form-text">Si está activo, se creará la asistencia de inmediato sin duplicarla.</div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>

@@ -600,6 +600,88 @@ class AsistenciasViewTests(TestCase):
                 rol__codigo="ESTUDIANTE",
             ).exists()
         )
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=persona).exists())
+
+    def test_sesion_detail_crea_persona_y_agrega_a_sesion_con_switch_activo(self):
+        url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+
+        response = self.client.post(
+            url,
+            {
+                "crear_persona_estudiante": "1",
+                "nombres": "Lucia",
+                "apellidos": "Asistente",
+                "telefono": "(+56) 9 1111-2222",
+                "agregar_a_sesion": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        persona = Persona.objects.get(nombres="Lucia", apellidos="Asistente")
+        self.assertTrue(Asistencia.objects.filter(sesion=self.sesion, persona=persona).exists())
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
+
+    def test_sesion_detail_crear_persona_sin_identidad_falla_sin_asistencia(self):
+        response = self.client.post(
+            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}),
+            {
+                "crear_persona_estudiante": "1",
+                "nombres": "Sin",
+                "apellidos": "Telefono",
+                "telefono": "",
+                "agregar_a_sesion": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Debes ingresar al menos un telefono")
+        self.assertFalse(Persona.objects.filter(nombres="Sin", apellidos="Telefono").exists())
+
+    def test_sesion_detail_alta_rapida_no_duplica_asistencia(self):
+        url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+        response = self.client.post(
+            url,
+            {
+                "crear_persona_estudiante": "1",
+                "nombres": "Duplicada",
+                "apellidos": "Asistencia",
+                "telefono": "+56922223333",
+                "agregar_a_sesion": "1",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        persona = Persona.objects.get(nombres="Duplicada", apellidos="Asistencia")
+
+        response = self.client.post(
+            url,
+            {
+                "agregar_asistentes": "1",
+                "estudiantes": [str(persona.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Asistencia.objects.filter(sesion=self.sesion, persona=persona).count(), 1)
+
+    def test_sesion_detail_usuario_sin_permiso_no_crea_persona_ni_asistencia(self):
+        User = get_user_model()
+        usuario = User.objects.create_user("sin_permiso_sesion", password="secret123")
+        self.client.force_login(usuario)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}),
+            {
+                "crear_persona_estudiante": "1",
+                "nombres": "No",
+                "apellidos": "Autorizado",
+                "telefono": "+56933334444",
+                "agregar_a_sesion": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Persona.objects.filter(nombres="No", apellidos="Autorizado").exists())
 
     def test_sesion_detail_muestra_modal_para_crear_persona(self):
         response = self.client.get(
@@ -610,6 +692,79 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Nueva persona")
         self.assertContains(response, 'data-bs-target="#nuevaPersonaSesionModal"', html=False)
+        self.assertContains(response, "Agregar a esta sesión")
+
+    def test_estudiantes_list_muestra_metricas_operacionales_y_acciones(self):
+        pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago="2026-02-03",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=30000,
+            clases_asignadas=3,
+        )
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+        )
+        consumo = asistencia.consumo_financiero
+        consumo.pago = pago
+        consumo.estado = AttendanceConsumption.Estado.CONSUMIDO
+        consumo.save(update_fields=["pago", "estado"])
+
+        response = self.client.get(
+            reverse("asistencias:estudiantes_list"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        item = next(item for item in response.context["estudiantes"] if item["persona"] == self.estudiante)
+        self.assertEqual(item["clases_pagadas"], 3)
+        self.assertEqual(item["clases_usadas"], 1)
+        self.assertEqual(item["clases_restantes"], 2)
+        self.assertEqual(item["total_pagado"], Decimal("30000.00"))
+        self.assertEqual(item["asistencias_mes"], 1)
+        self.assertEqual(item["estado_financiero"], "OK")
+        self.assertContains(response, "Clases pagadas")
+        self.assertContains(response, "Registrar pago")
+        self.assertContains(response, "open=registrar_pago")
+
+    def test_estudiantes_list_respeta_periodo_y_organizacion_en_metricas(self):
+        otra_org = Organizacion.objects.create(
+            nombre="Otra Estudiantes",
+            razon_social="Otra Estudiantes SPA",
+            rut="44.444.444-4",
+        )
+        Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago="2026-03-03",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=90000,
+            clases_asignadas=9,
+        )
+        Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=otra_org,
+            fecha_pago="2026-02-03",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=80000,
+            clases_asignadas=8,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:estudiantes_list"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        item = next(item for item in response.context["estudiantes"] if item["persona"] == self.estudiante)
+        self.assertEqual(item["clases_pagadas"], 0)
+        self.assertEqual(item["total_pagado"], 0)
 
     def test_sesion_edit_muestra_solo_disciplinas_y_profesores_vigentes(self):
         disciplina_inactiva = Disciplina.objects.create(

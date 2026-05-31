@@ -30,6 +30,7 @@ Debe concentrar:
 - `Persona.email` mantiene una restriccion unica existente en base de datos; no se endurece ni se relaja en v1.0 sin auditoria previa.
 - `Persona.rut` se valida como unico global en formularios y validacion de modelo cuando existe, pero no se agrego constraint de base de datos hasta auditar y corregir datos productivos existentes.
 - Las altas rapidas desde `asistencias` y `finanzas` deben capturar telefono como identidad minima y guardarlo normalizado.
+- El alta rapida desde detalle de sesion puede agregar la persona recien creada a la asistencia de esa sesion mediante switch explicito; la organizacion usada siempre es la organizacion dueña de la sesion.
 - El comando `python manage.py auditar_datos_v1` revisa datos existentes sin modificar la base: personas sin identidad, duplicados de RUT/email/telefono, telefonos inconsistentes y posibles duplicados por nombre.
 - En `personas/listado`, el filtro por `rol` debe considerar asignaciones activas e inactivas; el filtro `estado` controla el estado de la `Persona`, no la vigencia del rol. La tabla debe mostrar si cada rol esta activo o inactivo.
 - El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
@@ -39,6 +40,7 @@ Debe concentrar:
 - En `personas/<id>/`, el bloque `Perfil profesor` debe mostrar el resumen economico del periodo con cards separadas para `pago bruto`, `retencion SII` en monto y `monto neto`; el porcentaje de retencion se configura en el rol, pero no se muestra como card principal.
 - En `personas/<id>/`, la tabla de sesiones del `Perfil profesor` debe ofrecer acciones operativas de sesion para `Ver sesion`, `Agregar asistentes` y cambiar estado de sesion desde un selector autoaplicado, manteniendo los filtros globales y abriendo el modal vigente de asistentes.
 - `personas` no reemplaza la operacion diaria de `asistencias`; cumple una funcion administrativa y transversal.
+- Las acciones rapidas de estudiantes desde vistas operativas deben apuntar a perfiles consolidados en `personas/<id>/` y preservar filtros globales.
 
 ## Relacion con otras apps
 - `asistencias` usa perfiles operativos y flujos rapidos.

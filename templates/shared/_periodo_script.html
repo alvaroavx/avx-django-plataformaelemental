@@ -1,0 +1,21 @@
+<script>
+  (function () {
+    const form = document.getElementById("periodo-global-form");
+    const hiddenWrap = document.getElementById("periodo-hidden-filtros");
+    if (!form || !hiddenWrap) return;
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((value, key) => {
+      if (key === "periodo_mes" || key === "periodo_anio" || key === "organizacion") return;
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = value;
+      hiddenWrap.appendChild(input);
+    });
+    form.querySelectorAll(".js-periodo-autosubmit").forEach((element) => {
+      element.addEventListener("change", function () {
+        form.requestSubmit();
+      });
+    });
+  })();
+</script>

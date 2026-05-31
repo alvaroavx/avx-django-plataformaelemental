@@ -1,4 +1,5 @@
 {% extends "asistencias/base_app.html" %}
+{% load finanzas_format %}
 {% block title %}Estudiantes{% endblock %}
 {% block content %}
 <div class="mt-4">
@@ -31,9 +32,17 @@
       <thead>
         <tr>
           <th>Nombre</th>
+          <th>Organización</th>
+          <th>Clases pagadas</th>
+          <th>Clases usadas</th>
+          <th>Clases restantes</th>
+          <th>Total pagado</th>
+          <th>Último pago</th>
           <th>Asistencias mes</th>
           <th>Última asistencia</th>
-          <th>Estado</th>
+          <th>Deuda</th>
+          <th>Estado financiero</th>
+          <th>Actividad</th>
           <th></th>
         </tr>
       </thead>
@@ -41,15 +50,26 @@
         {% for item in estudiantes %}
         <tr>
           <td>
-            <a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
-            {% for rol in item.persona.roles.all %}
-              {% if rol.rol.codigo == "ESTUDIANTE" %}
-                <span class="badge text-bg-light ms-1">{{ rol.organizacion.nombre }}</span>
-              {% endif %}
+            <a href="{{ item.perfil_url }}">{{ item.persona }}</a>
+          </td>
+          <td>
+            {% for organizacion_nombre in item.organizaciones %}
+              <span class="badge text-bg-light me-1">{{ organizacion_nombre }}</span>
+            {% empty %}
+              <span class="text-muted">—</span>
             {% endfor %}
           </td>
+          <td data-order="{{ item.clases_pagadas }}">{{ item.clases_pagadas }}</td>
+          <td data-order="{{ item.clases_usadas }}">{{ item.clases_usadas }}</td>
+          <td data-order="{{ item.clases_restantes }}">{{ item.clases_restantes }}</td>
+          <td data-order="{{ item.total_pagado }}">{{ item.total_pagado|clp }}</td>
+          <td>{% if item.ultimo_pago %}{{ item.ultimo_pago|date:"d/m/Y" }}{% else %}—{% endif %}</td>
           <td data-order="{{ item.asistencias_mes }}">{{ item.asistencias_mes }}</td>
-          <td>{% if item.ultima_asistencia %}{{ item.ultima_asistencia|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+          <td>{% if item.ultima_asistencia %}{{ item.ultima_asistencia|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+          <td data-order="{{ item.deuda_clases }}">{{ item.deuda_clases }}</td>
+          <td>
+            <span class="badge text-bg-{{ item.estado_financiero_class }}">{{ item.estado_financiero }}</span>
+          </td>
           <td>
             {% if item.activo_mes %}
               <span class="badge text-bg-success">Activo</span>
@@ -57,14 +77,29 @@
               <span class="badge text-bg-warning">Sin asistencia</span>
             {% endif %}
           </td>
-          <td>
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-              <i class="bi bi-person"></i><span class="d-none d-md-inline ms-1">Perfil</span>
-            </a>
+          <td class="text-nowrap">
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-outline-secondary" href="{{ item.perfil_url }}" title="Ver perfil">
+                <i class="bi bi-person"></i><span class="d-none d-xl-inline ms-1">Perfil</span>
+              </a>
+              <a class="btn btn-outline-secondary" href="{{ item.asistencias_url }}" title="Ver asistencia">
+                <i class="bi bi-calendar-check"></i><span class="d-none d-xl-inline ms-1">Asistencia</span>
+              </a>
+              {% if puede_ver_finanzas %}
+                <a class="btn btn-outline-secondary" href="{{ item.perfil_url }}#perfil-estudiante" title="Ver estado financiero">
+                  <i class="bi bi-wallet2"></i><span class="d-none d-xl-inline ms-1">Estado</span>
+                </a>
+              {% endif %}
+              {% if puede_operar_pagos %}
+                <a class="btn btn-outline-success" href="{{ item.registrar_pago_url }}" title="Registrar pago">
+                  <i class="bi bi-cash-coin"></i><span class="d-none d-xl-inline ms-1">Pago</span>
+                </a>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
+        <tr><td colspan="13" class="text-center text-muted">Sin estudiantes registrados.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -80,12 +115,13 @@
   (function () {
     const table = document.getElementById("tabla-estudiantes");
     if (!table || !window.jQuery) return;
+    if (table.querySelector("tbody td[colspan]")) return;
     const dt = jQuery(table).DataTable({
       paging: true,
       pageLength: 25,
       order: [[0, "asc"]],
       columnDefs: [
-        { targets: 1, type: "num" },
+        { targets: [2, 3, 4, 5, 7, 9], type: "num" },
       ],
       stateSave: true,
       dom: "<'row'<'col-12'f>>rt<'row'<'col-12 col-md-6'i><'col-12 col-md-6'p>>",
@@ -114,9 +150,9 @@
     const inputBuscar = table.closest(".dataTables_wrapper").querySelector(".dataTables_filter input");
 
     if (filtroActividad) {
-      filtroActividad.value = dt.column(3).search() || "";
+      filtroActividad.value = dt.column(11).search() || "";
       filtroActividad.addEventListener("change", function () {
-        dt.column(3).search(this.value).draw();
+        dt.column(11).search(this.value).draw();
       });
     }
     if (limpiar) {

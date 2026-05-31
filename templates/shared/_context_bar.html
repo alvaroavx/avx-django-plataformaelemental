@@ -1,0 +1,56 @@
+<div class="elemental-context-bar border-bottom">
+  <div class="container-fluid py-2">
+    <div class="d-flex flex-column flex-xl-row gap-2 align-items-xl-end justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#elementalSidebar" aria-controls="elementalSidebar" aria-label="Abrir menú">
+          <i class="bi bi-list"></i>
+        </button>
+        <div>
+          <div class="small text-muted">Elemental Apps</div>
+          <div class="fw-semibold">{{ periodo_descripcion_corta }}</div>
+        </div>
+      </div>
+      {% if not hide_periodo %}
+        <form method="get" class="row g-2 align-items-end flex-grow-1 justify-content-xl-end" id="periodo-global-form">
+          <div id="periodo-hidden-filtros"></div>
+          <div class="col-6 col-md-2 col-xl-2">
+            <label class="form-label small mb-1">Mes</label>
+            <select name="periodo_mes" class="form-select form-select-sm js-periodo-autosubmit">
+              {% for value, label in periodo_meses %}
+                <option value="{{ value }}" {% if periodo_mes == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 col-md-2 col-xl-2">
+            <label class="form-label small mb-1">Año</label>
+            <select name="periodo_anio" class="form-select form-select-sm js-periodo-autosubmit">
+              {% for y in periodo_anios %}
+                <option value="{{ y.0 }}" {% if periodo_anio == y.0 %}selected{% endif %}>{{ y.1 }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4 col-xl-3">
+            <label class="form-label small mb-1">Organización</label>
+            <select name="organizacion" class="form-select form-select-sm js-periodo-autosubmit">
+              <option value="">Todas</option>
+              {% for org in organizaciones_global %}
+                <option value="{{ org.id }}" {% if organizacion_id == org.id|stringformat:"s" %}selected{% endif %}>{{ org.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+      {% endif %}
+      <div class="d-flex align-items-center justify-content-between justify-content-xl-end gap-2">
+        <span class="small text-muted d-inline-flex align-items-center gap-1">
+          <i class="bi bi-person-circle"></i>{{ request.user.get_username }}
+        </span>
+        <form method="post" action="{% url 'logout' %}" class="d-inline">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-secondary" type="submit" title="Cerrar sesión" aria-label="Cerrar sesión">
+            <i class="bi bi-box-arrow-right"></i><span class="d-none d-sm-inline ms-1">Salir</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
