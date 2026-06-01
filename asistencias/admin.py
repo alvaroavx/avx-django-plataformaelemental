@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db.models import Count
 
 from personas.models import Persona
 
@@ -28,12 +29,25 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
 
 @admin.register(SesionClase)
 class SesionClaseAdmin(admin.ModelAdmin):
-    list_display = ("disciplina", "fecha", "estado", "profesores_display", "cupo_maximo")
-    list_filter = ("estado", "disciplina", ("fecha", admin.DateFieldListFilter))
+    list_display = ("fecha", "disciplina", "organizacion", "estado", "profesores_display", "asistentes_total")
+    list_filter = (
+        "disciplina__organizacion",
+        "disciplina",
+        "profesores",
+        "estado",
+        ("fecha", admin.DateFieldListFilter),
+    )
     search_fields = ("disciplina__nombre", "profesores__nombres", "profesores__apellidos", "notas")
     autocomplete_fields = ("disciplina", "bloque", "profesores")
-    list_select_related = ("disciplina",)
+    list_select_related = ("disciplina", "disciplina__organizacion")
     date_hierarchy = "fecha"
+    actions = None
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores").annotate(
+            asistentes_total_admin=Count("asistencias", distinct=True)
+        )
 
     def formfield_for_manytomany(self, db_field, request, **kwargs):
         if db_field.name == "profesores":
@@ -49,16 +63,35 @@ class SesionClaseAdmin(admin.ModelAdmin):
 
     profesores_display.short_description = "Profesores"
 
+    @admin.display(description="Organizacion", ordering="disciplina__organizacion__nombre")
+    def organizacion(self, obj):
+        return obj.disciplina.organizacion
+
+    @admin.display(description="Asistentes", ordering="asistentes_total_admin")
+    def asistentes_total(self, obj):
+        return obj.asistentes_total_admin
+
 
 @admin.register(Asistencia)
 class AsistenciaAdmin(admin.ModelAdmin):
-    list_display = ("sesion", "persona", "estado", "registrada_en")
+    list_display = ("sesion", "persona", "estado", "organizacion", "fecha_sesion", "registrada_en")
     list_filter = (
         "estado",
-        ("registrada_en", admin.DateFieldListFilter),
+        "sesion__disciplina__organizacion",
         "sesion__disciplina",
+        ("sesion__fecha", admin.DateFieldListFilter),
+        ("registrada_en", admin.DateFieldListFilter),
     )
-    search_fields = ("persona__nombres", "persona__apellidos", "sesion__disciplina__nombre")
+    search_fields = ("persona__nombres", "persona__apellidos", "persona__rut", "sesion__disciplina__nombre")
     autocomplete_fields = ("sesion", "persona")
-    list_select_related = ("sesion", "persona")
+    list_select_related = ("sesion", "sesion__disciplina", "sesion__disciplina__organizacion", "persona")
     date_hierarchy = "registrada_en"
+    actions = None
+
+    @admin.display(description="Organizacion", ordering="sesion__disciplina__organizacion__nombre")
+    def organizacion(self, obj):
+        return obj.sesion.disciplina.organizacion
+
+    @admin.display(description="Fecha sesion", ordering="sesion__fecha")
+    def fecha_sesion(self, obj):
+        return obj.sesion.fecha

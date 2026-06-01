@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from asistencias.models import Asistencia, Disciplina, SesionClase
+from auditoria.models import AuditLog
+from finanzas.models import Category, DocumentoTributario, Payment, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 
@@ -212,3 +215,127 @@ class ElementalAppsUXTests(TestCase):
             )
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, "Implementado por AVX")
+
+
+class DjangoAdminSupportTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.superuser = User.objects.create_superuser(
+            "admin_support_test_user",
+            email="admin.support@example.com",
+            password=TEST_PASSWORD,
+        )
+        self.no_staff_user = User.objects.create_user("admin_no_staff_test_user", password=TEST_PASSWORD)
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Admin",
+            razon_social="Org Admin SPA",
+            rut="77.777.777-7",
+        )
+        self.rol = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        self.persona = Persona.objects.create(
+            nombres="Admin",
+            apellidos="Soporte",
+            email="admin.soporte@example.com",
+            rut="12.345.678-5",
+        )
+        PersonaRol.objects.create(persona=self.persona, rol=self.rol, organizacion=self.organizacion, activo=True)
+        self.disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Admin Disciplina")
+        self.sesion = SesionClase.objects.create(disciplina=self.disciplina, fecha="2026-05-01")
+        self.asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.persona)
+        self.documento = DocumentoTributario.objects.create(
+            organizacion=self.organizacion,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="ADM-1",
+            fecha_emision="2026-05-01",
+            nombre_emisor="Emisor Admin",
+            rut_emisor="11.111.111-1",
+            nombre_receptor="Receptor Admin",
+            rut_receptor="22.222.222-2",
+            monto_total=10000,
+        )
+        self.pago = Payment.objects.create(
+            persona=self.persona,
+            organizacion=self.organizacion,
+            documento_tributario=self.documento,
+            fecha_pago="2026-05-01",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        self.categoria = Category.objects.create(nombre="Ingreso admin", tipo=Category.Tipo.INGRESO)
+        self.transaccion = Transaction.objects.create(
+            organizacion=self.organizacion,
+            categoria=self.categoria,
+            fecha="2026-05-01",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=10000,
+            descripcion="Transaccion admin",
+        )
+        self.transaccion.documentos_tributarios.add(self.documento)
+        self.audit_log = AuditLog.objects.create(
+            usuario=self.superuser,
+            accion=AuditLog.ACCION_CREAR,
+            dominio="personas",
+            modelo="personas.Persona",
+            objeto_id=str(self.persona.pk),
+            organizacion=self.organizacion,
+            resumen="Persona creada",
+            metadata={"persona_id": self.persona.pk},
+        )
+
+    def test_superuser_carga_changelists_modelos_criticos(self):
+        self.client.force_login(self.superuser)
+        admin_names = [
+            "admin:personas_persona_changelist",
+            "admin:personas_personarol_changelist",
+            "admin:personas_organizacion_changelist",
+            "admin:asistencias_sesionclase_changelist",
+            "admin:asistencias_asistencia_changelist",
+            "admin:finanzas_payment_changelist",
+            "admin:finanzas_transaction_changelist",
+            "admin:finanzas_documentotributario_changelist",
+            "admin:auditoria_auditlog_changelist",
+        ]
+
+        for admin_name in admin_names:
+            response = self.client.get(reverse(admin_name))
+            self.assertEqual(response.status_code, 200, admin_name)
+
+    def test_usuario_no_staff_no_entra_al_admin(self):
+        self.client.force_login(self.no_staff_user)
+
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("admin:login"), response.url)
+
+    def test_delete_selected_no_disponible_en_modelos_criticos(self):
+        self.client.force_login(self.superuser)
+        admin_names = [
+            "admin:personas_persona_changelist",
+            "admin:personas_personarol_changelist",
+            "admin:personas_organizacion_changelist",
+            "admin:asistencias_sesionclase_changelist",
+            "admin:asistencias_asistencia_changelist",
+            "admin:finanzas_payment_changelist",
+            "admin:finanzas_transaction_changelist",
+            "admin:finanzas_documentotributario_changelist",
+            "admin:auditoria_auditlog_changelist",
+        ]
+
+        for admin_name in admin_names:
+            response = self.client.get(reverse(admin_name))
+            self.assertNotContains(response, 'value="delete_selected"', html=False)
+
+    def test_busquedas_admin_basicas_no_rompen(self):
+        self.client.force_login(self.superuser)
+        casos = [
+            ("admin:personas_persona_changelist", "Soporte"),
+            ("admin:finanzas_payment_changelist", "Soporte"),
+            ("admin:finanzas_documentotributario_changelist", "ADM-1"),
+        ]
+
+        for admin_name, query in casos:
+            response = self.client.get(reverse(admin_name), {"q": query})
+            self.assertEqual(response.status_code, 200, admin_name)

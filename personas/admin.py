@@ -39,20 +39,37 @@ class PersonaRolBulkForm(forms.ModelForm):
 
 @admin.register(Organizacion)
 class OrganizacionAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "rut", "email_contacto", "telefono_contacto", "creada_en")
+    list_display = (
+        "nombre",
+        "rut",
+        "tiene_logo",
+        "es_exenta_iva",
+        "email_contacto",
+        "telefono_contacto",
+        "creada_en",
+    )
     search_fields = ("nombre", "rut", "email_contacto")
     list_filter = (("creada_en", admin.DateFieldListFilter),)
-    list_per_page = 25
+    readonly_fields = ("creada_en", "actualizada_en")
+    list_per_page = 50
     ordering = ("nombre",)
+    actions = None
+
+    @admin.display(boolean=True, description="Logo")
+    def tiene_logo(self, obj):
+        return bool(obj.logo)
 
 
 @admin.register(Persona)
 class PersonaAdmin(admin.ModelAdmin):
-    list_display = ("nombres", "apellidos", "email", "telefono", "activo", "creado_en", "user")
+    list_display = ("nombre_completo", "rut", "email", "telefono", "activo", "creado_en", "user")
     search_fields = ("nombres", "apellidos", "email", "telefono", "rut")
-    list_filter = ("activo", ("creado_en", admin.DateFieldListFilter))
+    list_filter = ("activo", "roles__organizacion", "roles__rol", ("creado_en", admin.DateFieldListFilter))
+    readonly_fields = ("creado_en", "actualizado_en")
     autocomplete_fields = ("user",)
-    list_per_page = 25
+    list_select_related = ("user",)
+    list_per_page = 50
+    actions = None
 
 
 @admin.register(Rol)
@@ -64,11 +81,12 @@ class RolAdmin(admin.ModelAdmin):
 
 @admin.register(PersonaRol)
 class PersonaRolAdmin(admin.ModelAdmin):
-    list_display = ("persona", "rol", "organizacion", "activo", "asignado_en")
-    list_filter = ("rol", "organizacion", "activo", ("asignado_en", admin.DateFieldListFilter))
-    search_fields = ("persona__nombres", "persona__apellidos", "organizacion__nombre")
+    list_display = ("persona", "organizacion", "rol", "activo", "valor_clase", "retencion_sii")
+    list_filter = ("organizacion", "rol", "activo")
+    search_fields = ("persona__nombres", "persona__apellidos", "persona__rut")
     autocomplete_fields = ("persona", "rol", "organizacion")
     list_select_related = ("persona", "rol", "organizacion")
+    actions = None
 
     def get_form(self, request, obj=None, **kwargs):
         if obj is None:

@@ -17,6 +17,9 @@ class AuditLogAdmin(admin.ModelAdmin):
     )
     list_filter = ("fecha", "usuario", "dominio", "accion", "organizacion")
     search_fields = ("resumen", "modelo", "objeto_id")
+    list_per_page = 50
+    date_hierarchy = "fecha"
+    actions = None
     readonly_fields = (
         "usuario",
         "fecha",
