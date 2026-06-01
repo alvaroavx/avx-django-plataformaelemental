@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "database",
+    "auditoria.apps.AuditoriaConfig",
     "api",
     "asistencias.apps.AsistenciasConfig",
     "personas.apps.PersonasConfig",

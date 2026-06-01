@@ -12,6 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
+from auditoria.models import AuditLog
+from auditoria.services import registrar_auditoria, registrar_cambio
 from asistencias.forms import PersonaRapidaForm
 from plataformaelemental.context import (
     descripcion_periodo,
@@ -103,6 +105,61 @@ from .services.reportes import (
     filas_export_transacciones,
     filas_export_transacciones_xlsx,
 )
+
+
+PAGO_AUDIT_FIELDS = [
+    "persona_id",
+    "organizacion_id",
+    "plan_id",
+    "documento_tributario_id",
+    "fecha_pago",
+    "metodo_pago",
+    "monto_referencia",
+    "monto_total",
+    "clases_asignadas",
+]
+DOCUMENTO_AUDIT_FIELDS = [
+    "organizacion_id",
+    "tipo_documento",
+    "fuente",
+    "folio",
+    "fecha_emision",
+    "monto_total",
+    "documento_relacionado_id",
+    "persona_relacionada_id",
+    "organizacion_relacionada_id",
+]
+TRANSACCION_AUDIT_FIELDS = [
+    "organizacion_id",
+    "categoria_id",
+    "fecha",
+    "tipo",
+    "monto",
+    "descripcion",
+    "documento_ids",
+]
+
+
+def _snapshot_pago(pago):
+    return {campo: getattr(pago, campo) for campo in PAGO_AUDIT_FIELDS}
+
+
+def _snapshot_documento(documento):
+    return {campo: getattr(documento, campo) for campo in DOCUMENTO_AUDIT_FIELDS}
+
+
+def _snapshot_transaccion(transaccion):
+    return {
+        "organizacion_id": transaccion.organizacion_id,
+        "categoria_id": transaccion.categoria_id,
+        "fecha": transaccion.fecha,
+        "tipo": transaccion.tipo,
+        "monto": transaccion.monto,
+        "descripcion": transaccion.descripcion,
+        "documento_ids": sorted(transaccion.documentos_tributarios.values_list("id", flat=True))
+        if transaccion.pk
+        else [],
+    }
 
 
 def _documento_revision_form(*, data=None, initial=None):
@@ -468,10 +525,28 @@ def pagos_list(request):
             if persona_form.is_valid():
                 persona = crear_persona_estudiante_desde_modal(form=persona_form, organizacion=organizacion)
                 if persona:
+                    registrar_auditoria(
+                        usuario=request.user,
+                        accion=AuditLog.ACCION_CREAR,
+                        dominio="personas",
+                        objeto=persona,
+                        organizacion=organizacion,
+                        resumen="Persona creada desde finanzas",
+                        metadata={"persona_id": persona.pk, "origen": "pagos_list"},
+                    )
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     return _redirect_with_query(request, "finanzas:pagos_list")
         elif form.is_valid():
-            form.save()
+            pago = form.save()
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_CREAR,
+                dominio="finanzas",
+                objeto=pago,
+                organizacion=pago.organizacion,
+                resumen="Pago creado",
+                metadata=_snapshot_pago(pago),
+            )
             messages.success(request, "Pago registrado.")
             return _redirect_with_query(request, "finanzas:pagos_list")
 
@@ -487,6 +562,7 @@ def pago_edit(request, pk):
 
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
+    antes = _snapshot_pago(pago) if request.method == "POST" else None
     form = PaymentForm(
         request.POST or None,
         instance=pago,
@@ -496,7 +572,17 @@ def pago_edit(request, pk):
         organizacion=organizacion,
     )
     if request.method == "POST" and form.is_valid():
-        form.save()
+        pago = form.save()
+        registrar_cambio(
+            usuario=request.user,
+            dominio="finanzas",
+            objeto=pago,
+            organizacion=pago.organizacion,
+            resumen="Pago actualizado",
+            antes=antes,
+            despues=_snapshot_pago(pago),
+            campos=PAGO_AUDIT_FIELDS,
+        )
         messages.success(request, "Pago actualizado.")
         return redirect(_url_pagos_list_sin_edicion(request))
     context = _contexto_pagos_list(request, edit_form=form, edit_pago=pago)
@@ -526,6 +612,15 @@ def pago_detail(request, pk):
 def pago_delete(request, pk):
     pago = get_object_or_404(Payment, pk=pk)
     if request.method == "POST":
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_ELIMINAR,
+            dominio="finanzas",
+            objeto=pago,
+            organizacion=pago.organizacion,
+            resumen="Pago eliminado",
+            metadata=_snapshot_pago(pago),
+        )
         pago.delete()
         messages.success(request, "Pago eliminado.")
         return _redirect_with_query(request, "finanzas:pagos_list")
@@ -555,10 +650,19 @@ def documentos_tributarios_list(request):
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         try:
-            form.save()
+            documento = form.save()
         except IntegrityError:
             _agregar_error_conflicto_documento(form)
         else:
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_CREAR,
+                dominio="finanzas",
+                objeto=documento,
+                organizacion=documento.organizacion,
+                resumen="Documento tributario creado",
+                metadata=_snapshot_documento(documento),
+            )
             messages.success(request, "Documento tributario registrado.")
             return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
 
@@ -643,6 +747,31 @@ def documento_tributario_importar(request):
                 pago = pago_form.save(commit=False)
                 pago.documento_tributario = documento
                 pago.save()
+                registrar_auditoria(
+                    usuario=request.user,
+                    accion=AuditLog.ACCION_CREAR,
+                    dominio="finanzas",
+                    objeto=pago,
+                    organizacion=pago.organizacion,
+                    resumen="Pago creado desde importación tributaria",
+                    metadata={**_snapshot_pago(pago), "documento_tributario_id": documento.pk},
+                )
+
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_IMPORTAR,
+                dominio="finanzas",
+                objeto=documento,
+                organizacion=documento.organizacion,
+                resumen="Documento tributario importado",
+                metadata={
+                    **_snapshot_documento(documento),
+                    "warnings_count": len(payload.get("warnings", [])),
+                    "duplicates_count": len(payload.get("duplicates", [])),
+                    "tiene_xml": bool(xml_info),
+                    "tiene_pdf": bool(pdf_info),
+                },
+            )
 
             eliminar_importacion_temporal(request, token)
             messages.success(request, "Documento tributario importado y revisado correctamente.")
@@ -813,13 +942,24 @@ def documento_tributario_archivo(request, pk, tipo_archivo):
 @documentos_required
 def documento_tributario_edit(request, pk):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
+    antes = _snapshot_documento(documento) if request.method == "POST" else None
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None, instance=documento)
     if request.method == "POST" and form.is_valid():
         try:
-            form.save()
+            documento = form.save()
         except IntegrityError:
             _agregar_error_conflicto_documento(form)
         else:
+            registrar_cambio(
+                usuario=request.user,
+                dominio="finanzas",
+                objeto=documento,
+                organizacion=documento.organizacion,
+                resumen="Documento tributario actualizado",
+                antes=antes,
+                despues=_snapshot_documento(documento),
+                campos=DOCUMENTO_AUDIT_FIELDS,
+            )
             messages.success(request, "Documento tributario actualizado.")
             return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
     return render(
@@ -837,6 +977,15 @@ def documento_tributario_edit(request, pk):
 def documento_tributario_delete(request, pk):
     documento = get_object_or_404(DocumentoTributario, pk=pk)
     if request.method == "POST":
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_ELIMINAR,
+            dominio="finanzas",
+            objeto=documento,
+            organizacion=documento.organizacion,
+            resumen="Documento tributario eliminado",
+            metadata=_snapshot_documento(documento),
+        )
         documento.delete()
         messages.success(request, "Documento tributario eliminado.")
         return _redirect_with_query(request, "finanzas:documentos_tributarios_list")
@@ -912,7 +1061,16 @@ def transacciones_list(request):
         organizacion=organizacion,
     )
     if request.method == "POST" and form.is_valid():
-        form.save()
+        transaccion = form.save()
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_CREAR,
+            dominio="finanzas",
+            objeto=transaccion,
+            organizacion=transaccion.organizacion,
+            resumen="Transacción creada",
+            metadata=_snapshot_transaccion(transaccion),
+        )
         messages.success(request, "Transaccion registrada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
 
@@ -974,6 +1132,7 @@ def transaccion_edit(request, pk):
     transaccion = get_object_or_404(Transaction, pk=pk)
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
+    antes = _snapshot_transaccion(transaccion) if request.method == "POST" else None
     form = TransactionForm(
         request.POST or None,
         request.FILES or None,
@@ -983,7 +1142,17 @@ def transaccion_edit(request, pk):
         organizacion=organizacion,
     )
     if request.method == "POST" and form.is_valid():
-        form.save()
+        transaccion = form.save()
+        registrar_cambio(
+            usuario=request.user,
+            dominio="finanzas",
+            objeto=transaccion,
+            organizacion=transaccion.organizacion,
+            resumen="Transacción actualizada",
+            antes=antes,
+            despues=_snapshot_transaccion(transaccion),
+            campos=TRANSACCION_AUDIT_FIELDS,
+        )
         messages.success(request, "Transaccion actualizada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
     return render(
@@ -997,6 +1166,15 @@ def transaccion_edit(request, pk):
 def transaccion_delete(request, pk):
     transaccion = get_object_or_404(Transaction, pk=pk)
     if request.method == "POST":
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_ELIMINAR,
+            dominio="finanzas",
+            objeto=transaccion,
+            organizacion=transaccion.organizacion,
+            resumen="Transacción eliminada",
+            metadata=_snapshot_transaccion(transaccion),
+        )
         transaccion.delete()
         messages.success(request, "Transaccion eliminada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")

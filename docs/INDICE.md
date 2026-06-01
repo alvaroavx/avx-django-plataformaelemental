@@ -30,6 +30,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md): decisiones de `finanzas`.
 - [docs/apps/UX.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/UX.md): navegacion, login y UX responsive de `Elemental Apps`.
 - [docs/apps/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERMISOS_Y_ROLES.md): matriz minima de permisos HTML v1.0.
+- [docs/apps/AUDITORIA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/AUDITORIA.md): trazabilidad operativa minima de acciones sensibles.
 - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md): decisiones de `api`.
 - [docs/apps/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/MONITOR.md): estado archivado de `monitor`.
 

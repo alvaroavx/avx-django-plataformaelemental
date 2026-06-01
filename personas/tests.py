@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from auditoria.models import AuditLog
 from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from finanzas.models import AttendanceConsumption, Payment
@@ -129,6 +130,61 @@ class PersonasOrganizacionesTests(TestCase):
             f"{reverse('personas:organizacion_detail', kwargs={'pk': nueva.pk})}?{query}",
         )
 
+    def test_persona_create_genera_auditlog_sin_identificadores_completos(self):
+        url = reverse("personas:persona_create")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                url,
+                {
+                    "nombres": "Auditada",
+                    "apellidos": "Nueva",
+                    "email": "auditada.nueva@example.com",
+                    "telefono": "+56 9 1111 2222",
+                    "rut": "",
+                    "fecha_nacimiento": "",
+                    "activo": "on",
+                    "user": "",
+                    "rol-rol": self.rol_estudiante.pk,
+                    "rol-organizacion": self.org.pk,
+                    "rol-valor_clase": "",
+                    "rol-retencion_sii": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        persona = Persona.objects.get(email="auditada.nueva@example.com")
+        logs = AuditLog.objects.filter(dominio="personas", objeto_id=str(persona.pk))
+        self.assertTrue(logs.filter(accion=AuditLog.ACCION_CREAR).exists())
+        self.assertNotIn("auditada.nueva@example.com", str(list(logs.values_list("metadata", flat=True))))
+
+    def test_persona_edit_genera_auditlog_con_cambio_relevante(self):
+        url = reverse("personas:persona_edit", kwargs={"pk": self.estudiante.pk})
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                url,
+                {
+                    "accion": "guardar_persona",
+                    "nombres": "Ana Maria",
+                    "apellidos": self.estudiante.apellidos,
+                    "email": self.estudiante.email,
+                    "telefono": self.estudiante.telefono,
+                    "rut": self.estudiante.rut,
+                    "fecha_nacimiento": "",
+                    "activo": "on",
+                    "user": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        log = AuditLog.objects.filter(
+            dominio="personas",
+            accion=AuditLog.ACCION_EDITAR,
+            objeto_id=str(self.estudiante.pk),
+        ).latest("fecha")
+        self.assertIn("nombres", log.metadata["cambios"])
+
     def test_ruta_organizaciones_sale_de_asistencias(self):
         response = self.client.get("/asistencias/organizaciones/")
         self.assertEqual(response.status_code, 404)
@@ -143,6 +199,26 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, "Perfil estudiante")
         self.assertNotContains(response, "Perfil profesor")
         self.assertContains(response, "Resumen financiero del estudiante")
+
+    def test_dashboard_personas_anota_deuda_periodo(self):
+        sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-03-20",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        asistencia = Asistencia.objects.create(sesion=sesion, persona=self.estudiante)
+        AttendanceConsumption.objects.filter(asistencia=asistencia).update(
+            estado=AttendanceConsumption.Estado.DEUDA
+        )
+
+        response = self.client.get(
+            reverse("personas:dashboard"),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["personas_con_deuda_total"], 1)
+        self.assertEqual(list(response.context["personas_con_deuda"]), [self.estudiante])
 
     def test_persona_detail_estudiante_permite_asociar_pago_a_asistencia(self):
         sesion = SesionClase.objects.create(

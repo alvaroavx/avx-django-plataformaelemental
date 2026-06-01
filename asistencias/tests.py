@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import load_workbook
 
+from auditoria.models import AuditLog
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from plataformaelemental.context import nav_context, organizacion_desde_request, periodo_context
@@ -167,18 +168,48 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_agregar_asistentes_cambia_estado_a_completada(self):
-        response = self.client.post(
-            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
-            {
-                "agregar_asistentes": "1",
-                "sesion_id": str(self.sesion.pk),
-                "estudiantes": [str(self.estudiante.pk)],
-            },
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+                {
+                    "agregar_asistentes": "1",
+                    "sesion_id": str(self.sesion.pk),
+                    "estudiantes": [str(self.estudiante.pk)],
+                },
+            )
 
         self.assertEqual(response.status_code, 302)
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
+        log = AuditLog.objects.filter(
+            dominio="asistencias",
+            accion=AuditLog.ACCION_AGREGAR_ASISTENTES,
+            objeto_id=str(self.sesion.pk),
+        ).latest("fecha")
+        self.assertEqual(log.metadata["asistencias_creadas"], 1)
+        self.assertEqual(log.metadata["persona_ids"], [self.estudiante.pk])
+
+    def test_crear_sesion_genera_auditlog(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+                {
+                    "crear_sesion": "1",
+                    "disciplina": self.disciplina.pk,
+                    "fecha": "2026-02-27",
+                    "profesores": [],
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        sesion = SesionClase.objects.get(fecha="2026-02-27", disciplina=self.disciplina)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="asistencias",
+                accion=AuditLog.ACCION_CREAR,
+                objeto_id=str(sesion.pk),
+            ).exists()
+        )
 
     def test_agregar_asistentes_guardar_y_cerrar_cierra_modal(self):
         response = self.client.post(
@@ -704,22 +735,37 @@ class AsistenciasViewTests(TestCase):
     def test_sesion_detail_crea_persona_y_agrega_a_sesion_con_switch_activo(self):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
 
-        response = self.client.post(
-            url,
-            {
-                "crear_persona_estudiante": "1",
-                "nombres": "Lucia",
-                "apellidos": "Asistente",
-                "telefono": "(+56) 9 1111-2222",
-                "agregar_a_sesion": "1",
-            },
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                url,
+                {
+                    "crear_persona_estudiante": "1",
+                    "nombres": "Lucia",
+                    "apellidos": "Asistente",
+                    "telefono": "(+56) 9 1111-2222",
+                    "agregar_a_sesion": "1",
+                },
+            )
 
         self.assertEqual(response.status_code, 302)
         persona = Persona.objects.get(nombres="Lucia", apellidos="Asistente")
         self.assertTrue(Asistencia.objects.filter(sesion=self.sesion, persona=persona).exists())
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="personas",
+                accion=AuditLog.ACCION_CREAR,
+                objeto_id=str(persona.pk),
+            ).exists()
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="asistencias",
+                accion=AuditLog.ACCION_CREAR,
+                metadata__origen="alta_rapida_sesion",
+            ).exists()
+        )
 
     def test_sesion_detail_crear_persona_sin_identidad_falla_sin_asistencia(self):
         response = self.client.post(

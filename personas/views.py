@@ -7,6 +7,8 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from auditoria.models import AuditLog
+from auditoria.services import registrar_auditoria, registrar_cambio
 from asistencias.decorators import role_required
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from asistencias.utils import ROLE_ADMIN
@@ -26,6 +28,8 @@ from .models import Organizacion, Persona, PersonaRol, Rol
 
 
 MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
+PERSONA_AUDIT_FIELDS = ["nombres", "apellidos", "rut", "email", "telefono", "activo"]
+PERSONA_ROL_AUDIT_FIELDS = ["activo", "valor_clase", "retencion_sii"]
 
 
 def _base_context(request):
@@ -36,6 +40,46 @@ def _url_con_filtros(request, nombre_url, **kwargs):
     url = reverse(nombre_url, kwargs=kwargs or None)
     query = request.GET.urlencode()
     return f"{url}?{query}" if query else url
+
+
+def _snapshot_persona(persona):
+    return {campo: getattr(persona, campo) for campo in PERSONA_AUDIT_FIELDS}
+
+
+def _snapshot_persona_rol(persona_rol):
+    return {campo: getattr(persona_rol, campo) for campo in PERSONA_ROL_AUDIT_FIELDS}
+
+
+def _auditar_persona_rol(request, persona_rol, *, created, antes=None):
+    metadata = {
+        "persona_id": persona_rol.persona_id,
+        "rol_id": persona_rol.rol_id,
+        "rol_codigo": persona_rol.rol.codigo,
+        "organizacion_id": persona_rol.organizacion_id,
+    }
+    if created:
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_ASOCIAR,
+            dominio="personas",
+            objeto=persona_rol,
+            organizacion=persona_rol.organizacion,
+            resumen="Rol agregado a persona",
+            metadata=metadata,
+        )
+        return
+    if antes is not None:
+        registrar_cambio(
+            usuario=request.user,
+            dominio="personas",
+            objeto=persona_rol,
+            organizacion=persona_rol.organizacion,
+            resumen="Rol de persona actualizado",
+            antes=antes,
+            despues=_snapshot_persona_rol(persona_rol),
+            campos=PERSONA_ROL_AUDIT_FIELDS,
+            metadata=metadata,
+        )
 
 
 def _guardar_persona_rol_desde_form(persona, rol_form):
@@ -184,7 +228,12 @@ def dashboard(request):
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
 
-    personas_qs = _personas_queryset(organizacion)
+    personas_qs = _annotate_personas_resumen(
+        _personas_queryset(organizacion),
+        mes=periodo["mes"],
+        anio=periodo["anio"],
+        organizacion=organizacion,
+    )
     pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
     consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
     asistencias_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
@@ -387,8 +436,25 @@ def persona_create(request):
         rol_valido = rol_form.is_valid()
         if persona_valida and rol_valido:
             persona = form.save()
+            persona_rol = None
+            rol_created = False
             if rol_valido and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
-                _guardar_persona_rol_desde_form(persona, rol_form)
+                persona_rol, rol_created = _guardar_persona_rol_desde_form(persona, rol_form)
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_CREAR,
+                dominio="personas",
+                objeto=persona,
+                organizacion=persona_rol.organizacion if persona_rol else None,
+                resumen="Persona creada",
+                metadata={
+                    "persona_id": persona.pk,
+                    "rol_id": persona_rol.rol_id if persona_rol else None,
+                    "organizacion_id": persona_rol.organizacion_id if persona_rol else None,
+                },
+            )
+            if persona_rol:
+                _auditar_persona_rol(request, persona_rol, created=rol_created)
             messages.success(request, "Persona creada correctamente.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     context.update(
@@ -459,7 +525,14 @@ def persona_detail(request, pk):
         if accion == "agregar_rol":
             rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form_post.is_valid() and rol_form_post.cleaned_data.get("rol") and rol_form_post.cleaned_data.get("organizacion"):
+                persona_rol_existente = PersonaRol.objects.filter(
+                    persona=persona,
+                    rol=rol_form_post.cleaned_data["rol"],
+                    organizacion=rol_form_post.cleaned_data["organizacion"],
+                ).first()
+                antes = _snapshot_persona_rol(persona_rol_existente) if persona_rol_existente else None
                 persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form_post)
+                _auditar_persona_rol(request, persona_rol, created=created, antes=antes)
                 if not created and not persona_rol.activo:
                     messages.success(request, "Rol reactivado para la persona.")
                 elif created:
@@ -480,9 +553,11 @@ def persona_detail(request, pk):
                 return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
             valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
             retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
+            antes = _snapshot_persona_rol(persona_rol)
             persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
             persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
             persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
+            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
             messages.success(request, "Configuración de honorarios actualizada.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         elif accion == "cambiar_estado_sesion":
@@ -498,14 +573,29 @@ def persona_detail(request, pk):
             if organizacion and sesion.disciplina.organizacion_id != organizacion.id:
                 messages.error(request, "La sesión no pertenece a la organización filtrada.")
                 return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+            estado_anterior = sesion.estado
             sesion.estado = estado
             sesion.save(update_fields=["estado"])
+            registrar_cambio(
+                usuario=request.user,
+                dominio="asistencias",
+                objeto=sesion,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Estado de sesión actualizado desde perfil profesor",
+                antes={"estado": estado_anterior},
+                despues={"estado": sesion.estado},
+                campos=["estado"],
+                accion=AuditLog.ACCION_CAMBIAR_ESTADO,
+                metadata={"sesion_id": sesion.pk, "profesor_id": persona.pk},
+            )
             messages.success(request, "Estado de la sesión actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         elif accion == "toggle_rol":
             persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            antes = _snapshot_persona_rol(persona_rol)
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])
+            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
             messages.success(request, "Estado del rol actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     roles_asignados = list(persona.roles.all())
@@ -655,15 +745,33 @@ def persona_edit(request, pk):
     if request.method == "POST":
         accion = request.POST.get("accion")
         if accion == "guardar_persona":
+            antes = _snapshot_persona(persona)
             form = PersonaCRMForm(request.POST, instance=persona)
             if form.is_valid():
-                form.save()
+                persona = form.save()
+                registrar_cambio(
+                    usuario=request.user,
+                    dominio="personas",
+                    objeto=persona,
+                    organizacion=organizacion_desde_request(request),
+                    resumen="Persona actualizada",
+                    antes=antes,
+                    despues=_snapshot_persona(persona),
+                    campos=PERSONA_AUDIT_FIELDS,
+                )
                 messages.success(request, "Perfil de persona actualizado.")
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "agregar_rol":
             rol_form = PersonaRolCRMForm(request.POST, prefix="rol")
             if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
+                persona_rol_existente = PersonaRol.objects.filter(
+                    persona=persona,
+                    rol=rol_form.cleaned_data["rol"],
+                    organizacion=rol_form.cleaned_data["organizacion"],
+                ).first()
+                antes = _snapshot_persona_rol(persona_rol_existente) if persona_rol_existente else None
                 persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form)
+                _auditar_persona_rol(request, persona_rol, created=created, antes=antes)
                 if not created and not persona_rol.activo:
                     messages.success(request, "Rol reactivado para la persona.")
                 elif created:
@@ -684,15 +792,19 @@ def persona_edit(request, pk):
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
             valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
             retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
+            antes = _snapshot_persona_rol(persona_rol)
             persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
             persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
             persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
+            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
             messages.success(request, "Configuración de honorarios actualizada.")
             return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "toggle_rol":
             persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            antes = _snapshot_persona_rol(persona_rol)
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])
+            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
             messages.success(request, "Estado del rol actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
 

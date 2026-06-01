@@ -11,6 +11,7 @@ from decimal import Decimal
 from openpyxl import load_workbook
 from unittest.mock import patch
 
+from auditoria.models import AuditLog
 from finanzas.documentos.services import parse_tax_document
 from finanzas.documentos.temp_storage import SESSION_KEY
 from finanzas.forms import DocumentoTributarioForm, PaymentForm, TransactionForm
@@ -621,6 +622,38 @@ class FinanzasAccessTests(TestCase):
         self.assertTrue(response.context["open_registrar_pago"])
         self.assertEqual(str(response.context["form"].initial["persona"]), str(self.persona_no_admin.pk))
 
+    def test_pagos_list_crea_pago_y_auditlog(self):
+        self.client.force_login(self.user_admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("finanzas:pagos_list") + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+                {
+                    "guardar_pago": "1",
+                    "organizacion": self.org.pk,
+                    "persona": self.persona_no_admin.pk,
+                    "plan": "",
+                    "documento_tributario": "",
+                    "fecha_pago": "2026-02-27",
+                    "metodo_pago": Payment.Metodo.EFECTIVO,
+                    "numero_comprobante": "",
+                    "monto_referencia": "15000",
+                    "clases_asignadas": "2",
+                    "observaciones": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        pago = Payment.objects.get(monto_referencia=15000)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="finanzas",
+                accion=AuditLog.ACCION_CREAR,
+                modelo="finanzas.Payment",
+                objeto_id=str(pago.pk),
+            ).exists()
+        )
+
     def test_pago_edit_get_redirige_a_listado_con_modal(self):
         pago = Payment.objects.create(
             persona=self.persona_no_admin,
@@ -679,43 +712,52 @@ class FinanzasAccessTests(TestCase):
         )
         self.client.force_login(self.user_admin)
 
-        response = self.client.post(
-            (
-                f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}"
-                f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}&editar_pago={pago.pk}"
-            ),
-            {
-                "edit_pago-organizacion": str(self.org.pk),
-                "edit_pago-persona": str(self.persona_no_admin.pk),
-                "edit_pago-plan": "",
-                "edit_pago-documento_tributario": "",
-                "edit_pago-fecha_pago": "2026-02-28",
-                "edit_pago-metodo_pago": Payment.Metodo.EFECTIVO,
-                "edit_pago-numero_comprobante": "",
-                "edit_pago-monto_referencia": "12000",
-                "edit_pago-clases_asignadas": "2",
-                "edit_pago-observaciones": "Pago actualizado",
-            },
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                (
+                    f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}"
+                    f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}&editar_pago={pago.pk}"
+                ),
+                {
+                    "edit_pago-organizacion": str(self.org.pk),
+                    "edit_pago-persona": str(self.persona_no_admin.pk),
+                    "edit_pago-plan": "",
+                    "edit_pago-documento_tributario": "",
+                    "edit_pago-fecha_pago": "2026-02-28",
+                    "edit_pago-metodo_pago": Payment.Metodo.EFECTIVO,
+                    "edit_pago-numero_comprobante": "",
+                    "edit_pago-monto_referencia": "12000",
+                    "edit_pago-clases_asignadas": "2",
+                    "edit_pago-observaciones": "Pago actualizado",
+                },
+            )
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response["Location"],
             f"{reverse('finanzas:pagos_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
         )
+        log = AuditLog.objects.filter(
+            dominio="finanzas",
+            accion=AuditLog.ACCION_EDITAR,
+            modelo="finanzas.Payment",
+            objeto_id=str(pago.pk),
+        ).latest("fecha")
+        self.assertIn("monto_referencia", log.metadata["cambios"])
 
     def test_pagos_list_crea_persona_rapida_como_estudiante_en_organizacion_filtrada(self):
         self.client.force_login(self.user_admin)
 
-        response = self.client.post(
-            reverse("finanzas:pagos_list") + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
-            {
-                "nombres": "Lucia",
-                "apellidos": "Perez",
-                "telefono": "999999",
-                "agregar_persona": "1",
-            },
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("finanzas:pagos_list") + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+                {
+                    "nombres": "Lucia",
+                    "apellidos": "Perez",
+                    "telefono": "999999",
+                    "agregar_persona": "1",
+                },
+            )
 
         self.assertEqual(response.status_code, 302)
         persona = Persona.objects.get(nombres="Lucia", apellidos="Perez")
@@ -725,6 +767,13 @@ class FinanzasAccessTests(TestCase):
                 rol__codigo="ESTUDIANTE",
                 organizacion=self.org,
                 activo=True,
+            ).exists()
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="personas",
+                accion=AuditLog.ACCION_CREAR,
+                objeto_id=str(persona.pk),
             ).exists()
         )
 
@@ -1273,6 +1322,50 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, "$ 15.250")
         self.assertContains(response, "$ 50.000")
 
+    def test_documentos_tributarios_list_crea_documento_y_auditlog(self):
+        self.client.force_login(self.user_admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("finanzas:documentos_tributarios_list")
+                + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+                {
+                    "organizacion": self.org.pk,
+                    "tipo_documento": DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+                    "fuente": DocumentoTributario.Fuente.MANUAL,
+                    "folio": "AUD-1",
+                    "fecha_emision": "2026-02-11",
+                    "nombre_emisor": "Emisor Audit",
+                    "rut_emisor": "11.111.111-1",
+                    "nombre_receptor": "Receptor Audit",
+                    "rut_receptor": "22.222.222-2",
+                    "monto_neto": "10000",
+                    "monto_exento": "0",
+                    "iva_tasa": "19.00",
+                    "monto_iva": "1900",
+                    "retencion_tasa": "0",
+                    "retencion_monto": "0",
+                    "monto_total": "11900",
+                    "documento_relacionado": "",
+                    "persona_relacionada": "",
+                    "organizacion_relacionada": "",
+                    "enlace_sii": "",
+                    "metadata_extra": "{}",
+                    "observaciones": "",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        documento = DocumentoTributario.objects.get(folio="AUD-1")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="finanzas",
+                accion=AuditLog.ACCION_CREAR,
+                modelo="finanzas.DocumentoTributario",
+                objeto_id=str(documento.pk),
+            ).exists()
+        )
+
     def test_transacciones_list_muestra_resumen_del_listado(self):
         categoria_ingreso = Category.objects.create(nombre="Venta", tipo="ingreso", activa=True)
         categoria_egreso = Category.objects.create(nombre="Honorarios", tipo="egreso", activa=True)
@@ -1314,6 +1407,36 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(response.context["balance_transacciones"], 90000)
         self.assertContains(response, "Total transacciones")
         self.assertContains(response, "Balance")
+
+    def test_transacciones_list_crea_transaccion_y_auditlog(self):
+        categoria = Category.objects.create(nombre="Venta audit", tipo="ingreso", activa=True)
+        self.client.force_login(self.user_admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("finanzas:transacciones_list")
+                + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+                {
+                    "organizacion": self.org.pk,
+                    "categoria": categoria.pk,
+                    "fecha": "2026-02-07",
+                    "tipo": Transaction.Tipo.INGRESO,
+                    "monto": "33000",
+                    "descripcion": "Ingreso auditado",
+                    "documentos_tributarios": [],
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        transaccion = Transaction.objects.get(descripcion="Ingreso auditado")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="finanzas",
+                accion=AuditLog.ACCION_CREAR,
+                modelo="finanzas.Transaction",
+                objeto_id=str(transaccion.pk),
+            ).exists()
+        )
 
     def test_documento_tributario_importar_parsea_y_muestra_revision_sin_guardar(self):
         xml = SimpleUploadedFile(

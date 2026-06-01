@@ -8,6 +8,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from auditoria.models import AuditLog
+from auditoria.services import registrar_auditoria, registrar_cambio
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
@@ -40,6 +42,37 @@ from .selectors import asistencias_export_queryset, estudiantes_operativos_perio
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
 from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
+
+
+SESION_AUDIT_FIELDS = ["disciplina_id", "fecha", "estado"]
+
+
+def _snapshot_sesion(sesion):
+    return {
+        "disciplina_id": sesion.disciplina_id,
+        "fecha": sesion.fecha,
+        "estado": sesion.estado,
+        "profesor_ids": sorted(sesion.profesores.values_list("id", flat=True)) if sesion.pk else [],
+    }
+
+
+def _metadata_sesion(sesion):
+    return {
+        "sesion_id": sesion.pk,
+        "disciplina_id": sesion.disciplina_id,
+        "organizacion_id": sesion.disciplina.organizacion_id,
+        "fecha": sesion.fecha,
+        "estado": sesion.estado,
+    }
+
+
+def _metadata_asistencia(asistencia):
+    return {
+        "asistencia_id": asistencia.pk,
+        "sesion_id": asistencia.sesion_id,
+        "persona_id": asistencia.persona_id,
+        "estado": asistencia.estado,
+    }
 
 
 def _periodo(request):
@@ -693,6 +726,15 @@ def asistencias_list(request):
                 )
                 if profesores:
                     sesion.profesores.set(profesores)
+                registrar_auditoria(
+                    usuario=request.user,
+                    accion=AuditLog.ACCION_CREAR,
+                    dominio="asistencias",
+                    objeto=sesion,
+                    organizacion=sesion.disciplina.organizacion,
+                    resumen="Sesión creada",
+                    metadata={**_metadata_sesion(sesion), "profesor_ids": [profesor.pk for profesor in profesores]},
+                )
                 messages.success(request, "Sesión creada. Ahora puedes agregar asistentes.")
                 return redirect(_url_actual_con_filtros(request, sesion_id=sesion.pk, open="agregar_asistentes"))
             open_nueva_sesion = True
@@ -701,8 +743,21 @@ def asistencias_list(request):
             estado = request.POST.get("estado")
             if sesion_id_post and estado in dict(SesionClase.Estado.choices):
                 sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
+                estado_anterior = sesion.estado
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
+                registrar_cambio(
+                    usuario=request.user,
+                    dominio="asistencias",
+                    objeto=sesion,
+                    organizacion=sesion.disciplina.organizacion,
+                    resumen="Estado de sesión actualizado",
+                    antes={"estado": estado_anterior},
+                    despues={"estado": sesion.estado},
+                    campos=["estado"],
+                    accion=AuditLog.ACCION_CAMBIAR_ESTADO,
+                    metadata=_metadata_sesion(sesion),
+                )
                 messages.success(request, "Estado de la sesión actualizado.")
                 return redirect(request.get_full_path())
         elif "agregar_persona" in request.POST:
@@ -711,6 +766,15 @@ def asistencias_list(request):
             if persona_form.is_valid():
                 persona = _crear_persona_estudiante_en_organizacion(persona_form, organizacion)
                 if persona:
+                    registrar_auditoria(
+                        usuario=request.user,
+                        accion=AuditLog.ACCION_CREAR,
+                        dominio="personas",
+                        objeto=persona,
+                        organizacion=organizacion,
+                        resumen="Persona creada desde asistencias",
+                        metadata={"persona_id": persona.pk, "origen": "asistencias_list"},
+                    )
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     open_nueva_persona = False
                     return redirect(_url_actual_con_filtros(request))
@@ -728,18 +792,37 @@ def asistencias_list(request):
             if asistencia_form.is_valid():
                 estudiantes_seleccionados = list(asistencia_form.cleaned_data["estudiantes"])
                 creados = 0
+                asistencia_ids_creadas = []
                 for persona in estudiantes_seleccionados:
                     _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
-                    _, created = Asistencia.objects.get_or_create(
+                    asistencia, created = Asistencia.objects.get_or_create(
                         sesion=sesion,
                         persona=persona,
                         defaults={"estado": Asistencia.Estado.PRESENTE},
                     )
                     if created:
                         creados += 1
+                        asistencia_ids_creadas.append(asistencia.pk)
+                estado_anterior = sesion.estado
                 if estudiantes_seleccionados and sesion.estado == SesionClase.Estado.PROGRAMADA:
                     sesion.estado = SesionClase.Estado.COMPLETADA
                     sesion.save(update_fields=["estado"])
+                registrar_auditoria(
+                    usuario=request.user,
+                    accion=AuditLog.ACCION_AGREGAR_ASISTENTES,
+                    dominio="asistencias",
+                    objeto=sesion,
+                    organizacion=sesion.disciplina.organizacion,
+                    resumen="Asistentes agregados a sesión",
+                    metadata={
+                        **_metadata_sesion(sesion),
+                        "asistencias_creadas": creados,
+                        "asistencia_ids_creadas": asistencia_ids_creadas,
+                        "persona_ids": [persona.pk for persona in estudiantes_seleccionados],
+                        "estado_anterior": estado_anterior,
+                        "estado_despues": sesion.estado,
+                    },
+                )
                 messages.success(request, f"Asistencias agregadas: {creados}.")
                 accion_guardado = request.POST.get("accion_guardado_asistencias", "cerrar")
                 if accion_guardado == "continuar":
@@ -847,6 +930,15 @@ def sesion_detail(request, pk):
     if request.method == "POST":
         if "eliminar_sesion" in request.POST:
             sesion_resumen = str(sesion)
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_ELIMINAR,
+                dominio="asistencias",
+                objeto=sesion,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Sesión eliminada",
+                metadata=_metadata_sesion(sesion),
+            )
             sesion.delete()
             messages.success(request, f"Sesión eliminada: {sesion_resumen}.")
             return redirect(_url_con_filtros(request, "asistencias:sesiones_list"))
@@ -859,16 +951,52 @@ def sesion_detail(request, pk):
                     sesion.disciplina.organizacion,
                 )
                 if persona:
+                    registrar_auditoria(
+                        usuario=request.user,
+                        accion=AuditLog.ACCION_CREAR,
+                        dominio="personas",
+                        objeto=persona,
+                        organizacion=sesion.disciplina.organizacion,
+                        resumen="Persona creada desde sesión",
+                        metadata={"persona_id": persona.pk, "sesion_id": sesion.pk, "origen": "sesion_detail"},
+                    )
                     agregar_a_sesion = request.POST.get("agregar_a_sesion") == "1"
                     if agregar_a_sesion:
-                        _, created = Asistencia.objects.get_or_create(
+                        asistencia, created = Asistencia.objects.get_or_create(
                             sesion=sesion,
                             persona=persona,
                             defaults={"estado": Asistencia.Estado.PRESENTE},
                         )
+                        estado_anterior = sesion.estado
                         if sesion.estado == SesionClase.Estado.PROGRAMADA:
                             sesion.estado = SesionClase.Estado.COMPLETADA
                             sesion.save(update_fields=["estado"])
+                        if created:
+                            registrar_auditoria(
+                                usuario=request.user,
+                                accion=AuditLog.ACCION_CREAR,
+                                dominio="asistencias",
+                                objeto=asistencia,
+                                organizacion=sesion.disciplina.organizacion,
+                                resumen="Asistencia creada desde alta rápida",
+                                metadata={
+                                    **_metadata_asistencia(asistencia),
+                                    "origen": "alta_rapida_sesion",
+                                },
+                            )
+                        if estado_anterior != sesion.estado:
+                            registrar_cambio(
+                                usuario=request.user,
+                                dominio="asistencias",
+                                objeto=sesion,
+                                organizacion=sesion.disciplina.organizacion,
+                                resumen="Estado de sesión actualizado por alta rápida",
+                                antes={"estado": estado_anterior},
+                                despues={"estado": sesion.estado},
+                                campos=["estado"],
+                                accion=AuditLog.ACCION_CAMBIAR_ESTADO,
+                                metadata=_metadata_sesion(sesion),
+                            )
                         if created:
                             messages.success(request, "Persona creada y agregada a la asistencia.")
                         else:
@@ -879,32 +1007,73 @@ def sesion_detail(request, pk):
         elif "eliminar_asistente" in request.POST:
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_ELIMINAR,
+                dominio="asistencias",
+                objeto=asistencia,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Asistente eliminado de sesión",
+                metadata=_metadata_asistencia(asistencia),
+            )
             asistencia.delete()
             messages.success(request, f"Asistente eliminado de la sesión: {persona_nombre}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "cambiar_estado" in request.POST:
             estado = request.POST.get("estado")
             if estado in dict(SesionClase.Estado.choices):
+                estado_anterior = sesion.estado
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
+                registrar_cambio(
+                    usuario=request.user,
+                    dominio="asistencias",
+                    objeto=sesion,
+                    organizacion=sesion.disciplina.organizacion,
+                    resumen="Estado de sesión actualizado",
+                    antes={"estado": estado_anterior},
+                    despues={"estado": sesion.estado},
+                    campos=["estado"],
+                    accion=AuditLog.ACCION_CAMBIAR_ESTADO,
+                    metadata=_metadata_sesion(sesion),
+                )
                 messages.success(request, "Estado de la sesión actualizado.")
                 return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "agregar_asistentes" in request.POST:
             estudiantes_ids = request.POST.getlist("estudiantes")
             estudiantes_seleccionados = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
             creados = 0
+            asistencia_ids_creadas = []
             for persona in estudiantes_seleccionados:
                 _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
-                _, created = Asistencia.objects.get_or_create(
+                asistencia, created = Asistencia.objects.get_or_create(
                     sesion=sesion,
                     persona=persona,
                     defaults={"estado": Asistencia.Estado.PRESENTE},
                 )
                 if created:
                     creados += 1
+                    asistencia_ids_creadas.append(asistencia.pk)
+            estado_anterior = sesion.estado
             if estudiantes_seleccionados and sesion.estado == SesionClase.Estado.PROGRAMADA:
                 sesion.estado = SesionClase.Estado.COMPLETADA
                 sesion.save(update_fields=["estado"])
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_AGREGAR_ASISTENTES,
+                dominio="asistencias",
+                objeto=sesion,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Asistentes agregados a sesión",
+                metadata={
+                    **_metadata_sesion(sesion),
+                    "asistencias_creadas": creados,
+                    "asistencia_ids_creadas": asistencia_ids_creadas,
+                    "persona_ids": [persona.pk for persona in estudiantes_seleccionados],
+                    "estado_anterior": estado_anterior,
+                    "estado_despues": sesion.estado,
+                },
+            )
             messages.success(request, f"Asistencias agregadas: {creados}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
 
@@ -958,10 +1127,28 @@ def sesion_edit(request, pk):
     )
 
     if request.method == "POST" and form.is_valid():
+        antes = _snapshot_sesion(sesion)
         sesion.disciplina = form.cleaned_data["disciplina"]
         sesion.fecha = form.cleaned_data["fecha"] or sesion.fecha
         sesion.save(update_fields=["disciplina", "fecha"])
         sesion.profesores.set(form.cleaned_data["profesores"])
+        despues = _snapshot_sesion(sesion)
+        cambios = {
+            "disciplina_id": {"antes": antes["disciplina_id"], "despues": despues["disciplina_id"]},
+            "fecha": {"antes": antes["fecha"], "despues": despues["fecha"]},
+            "profesor_ids": {"antes": antes["profesor_ids"], "despues": despues["profesor_ids"]},
+        }
+        cambios = {campo: cambio for campo, cambio in cambios.items() if cambio["antes"] != cambio["despues"]}
+        if cambios:
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_EDITAR,
+                dominio="asistencias",
+                objeto=sesion,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Sesión actualizada",
+                metadata={"cambios": cambios, **_metadata_sesion(sesion)},
+            )
         messages.success(request, "Sesión actualizada correctamente.")
         return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
 
