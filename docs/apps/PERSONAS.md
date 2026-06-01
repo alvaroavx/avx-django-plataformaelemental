@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-05-30
+Fecha de actualizacion: 2026-06-01
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -33,6 +33,10 @@ Debe concentrar:
 - El alta rapida desde detalle de sesion puede agregar la persona recien creada a la asistencia de esa sesion mediante switch explicito; la organizacion usada siempre es la organizacion dueña de la sesion.
 - El comando `python manage.py auditar_datos_v1` revisa datos existentes sin modificar la base: personas sin identidad, duplicados de RUT/email/telefono, telefonos inconsistentes y posibles duplicados por nombre.
 - En `personas/listado`, el filtro por `rol` debe considerar asignaciones activas e inactivas; el filtro `estado` controla el estado de la `Persona`, no la vigencia del rol. La tabla debe mostrar si cada rol esta activo o inactivo.
+- En `personas/listado`, la tabla usa paginacion Django en servidor de 25 filas por pagina. DataTables no debe cargar todas las personas en HTML inicial.
+- El listado conserva filtros `periodo_mes`, `periodo_anio`, `organizacion`, busqueda y filtros propios al cambiar de pagina.
+- Las metricas por persona del listado se calculan para el periodo/organizacion activos y se evalúan solo sobre la pagina visible.
+- Si la organizacion esta en `Todas`, el listado sigue siendo paginado para evitar una carga inicial masiva.
 - El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.
 - En `personas/<id>/`, el bloque `Perfil estudiante` debe permitir asociar pagos disponibles a asistencias presentes, respetando periodo, organizacion, saldo del pago y las validaciones de `finanzas`.
@@ -62,9 +66,12 @@ No permitido:
 - editar documentos tributarios desde perfiles
 - importar helpers privados desde otras apps
 
-## API externa base
-- `personas` expone una base de consumo externo en:
-  - `/api/v1/personas/organizaciones/`
-  - `/api/v1/personas/personas/`
-  - `/api/v1/personas/resumen/`
-- La API permite filtrar y reutilizar personas y organizaciones sin acoplar clientes externos al frontend HTML.
+## API
+La API de datos de `personas` queda desactivada en v1.0.
+
+Motivo:
+- no existe consumidor real actual
+- reduce superficie de exposicion de datos personales
+- evita mantener endpoints "por si acaso"
+
+Si en el futuro se reactiva, debe definirse por caso de uso concreto, con permisos, filtros por organizacion y tests especificos.

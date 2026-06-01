@@ -9,8 +9,12 @@
       <div class="text-muted small">Perfil CRM consolidado</div>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}">Volver al listado</a>
-      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_edit' persona_obj.pk %}?{{ request.GET.urlencode }}">Editar perfil</a>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}" title="Volver" aria-label="Volver">
+        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
+      </a>
+      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_edit' persona_obj.pk %}?{{ request.GET.urlencode }}">
+        <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar perfil</span>
+      </a>
     </div>
   </div>
 

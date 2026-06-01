@@ -15,6 +15,9 @@ from plataformaelemental.context import nav_context, organizacion_desde_request,
 from .models import Asistencia, Disciplina, SesionClase
 
 
+TEST_PASSWORD = "not-a-real-test-password"
+
+
 class ContextoGlobalTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -44,7 +47,7 @@ class ContextoGlobalTests(TestCase):
 
     def test_nav_context_expone_persona_y_roles_activos(self):
         User = get_user_model()
-        user = User.objects.create_user(username="contexto", password="secret123")
+        user = User.objects.create_user(username="contexto", password=TEST_PASSWORD)
         persona = Persona.objects.create(nombres="Clara", apellidos="Contexto", user=user)
         rol_activo = Rol.objects.create(nombre="Administrador", codigo="ADMIN")
         rol_inactivo = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
@@ -64,7 +67,7 @@ class AsistenciasViewTests(TestCase):
         User = get_user_model()
         self.user = User.objects.create_user(
             username="admin",
-            password="secret123",
+            password=TEST_PASSWORD,
             is_superuser=True,
             is_staff=True,
         )
@@ -153,7 +156,7 @@ class AsistenciasViewTests(TestCase):
 
     def test_export_asistencias_xlsx_bloquea_usuario_sin_permiso(self):
         User = get_user_model()
-        usuario = User.objects.create_user("sin_permiso_export", password="secret123")
+        usuario = User.objects.create_user("sin_permiso_export", password=TEST_PASSWORD)
         self.client.force_login(usuario)
 
         response = self.client.get(
@@ -165,7 +168,7 @@ class AsistenciasViewTests(TestCase):
 
     def test_agregar_asistentes_cambia_estado_a_completada(self):
         response = self.client.post(
-            reverse("asistencias:asistencias_list"),
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
             {
                 "agregar_asistentes": "1",
                 "sesion_id": str(self.sesion.pk),
@@ -267,6 +270,102 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, self.estudiante.nombre_completo)
         self.assertNotContains(response, estudiante_otra_org.nombre_completo)
 
+    def test_agregar_asistentes_preselecciona_sesion_en_modal(self):
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+                "sesion_id": self.sesion.pk,
+                "open": "agregar_asistentes",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sesión de asistencia")
+        self.assertContains(response, f'value="{self.sesion.pk}" selected', html=False)
+
+    def test_agregar_asistentes_selector_lista_solo_sesiones_de_periodo_y_organizacion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="22.222.222-2",
+        )
+        otra_disciplina = Disciplina.objects.create(organizacion=otra_organizacion, nombre="Otra disciplina")
+        sesion_otro_periodo = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-03-05",
+        )
+        sesion_otra_org = SesionClase.objects.create(
+            disciplina=otra_disciplina,
+            fecha="2026-02-05",
+        )
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+                "open": "agregar_asistentes",
+            },
+        )
+
+        sesiones = list(response.context["sesiones_agregar_asistentes"])
+        self.assertIn(self.sesion, sesiones)
+        self.assertNotIn(sesion_otro_periodo, sesiones)
+        self.assertNotIn(sesion_otra_org, sesiones)
+
+    def test_agregar_asistentes_rechaza_sesion_de_otra_organizacion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="22.222.222-2",
+        )
+        otra_disciplina = Disciplina.objects.create(organizacion=otra_organizacion, nombre="Otra disciplina")
+        sesion_otra_org = SesionClase.objects.create(
+            disciplina=otra_disciplina,
+            fecha="2026-02-05",
+        )
+
+        response = self.client.post(
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+            {
+                "agregar_asistentes": "1",
+                "sesion_id": str(sesion_otra_org.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            Asistencia.objects.filter(sesion=sesion_otra_org, persona=self.estudiante).exists()
+        )
+
+    def test_agregar_asistentes_usa_sesion_seleccionada(self):
+        segunda_sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-02-28",
+        )
+
+        response = self.client.post(
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
+            {
+                "agregar_asistentes": "1",
+                "sesion_id": str(segunda_sesion.pk),
+                "estudiantes": [str(self.estudiante.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Asistencia.objects.filter(sesion=segunda_sesion, persona=self.estudiante).exists()
+        )
+        self.assertFalse(
+            Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists()
+        )
+
     def test_agregar_asistentes_rechaza_estudiante_de_otra_organizacion(self):
         otra_organizacion = Organizacion.objects.create(
             nombre="Otra Org",
@@ -287,7 +386,7 @@ class AsistenciasViewTests(TestCase):
         )
 
         response = self.client.post(
-            reverse("asistencias:asistencias_list"),
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
             {
                 "agregar_asistentes": "1",
                 "sesion_id": str(self.sesion.pk),
@@ -326,7 +425,7 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "Inactivo")
 
         response = self.client.post(
-            reverse("asistencias:asistencias_list"),
+            f"{reverse('asistencias:asistencias_list')}?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}",
             {
                 "agregar_asistentes": "1",
                 "sesion_id": str(self.sesion.pk),
@@ -666,7 +765,7 @@ class AsistenciasViewTests(TestCase):
 
     def test_sesion_detail_usuario_sin_permiso_no_crea_persona_ni_asistencia(self):
         User = get_user_model()
-        usuario = User.objects.create_user("sin_permiso_sesion", password="secret123")
+        usuario = User.objects.create_user("sin_permiso_sesion", password=TEST_PASSWORD)
         self.client.force_login(usuario)
 
         response = self.client.post(

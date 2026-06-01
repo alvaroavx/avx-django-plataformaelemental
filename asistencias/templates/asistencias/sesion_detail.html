@@ -4,8 +4,8 @@
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}">
-        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Atrás</span>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}" title="Volver" aria-label="Volver">
+        <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
       </a>
       <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>

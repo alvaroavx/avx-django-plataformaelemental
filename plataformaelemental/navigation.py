@@ -77,7 +77,7 @@ def build_navigation(request):
                 url_name="asistencias:dashboard",
                 active_prefixes=["/asistencias/"],
                 children=[
-                    _item(request, label="Dashboard", icon="bi-grid", url_name="asistencias:dashboard"),
+                    _item(request, label="Panel", icon="bi-grid", url_name="asistencias:dashboard"),
                     _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
                     _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),
                     _item(request, label="Estudiantes", icon="bi-people", url_name="asistencias:estudiantes_list"),
@@ -96,7 +96,7 @@ def build_navigation(request):
                 url_name="finanzas:dashboard",
                 active_prefixes=["/finanzas/"],
                 children=[
-                    _item(request, label="Dashboard", icon="bi-grid", url_name="finanzas:dashboard"),
+                    _item(request, label="Panel", icon="bi-grid", url_name="finanzas:dashboard"),
                     _item(request, label="Pagos", icon="bi-cash-stack", url_name="finanzas:pagos_list"),
                     _item(
                         request,
@@ -125,7 +125,7 @@ def build_navigation(request):
                 url_name="personas:dashboard",
                 active_prefixes=["/personas/"],
                 children=[
-                    _item(request, label="Dashboard", icon="bi-grid", url_name="personas:dashboard"),
+                    _item(request, label="Panel", icon="bi-grid", url_name="personas:dashboard"),
                     _item(request, label="Personas", icon="bi-people", url_name="personas:personas_list"),
                     _item(
                         request,

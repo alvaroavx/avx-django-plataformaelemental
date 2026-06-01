@@ -8,7 +8,7 @@ Hoy el proyecto integra:
 - pagos y consumo de clases
 - documentos tributarios opcionales
 - transacciones de caja
-- API externa versionada para consumo desde clientes externos
+- API minima de salud/estado/version
 
 ## Estado actual
 
@@ -41,11 +41,9 @@ Reglas funcionales vigentes:
 - categorías y reportes
 
 ### `api`
-- API REST externa
-- endpoints base bajo `/api/v1/`
-- autenticación por token para usuarios
-- API key de solo lectura para consultas externas
-- rate limiting por usuario, API key o IP
+- endpoints minimos operativos
+- health/status/version
+- check minimo de usuario autenticado
 
 ## Arquitectura
 
@@ -63,7 +61,7 @@ Reglas funcionales vigentes:
 - `asistencias/`: dominio académico
 - `personas/`: personas, roles y organizaciones
 - `finanzas/`: pagos, documentos tributarios y caja
-- `api/`: API externa
+- `api/`: API minima de salud/estado/version
 - `docs/`: documentación viva
 - `data/`: cargas y soporte de datos
 - `database/`: compatibilidad histórica de migraciones
@@ -89,21 +87,8 @@ Reglas funcionales vigentes:
 ### API base
 - `/api/health/`
 - `/api/me/`
-- `/api/auth/login/`
-- `/api/auth/refresh/`
-- `/api/auth/logout/`
-- `/api/v1/personas/organizaciones/`
-- `/api/v1/personas/personas/`
-- `/api/v1/personas/resumen/`
-- `/api/v1/asistencias/disciplinas/`
-- `/api/v1/asistencias/sesiones/`
-- `/api/v1/asistencias/asistencias/`
-- `/api/v1/asistencias/resumen/`
-- `/api/v1/finanzas/planes/`
-- `/api/v1/finanzas/pagos/`
-- `/api/v1/finanzas/documentos-tributarios/`
-- `/api/v1/finanzas/transacciones/`
-- `/api/v1/finanzas/resumen/`
+- `/api/status/`
+- `/api/version/`
 
 ## Puesta en marcha
 
@@ -163,35 +148,25 @@ Reglas:
 - si hay solo PDF, el resultado depende de que el archivo tenga texto seleccionable
 - subir un archivo no guarda automáticamente el registro final
 
-## API externa
+## API minima
 
-### Autenticación disponible
-- token DRF para usuarios autenticados
-- API key de solo lectura para consultas externas
+Estado v1.0:
+- No se exponen personas, asistencias, pagos, documentos tributarios ni transacciones por API.
+- `GET /api/health/`, `GET /api/status/` y `GET /api/version/` son publicos.
+- `GET /api/me/` requiere usuario autenticado y devuelve payload minimo.
+- `ApiAccessKey` se conserva temporalmente por compatibilidad historica, pero no hay endpoints de datos activos que la usen.
 
-### Crear API key
+### Consultar estado
 ```bash
-python manage.py crear_api_key integracion-externa
-```
-
-### Consultar con API key
-```bash
-curl -H "X-API-Key: <tu_clave>" http://127.0.0.1:8000/api/v1/personas/organizaciones/
-curl -H "Authorization: ApiKey <tu_clave>" "http://127.0.0.1:8000/api/v1/finanzas/pagos/?organizacion=1&periodo_mes=4&periodo_anio=2026"
-```
-
-### Obtener token de usuario
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario","password":"clave"}'
+curl http://127.0.0.1:8000/api/health/
+curl http://127.0.0.1:8000/api/status/
+curl http://127.0.0.1:8000/api/version/
 ```
 
 ### Seguridad base actual
 - throttling por usuario, API key o IP
-- throttling más estricto para login
-- API key solo para lectura
-- escrituras requieren usuario autenticado
+- sin endpoints de datos activos por API key
+- sin endpoints API mutables de operacion en v1.0
 
 ## CI/CD y despliegue
 

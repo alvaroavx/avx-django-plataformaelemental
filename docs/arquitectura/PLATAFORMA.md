@@ -20,8 +20,8 @@ Apps funcionales visibles:
 - `asistencias`: operacion academica diaria.
 - `personas`: identidad, CRM, roles y organizaciones.
 - `finanzas`: cobranza operacional, documentos tributarios, transacciones y reportes.
-- `api`: endpoints REST para consumo externo.
-- `monitor`: monitoreo interno.
+- `api`: endpoints minimos de salud, estado, version y usuario autenticado.
+- `monitor`: archivado/desactivado del producto principal; se conserva temporalmente por migraciones y posible data historica.
 
 Componentes de soporte:
 - `plataformaelemental`: configuracion del proyecto.
@@ -52,8 +52,8 @@ Detalle operativo:
 - `finanzas` contiene dos subdominios internos:
   - cobranza operacional: planes, pagos, deuda, saldo e imputacion contra asistencias.
   - finanzas/contabilidad: documentos tributarios, transacciones, categorias y reportes.
-- `api` expone la superficie externa versionada.
-- `monitor` no define core operacional; consume informacion de apps duenias.
+- `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
+- `monitor` no define core operacional y no forma parte de la navegacion/rutas activas de `Elemental Apps`.
 - `database` existe solo por compatibilidad historica de migraciones.
 
 Detalle por app:

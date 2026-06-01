@@ -1,6 +1,7 @@
 ﻿from decimal import Decimal
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -183,12 +184,7 @@ def dashboard(request):
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
 
-    personas_qs = _annotate_personas_resumen(
-        _personas_queryset(organizacion),
-        mes=periodo["mes"],
-        anio=periodo["anio"],
-        organizacion=organizacion,
-    )
+    personas_qs = _personas_queryset(organizacion)
     pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
     consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
     asistencias_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
@@ -329,13 +325,47 @@ def personas_list(request):
     elif con_usuario == "no":
         personas_qs = personas_qs.filter(user__isnull=True)
     if con_deuda == "si":
+        personas_qs = _annotate_personas_resumen(
+            personas_qs,
+            mes=periodo["mes"],
+            anio=periodo["anio"],
+            organizacion=organizacion,
+        )
         personas_qs = personas_qs.filter(deuda_periodo__gt=0)
     elif con_deuda == "no":
+        personas_qs = _annotate_personas_resumen(
+            personas_qs,
+            mes=periodo["mes"],
+            anio=periodo["anio"],
+            organizacion=organizacion,
+        )
         personas_qs = personas_qs.filter(deuda_periodo=0)
+
+    personas_qs = personas_qs.order_by("apellidos", "nombres", "pk").distinct()
+    paginator = Paginator(personas_qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    page_ids = list(page_obj.object_list.values_list("pk", flat=True))
+    personas_pagina = []
+    if page_ids:
+        personas_pagina = list(
+            _annotate_personas_resumen(
+                _personas_queryset(organizacion).filter(pk__in=page_ids),
+                mes=periodo["mes"],
+                anio=periodo["anio"],
+                organizacion=organizacion,
+            ).order_by("apellidos", "nombres", "pk")
+        )
+    page_obj.object_list = personas_pagina
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
 
     context.update(
         {
-            "personas": personas_qs.order_by("apellidos", "nombres"),
+            "personas": personas_pagina,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "total_resultados": paginator.count,
+            "querystring_sin_page": query_params.urlencode(),
             "roles_disponibles": Rol.objects.order_by("nombre"),
             "q": q,
             "rol": rol,

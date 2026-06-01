@@ -267,16 +267,22 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body d-flex flex-column" style="min-height: 640px;">
-        {% if sesion_seleccionada %}
-          <div class="mb-2 text-muted small">
-            Sesión: {{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}
-          </div>
-          <form method="post" class="d-flex flex-column flex-grow-1">
-            {% csrf_token %}
+        <form method="post" class="d-flex flex-column flex-grow-1">
+          {% csrf_token %}
+          {% for error in asistencia_form.non_field_errors %}
+            <div class="alert alert-danger py-2">{{ error }}</div>
+          {% endfor %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ asistencia_form.sesion_id.id_for_label }}">Sesión de asistencia</label>
             {{ asistencia_form.sesion_id }}
-            {% for error in asistencia_form.non_field_errors %}
-              <div class="alert alert-danger py-2">{{ error }}</div>
+            {% for error in asistencia_form.sesion_id.errors %}
+              <div class="text-danger small">{{ error }}</div>
             {% endfor %}
+            <div class="form-text">
+              Solo se listan sesiones del período y organización activos.
+            </div>
+          </div>
+          {% if sesion_seleccionada %}
             <label class="form-label" for="estudiantes_search">Buscar estudiante</label>
             <input id="estudiantes_search" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
             <div class="d-flex gap-2 mb-2">
@@ -328,10 +334,12 @@
               </button>
             </div>
             <input id="accion_guardado_asistencias" type="hidden" name="accion_guardado_asistencias" value="cerrar">
-          </form>
-        {% else %}
-          <div class="text-muted">Selecciona una sesión desde el listado para agregar asistentes.</div>
-        {% endif %}
+          {% else %}
+            <div class="alert alert-light border mb-0">
+              Selecciona una sesión para cargar los estudiantes disponibles.
+            </div>
+          {% endif %}
+        </form>
       </div>
     </div>
   </div>
@@ -353,10 +361,22 @@
         .replace(/[\u0300-\u036f]/g, "");
 
     const input = document.getElementById("estudiantes_search");
+    const sesionSelect = document.querySelector(".js-sesion-asistentes-select");
     const selectVisibleBtn = document.getElementById("seleccionar_visibles");
     const clearBtn = document.getElementById("limpiar_seleccion");
     const rows = Array.from(document.querySelectorAll(".estudiante-opcion"));
     const nuevaPersonaModal = document.getElementById("nuevaPersonaModal");
+    if (sesionSelect) {
+      sesionSelect.addEventListener("change", function () {
+        if (!this.value) {
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.set("sesion_id", this.value);
+        url.searchParams.set("open", "agregar_asistentes");
+        window.location.href = url.toString();
+      });
+    }
     if (rows.length) {
       const aplicarFiltro = function () {
         const term = normalizeText(input ? input.value : "");

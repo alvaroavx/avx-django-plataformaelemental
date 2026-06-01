@@ -1,21 +1,21 @@
 # Observabilidad
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-06-01
 
 ## Proposito
-Este documento define como debe crecer la observabilidad interna de Plataforma Elemental.
+Este documento define criterios futuros de observabilidad interna de Plataforma Elemental.
 
-La app `monitor` puede crecer, pero no debe transformarse en una segunda fuente de verdad.
+La app `monitor` queda archivada/desactivada en v1.0. Si la observabilidad vuelve a crecer, debe hacerlo como decision explicita y sin transformarse en una segunda fuente de verdad.
 
 ## Estado Actual
-- Existe app `monitor`.
-- Ruta base: `/monitor/`.
-- Vista inicial protegida por autenticacion.
-- No tiene modelos propios.
-- Consume navegacion compartida y filtros globales cuando aplique.
+- Existe app `monitor`, pero esta archivada.
+- `/monitor/` no esta registrado en URLs raiz.
+- Tiene modelos historicos propios y puede tener tablas `monitor_*`.
+- No aparece en navegacion principal.
+- Antes de quitarla de `INSTALLED_APPS`, auditar datos con `python manage.py auditar_monitor`.
 
 ## Principio
-`monitor` observa datos de apps duenias.
+Una futura herramienta de observabilidad debe observar datos de apps duenias.
 
 No debe:
 - duplicar modelos,
@@ -62,7 +62,7 @@ Regla:
 ## Reglas Para Nuevos Indicadores
 - Preferir selectors existentes.
 - Si el indicador necesita calculo nuevo, crear selector/service en la app duena.
-- `monitor` solo orquesta lectura y render.
+- La capa de observabilidad solo orquesta lectura y render.
 - No crear tablas espejo.
 - No cachear indicadores sin definir invalidacion.
 - Mantener filtros globales `periodo_mes`, `periodo_anio` y `organizacion`.
@@ -96,5 +96,5 @@ No exponer en `monitor`:
 ## Deuda
 - Falta definir indicadores minimos de produccion.
 - Falta decidir si se usara logging estructurado.
-- Falta definir si `monitor` tendra endpoints API propios o solo HTML interno.
+- Falta decidir si la observabilidad futura vivira fuera de este repo o como herramienta interna separada.
 - Falta criterio de retencion si algun dia se persisten metricas.

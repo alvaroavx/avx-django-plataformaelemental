@@ -1,3 +1,4 @@
+import unittest
 from unittest.mock import patch
 from urllib.error import URLError
 
@@ -8,6 +9,9 @@ from django.urls import reverse
 from .models import ConfiguracionMonitor, ConfiguracionSitio, DiscoverySitio, Proyecto, Sitio
 from .services.discovery import ejecutar_discovery_inicial
 from .services.urls import normalizar_url
+
+
+TEST_PASSWORD = "not-a-real-test-password"
 
 
 class _HeadersFake:
@@ -38,13 +42,14 @@ class MonitorBaseTestCase(TestCase):
     def setUp(self):
         self.usuario = get_user_model().objects.create_user(
             username="monitor",
-            password="monitor-test",
+            password=TEST_PASSWORD,
         )
 
     def login(self):
         self.client.force_login(self.usuario)
 
 
+@unittest.skip("monitor esta archivado y sus rutas HTML no forman parte de Elemental Apps v1.0")
 class MonitorDashboardTests(MonitorBaseTestCase):
     def test_vistas_html_requieren_login(self):
         proyecto = Proyecto.objects.create(nombre="AVX")
@@ -89,6 +94,7 @@ class MonitorDashboardTests(MonitorBaseTestCase):
         self.assertContains(response, "Activo")
 
 
+@unittest.skip("monitor esta archivado y sus rutas HTML no forman parte de Elemental Apps v1.0")
 class MonitorSitioWorkflowTests(MonitorBaseTestCase):
     def test_crear_sitio_normaliza_url_y_ejecuta_discovery(self):
         self.login()
@@ -201,6 +207,7 @@ class MonitorSitioWorkflowTests(MonitorBaseTestCase):
         self.assertFalse(ConfiguracionSitio.objects.filter(sitio=sitio).exists())
 
 
+@unittest.skip("monitor esta archivado y sus rutas HTML no forman parte de Elemental Apps v1.0")
 class MonitorConfiguracionTests(MonitorBaseTestCase):
     def test_configuracion_global_puede_existir_sin_configuracion_por_sitio(self):
         self.login()
@@ -282,7 +289,7 @@ class MonitorServiceTests(TestCase):
         self.assertIsNotNone(sitio.ultimo_check_en)
 
     @patch("monitor.services.discovery.urlopen", side_effect=URLError("timeout simulado"))
-    def test_discovery_con_error_queda_controlado_y_visible_en_detalle(self, _urlopen_mock):
+    def test_discovery_con_error_queda_controlado(self, _urlopen_mock):
         proyecto = Proyecto.objects.create(nombre="AVX")
         sitio = Sitio.objects.create(proyecto=proyecto, nombre="AVX", url="https://avx.cl")
 
@@ -291,8 +298,3 @@ class MonitorServiceTests(TestCase):
 
         self.assertEqual(sitio.ultimo_estado, Sitio.ESTADO_ERROR)
         self.assertIn("timeout simulado", discovery.error)
-
-        usuario = get_user_model().objects.create_user(username="qa", password="qa-test")
-        self.client.force_login(usuario)
-        response = self.client.get(reverse("monitor:sitio_detail", args=[sitio.pk]))
-        self.assertContains(response, "timeout simulado")

@@ -1,6 +1,6 @@
 # Navegacion Y Contexto Global
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-06-01
 
 ## Proposito
 Este documento concentra las reglas transversales de navegacion, periodo, organizacion activa y contexto global de UI.
@@ -9,7 +9,6 @@ Aplica a:
 - `asistencias`
 - `finanzas`
 - `personas`
-- `monitor`, cuando consuma filtros globales
 
 ## Filtros globales
 Los filtros globales son:
@@ -30,7 +29,6 @@ flowchart LR
     E --> F["asistencias"]
     E --> G["personas"]
     E --> H["finanzas"]
-    E --> I["monitor"]
     J["Cambio de selector"] --> K["Autoaplicar filtros"]
     K --> A
     L["Opcion Todos"] --> B
@@ -71,17 +69,17 @@ flowchart TD
     B --> F["Contexto global reutilizable"]
 ```
 
-## Barra de apps
-La barra compartida debe mantener enlaces a:
+## Navegacion principal
+La navegacion principal debe mantener enlaces activos a:
 - `asistencias`
 - `finanzas`
 - `personas`
-- `monitor`
 
 Reglas:
 - Los enlaces deben arrastrar los filtros globales activos.
 - El objetivo es continuidad operativa, no navegacion aislada por app.
 - En mobile puede cambiar la disposicion visual, pero debe conservar la misma necesidad funcional.
+- `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
 
 ## Responsabilidad por capa
 - El modulo neutral arma contexto global reutilizable.

@@ -5,6 +5,11 @@ from django.urls import reverse
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 
+TEST_PASSWORD = "not-a-real-test-password"
+TEST_INVALID_PASSWORD = "not-a-real-invalid-password"
+TEST_ADMIN_USERNAME = "elemental_admin_test_user"
+
+
 class ElementalAppsUXTests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -17,7 +22,7 @@ class ElementalAppsUXTests(TestCase):
         self.rol_finanzas = Rol.objects.create(nombre="Finanzas", codigo="FINANZAS")
         self.rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
 
-        self.user_admin = User.objects.create_user("ux_admin", password="secret123")
+        self.user_admin = User.objects.create_user(TEST_ADMIN_USERNAME, password=TEST_PASSWORD)
         self.persona_admin = Persona.objects.create(
             nombres="Admin",
             apellidos="UX",
@@ -31,7 +36,7 @@ class ElementalAppsUXTests(TestCase):
             activo=True,
         )
 
-        self.user_finanzas = User.objects.create_user("ux_finanzas", password="secret123")
+        self.user_finanzas = User.objects.create_user("ux_finanzas_test_user", password=TEST_PASSWORD)
         self.persona_finanzas = Persona.objects.create(
             nombres="Finanzas",
             apellidos="UX",
@@ -45,7 +50,7 @@ class ElementalAppsUXTests(TestCase):
             activo=True,
         )
 
-        self.user_profesor = User.objects.create_user("ux_profesor", password="secret123")
+        self.user_profesor = User.objects.create_user("ux_profesor_test_user", password=TEST_PASSWORD)
         self.persona_profesor = Persona.objects.create(
             nombres="Profesor",
             apellidos="UX",
@@ -59,8 +64,8 @@ class ElementalAppsUXTests(TestCase):
             activo=True,
         )
 
-        self.user_staff = User.objects.create_user("ux_staff", password="secret123", is_staff=True)
-        self.user_sin_roles = User.objects.create_user("ux_sin_roles", password="secret123")
+        self.user_staff = User.objects.create_user("ux_staff_test_user", password=TEST_PASSWORD, is_staff=True)
+        self.user_sin_roles = User.objects.create_user("ux_sin_roles_test_user", password=TEST_PASSWORD)
 
     def test_login_get_renderiza_elemental_apps(self):
         response = self.client.get(reverse("login"))
@@ -72,7 +77,7 @@ class ElementalAppsUXTests(TestCase):
     def test_login_post_valido_respeta_next(self):
         response = self.client.post(
             f"{reverse('login')}?next=/finanzas/",
-            {"username": "ux_admin", "password": "secret123"},
+            {"username": TEST_ADMIN_USERNAME, "password": TEST_PASSWORD},
         )
 
         self.assertEqual(response.status_code, 302)
@@ -81,7 +86,7 @@ class ElementalAppsUXTests(TestCase):
     def test_login_post_invalido_muestra_error(self):
         response = self.client.post(
             reverse("login"),
-            {"username": "ux_admin", "password": "incorrecta"},
+            {"username": TEST_ADMIN_USERNAME, "password": TEST_INVALID_PASSWORD},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -151,6 +156,46 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "periodo_mes=3")
         self.assertContains(response, "periodo_anio=2026")
         self.assertContains(response, f"organizacion={self.organizacion.pk}")
+
+    def test_topbar_muestra_logo_de_organizacion_seleccionada(self):
+        self.organizacion.logo = "organizaciones/logos/org-ux.png"
+        self.organizacion.save(update_fields=["logo"])
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="elemental-org-logo"', html=False)
+        self.assertContains(response, "/media/organizaciones/logos/org-ux.png")
+        self.assertContains(response, "Org UX")
+
+    def test_topbar_muestra_fallback_si_organizacion_no_tiene_logo(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="elemental-org-fallback"', html=False)
+        self.assertContains(response, ">OU<", html=False)
+
+    def test_topbar_con_todas_las_organizaciones_muestra_elemental_apps_sin_logo(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 2, "periodo_anio": 2026},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Elemental Apps")
+        self.assertNotContains(response, 'class="elemental-org-logo"', html=False)
+        self.assertNotContains(response, 'class="elemental-org-fallback"', html=False)
 
     def test_vistas_principales_renderizan_con_shell_responsive(self):
         self.client.force_login(self.user_admin)

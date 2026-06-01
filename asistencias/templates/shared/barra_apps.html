@@ -63,11 +63,5 @@
     >
       PERSONAS
     </a>
-    <a
-      class="barra-apps-link {% if request.resolver_match.namespace == 'monitor' %}activa{% endif %}"
-      href="{% url 'monitor:dashboard' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"
-    >
-      MONITOR
-    </a>
   </div>
 </div>

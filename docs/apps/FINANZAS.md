@@ -183,14 +183,14 @@ Puede respaldar:
 
 No debe contarse como ingreso o egreso por si solo.
 
-## Dashboard Financiero Operativo
-- El dashboard financiero expone accesos rapidos para iniciar las tres acciones principales del periodo activo:
+## Panel Financiero Operativo
+- El panel financiero expone accesos rapidos para iniciar las tres acciones principales del periodo activo:
   - `Agregar pago`: abre el flujo de `Payment` en `finanzas:pagos_list` con `open=registrar_pago`.
   - `Agregar documento`: usa el flujo existente de importacion/revision de `DocumentoTributario` en `finanzas:documento_tributario_importar`.
   - `Agregar transaccion`: abre el flujo de `Transaction` en `finanzas:transacciones_list` con `open=nueva_transaccion`.
 - Los enlaces preservan `periodo_mes`, `periodo_anio` y `organizacion`.
 - Los botones solo se muestran a usuarios con permisos mutables del subdominio correspondiente: admin y finanzas.
-- Solo lectura puede ver dashboard financiero si tiene permiso de lectura, pero no ve accesos mutables.
+- Solo lectura puede ver el panel financiero si tiene permiso de lectura, pero no ve accesos mutables.
 - Profesor no accede a finanzas completa ni ve acciones financieras.
 - Estos accesos no mezclan responsabilidades: crear un `Payment` no crea una `Transaction`, crear una `Transaction` no crea un `Payment`, y un `DocumentoTributario` no se trata como movimiento financiero.
 
@@ -212,7 +212,7 @@ No debe contarse como ingreso o egreso por si solo.
 - Las metricas financieras visibles en la tabla operacional de estudiantes vienen de `Payment` y `AttendanceConsumption`; son cobranza operacional y no deben sumarse al bloque contable.
 
 ## Prevencion De Doble Conteo
-- El dashboard separa bloque contable y bloque operacional.
+- El panel separa bloque contable y bloque operacional.
 - El bloque contable suma solo `Transaction`.
 - El bloque operacional muestra `Payment`, saldos y deuda de clases como informacion de cobranza, no como caja.
 - Los documentos tributarios se muestran como respaldo disponible/asociado, no como movimiento financiero.
@@ -340,7 +340,7 @@ Reglas:
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales de `mes`, `anio` y `organizacion` deben autoaplicarse al cambiar, sin boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` deben ofrecer la opcion `Todos`, permitiendo ver todos los meses de un año, un mismo mes en todos los años o todo el historial, segun combinacion.
-- El menu superior agrupa visualmente los accesos en bloques redondeados, manteniendo este orden: `dashboard`, `pagos`, `documentos tributarios`, `transacciones` | `planes`, `categorias` | `reporte categorias`.
+- El sidebar agrupa visualmente los accesos principales, manteniendo `panel`, `pagos`, `documentos tributarios`, `transacciones`, `planes` y `categorias`.
 - Cada vista principal y de detalle debe tener su ayuda breve accesible desde un icono junto al titulo; en desktop se muestra como tooltip al pasar el mouse y en mobile como popover al tocar, en vez de ocupar un cuadro adicional dentro de la vista.
 - Los botones de accion en `finanzas` deben llevar icono representativo a la izquierda y `title` descriptivo; en desktop muestran icono y texto, y en mobile conservan solo el icono para ahorrar espacio.
 - Botones de crear/agregar en verde.
@@ -349,7 +349,7 @@ Reglas:
 ## Cambios ya implementados
 - Resumen superior en `pagos` con total pagos, total clases pagadas, IVA total y saldo.
 - Resumen superior en `documentos tributarios` y `transacciones` usando el mismo universo filtrado del listado; en documentos separa `ingresos` y `egresos` segun si la organizacion del documento actua como emisor o receptor, y ademas muestra `IVA` y `retencion`.
-- Los cards de resumen en `pagos`, `transacciones` y dashboard deben usar colores suaves y consistentes entre vistas, evitando fondos saturados.
+- Los cards de resumen en `pagos`, `transacciones` y panel deben usar colores suaves y consistentes entre vistas, evitando fondos saturados.
 - Las vistas principales que crean contenido en `finanzas` deben mostrar el boton de alta al nivel del titulo y abrir el formulario en modal, para no desplazar el listado principal.
 - En `pagos`, la edicion tambien debe resolverse dentro del listado mediante modal, y al guardar debe volver al mismo listado filtrado en vez de abrir una pantalla aparte.
 - En `pagos`, al cerrar el modal de edicion con cancelar, equis o click fuera, la URL debe eliminar `editar_pago` del querystring para que un refresh no reabra el modal.
@@ -367,11 +367,11 @@ Reglas:
 - Filtro de planes por organizacion en el formulario de pagos.
 - Gestion de planes con marca `por defecto` por organizacion y precarga automatica en el alta de pagos.
 - `finanzas/planes/<id>/editar` reutiliza el mismo listado de planes y abre una edicion inline dentro de la tabla, en vez de navegar a una pantalla separada.
-- Los querysets y agregaciones de lectura para planes, pagos, documentos tributarios, transacciones, dashboard, categorias y exportaciones viven en `finanzas/selectors.py`; las views no deben volver a concentrar esos calculos si solo leen datos.
+- Los querysets y agregaciones de lectura para planes, pagos, documentos tributarios, transacciones, panel, categorias y exportaciones viven en `finanzas/selectors.py`; las views no deben volver a concentrar esos calculos si solo leen datos.
 - Los helpers de contexto base, ayudas UI, URLs con querystring, redirects con querystring, clasificacion visual de archivos y error legible por conflicto de documento viven en `finanzas/forms_helpers.py`.
 - `finanzas.services` es un paquete; la imputacion de pagos y consumos vive en `finanzas/services/imputacion.py`, y `finanzas/services/__init__.py` reexporta la API publica historica para mantener imports existentes.
 - La logica operacional de pagos que no depende de documentos tributarios vive en `finanzas/services/pagos.py`: alta rapida de estudiante desde pagos, enriquecimiento de filas del listado, texto copiable, resumen de consumos y saldo de clases.
-- La logica de armado de reportes y exportaciones vive en `finanzas/services/reportes.py`: contexto final del dashboard financiero, contexto del reporte de categorias y filas CSV de pagos/transacciones. Las queries puras siguen en `finanzas/selectors.py`.
+- La logica de armado de reportes y exportaciones vive en `finanzas/services/reportes.py`: contexto final del panel financiero, contexto del reporte de categorias y filas CSV de pagos/transacciones. Las queries puras siguen en `finanzas/selectors.py`.
 - Boton volver en editar pago prioriza la pagina anterior.
 - Visor embebido en detalle de transacciones para PDF e imagenes; otros archivos siguen abriendose externamente.
 - Separacion clara entre `Documentos tributarios` y `Transacciones`.
@@ -399,12 +399,12 @@ Queda pendiente, no urgente:
 - evaluar constraints de integridad
 - separar CI de deploy productivo cuando produccion migre a PostgreSQL
 
-## API externa base
-- `finanzas` expone una base de consumo externo en:
-  - `/api/v1/finanzas/planes/`
-  - `/api/v1/finanzas/pagos/`
-  - `/api/v1/finanzas/documentos-tributarios/`
-  - `/api/v1/finanzas/transacciones/`
-  - `/api/v1/finanzas/resumen/`
-- En esta fase la API es principalmente de lectura; no se expone aun escritura financiera externa.
-- La API key de solo lectura es valida para estos endpoints.
+## API
+La API de datos de `finanzas` queda desactivada en v1.0.
+
+Motivo:
+- no existe consumidor real actual
+- reduce riesgo de exposicion de pagos, documentos tributarios y transacciones
+- evita mantener endpoints "por si acaso"
+
+La salida contable/operacional vigente se hace por vistas HTML y exportaciones controladas por permisos.

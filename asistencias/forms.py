@@ -4,7 +4,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from personas.models import Persona
 from personas.utils import normalizar_telefono
 
-from .models import BloqueHorario, Disciplina
+from .models import BloqueHorario, Disciplina, SesionClase
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
@@ -85,12 +85,21 @@ class SesionesMasivasForm(forms.Form):
 
 
 class AsistenciaMasivaForm(forms.Form):
-    sesion_id = forms.IntegerField(widget=forms.HiddenInput)
+    sesion_id = forms.ModelChoiceField(
+        queryset=SesionClase.objects.none(),
+        required=True,
+        label="Sesión",
+        widget=forms.Select(attrs={"class": "form-select js-sesion-asistentes-select"}),
+    )
     estudiantes = forms.ModelMultipleChoiceField(
         queryset=Persona.objects.none(),
         required=False,
         widget=forms.SelectMultiple(attrs={"id": "id_estudiantes", "class": "form-select"}),
     )
+
+    def __init__(self, *args, sesiones_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["sesion_id"].queryset = sesiones_queryset or SesionClase.objects.none()
 
 
 class PersonaRapidaForm(forms.Form):

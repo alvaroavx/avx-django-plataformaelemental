@@ -36,6 +36,9 @@ from finanzas.models import (
 )
 
 
+TEST_PASSWORD = "not-a-real-test-password"
+
+
 class FinanzasServicesCompatibilityTests(SimpleTestCase):
     def test_imports_publicos_antiguos_siguen_disponibles(self):
         from finanzas.services import (
@@ -67,7 +70,7 @@ class FinanzasAccessTests(TestCase):
         self.rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
         self.rol_solo_lectura = Rol.objects.create(nombre="Solo lectura", codigo="SOLO_LECTURA")
 
-        self.user_admin = User.objects.create_user("admin_fin", password="secret123")
+        self.user_admin = User.objects.create_user("admin_fin", password=TEST_PASSWORD)
         self.persona_admin = Persona.objects.create(
             nombres="Admin",
             apellidos="Fin",
@@ -81,7 +84,7 @@ class FinanzasAccessTests(TestCase):
             activo=True,
         )
 
-        self.user_no_admin = User.objects.create_user("noadmin_fin", password="secret123")
+        self.user_no_admin = User.objects.create_user("noadmin_fin", password=TEST_PASSWORD)
         self.persona_no_admin = Persona.objects.create(
             nombres="No",
             apellidos="Admin",
@@ -94,7 +97,7 @@ class FinanzasAccessTests(TestCase):
             organizacion=self.org,
             activo=True,
         )
-        self.user_finanzas = User.objects.create_user("finanzas_user", password="secret123")
+        self.user_finanzas = User.objects.create_user("finanzas_user", password=TEST_PASSWORD)
         self.persona_finanzas = Persona.objects.create(
             nombres="Finanzas",
             apellidos="User",
@@ -107,7 +110,7 @@ class FinanzasAccessTests(TestCase):
             organizacion=self.org,
             activo=True,
         )
-        self.user_profesor = User.objects.create_user("profesor_fin", password="secret123")
+        self.user_profesor = User.objects.create_user("profesor_fin", password=TEST_PASSWORD)
         self.persona_profesor = Persona.objects.create(
             nombres="Profesor",
             apellidos="Fin",
@@ -120,7 +123,7 @@ class FinanzasAccessTests(TestCase):
             organizacion=self.org,
             activo=True,
         )
-        self.user_solo_lectura = User.objects.create_user("lectura_fin", password="secret123")
+        self.user_solo_lectura = User.objects.create_user("lectura_fin", password=TEST_PASSWORD)
         self.persona_solo_lectura = Persona.objects.create(
             nombres="Lectura",
             apellidos="Fin",
@@ -133,7 +136,7 @@ class FinanzasAccessTests(TestCase):
             organizacion=self.org,
             activo=True,
         )
-        self.user_sin_rol = User.objects.create_user("sinrol_fin", password="secret123")
+        self.user_sin_rol = User.objects.create_user("sinrol_fin", password=TEST_PASSWORD)
         self.persona_sin_rol = Persona.objects.create(
             nombres="Sin",
             apellidos="Rol",
@@ -1840,7 +1843,7 @@ class FinanzasIntegrationTests(TestCase):
         self.rol_admin = Rol.objects.create(nombre="Administrador", codigo="ADMINISTRADOR")
         self.rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
 
-        self.user_admin = User.objects.create_user("admin_int", password="secret123")
+        self.user_admin = User.objects.create_user("admin_int", password=TEST_PASSWORD)
         self.persona_admin = Persona.objects.create(
             nombres="Admin",
             apellidos="Integracion",

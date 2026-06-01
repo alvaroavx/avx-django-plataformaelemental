@@ -126,7 +126,7 @@ flowchart TD
 - Las asistencias deben poder verse junto con su estado financiero.
 - Los modelos propios de esta app viven en `asistencias.models`; no deben declararse en `database`.
 - El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
-- La barra compartida de apps vive en templates de `asistencias`, incluye `asistencias`, `finanzas`, `personas` y `monitor`, y debe permitir desplazamiento horizontal en mobile si no hay ancho suficiente.
+- La navegacion principal vive en el sidebar global de `Elemental Apps`; `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
 
 ## Decisiones funcionales vigentes
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.
@@ -149,6 +149,8 @@ flowchart TD
 - Todo enlace interno de la app que lleve a `asistencias/asistencias/` para agregar asistentes a una sesion debe incluir `sesion_id=<id>` y `open=agregar_asistentes`, para abrir el modal vigente y no depender de flujos embebidos antiguos.
 - En `asistencias/asistencias/`, cuando la vista se abre con `open=<modal>` para forzar un modal, al cerrarlo debe limpiarse ese parametro del querystring sin recargar la pagina; esto aplica a `Nueva sesion`, `Nueva persona` y `Agregar asistentes`.
 - En `asistencias/asistencias/`, cuando se selecciona una sesion para agregar asistentes, el selector debe usar checkboxes iguales al detalle de sesion y dejar marcados visualmente los estudiantes ya registrados.
+- En `asistencias/asistencias/`, el modal `Agregar asistentes` incluye selector de sesion. Si viene desde una sesion queda preseleccionada; si se abre desde una vista general, permite elegir una sesion del periodo y organizacion activos antes de cargar estudiantes.
+- El POST de `Agregar asistentes` valida la sesion contra organizacion y periodo activos para impedir asociar estudiantes a sesiones de otra organizacion mediante request manual.
 - En `asistencias/asistencias/`, el modal `Agregar asistentes` debe listar solo estudiantes de la organizacion de la sesion seleccionada. Los estudiantes inactivos no se ocultan: se muestran con marca `Inactivo` y al agregarlos a una sesion se reactiva su persona y su rol `ESTUDIANTE` en esa organizacion.
 - En `asistencias/asistencias/`, el modal `Agregar asistentes` debe mantener una altura fija para que la vista no cambie de tamaño segun la cantidad de resultados; el scroll debe ocurrir dentro del listado de estudiantes.
 - En `asistencias/asistencias/`, el modal `Agregar asistentes` debe ofrecer dos salidas de guardado: `Guardar y cerrar`, que vuelve a la vista principal con la sesion aun seleccionada, y `Guardar y agregar otro`, que guarda y reabre el mismo modal.
@@ -165,8 +167,8 @@ flowchart TD
 - En `asistencias/calendario/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
 - En `asistencias/calendario/`, se pueden crear sesiones masivas para el mes seleccionado indicando disciplina, dias de la semana, profesores opcionales y un maximo opcional de sesiones. Las fechas duplicadas para la misma disciplina se omiten.
 - `asistencias/sesiones/` queda como redireccion compatible hacia `asistencias/calendario/`; los detalles de sesion siguen viviendo en `asistencias/sesiones/<id>/`.
-- En el dashboard de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
-- En el dashboard de `asistencias`, las tablas que usen DataTables deben inicializarse solo cuando tengan filas reales de datos; los estados vacios deben mantener la cantidad real de columnas y no usar una unica fila con `colspan` dentro de la tabla inicializada.
+- En el panel de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
+- En el panel de `asistencias`, las tablas que usen DataTables deben inicializarse solo cuando tengan filas reales de datos; los estados vacios deben mantener la cantidad real de columnas y no usar una unica fila con `colspan` dentro de la tabla inicializada.
 - El resumen de profesor se consulta desde `personas/<id>/` y debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en vistas de `asistencias`.
 - En `asistencias/estudiantes/`, la tabla operacional muestra metricas academicas y de cobranza del periodo: clases pagadas, usadas, restantes, total pagado, ultimo pago, asistencias, deuda y estado financiero simple. Estas metricas son operacionales y se calculan en selector, no en template.
 - En `asistencias/estudiantes/`, las acciones rapidas minimas son: perfil, asistencia, estado financiero y registrar pago cuando el usuario tenga permiso financiero. Las URLs preservan periodo y organizacion.
@@ -200,12 +202,12 @@ No permitido:
 - modificar pagos directamente desde templates
 - depender de helpers internos de `finanzas.views` o `personas.views`
 
-## API externa base
-- `asistencias` expone una base de consumo externo en:
-  - `/api/v1/asistencias/disciplinas/`
-  - `/api/v1/asistencias/sesiones/`
-  - `/api/v1/asistencias/sesiones/<id>/asistencias/`
-  - `/api/v1/asistencias/asistencias/`
-  - `/api/v1/asistencias/resumen/`
-- Las consultas pueden usarse con API key de solo lectura.
-- La carga de asistencias via API requiere usuario autenticado.
+## API
+La API de datos de `asistencias` queda desactivada en v1.0.
+
+Motivo:
+- no existe consumidor real actual
+- reduce superficie mutable y de lectura sobre asistencia
+- evita mantener endpoints "por si acaso"
+
+Las asistencias se operan desde HTML server-rendered hasta nueva decision explicita.

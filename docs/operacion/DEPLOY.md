@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-06-01
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -29,25 +29,23 @@ Este documento describe el CI/CD minimo del proyecto:
   - host o IP del servidor
 - `DEPLOY_USER`
   - usuario SSH de despliegue
-- `DEPLOY_SSH_KEY`
-  - clave privada SSH exclusiva para GitHub Actions
-  - debe ser una clave nueva de deploy, sin passphrase
 - `DEPLOY_SSH_KEY_B64`
-  - la misma clave privada de deploy, codificada en Base64
-  - hoy el workflow la usa para escribir `~/.ssh/deploy_key`
+  - clave privada SSH exclusiva para GitHub Actions, codificada en Base64
+  - debe ser una clave nueva de deploy, sin passphrase
+  - el workflow la usa para escribir `~/.ssh/deploy_key`
 - `DEPLOY_PATH`
   - ruta absoluta del repo en el servidor, por ejemplo `/srv/plataformaelemental`
 - `DEPLOY_SERVICE`
   - nombre del servicio systemd, por ejemplo `plataforma-elemental`
   - el script acepta `plataforma-elemental` o `plataforma-elemental.service`
+- `DEPLOY_ENV_FILE`
+  - ruta absoluta del archivo de entorno productivo del servidor, por ejemplo `/srv/elementos/.env.prod`
+  - `scripts/deploy.sh` falla si esta variable viene vacia o si el archivo no existe
 
 ### Opcionales
 - `DEPLOY_PORT`
   - puerto SSH, normalmente `22`
   - si no existe, el workflow usa `22`
-- `DEPLOY_ENV_FILE`
-  - ruta absoluta del archivo de entorno del servidor, por ejemplo `/srv/plataformaelemental/.env.prod`
-  - si no existe, `scripts/deploy.sh` no carga archivo externo
 - `DEPLOY_VENV_DIR`
   - ruta absoluta del virtualenv si no quieres usar `.venv` dentro del repo
   - si no existe, usa `.venv` en el repo
@@ -99,16 +97,7 @@ En GitHub:
 1. Ir a `Settings`
 2. `Secrets and variables`
 3. `Actions`
-4. Crear el secret `DEPLOY_SSH_KEY`
-5. Pegar el contenido completo de la privada:
-
-```text
------BEGIN OPENSSH PRIVATE KEY-----
-...
------END OPENSSH PRIVATE KEY-----
-```
-
-6. Crear tambien `DEPLOY_SSH_KEY_B64` con la misma clave codificada en Base64.
+4. Crear el secret `DEPLOY_SSH_KEY_B64` con la clave privada codificada en Base64.
 
 En Linux GNU:
 
@@ -218,11 +207,10 @@ flowchart TD
 7. escribir la llave privada en `~/.ssh/deploy_key`
 8. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
 9. poblar `known_hosts` con `ssh-keyscan`
-10. ejecutar el paso `Debug SSH key file`
-11. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
-12. `git fetch`
-13. `git reset --hard origin/main`
-14. ejecutar `bash scripts/deploy.sh`
+10. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
+11. `git fetch`
+12. `git reset --hard origin/main`
+13. ejecutar `bash scripts/deploy.sh`
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
@@ -232,20 +220,17 @@ flowchart TD
 - SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
 
 ## SSH En CI
-- El workflow valida `DEPLOY_SSH_KEY` como secret obligatorio.
+- El workflow valida `DEPLOY_SSH_KEY_B64` como secret obligatorio.
 - El workflow actual escribe `~/.ssh/deploy_key` a partir de `DEPLOY_SSH_KEY_B64`, decodificandolo con `base64 -d`.
 - `DEPLOY_SSH_KEY_B64` debe contener la misma llave privada de deploy, codificada en una sola linea Base64.
 - El comando `ssh` usa `-i ~/.ssh/deploy_key` y `IdentitiesOnly=yes` para no depender de nombres por defecto de OpenSSH.
-- El workflow actual incluye un paso `Debug SSH key file` que imprime:
-  - cantidad de bytes
-  - primera linea
-  - ultima linea
-  - fingerprint de la clave
-- Mientras ese paso exista en el YAML, la documentacion debe asumirlo como parte real del flujo.
+- El workflow no debe imprimir contenido, primeras lineas, ultimas lineas ni fingerprints de la llave en logs.
 
 ## Que hace `scripts/deploy.sh`
-- carga variables desde `DEPLOY_ENV_FILE` si existe
-- fuerza `DJANGO_ENV=prod` por defecto
+- exige `DEPLOY_ENV_FILE`
+- carga variables desde `DEPLOY_ENV_FILE`
+- valida `DJANGO_ENV=prod`
+- valida que PostgreSQL apunte a la base productiva esperada antes de migrar
 - crea virtualenv si no existe
 - instala dependencias
 - si `DJANGO_ENV=prod`, ejecuta backup PostgreSQL previo a migraciones usando `pg_dump`
@@ -256,6 +241,56 @@ flowchart TD
 - normaliza `DEPLOY_SERVICE` para aceptar nombre con o sin sufijo `.service`
 - valida que el unit exista con `systemctl show`
 - reinicia el servicio systemd
+
+## Deploy v1.0 con logos de organización
+Checklist operativo para validar el deploy que incluye `Organizacion.logo`:
+
+1. Confirmar que `Pillow` esta en `requirements.txt`.
+2. Confirmar que el workflow remoto ejecuta `pip install -r requirements.txt` mediante `scripts/deploy.sh`.
+3. Ejecutar deploy normal por push a `main` o `workflow_dispatch`.
+4. Verificar que la migracion `personas.0005_organizacion_logo` se aplica durante `python manage.py migrate --noinput`.
+5. Confirmar que `python manage.py check --deploy` corre en el script.
+6. Confirmar que `python manage.py collectstatic --noinput` corre en el script.
+7. Confirmar que Gunicorn/systemd se reinicia y queda activo.
+8. Confirmar `MEDIA_URL` y `MEDIA_ROOT`.
+9. Confirmar que el usuario que ejecuta Gunicorn puede escribir en `MEDIA_ROOT`.
+10. Confirmar que Nginx sirve `/media/`.
+11. Entrar a Django Admin.
+12. Subir logo a una organizacion.
+13. Verificar topbar con una organizacion con logo.
+14. Verificar que una organizacion sin logo usa iniciales.
+15. Verificar que organizacion `Todas` muestra `Elemental Apps`.
+16. Revisar logs de Gunicorn y Nginx si algo falla.
+
+Fallback de Pillow:
+- En Python 3.13, `Pillow==11.3.0` deberia instalarse desde wheel manylinux con `pip`.
+- No se agregan paquetes `apt` por defecto.
+- Si `pip install -r requirements.txt` falla compilando Pillow, revisar version de Python, arquitectura del servidor y disponibilidad de wheel.
+- Solo si no hay wheel disponible, instalar dependencias del sistema para compilar Pillow segun la distribucion del servidor.
+
+## Media files / logos de organización
+Configuracion Django vigente:
+
+```python
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+```
+
+En produccion Django no debe servir media files. Nginx debe servir `/media/`.
+
+Bloque sugerido, ajustando la ruta real al `MEDIA_ROOT` de produccion:
+
+```nginx
+location /media/ {
+    alias /srv/elementos/plataformaelemental/media/;
+}
+```
+
+Validaciones:
+- La ruta del `alias` debe coincidir con el `MEDIA_ROOT` real.
+- Nginx necesita permisos de lectura sobre esa carpeta.
+- El usuario que ejecuta Gunicorn necesita permisos de escritura para subir logos desde Django Admin.
+- Si `/media/` no esta configurado, la plataforma sigue funcionando con fallback de iniciales o `Elemental Apps`, pero los logos subidos no se serviran correctamente.
 
 ## Backup PostgreSQL Previo A Migraciones
 - Solo corre cuando `DJANGO_ENV=prod`.
@@ -303,7 +338,7 @@ bash scripts/deploy.sh
 - No hay hasta ahora configuracion de `systemd`, `nginx` o proceso WSGI versionada; por eso se agrega el unit file ejemplo.
 - El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
-- Si `DEPLOY_SSH_KEY` o `DEPLOY_SSH_KEY_B64` estan mal cargados, el workflow fallara antes de intentar el SSH remoto.
+- Si `DEPLOY_SSH_KEY_B64` esta mal cargado, el workflow fallara antes de intentar el SSH remoto.
 - Si `DJANGO_SECRET_KEY` es corto, repetitivo o empieza con `django-insecure-`, Django mostrara `security.W009` en deploy; no siempre bloquea, pero debe corregirse en produccion.
 
 ## Recomendaciones inmediatas

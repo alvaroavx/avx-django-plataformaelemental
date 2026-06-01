@@ -652,7 +652,10 @@ def asistencias_list(request):
     context = nav_context(request)
     sesion_id = request.GET.get("sesion_id")
     organizacion = organizacion_desde_request(request)
-    sesiones_disponibles_qs = SesionClase.objects.select_related("disciplina", "disciplina__organizacion")
+    sesiones_disponibles_qs = SesionClase.objects.select_related(
+        "disciplina",
+        "disciplina__organizacion",
+    ).filter(**filtros_periodo("fecha", request=request))
     if organizacion:
         sesiones_disponibles_qs = sesiones_disponibles_qs.filter(disciplina__organizacion=organizacion)
     sesion_seleccionada = sesiones_disponibles_qs.filter(pk=sesion_id).first() if sesion_id else None
@@ -663,7 +666,10 @@ def asistencias_list(request):
             Asistencia.objects.filter(sesion=sesion_seleccionada).values_list("persona_id", flat=True)
         )
     sesion_form = SesionBasicaForm(initial={"fecha": timezone.localdate()}, organizacion=organizacion)
-    asistencia_form = AsistenciaMasivaForm(initial={"sesion_id": sesion_id} if sesion_id else None)
+    asistencia_form = AsistenciaMasivaForm(
+        initial={"sesion_id": sesion_seleccionada.pk} if sesion_seleccionada else None,
+        sesiones_queryset=sesiones_disponibles_qs,
+    )
     persona_form = PersonaRapidaForm()
     open_nueva_sesion = request.GET.get("open") == "nueva_sesion"
     open_nueva_persona = False
@@ -709,18 +715,16 @@ def asistencias_list(request):
                     open_nueva_persona = False
                     return redirect(_url_actual_con_filtros(request))
         elif "agregar_asistentes" in request.POST:
-            sesion = get_object_or_404(
-                sesiones_disponibles_qs,
-                pk=request.POST.get("sesion_id"),
-            )
-            sesion_seleccionada = sesion
-            estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
-            estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
-            asistentes_ids = set(
-                Asistencia.objects.filter(sesion=sesion).values_list("persona_id", flat=True)
-            )
-            asistencia_form = AsistenciaMasivaForm(request.POST)
-            asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
+            asistencia_form = AsistenciaMasivaForm(request.POST, sesiones_queryset=sesiones_disponibles_qs)
+            sesion = sesiones_disponibles_qs.filter(pk=request.POST.get("sesion_id")).first()
+            if sesion:
+                sesion_seleccionada = sesion
+                estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+                estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
+                asistentes_ids = set(
+                    Asistencia.objects.filter(sesion=sesion).values_list("persona_id", flat=True)
+                )
+                asistencia_form.fields["estudiantes"].queryset = estudiantes_qs
             if asistencia_form.is_valid():
                 estudiantes_seleccionados = list(asistencia_form.cleaned_data["estudiantes"])
                 creados = 0
@@ -814,6 +818,7 @@ def asistencias_list(request):
             "open_agregar_asistentes": open_agregar_asistentes,
             "sesiones": sesiones_list,
             "sesion_seleccionada": sesion_seleccionada,
+            "sesiones_agregar_asistentes": sesiones_disponibles_qs,
             "asistentes_ids": asistentes_ids,
             "estudiantes": estudiantes,
             "estudiantes_total": estudiantes_qs.count(),

@@ -12,6 +12,7 @@ class Organizacion(models.Model):
     nombre = models.CharField(max_length=255)
     razon_social = models.CharField(max_length=255, blank=True)
     rut = models.CharField(max_length=20, unique=True)
+    logo = models.ImageField(upload_to="organizaciones/logos/", blank=True, null=True)
     es_exenta_iva = models.BooleanField(
         default=False,
         help_text="Marcar si la organizacion aplica exencion de IVA (Ley 21.622).",
@@ -31,6 +32,11 @@ class Organizacion(models.Model):
 
     def __str__(self) -> str:
         return self.nombre
+
+    @property
+    def iniciales(self) -> str:
+        partes = [parte[0] for parte in self.nombre.split() if parte]
+        return "".join(partes[:2]).upper() or "EA"
 
 
 class Persona(models.Model):

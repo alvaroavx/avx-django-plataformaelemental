@@ -2,7 +2,9 @@ from io import StringIO
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from asistencias.forms import PersonaRapidaForm
@@ -11,6 +13,9 @@ from finanzas.models import AttendanceConsumption, Payment
 
 from .forms import PersonaCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
+
+
+TEST_PASSWORD = "not-a-real-test-password"
 
 
 class PersonasOrganizacionesTests(TestCase):
@@ -25,7 +30,7 @@ class PersonasOrganizacionesTests(TestCase):
         self.rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
         self.rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
 
-        self.user_admin = User.objects.create_user("admin_personas", password="secret123", is_staff=True)
+        self.user_admin = User.objects.create_user("admin_personas", password=TEST_PASSWORD, is_staff=True)
         self.persona_admin = Persona.objects.create(
             nombres="Admin",
             apellidos="Personas",
@@ -94,6 +99,13 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, "Org Personas")
         self.assertContains(response, "Ingresos periodo")
         self.assertEqual(len(response.context["organizaciones"]), 1)
+
+    def test_logo_organizacion_es_opcional(self):
+        field = Organizacion._meta.get_field("logo")
+
+        self.assertTrue(field.blank)
+        self.assertTrue(field.null)
+        self.assertIsNone(self.org.logo.name)
 
     def test_organizacion_create_redirige_a_detalle_con_filtros(self):
         query = "periodo_mes=3&periodo_anio=2026&organizacion=1"
@@ -277,6 +289,103 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, "Luis Rojas")
         self.assertContains(response, "Profesor")
         self.assertContains(response, "Inactivo")
+
+    def test_personas_list_respeta_organizacion_activa(self):
+        otra_org = Organizacion.objects.create(
+            nombre="Otra Org Personas",
+            razon_social="Otra Org Personas SPA",
+            rut="77.777.777-7",
+        )
+        persona_otra_org = Persona.objects.create(
+            nombres="Persona",
+            apellidos="Externa",
+            email="externa.personas@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona_otra_org,
+            rol=self.rol_estudiante,
+            organizacion=otra_org,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("personas:personas_list"),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ana Diaz")
+        self.assertNotContains(response, "Persona Externa")
+
+    def test_personas_list_busqueda_funciona(self):
+        response = self.client.get(
+            reverse("personas:personas_list"),
+            {
+                "periodo_mes": 3,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "q": "ana.personas@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ana Diaz")
+        self.assertNotContains(response, "Luis Rojas")
+        self.assertEqual(response.context["q"], "ana.personas@example.com")
+
+    def test_personas_list_paginate_en_servidor_y_preserva_filtros(self):
+        for index in range(30):
+            persona = Persona.objects.create(
+                nombres=f"Estudiante {index:02d}",
+                apellidos="Paginacion",
+                email=f"paginacion{index:02d}@example.com",
+            )
+            PersonaRol.objects.create(
+                persona=persona,
+                rol=self.rol_estudiante,
+                organizacion=self.org,
+                activo=True,
+            )
+
+        response = self.client.get(
+            reverse("personas:personas_list"),
+            {
+                "periodo_mes": 3,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "rol": "ESTUDIANTE",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["page_obj"].has_next())
+        self.assertLessEqual(len(response.context["personas"]), 25)
+        self.assertContains(response, "Siguiente")
+        self.assertContains(response, "rol=ESTUDIANTE&amp;page=2", html=False)
+
+    def test_personas_list_no_hace_prefetch_por_todo_el_resultado(self):
+        for index in range(30):
+            persona = Persona.objects.create(
+                nombres=f"Query {index:02d}",
+                apellidos="Control",
+                email=f"querycontrol{index:02d}@example.com",
+            )
+            PersonaRol.objects.create(
+                persona=persona,
+                rol=self.rol_estudiante,
+                organizacion=self.org,
+                activo=True,
+            )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(
+                reverse("personas:personas_list"),
+                {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(response.context["personas"]), 25)
+        self.assertLessEqual(len(queries), 20)
 
 
 class PersonasRutFormTests(TestCase):

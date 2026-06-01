@@ -1,19 +1,48 @@
 # MONITOR
 
-Fecha de actualizacion: 2026-04-29
+Fecha de actualizacion: 2026-06-01
 
-## Proposito
-La app `monitor` agrupa vistas internas de monitoreo operativo de la plataforma.
+## Estado
+`monitor` esta archivada/desactivada del producto principal `Elemental Apps` v1.0.
 
-## Estado inicial
-- App Django registrada como `monitor.apps.MonitorConfig`.
-- Ruta base disponible en `/monitor/`.
-- Vista inicial `monitor:dashboard` protegida por autenticacion.
-- Enlace disponible desde la barra compartida de apps.
-- Sin modelos propios en la creacion inicial.
+Decision:
+- No forma parte de la navegacion principal.
+- La ruta `/monitor/` ya no esta registrada en las URLs raiz.
+- La app se mantiene temporalmente en `INSTALLED_APPS`.
+- No se borran modelos, migraciones ni tablas.
+- Antes de quitarla de `INSTALLED_APPS`, se debe auditar si existen filas `monitor_*` en produccion.
 
-## Reglas locales
-- Los indicadores futuros deben consumir datos desde las apps duenas del dominio, sin duplicar modelos.
-- Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse activos en las vistas HTML de monitor.
-- Cualquier indicador que mezcle datos de varias apps debe documentar su criterio de calculo en este archivo.
-- La estrategia transversal para crecimiento de indicadores y observabilidad vive en `docs/arquitectura/OBSERVABILIDAD.md`.
+## Motivo
+La app `monitor` es una herramienta distinta al core operacional de Plataforma Elemental. Puede ser util como proyecto separado o pagina estatica futura, pero no debe aumentar la superficie viva de la plataforma interna v1.0.
+
+## Modelos historicos
+- `Proyecto`
+- `Sitio`
+- `ConfiguracionMonitor`
+- `ConfiguracionSitio`
+- `DiscoverySitio`
+
+## Rutas historicas
+- `/monitor/`
+- `/monitor/sitios/nuevo/`
+- `/monitor/sitios/<id>/`
+- `/monitor/sitios/<id>/configuracion/`
+- `/monitor/configuracion/`
+
+## Auditoria de datos
+Existe comando read-only:
+
+```bash
+python manage.py auditar_monitor
+```
+
+El comando solo cuenta registros. No borra ni modifica datos.
+
+## Futuro posible
+Si se decide recuperar `monitor`, hacerlo fuera del producto principal:
+- proyecto separado
+- pagina estatica
+- herramienta interna independiente
+
+La referencia de archivo vive en:
+- `docs/archivo/MONITOR.md`

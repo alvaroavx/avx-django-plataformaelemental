@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-05-30
+Fecha de actualizacion: 2026-06-01
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -12,9 +12,9 @@ La UX v1.0 prioriza:
 - accesos visibles segun permisos existentes
 
 ## Home Oficial
-La ruta `/` muestra el dashboard general `Elemental Apps`.
+La ruta `/` muestra el panel general `Elemental Apps`.
 
-El dashboard muestra cards de acceso a:
+El panel muestra cards de acceso a:
 - Personas
 - Asistencias
 - Finanzas
@@ -53,12 +53,29 @@ La navegacion se construye desde `plataformaelemental.navigation`, no desde temp
 ## Barra De Contexto
 La parte superior del area principal contiene:
 - boton de menu en mobile
+- logo de la organizacion seleccionada, si existe
+- fallback con iniciales cuando la organizacion seleccionada no tiene logo
 - descripcion del periodo activo
 - filtros `periodo_mes`, `periodo_anio` y `organizacion`
 - usuario actual
 - logout
 
 Los filtros conservan parametros adicionales del querystring y se autoaplican al cambiar.
+
+Si la organizacion seleccionada es `Todas`, la barra muestra `Elemental Apps` y no muestra logo de ninguna organizacion.
+
+El logo de organizacion vive en `Organizacion.logo`, es opcional y se administra inicialmente desde Django Admin.
+
+## Navegacion De Retorno
+Las pantallas internas priorizan un boton `Volver` con icono `bi-arrow-left`.
+
+Regla:
+- usa la pagina anterior cuando la view expone `HTTP_REFERER`
+- usa fallback seguro por pantalla cuando no existe pagina anterior
+- conserva filtros globales cuando la URL de fallback los conoce
+
+## Lenguaje Visible
+Desde v1.0 se usa `Panel` para vistas principales. `Dashboard` queda reservado solo para nombres internos de rutas/views cuando cambiarlo podria romper compatibilidad.
 
 ## Visibilidad Por Permisos
 La navegacion usa permisos existentes:
@@ -78,5 +95,5 @@ El layout principal muestra footer discreto:
 - No se implementa auditoria transversal.
 - No se implementa backoffice/configuracion.
 - No se implementa rediseño profundo del Django Admin.
-- No se cambia la app `monitor`; solo se oculta de navegacion principal.
+- `monitor` queda archivado: no aparece en navegacion y `/monitor/` no esta registrado como ruta activa.
 - Algunas acciones secundarias conservan botones compactos existentes para evitar tocar demasiadas vistas antes de v1.0.

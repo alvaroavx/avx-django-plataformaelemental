@@ -122,6 +122,7 @@ def periodo_context(request):
     anio = str(periodo["anio"]) if periodo["anio"] is not None else "todos"
     mes = str(periodo["mes"]) if periodo["mes"] is not None else "todos"
     organizacion_id = request.GET.get("organizacion") or ""
+    organizacion_activa = organizacion_desde_request(request)
 
     return {
         "periodo_anio": anio,
@@ -132,4 +133,5 @@ def periodo_context(request):
         "periodo_descripcion_corta": descripcion_periodo(request=request, corta=True),
         "organizaciones_global": Organizacion.objects.all().order_by("nombre"),
         "organizacion_id": str(organizacion_id),
+        "organizacion_activa": organizacion_activa,
     }
