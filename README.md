@@ -16,7 +16,7 @@ Reglas funcionales vigentes:
 - la plataforma debe funcionar aunque no existan documentos tributarios
 - `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas
 - los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegación HTML
-- los modelos viven en su app dueña y `database/` quedó como namespace legado de migraciones y compatibilidad histórica
+- los modelos viven en su app dueña; la app legacy `database/` fue retirada del producto activo y del grafo vigente de migraciones
 
 ## Apps del proyecto
 
@@ -64,7 +64,6 @@ Reglas funcionales vigentes:
 - `api/`: API minima de salud/estado/version
 - `docs/`: documentación viva
 - `data/`: cargas y soporte de datos
-- `database/`: compatibilidad histórica de migraciones
 
 ### Ownership de modelos
 - `personas.models`: `Organizacion`, `Persona`, `Rol`, `PersonaRol`

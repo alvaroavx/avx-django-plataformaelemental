@@ -21,7 +21,7 @@ Debe usarse antes de cerrar cambios funcionales, visuales, de modelo, deploy o d
 ## Si Toca Modelos O Migraciones
 - Revisar [docs/arquitectura/MODELO_DATOS.md](../arquitectura/MODELO_DATOS.md).
 - Confirmar app duena del modelo.
-- Revisar dependencias con `database` antes de tocar migraciones.
+- Revisar dependencias de migraciones y evitar reintroducir namespaces legacy.
 - Ejecutar:
 
 ```bash

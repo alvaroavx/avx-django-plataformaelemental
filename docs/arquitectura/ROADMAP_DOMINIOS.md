@@ -189,7 +189,7 @@ Criterio de app:
 
 ## Orden Recomendado
 1. Estabilizar PostgreSQL en produccion.
-2. Reducir deuda legacy de `database`.
+2. Mantener validado el retiro de `database` legacy en cambios futuros de migraciones.
 3. Completar separacion interna de `finanzas`.
 4. Formalizar permisos/roles antes de exponer mas escrituras.
 5. Hacer crecer `monitor` con indicadores sin duplicar modelos.

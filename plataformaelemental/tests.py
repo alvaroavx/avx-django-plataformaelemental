@@ -310,6 +310,14 @@ class DjangoAdminSupportTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("admin:login"), response.url)
 
+    def test_monitor_no_aparece_en_admin_index(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Monitor")
+
     def test_delete_selected_no_disponible_en_modelos_criticos(self):
         self.client.force_login(self.superuser)
         admin_names = [

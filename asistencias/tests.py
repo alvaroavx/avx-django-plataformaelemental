@@ -1,12 +1,17 @@
 ﻿from datetime import date
 from decimal import Decimal
-from io import BytesIO
+from io import BytesIO, StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import RequestFactory, TestCase
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from auditoria.models import AuditLog
 from finanzas.models import AttendanceConsumption, Payment
@@ -61,6 +66,48 @@ class ContextoGlobalTests(TestCase):
 
         self.assertEqual(contexto["persona"], persona)
         self.assertEqual(contexto["roles_usuario"], ["ADMIN"])
+
+
+class ImportAsistenciasCommandTests(TestCase):
+    def setUp(self):
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Import",
+            razon_social="Org Import SPA",
+            rut="33.333.333-3",
+        )
+
+    def test_import_asistencias_exige_organizacion_explicita(self):
+        with self.assertRaises(CommandError):
+            call_command("import_asistencias")
+
+    def test_import_asistencias_con_organizacion_invalida_falla_claro(self):
+        with self.assertRaisesMessage(CommandError, "No existe una organizacion con ID 999999."):
+            call_command("import_asistencias", organizacion_id=999999)
+
+    def test_import_asistencias_usa_organizacion_explicita(self):
+        with TemporaryDirectory() as tmp_dir:
+            data_dir = Path(tmp_dir) / "data"
+            data_dir.mkdir()
+            archivo = data_dir / "asistencias.xlsx"
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["Fecha", "Disciplina", "Estudiante", "Estado"])
+            sheet.append([date(2026, 5, 4), "Yoga", "Ana Diaz", "presente"])
+            workbook.save(archivo)
+
+            with override_settings(BASE_DIR=Path(tmp_dir)):
+                salida = StringIO()
+                call_command(
+                    "import_asistencias",
+                    archivo="asistencias.xlsx",
+                    organizacion_id=self.organizacion.pk,
+                    stdout=salida,
+                )
+
+        self.assertIn("Asistencias importadas/actualizadas: 1", salida.getvalue())
+        disciplina = Disciplina.objects.get(nombre="Yoga")
+        self.assertEqual(disciplina.organizacion, self.organizacion)
+        self.assertEqual(Asistencia.objects.count(), 1)
 
 
 class AsistenciasViewTests(TestCase):

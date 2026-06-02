@@ -15,20 +15,18 @@ No es backlog de features. Es inventario de riesgos tecnicos conocidos que afect
 
 ## Deuda Alta
 
-### `database` Como Namespace Legacy
+### Retiro De `database` Legacy
 Estado:
-- Activa.
+- Resuelta en Sprint 14B.
 
 Impacto:
-- Ensucia el modelo mental del dominio.
-- `database/models.py` reexporta modelos reales desde apps duenias.
-- Las migraciones historicas de `personas`, `asistencias` y `finanzas` dependen de nodos `database`.
-- Borrar la carpeta sin limpiar el grafo puede romper `migrate` en bases nuevas.
+- La app legacy fue retirada de `INSTALLED_APPS`.
+- Las migraciones vigentes de `personas`, `asistencias` y `finanzas` ya no dependen de nodos `database`.
+- La carpeta `database/` fue eliminada del codigo versionado.
 
 Accion recomendada:
-- Primero eliminar imports runtime hacia `database`.
-- Luego dejar `database` como app solo de compatibilidad de migraciones.
-- Despues de estabilizar PostgreSQL en produccion, evaluar squash/refactor de migraciones para eliminarla completamente.
+- Mantener tests de instalacion limpia y `migrate --plan` antes de tocar migraciones futuras.
+- No reintroducir imports o modelos bajo `database`.
 
 Documentos relacionados:
 - [docs/arquitectura/MODELO_DATOS.md](MODELO_DATOS.md)
@@ -36,29 +34,27 @@ Documentos relacionados:
 
 ### Inventario De Reglas Con Referencias Obsoletas
 Estado:
-- Activa.
+- Mitigada.
 
 Impacto:
-- [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](INVENTARIO_REGLAS_NEGOCIO.md) contiene referencias historicas a `database/models.py` con lineas que ya no representan el codigo actual.
-- Puede confundir a Codex o a un humano antes de tocar reglas de negocio.
+- [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](INVENTARIO_REGLAS_NEGOCIO.md) fue reducido a marcador pendiente de regeneracion para no mantener enlaces obsoletos.
+- Falta reconstruir el inventario desde codigo vigente.
 
 Accion recomendada:
 - Regenerar el inventario desde codigo vigente.
-- Reemplazar referencias a `database/models.py` por modelos reales en `personas`, `asistencias` y `finanzas`.
 - Mantener referencias a services/selectors actuales.
 
 ### Produccion PostgreSQL Pendiente De Estabilizacion
 Estado:
-- Activa.
+- Mitigada.
 
 Impacto:
-- Desarrollo ya opera con PostgreSQL, pero la decision de eliminar legacy de migraciones debe esperar validacion productiva.
-- Cambios de migracion profundos antes de estabilizar produccion aumentan riesgo de deploy y recuperacion.
+- Desarrollo y produccion operan con PostgreSQL.
+- Los cambios de migracion profundos siguen requiriendo respaldo y validacion en copia de datos antes de deploy.
 
 Accion recomendada:
-- Publicar y validar PostgreSQL en produccion con backups previos a migraciones.
 - Confirmar restauracion de backup con `pg_restore` en entorno controlado.
-- Recien despues evaluar limpieza fuerte de migraciones legacy.
+- Mantener backups previos a migraciones productivas.
 
 ## Deuda Media
 

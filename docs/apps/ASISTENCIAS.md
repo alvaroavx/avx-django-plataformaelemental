@@ -124,7 +124,7 @@ flowchart TD
 - La administracion de organizaciones no vive aqui; vive en `personas`.
 - Los enlaces hacia perfiles de persona deben dirigir a `personas/<id>/` y respetar siempre el periodo y la organizacion activos.
 - Las asistencias deben poder verse junto con su estado financiero.
-- Los modelos propios de esta app viven en `asistencias.models`; no deben declararse en `database`.
+- Los modelos propios de esta app viven en `asistencias.models`.
 - El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
 - La navegacion principal vive en el sidebar global de `Elemental Apps`; `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
 

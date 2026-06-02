@@ -12,11 +12,51 @@ from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from finanzas.models import AttendanceConsumption, Payment
 
+from .admin import PersonaRolBulkForm
 from .forms import PersonaCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol
 
 
 TEST_PASSWORD = "not-a-real-test-password"
+
+
+class PersonaRolBulkFormTests(TestCase):
+    def setUp(self):
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Bulk",
+            razon_social="Org Bulk SPA",
+            rut="44.444.444-4",
+        )
+        self.rol = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        self.persona = Persona.objects.create(
+            nombres="Ana",
+            apellidos="Bulk",
+            email="ana.bulk@example.com",
+        )
+
+    def test_persona_rol_bulk_form_sin_organizacion_falla(self):
+        form = PersonaRolBulkForm(
+            data={
+                "personas": [self.persona.pk],
+                "rol": self.rol.pk,
+                "activo": "on",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("organizacion", form.errors)
+
+    def test_persona_rol_bulk_form_con_organizacion_valida_pasa(self):
+        form = PersonaRolBulkForm(
+            data={
+                "personas": [self.persona.pk],
+                "rol": self.rol.pk,
+                "organizacion": self.organizacion.pk,
+                "activo": "on",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
 
 
 class PersonasOrganizacionesTests(TestCase):

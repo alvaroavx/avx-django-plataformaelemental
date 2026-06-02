@@ -4,21 +4,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('database', '0004_personarol_valor_clase'),
-        ('personas', '0002_persona_rut'),
+        ("personas", "0002_persona_rut"),
     ]
 
     operations = [
-        migrations.SeparateDatabaseAndState(
-            database_operations=[],
-            state_operations=[
-                migrations.AddField(
-                    model_name='personarol',
-                    name='valor_clase',
-                    field=models.DecimalField(blank=True, decimal_places=2, default=None, help_text='Tarifa por asistencia/clase para roles donde aplique, como PROFESOR.', max_digits=12, null=True),
-                ),
-            ],
+        migrations.AddField(
+            model_name="personarol",
+            name="valor_clase",
+            field=models.DecimalField(
+                blank=True,
+                decimal_places=2,
+                default=None,
+                help_text="Tarifa por asistencia/clase para roles donde aplique, como PROFESOR.",
+                max_digits=12,
+                null=True,
+            ),
         ),
     ]

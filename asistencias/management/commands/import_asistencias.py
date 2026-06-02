@@ -1,12 +1,13 @@
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from openpyxl import load_workbook
 
 from personas.models import Organizacion, Persona
 
 from asistencias.models import Asistencia, Disciplina, SesionClase
+
 
 class Command(BaseCommand):
     help = "Importa asistencias históricas desde planilla Excel."
@@ -17,16 +18,24 @@ class Command(BaseCommand):
             default="Asistencia Talleres Elementos.xlsx",
             help="Nombre del archivo en /data/ con los registros de asistencia.",
         )
+        parser.add_argument(
+            "--organizacion-id",
+            type=int,
+            required=True,
+            help="ID de la organizacion a la que se asociaran los datos importados.",
+        )
 
     def handle(self, *args, **options):
+        organizacion_id = options["organizacion_id"]
+        try:
+            organizacion = Organizacion.objects.get(pk=organizacion_id)
+        except Organizacion.DoesNotExist as exc:
+            raise CommandError(f"No existe una organizacion con ID {organizacion_id}.") from exc
+
         base_dir = Path(settings.BASE_DIR) / "data"
         archivo = base_dir / options["archivo"]
         if not archivo.exists():
             self.stderr.write(f"No se encontró {archivo}.")
-            return
-        organizacion = Organizacion.objects.first()
-        if not organizacion:
-            self.stderr.write("No hay organizaciones cargadas.")
             return
         wb = load_workbook(archivo)
         ws = wb.active

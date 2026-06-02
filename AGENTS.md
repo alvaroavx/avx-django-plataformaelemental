@@ -14,7 +14,6 @@
 ## Estructura del proyecto
 api/ contiene las apis hacia el exterior de esta plataforma
 data/ cargas masivas de informacion
-database/ namespace legado de migraciones y compatibilidad historica
 finanzas/ nueva app de finanzas
 plataformaelemental/ config de django
 asistencias/ aplicacion de asistencias
@@ -23,7 +22,6 @@ asistencias/ aplicacion de asistencias
   - `personas` para personas, roles y organizaciones
   - `asistencias` para disciplinas, sesiones y asistencias
   - `finanzas` para pagos, documentos tributarios y transacciones
-  - `database` no recibe modelos nuevos; solo mantiene compatibilidad historica de migraciones mientras exista ese legado
 2.Que el codigo este en lo posible en espanol, excepto para casos donde en ingles hace mas sentido.
 3.El monto de dinero siempre sera visto en CLP, sin decimales, y con los cientos separados por punto.
 4.Los filtros del menu superior: mes, ano y organizacion. Seran arrastrados en toda la aplicacion y seran siempre mantenidos activos.
@@ -46,7 +44,6 @@ Un cambio se considera terminado solo si:
 - `cobranzas` es un dominio conceptual, por ahora implementado dentro de `finanzas/services/`, y maneja planes, pagos operacionales, deuda e imputación de clases.
 - `finanzas` maneja contabilidad: documentos tributarios, transacciones, categorías, reportes para contadora.
 - `monitor` es herramienta interna y no debe depender del core operacional.
-- `database` está congelada.
 
 ## Reglas de dependencia
 - Ninguna app debe importar helpers desde `views.py` de otra app.

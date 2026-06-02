@@ -22,7 +22,7 @@ Debe concentrar:
 - El `RUT` de una persona se edita solo desde `personas`, es opcional y debe validarse como RUT chileno.
 - Para crear o editar una persona debe existir al menos un dato de identidad operacional: `RUT`, email o telefono.
 - El telefono se normaliza en backend para uso operacional; no es unico porque puede compartirse entre familia, apoderados o contactos.
-- Los modelos propios de personas, roles y organizaciones viven en `personas.models`; no deben declararse en `database`.
+- Los modelos propios de personas, roles y organizaciones viven en `personas.models`.
 
 ## Decisiones funcionales vigentes
 - Debe existir listado, detalle, creacion y edicion de organizaciones.

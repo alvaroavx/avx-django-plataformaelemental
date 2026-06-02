@@ -55,7 +55,9 @@ La revision de logs se hace desde `Auditoria > Registros de auditoria`.
 
 `monitor` esta archivado y no forma parte activa de `Elemental Apps` v1.0.
 
-Si sigue instalado o registrado en admin, es por compatibilidad temporal con migraciones o datos historicos. No debe operarse como parte del producto principal.
+Se mantiene instalado temporalmente por compatibilidad con migraciones o datos historicos, pero sus modelos no se registran en Django Admin.
+
+No debe operarse como parte del producto principal.
 
 ## Limites conocidos
 

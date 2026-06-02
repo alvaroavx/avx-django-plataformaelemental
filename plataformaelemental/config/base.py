@@ -1,4 +1,4 @@
-﻿"""
+"""
 Base settings shared by all execution environments.
 """
 
@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "rest_framework",
     "rest_framework.authtoken",
-    "database",
     "auditoria.apps.AuditoriaConfig",
     "api",
     "asistencias.apps.AsistenciasConfig",

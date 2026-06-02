@@ -19,9 +19,7 @@ def migrar_tipos_documento(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ("database", "0002_organizacion_es_exenta_iva"),
         ("finanzas", "0004_payment_numero_comprobante"),
     ]
 
@@ -118,7 +116,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="transaction",
             name="documentos_tributarios",
-            field=models.ManyToManyField(blank=True, related_name="transacciones_asociadas", to="finanzas.documentotributario"),
+            field=models.ManyToManyField(
+                blank=True, related_name="transacciones_asociadas", to="finanzas.documentotributario"
+            ),
         ),
         migrations.AlterField(
             model_name="documentotributario",
@@ -136,7 +136,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="documentos_tributarios",
-                to="database.organizacion",
+                to="personas.organizacion",
             ),
         ),
         migrations.AlterField(

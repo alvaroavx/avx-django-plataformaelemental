@@ -25,7 +25,6 @@ Apps funcionales visibles:
 
 Componentes de soporte:
 - `plataformaelemental`: configuracion del proyecto.
-- `database`: namespace legado de migraciones y compatibilidad historica. Esta congelado y no recibe modelos nuevos.
 
 ## Arquitectura vigente
 - Framework: Django 5.
@@ -54,7 +53,7 @@ Detalle operativo:
   - finanzas/contabilidad: documentos tributarios, transacciones, categorias y reportes.
 - `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
 - `monitor` no define core operacional y no forma parte de la navegacion/rutas activas de `Elemental Apps`.
-- `database` existe solo por compatibilidad historica de migraciones.
+- La app legacy `database` fue retirada; las migraciones vigentes de `personas`, `asistencias` y `finanzas` crean sus tablas directamente.
 
 Detalle por app:
 - Asistencias: [docs/apps/ASISTENCIAS.md](../apps/ASISTENCIAS.md)

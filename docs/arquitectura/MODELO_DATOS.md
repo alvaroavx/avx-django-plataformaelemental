@@ -167,17 +167,16 @@ erDiagram
 
 ## Tablas Legacy
 
-`database` queda como namespace legado de migraciones y compatibilidad historica.
-
-Reglas:
-- No recibe modelos nuevos.
-- No debe contener logica de negocio nueva.
-- No debe ser importado por apps funcionales para resolver dominio.
-- Sigue existiendo porque migraciones historicas de `personas`, `asistencias` y `finanzas` todavia dependen de nodos de migracion `database`.
+La app legacy `database` fue retirada del producto activo.
 
 Estado actual:
-- `database/models.py` funciona como capa de compatibilidad que reexporta modelos reales desde apps duenias.
-- La eliminacion completa de `database` requiere limpiar o reescribir dependencias de migraciones, no solo borrar la carpeta.
+- No existe app `database` en `INSTALLED_APPS`.
+- No existen modelos runtime propios de `database`.
+- No existen tablas `database_*` esperadas.
+- Las migraciones iniciales vigentes de `personas`, `asistencias` y `finanzas` crean las tablas con sus apps duenias.
+
+Regla:
+- No reintroducir modelos ni imports desde `database`.
 
 ## Relaciones Criticas
 
@@ -258,8 +257,6 @@ Regla:
 
 ## Deuda Tecnica De Modelo
 
-- `database` sigue instalado por compatibilidad historica de migraciones; eliminarlo requiere refactor de grafo de migraciones.
-- `database/models.py` reexporta modelos reales y puede inducir imports incorrectos si no se controla.
 - `DocumentoTributario` permite `persona_relacionada` y `organizacion_relacionada`; debe mantenerse la regla de no asociar ambas a la vez desde formularios/servicios.
 - `Payment`, `Transaction` y `DocumentoTributario` estan relacionados, pero todavia no existe una entidad superior de conciliacion.
 - La frontera entre cobranza operacional y contabilidad vive dentro de `finanzas`; debe seguir separandose con selectors/services antes de crecer mas.
@@ -270,6 +267,6 @@ Regla:
 Checklist minimo:
 - Revisar este documento.
 - Revisar el `.md` de la app duena.
-- Revisar migraciones existentes y dependencias con `database`.
+- Revisar migraciones existentes y validar que no introduzcan dependencias legacy.
 - Ejecutar `python manage.py makemigrations --check --dry-run`.
 - Ejecutar tests relevantes, especialmente si cambia `Payment`, `AttendanceConsumption`, `Asistencia`, `PersonaRol` o `DocumentoTributario`.

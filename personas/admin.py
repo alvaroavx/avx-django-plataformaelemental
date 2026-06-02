@@ -105,7 +105,7 @@ class PersonaRolAdmin(admin.ModelAdmin):
                 )
                 return HttpResponseRedirect(reverse("admin:personas_personarol_changelist"))
         else:
-            form = PersonaRolBulkForm(initial={"activo": True, "organizacion": Organizacion.objects.first()})
+            form = PersonaRolBulkForm(initial={"activo": True})
 
         fieldsets = [(None, {"fields": ("personas", "rol", "organizacion", "activo")})]
         admin_form = admin.helpers.AdminForm(

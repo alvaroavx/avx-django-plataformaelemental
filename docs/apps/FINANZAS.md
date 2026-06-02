@@ -201,6 +201,17 @@ No debe contarse como ingreso o egreso por si solo.
 - La columna `Msg` se construye desde datos de la transaccion: fecha, tipo, categoria, descripcion y documentos asociados.
 - `Payment` no se exporta en libro de caja salvo que exista una relacion explicita futura con `Transaction`.
 
+### Contrato libro de caja y Msg
+- El libro de caja v1.0 usa solo `Transaction` como fuente contable/exportable.
+- `Payment` representa cobranza operacional de clases y no alimenta el libro de caja directamente.
+- `DocumentoTributario` es respaldo fiscal/documental, no movimiento financiero por si solo.
+- El orden estable del CSV es `fecha` ascendente y luego `id` ascendente.
+- `numero correlativo` se calcula en la exportacion, parte en 1 y sigue el orden exportado.
+- Headers actuales: `numero correlativo`, `fecha`, `tipo`, `categoria`, `descripcion/glosa`, `monto`, `ingreso/egreso`, `documento tributario asociado`, `Msg`.
+- `Msg` se arma como texto contable desde `fecha`, tipo de transaccion, categoria, descripcion y documentos asociados.
+- El CSV se entrega como UTF-8 con BOM para compatibilidad con Excel/LibreOffice.
+- Este contrato no es configurable en v1.0. Se evaluara hacerlo configurable solo si la contadora exige un formato distinto, si Espacio Elementos y Latin Rengo requieren formatos separados, o si aparece una integracion externa real.
+
 ## Exportaciones Excel v1.0
 - `pagos_alumnos_YYYY_MM.xlsx`: fuente `Payment`; export operacional de cobranza/clases, no ingreso contable.
 - `estimacion_pagos_profesores_YYYY_MM.xlsx`: fuente calculada desde sesiones/asistencias y `PersonaRol.valor_clase`/`retencion_sii`; es estimacion operacional, no `Transaction`.
@@ -234,7 +245,7 @@ No debe contarse como ingreso o egreso por si solo.
 - `DocumentoTributario`: documento fiscal opcional, con PDF/XML, montos, tasas y asociaciones.
 - `Category`: clasificacion de transacciones para reportes.
 - `PaymentPlan`: estructura comercial de clases y precio.
-- Los modelos financieros viven en `finanzas.models`; `database` ya no concentra modelos de runtime y queda solo como compatibilidad historica de migraciones.
+- Los modelos financieros viven en `finanzas.models`; no deben depender de namespaces legacy.
 
 ## Subdominios internos
 `finanzas` contiene por ahora dos subdominios distintos.
