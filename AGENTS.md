@@ -17,6 +17,12 @@ data/ cargas masivas de informacion
 finanzas/ nueva app de finanzas
 plataformaelemental/ config de django
 asistencias/ aplicacion de asistencias
+
+## Entorno local
+- Usar Python 3.12 para el entorno virtual local: `python3.12 -m venv .venv`.
+- No usar `python3 -m venv` en este proyecto si el alias `python3` apunta a Python 3.14.
+- Instalar dependencias con `python -m pip install -r requirements.txt` dentro del entorno activado.
+
 ## Reglas de Desarrollo
 1.Cada modelo de datos debe vivir en su app duena:
   - `personas` para personas, roles y organizaciones

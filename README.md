@@ -89,7 +89,16 @@ Reglas funcionales vigentes:
 - `/api/status/`
 - `/api/version/`
 
-## Puesta en marcha
+## Entorno local
+
+Usar Python 3.12 para recrear el virtualenv local.
+
+No usar `python3 -m venv` en este proyecto si Ubuntu tiene `python3` apuntando a Python 3.14. Ese alias puede crear un entorno incompatible con las dependencias actuales.
+
+### Crear entorno virtual
+```bash
+python3.12 -m venv .venv
+```
 
 ### Activar entorno virtual
 ```bash
@@ -98,7 +107,7 @@ source ./.venv/bin/activate
 
 ### Instalar dependencias
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ### Aplicar migraciones
