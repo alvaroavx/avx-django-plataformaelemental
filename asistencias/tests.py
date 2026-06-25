@@ -853,9 +853,12 @@ class AsistenciasViewTests(TestCase):
         asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
         self.assertEqual(data["asistencia"]["id"], asistencia.pk)
         self.assertEqual(data["asistencia"]["estado"], Asistencia.Estado.PRESENTE)
+        self.assertEqual(data["asistencia"]["estado_label"], asistencia.get_estado_display())
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
         self.assertIsNotNone(consumo.pago_id)
+        self.assertEqual(data["estado_financiero"]["codigo"], "consumido")
+        self.assertEqual(data["estado_financiero"]["label"], "Pagada")
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
         self.assertTrue(
@@ -935,7 +938,7 @@ class AsistenciasViewTests(TestCase):
             1,
         )
 
-    def test_agregar_asistente_mobile_admin_otra_organizacion_no_puede(self):
+    def test_agregar_asistente_mobile_admin_otra_organizacion_recibe_404(self):
         otra_organizacion = Organizacion.objects.create(
             nombre="Org Admin Ajeno",
             razon_social="Org Admin Ajeno SPA",
@@ -948,8 +951,8 @@ class AsistenciasViewTests(TestCase):
             {"persona_id": self.estudiante.pk},
         )
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["codigo"], "SESION_NO_ENCONTRADA")
         self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists())
 
     def test_agregar_asistente_mobile_usuario_sin_permiso_no_puede(self):
@@ -1035,7 +1038,7 @@ class AsistenciasViewTests(TestCase):
                 self.assertTrue(data["ok"])
                 self.assertEqual(data["resultados"], [])
 
-    def test_buscar_asistentes_mobile_admin_otra_organizacion_no_puede(self):
+    def test_buscar_asistentes_mobile_admin_otra_organizacion_recibe_404(self):
         otra_organizacion = Organizacion.objects.create(
             nombre="Org Buscar Ajena",
             razon_social="Org Buscar Ajena SPA",
@@ -1048,8 +1051,8 @@ class AsistenciasViewTests(TestCase):
             {"q": "Ana"},
         )
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["codigo"], "SESION_NO_ENCONTRADA")
 
     def test_buscar_asistentes_mobile_usuario_sin_permiso_no_puede(self):
         User = get_user_model()
@@ -1073,10 +1076,73 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
+        data = response.json()
         asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
         self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
         self.assertIsNone(consumo.pago)
+        self.assertEqual(data["estado_financiero"]["codigo"], "deuda")
+        self.assertEqual(data["estado_financiero"]["label"], "Deuda")
+
+    def test_agregar_asistente_mobile_crea_exactamente_un_consumo(self):
+        """El post_save signal crea el consumo; no debe haber duplicados."""
+        self._login_admin_organizacion(self.organizacion)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
+        self.assertEqual(AttendanceConsumption.objects.filter(asistencia=asistencia).count(), 1)
+
+    def test_agregar_asistente_mobile_sesion_ajena_e_inexistente_son_indistinguibles(self):
+        """Un admin de otra org y una sesión inexistente deben recibir el mismo 404."""
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Indistinguible Agregar",
+            razon_social="Org Indistinguible Agregar SPA",
+            rut="26.666.666-6",
+        )
+        self._login_admin_organizacion(otra_organizacion, username="admin_indistinguible_agregar")
+
+        response_ajena = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+        response_inexistente = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": 999998}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response_ajena.status_code, 404)
+        self.assertEqual(response_inexistente.status_code, 404)
+        self.assertEqual(response_ajena.json()["codigo"], "SESION_NO_ENCONTRADA")
+        self.assertEqual(response_inexistente.json()["codigo"], "SESION_NO_ENCONTRADA")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists())
+
+    def test_buscar_asistentes_mobile_sesion_ajena_e_inexistente_son_indistinguibles(self):
+        """Un admin de otra org y una sesión inexistente deben recibir el mismo 404."""
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Indistinguible Buscar",
+            razon_social="Org Indistinguible Buscar SPA",
+            rut="27.777.777-7",
+        )
+        self._login_admin_organizacion(otra_organizacion, username="admin_indistinguible_buscar")
+
+        response_ajena = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "Ana"},
+        )
+        response_inexistente = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": 999997}),
+            {"q": "Ana"},
+        )
+
+        self.assertEqual(response_ajena.status_code, 404)
+        self.assertEqual(response_inexistente.status_code, 404)
+        self.assertEqual(response_ajena.json()["codigo"], "SESION_NO_ENCONTRADA")
+        self.assertEqual(response_inexistente.json()["codigo"], "SESION_NO_ENCONTRADA")
 
     def test_sesion_detail_crea_persona_en_organizacion_de_la_sesion(self):
         otra_organizacion = Organizacion.objects.create(

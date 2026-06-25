@@ -16,7 +16,6 @@ from django.views.decorators.http import require_GET, require_POST
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from finanzas.models import AttendanceConsumption, Payment
-from finanzas.services import asignar_consumo_asistencia
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
     ACCION_ADMINISTRAR_SESIONES,
@@ -223,6 +222,27 @@ def _sesion_para_endpoint_json(pk):
         return SesionClase.objects.select_related("disciplina", "disciplina__organizacion").get(pk=pk)
     except SesionClase.DoesNotExist:
         return None
+
+
+def _verificar_acceso_sesion_json(user, pk):
+    """
+    Returns (sesion, None) on success.
+    Returns (None, error_response) on failure.
+
+    - Not authenticated or no qualifying role anywhere → 403 PERMISO_DENEGADO
+    - Session not found OR belongs to an org user cannot manage → 404 SESION_NO_ENCONTRADA
+      (both cases are intentionally indistinguishable)
+    """
+    if not user.is_authenticated:
+        return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+    if not usuario_tiene_permiso(user, ACCION_ADMINISTRAR_SESIONES):
+        return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+    sesion = _sesion_para_endpoint_json(pk)
+    if not sesion or not usuario_tiene_permiso(
+        user, ACCION_ADMINISTRAR_SESIONES, organizacion=sesion.disciplina.organizacion
+    ):
+        return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
+    return sesion, None
 
 
 def _post_data_json_o_form(request):
@@ -1157,11 +1177,9 @@ def sesion_detail(request, pk):
 
 @require_GET
 def sesion_asistentes_buscar(request, pk):
-    sesion = _sesion_para_endpoint_json(pk)
-    if not sesion:
-        return _json_error("SESION_NO_ENCONTRADA", "La sesión no existe.", status=404)
-    if not request.user.is_authenticated or not _usuario_puede_operar_sesion(request.user, sesion):
-        return _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    if error:
+        return error
 
     termino = request.GET.get("q", "").strip()
     if len(termino) < 2:
@@ -1197,11 +1215,9 @@ def sesion_asistentes_buscar(request, pk):
 
 @require_POST
 def sesion_asistente_agregar(request, pk):
-    sesion = _sesion_para_endpoint_json(pk)
-    if not sesion:
-        return _json_error("SESION_NO_ENCONTRADA", "La sesión no existe.", status=404)
-    if not request.user.is_authenticated or not _usuario_puede_operar_sesion(request.user, sesion):
-        return _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    if error:
+        return error
 
     data = _post_data_json_o_form(request)
     if data is None:
@@ -1235,7 +1251,6 @@ def sesion_asistente_agregar(request, pk):
             return _json_error("ASISTENCIA_DUPLICADA", "La persona ya está agregada.", status=409)
 
         _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
-        asignar_consumo_asistencia(asistencia)
         estado_anterior = sesion.estado
         if sesion.estado == SesionClase.Estado.PROGRAMADA:
             sesion.estado = SesionClase.Estado.COMPLETADA
@@ -1259,6 +1274,16 @@ def sesion_asistente_agregar(request, pk):
             },
         )
 
+    consumo = AttendanceConsumption.objects.filter(asistencia=asistencia).first()
+    if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
+        estado_fin_codigo, estado_fin_label = "consumido", "Pagada"
+    elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
+        estado_fin_codigo, estado_fin_label = "deuda", "Deuda"
+    elif consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
+        estado_fin_codigo, estado_fin_label = "pendiente", "Sin cobro"
+    else:
+        estado_fin_codigo, estado_fin_label = "sin_consumo", "Sin consumo"
+
     total = sesion.asistencias.count()
     return JsonResponse(
         {
@@ -1268,8 +1293,13 @@ def sesion_asistente_agregar(request, pk):
                 "persona_id": persona.pk,
                 "nombre": persona.nombre_completo,
                 "estado": asistencia.estado,
+                "estado_label": asistencia.get_estado_display(),
                 "persona_url": reverse("personas:persona_detail", args=[persona.pk]),
                 "hora": timezone.localtime(asistencia.registrada_en).strftime("%H:%M"),
+            },
+            "estado_financiero": {
+                "codigo": estado_fin_codigo,
+                "label": estado_fin_label,
             },
             "total": total,
             "mensaje": "Asistente agregado",

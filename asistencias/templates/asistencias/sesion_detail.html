@@ -92,7 +92,7 @@
   <div class="card mb-3">
     <div class="card-header">Agregar asistente</div>
     <div class="card-body">
-      <label class="form-label" for="buscar-asistente">Buscar por nombre, apellido, email o RUT</label>
+      <label id="buscar-asistente-label" class="form-label" for="buscar-asistente">Buscar por nombre, apellido, email o RUT</label>
       <select id="buscar-asistente" placeholder="Escribe 2 o más letras…" style="width:100%"></select>
       <div id="buscar-status" class="mt-2" aria-live="polite" style="min-height:1.25rem"></div>
       <p class="text-muted small mt-1 mb-0">Toca un nombre para agregarlo. El campo se limpia automáticamente.</p>
@@ -210,6 +210,13 @@
   var counterEl = document.getElementById('total-asistentes');
   var tbody = document.getElementById('asistentes-tbody');
 
+  var FIN_CLASES = {
+    consumido: 'success',
+    deuda: 'danger',
+    pendiente: 'secondary',
+    sin_consumo: 'light',
+  };
+
   function esc(str) {
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(String(str || '')));
@@ -233,11 +240,15 @@
     var emptyRow = tbody.querySelector('[data-empty-row]');
     if (emptyRow) emptyRow.remove();
     var a = data.asistencia;
+    var fin = data.estado_financiero || {};
+    var finCodigo = fin.codigo || 'sin_consumo';
+    var finLabel = fin.label || 'Sin consumo';
+    var finClase = FIN_CLASES[finCodigo] || 'light';
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td><a href="' + esc(a.persona_url || '#') + '">' + esc(a.nombre) + '</a></td>' +
-      '<td>Presente</td>' +
-      '<td><span class="badge text-bg-light">Sin consumo</span></td>' +
+      '<td>' + esc(a.estado_label || a.estado || '') + '</td>' +
+      '<td><span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span></td>' +
       '<td>' + esc(a.hora || '--:--') + '</td>' +
       '<td class="text-end">' +
         '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
@@ -251,33 +262,48 @@
     tbody.insertBefore(tr, tbody.firstChild);
   }
 
-  function agregarAsistente(value, tomInstance) {
-    tomInstance.lock();
+  function agregarAsistente(value, ts) {
+    ts.lock();
     mostrarEstado('muted', 'Agregando…', false);
     var fd = new FormData();
     fd.append('persona_id', value);
     fd.append('csrfmiddlewaretoken', CSRF);
+
     fetch(AGREGAR_URL, { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data.ok) {
+      .then(function (r) {
+        var status = r.status;
+        return r.text().then(function (texto) {
+          var json = null;
+          try { json = JSON.parse(texto); } catch (e) {}
+          return { status: status, json: json };
+        });
+      })
+      .then(function (resp) {
+        var data = resp.json;
+        var status = resp.status;
+        if (status === 201 && data && data.ok) {
           agregarFila(data);
           actualizarContador(data.total);
           mostrarEstado('success', data.mensaje || 'Asistente agregado.', true);
-        } else if (data.codigo === 'ASISTENCIA_DUPLICADA') {
-          mostrarEstado('warning', data.mensaje || 'La persona ya está en esta sesión.', false);
+          ts.clear(true);
+          ts.clearOptions();
+          ts.focus();
+        } else if (status === 409) {
+          mostrarEstado('warning', (data && data.mensaje) || 'La persona ya está en esta sesión.', false);
+          ts.clear(true);
+          ts.clearOptions();
+          ts.focus();
+        } else if (status >= 500 || !data) {
+          mostrarEstado('danger', 'Ocurrió un error del servidor. Intenta nuevamente.', false);
         } else {
-          mostrarEstado('danger', data.mensaje || 'Error al agregar.', false);
+          mostrarEstado('danger', (data && data.mensaje) || 'Error al agregar. Intenta de nuevo.', false);
         }
       })
       .catch(function () {
-        mostrarEstado('danger', 'Error de red. Intenta de nuevo.', false);
+        mostrarEstado('danger', 'No se pudo conectar. Revisa tu conexión e intenta nuevamente.', false);
       })
       .finally(function () {
-        tomInstance.unlock();
-        tomInstance.clear(true);
-        tomInstance.clearOptions();
-        tomInstance.focus();
+        ts.unlock();
       });
   }
 
@@ -312,6 +338,14 @@
         loading: function () {
           return '<div class="no-results px-2 py-2 text-muted small">Buscando…</div>';
         },
+      },
+      onInitialize: function () {
+        var ts = this;
+        this.control_input.setAttribute('aria-labelledby', 'buscar-asistente-label');
+        var lbl = document.getElementById('buscar-asistente-label');
+        if (lbl) {
+          lbl.addEventListener('click', function () { ts.focus(); });
+        }
       },
       onItemAdd: function (value) {
         agregarAsistente(value, this);
