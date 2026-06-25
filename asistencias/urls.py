@@ -9,6 +9,8 @@ urlpatterns = [
     path("calendario/", views.sesiones_list, name="sesiones_list"),
     path("sesiones/", views.sesiones_legacy_redirect),
     path("sesiones/<int:pk>/", views.sesion_detail, name="sesion_detail"),
+    path("sesiones/<int:pk>/asistentes/buscar/", views.sesion_asistentes_buscar, name="sesion_asistentes_buscar"),
+    path("sesiones/<int:pk>/asistentes/agregar/", views.sesion_asistente_agregar, name="sesion_asistente_agregar"),
     path("sesiones/<int:pk>/editar/", views.sesion_edit, name="sesion_edit"),
     path("disciplinas/", views.disciplinas_list, name="disciplinas_list"),
     path("disciplinas/nueva/", views.disciplina_create, name="disciplina_create"),

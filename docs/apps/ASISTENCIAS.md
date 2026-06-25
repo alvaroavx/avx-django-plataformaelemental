@@ -158,6 +158,7 @@ flowchart TD
 - En `asistencias/sesiones/<id>/`, la eliminacion de una sesion debe pedir confirmacion explicita y borrar en cascada sus asistencias y dependencias asociadas.
 - En `asistencias/sesiones/<id>/`, el listado de asistentes debe incluir estado de pago y permitir quitar asistentes individualmente desde la sesion, con confirmacion previa.
 - En `asistencias/sesiones/<id>/`, el bloque `Agregar asistentes` debe respetar la misma regla que `asistencias/asistencias/`: estudiantes de la organizacion de la sesion, inactivos visibles con marca y reactivacion al agregarlos.
+- En `asistencias/sesiones/<id>/`, el backend movil para agregar asistentes expone endpoints JSON internos bajo la sesion: `asistentes/buscar/` y `asistentes/agregar/`. Ambos validan permisos contra `sesion.disciplina.organizacion`, no confian en la organizacion activa ni en datos enviados por POST. La busqueda devuelve solo `id`, `nombre` e `inactivo`, excluye asistentes ya agregados y limita resultados. El alta valida rol `ESTUDIANTE` en la organizacion real, usa `get_or_create` dentro de transaccion, reactiva al estudiante si corresponde, sincroniza `AttendanceConsumption` mediante el servicio de `finanzas` y audita la accion.
 - En `asistencias/sesiones/<id>/`, debe existir una opcion para editar la sesion, manteniendo filtros globales y permitiendo actualizar disciplina, fecha y profesores.
 - En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/<id>/`, el modal `Nueva persona` incluye el switch `Agregar a esta sesión`, activo por defecto. Si esta activo, crea la persona, la asigna como estudiante de la organizacion de la sesion y crea la asistencia con `get_or_create`; si esta inactivo, solo crea la persona.
@@ -201,6 +202,92 @@ No permitido:
 - clasificar transacciones
 - modificar pagos directamente desde templates
 - depender de helpers internos de `finanzas.views` o `personas.views`
+
+## Endpoints JSON internos — sesión móvil
+
+### `GET sesiones/<pk>/asistentes/buscar/?q=<termino>`
+
+Busca estudiantes elegibles para agregar a la sesión.
+
+**Autenticación:** requiere usuario autenticado con rol `admin` o `staff_asistencia` en alguna organización.
+
+**Restricciones de búsqueda:**
+- Mínimo 2 caracteres en `q`; con menos de 2 se devuelve `{"ok": true, "resultados": []}` sin consultar DB.
+- Excluye personas ya registradas en la sesión.
+- Filtra por `ESTUDIANTE` activo de la organización de la sesión.
+- Limita a 10 resultados.
+- Devuelve solo `id`, `nombre` e `inactivo`; no expone email ni RUT.
+
+**Respuesta exitosa (200):**
+```json
+{
+  "ok": true,
+  "resultados": [
+    {"id": 1, "nombre": "Ana García", "inactivo": false}
+  ]
+}
+```
+
+**Códigos de error:**
+
+| HTTP | codigo | condición |
+|------|--------|-----------|
+| 403 | `PERMISO_DENEGADO` | no autenticado o sin rol base en ninguna org |
+| 404 | `SESION_NO_ENCONTRADA` | sesión inexistente **o** sesión de organización no autorizada (indistinguible) |
+
+---
+
+### `POST sesiones/<pk>/asistentes/agregar/`
+
+Crea una `Asistencia` y su `AttendanceConsumption` para la sesión.
+
+**Body:** `multipart/form-data` o `application/json` con campo `persona_id`.
+
+**Respuesta exitosa (201):**
+```json
+{
+  "ok": true,
+  "asistencia": {
+    "id": 42,
+    "persona_id": 7,
+    "nombre": "Ana García",
+    "estado": "presente",
+    "estado_label": "Presente",
+    "persona_url": "/personas/7/",
+    "hora": "10:30"
+  },
+  "estado_financiero": {
+    "codigo": "consumido|deuda|pendiente|sin_consumo",
+    "label": "Pagada|Deuda|Sin cobro|Sin consumo"
+  },
+  "total": 5,
+  "mensaje": "Asistente agregado"
+}
+```
+
+**Mapeo de `codigo` a clase Bootstrap (responsabilidad del frontend):**
+
+| codigo | clase |
+|--------|-------|
+| `consumido` | `success` |
+| `deuda` | `danger` |
+| `pendiente` | `secondary` |
+| `sin_consumo` | `light` |
+
+**Flujo financiero:** el `post_save` de `Asistencia` llama `asignar_consumo_asistencia` automáticamente. El endpoint no realiza una segunda llamada. El `AttendanceConsumption` resultante es consultado **después** del bloque atómico para incluir el estado real en la respuesta.
+
+**Códigos de error:**
+
+| HTTP | codigo | condición |
+|------|--------|-----------|
+| 400 | `PERSONA_REQUERIDA` | campo `persona_id` ausente |
+| 400 | `PERSONA_INVALIDA` | `persona_id` no numérico o persona no es estudiante de la org |
+| 400 | `JSON_INVALIDO` | body `application/json` malformado |
+| 403 | `PERMISO_DENEGADO` | no autenticado o sin rol base |
+| 404 | `SESION_NO_ENCONTRADA` | sesión inexistente o de org no autorizada (indistinguible) |
+| 409 | `ASISTENCIA_DUPLICADA` | persona ya está en la sesión |
+
+---
 
 ## API
 La API de datos de `asistencias` queda desactivada en v1.0.
