@@ -1,4 +1,5 @@
-﻿from datetime import date
+﻿import json
+from datetime import date
 from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -140,10 +141,10 @@ class AsistenciasViewTests(TestCase):
             apellidos="Diaz",
             email="ana@example.com",
         )
-        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
         PersonaRol.objects.create(
             persona=self.estudiante,
-            rol=rol_estudiante,
+            rol=self.rol_estudiante,
             organizacion=self.organizacion,
             activo=True,
         )
@@ -151,6 +152,20 @@ class AsistenciasViewTests(TestCase):
     def _xlsx_rows(self, response):
         workbook = load_workbook(BytesIO(response.content))
         return list(workbook.active.iter_rows(values_only=True))
+
+    def _login_admin_organizacion(self, organizacion, username="admin_org"):
+        User = get_user_model()
+        user = User.objects.create_user(username=username, password=TEST_PASSWORD)
+        persona = Persona.objects.create(nombres="Admin", apellidos=username, user=user)
+        rol_admin, _ = Rol.objects.get_or_create(nombre="Administrador", codigo="ADMIN")
+        PersonaRol.objects.create(
+            persona=persona,
+            rol=rol_admin,
+            organizacion=organizacion,
+            activo=True,
+        )
+        self.client.force_login(user)
+        return user
 
     def test_export_asistencias_xlsx_respeta_periodo_y_organizacion(self):
         otra_org = Organizacion.objects.create(
@@ -738,6 +753,330 @@ class AsistenciasViewTests(TestCase):
         )
         self.sesion.refresh_from_db()
         self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
+
+    def test_buscar_asistentes_mobile_misma_organizacion_excluye_agregados_y_limita_datos(self):
+        self._login_admin_organizacion(self.organizacion)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        for indice in range(12):
+            persona = Persona.objects.create(
+                nombres=f"Ana {indice}",
+                apellidos="Mobile",
+                email=f"ana.mobile.{indice}@example.com",
+            )
+            PersonaRol.objects.create(
+                persona=persona,
+                rol=self.rol_estudiante,
+                organizacion=self.organizacion,
+                activo=True,
+            )
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Mobile",
+            razon_social="Otra Mobile SPA",
+            rut="22.222.222-2",
+        )
+        persona_otra_org = Persona.objects.create(
+            nombres="Ana",
+            apellidos="Otra",
+            email="ana.otra@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona_otra_org,
+            rol=self.rol_estudiante,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "Ana", "organizacion": otra_organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertLessEqual(len(data["resultados"]), 10)
+        ids = {item["id"] for item in data["resultados"]}
+        self.assertNotIn(self.estudiante.pk, ids)
+        self.assertNotIn(persona_otra_org.pk, ids)
+        self.assertEqual(set(data["resultados"][0].keys()), {"id", "nombre", "inactivo"})
+
+    def test_buscar_asistentes_mobile_busca_por_email_y_rut_sin_exponerlos(self):
+        self._login_admin_organizacion(self.organizacion)
+        persona = Persona.objects.create(
+            nombres="Beatriz",
+            apellidos="Rut",
+            email="bea.buscar@example.com",
+            rut="12.345.678-5",
+        )
+        PersonaRol.objects.create(
+            persona=persona,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+
+        response_email = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "bea.buscar"},
+        )
+        response_rut = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "12.345"},
+        )
+
+        self.assertEqual(response_email.status_code, 200)
+        self.assertEqual(response_rut.status_code, 200)
+        self.assertEqual(response_email.json()["resultados"][0]["id"], persona.pk)
+        self.assertEqual(response_rut.json()["resultados"][0]["id"], persona.pk)
+        self.assertNotIn("email", response_email.json()["resultados"][0])
+        self.assertNotIn("rut", response_email.json()["resultados"][0])
+
+    def test_agregar_asistente_mobile_crea_asistencia_y_consumo_financiero(self):
+        self._login_admin_organizacion(self.organizacion)
+        Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago=date(2026, 2, 1),
+            monto_referencia=Decimal("10000"),
+            clases_asignadas=1,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+                {"persona_id": self.estudiante.pk},
+            )
+
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertTrue(data["ok"])
+        asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
+        self.assertEqual(data["asistencia"]["id"], asistencia.pk)
+        self.assertEqual(data["asistencia"]["estado"], Asistencia.Estado.PRESENTE)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertIsNotNone(consumo.pago_id)
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, SesionClase.Estado.COMPLETADA)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                dominio="asistencias",
+                accion=AuditLog.ACCION_AGREGAR_ASISTENTES,
+                metadata__origen="sesion_detail_mobile",
+            ).exists()
+        )
+
+    def test_agregar_asistente_mobile_acepta_cuerpo_json(self):
+        self._login_admin_organizacion(self.organizacion)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            data=json.dumps({"persona_id": self.estudiante.pk}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.json()["ok"])
+        self.assertTrue(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists())
+
+    def test_agregar_asistente_mobile_rechaza_persona_otra_organizacion(self):
+        self._login_admin_organizacion(self.organizacion)
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Ajena",
+            razon_social="Org Ajena SPA",
+            rut="23.333.333-3",
+        )
+        persona_otra_org = Persona.objects.create(
+            nombres="Persona",
+            apellidos="Ajena",
+            email="ajena@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona_otra_org,
+            rol=self.rol_estudiante,
+            organizacion=otra_organizacion,
+            activo=True,
+        )
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": persona_otra_org.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["codigo"], "PERSONA_INVALIDA")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=persona_otra_org).exists())
+
+    def test_agregar_asistente_mobile_rechaza_persona_ya_agregada(self):
+        self._login_admin_organizacion(self.organizacion)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["codigo"], "ASISTENCIA_DUPLICADA")
+        self.assertEqual(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).count(), 1)
+
+    def test_agregar_asistente_mobile_doble_post_no_duplica(self):
+        self._login_admin_organizacion(self.organizacion)
+        url = reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk})
+
+        primera = self.client.post(url, {"persona_id": self.estudiante.pk})
+        segunda = self.client.post(url, {"persona_id": self.estudiante.pk})
+
+        self.assertEqual(primera.status_code, 201)
+        self.assertEqual(segunda.status_code, 409)
+        self.assertEqual(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).count(), 1)
+        self.assertEqual(
+            AttendanceConsumption.objects.filter(asistencia__sesion=self.sesion, persona=self.estudiante).count(),
+            1,
+        )
+
+    def test_agregar_asistente_mobile_admin_otra_organizacion_no_puede(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Admin Ajeno",
+            razon_social="Org Admin Ajeno SPA",
+            rut="24.444.444-4",
+        )
+        self._login_admin_organizacion(otra_organizacion, username="admin_otra_org")
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists())
+
+    def test_agregar_asistente_mobile_usuario_sin_permiso_no_puede(self):
+        User = get_user_model()
+        usuario = User.objects.create_user("sin_permiso_mobile", password=TEST_PASSWORD)
+        self.client.force_login(usuario)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).exists())
+
+    def test_agregar_asistente_mobile_sesion_inexistente(self):
+        self._login_admin_organizacion(self.organizacion)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": 999999}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["codigo"], "SESION_NO_ENCONTRADA")
+
+    def test_agregar_asistente_mobile_persona_invalida(self):
+        self._login_admin_organizacion(self.organizacion)
+        persona_sin_rol = Persona.objects.create(
+            nombres="Sin",
+            apellidos="Rol",
+            email="sin.rol@example.com",
+        )
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": persona_sin_rol.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["codigo"], "PERSONA_INVALIDA")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion, persona=persona_sin_rol).exists())
+
+    def test_agregar_asistente_mobile_persona_id_malformado(self):
+        self._login_admin_organizacion(self.organizacion)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": "abc"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["codigo"], "PERSONA_INVALIDA")
+        self.assertFalse(Asistencia.objects.filter(sesion=self.sesion).exists())
+
+    def test_agregar_asistente_mobile_asistencia_existente_no_toca_consumo(self):
+        self._login_admin_organizacion(self.organizacion)
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["codigo"], "ASISTENCIA_DUPLICADA")
+        self.assertEqual(Asistencia.objects.filter(sesion=self.sesion, persona=self.estudiante).count(), 1)
+        self.assertEqual(AttendanceConsumption.objects.get(asistencia=asistencia).pk, consumo.pk)
+
+    def test_buscar_asistentes_mobile_termino_corto_retorna_vacio(self):
+        self._login_admin_organizacion(self.organizacion)
+
+        for termino in ["", "a", "A"]:
+            with self.subTest(termino=termino):
+                response = self.client.get(
+                    reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+                    {"q": termino},
+                )
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertTrue(data["ok"])
+                self.assertEqual(data["resultados"], [])
+
+    def test_buscar_asistentes_mobile_admin_otra_organizacion_no_puede(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org Buscar Ajena",
+            razon_social="Org Buscar Ajena SPA",
+            rut="25.555.555-5",
+        )
+        self._login_admin_organizacion(otra_organizacion, username="admin_buscar_ajena")
+
+        response = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "Ana"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+
+    def test_buscar_asistentes_mobile_usuario_sin_permiso_no_puede(self):
+        User = get_user_model()
+        usuario = User.objects.create_user("sin_permiso_buscar", password=TEST_PASSWORD)
+        self.client.force_login(usuario)
+
+        response = self.client.get(
+            reverse("asistencias:sesion_asistentes_buscar", kwargs={"pk": self.sesion.pk}),
+            {"q": "Ana"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["codigo"], "PERMISO_DENEGADO")
+
+    def test_agregar_asistente_mobile_crea_deuda_sin_pago_disponible(self):
+        self._login_admin_organizacion(self.organizacion)
+
+        response = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
 
     def test_sesion_detail_crea_persona_en_organizacion_de_la_sesion(self):
         otra_organizacion = Organizacion.objects.create(

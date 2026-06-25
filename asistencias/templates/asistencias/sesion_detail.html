@@ -1,5 +1,14 @@
 {% extends "asistencias/base_app.html" %}
 {% block title %}Detalle sesión{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<style>
+  .ts-control { min-height: 44px; font-size: 1rem; }
+  .ts-dropdown .option { padding: 0.5rem 0.75rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
@@ -26,6 +35,7 @@
       </form>
     </div>
   </div>
+
   <div class="card mb-3">
     <div class="card-body">
       <div class="row g-3 align-items-center">
@@ -73,55 +83,19 @@
       <div class="row mt-3">
         <div class="col-md-12">
           <div class="fw-semibold">Asistentes</div>
-          <div class="display-6">{{ total_asistentes }}</div>
+          <div class="display-6" id="total-asistentes">{{ total_asistentes }}</div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span>Agregar asistentes</span>
-      <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#agregarAsistentesSesionForm">
-        <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-      </button>
-    </div>
-    <div class="card-body collapse" id="agregarAsistentesSesionForm">
-      <form method="post">
-        {% csrf_token %}
-        <label class="form-label" for="estudiantes_search_detalle">Buscar estudiante</label>
-        <input id="estudiantes_search_detalle" class="form-control mb-2" type="text" placeholder="Escribe para filtrar">
-        <div class="d-flex gap-2 mb-2">
-          <button id="seleccionar_visibles_detalle" class="btn btn-sm btn-outline-primary" type="button">Seleccionar visibles</button>
-          <button id="limpiar_seleccion_detalle" class="btn btn-sm btn-outline-secondary" type="button">Limpiar selección</button>
-        </div>
-        <div class="border rounded p-2" style="max-height: 320px; overflow-y: auto;">
-          {% for estudiante in estudiantes %}
-            <div class="form-check mb-1 estudiante-opcion-detalle" data-text="{{ estudiante }}">
-              <input
-                class="form-check-input estudiante-check-detalle"
-                type="checkbox"
-                name="estudiantes"
-                value="{{ estudiante.pk }}"
-                id="estudiante_detalle_{{ estudiante.pk }}"
-                {% if estudiante.pk in asistentes_ids %}checked{% endif %}
-              >
-              <label class="form-check-label" for="estudiante_detalle_{{ estudiante.pk }}">
-                {{ estudiante }}
-                {% if estudiante.asistencia_inactivo %}
-                  <span class="badge text-bg-warning ms-1">Inactivo</span>
-                  <span class="text-muted small ms-1">se reactivará al agregarlo</span>
-                {% endif %}
-              </label>
-            </div>
-          {% empty %}
-            <div class="text-muted small">No hay estudiantes disponibles para seleccionar.</div>
-          {% endfor %}
-        </div>
-        <button class="btn btn-success mt-2" name="agregar_asistentes" type="submit">
-          <i class="bi bi-check2-square"></i><span class="d-none d-md-inline ms-1">Agregar seleccionados</span>
-        </button>
-      </form>
+  <div class="card mb-3">
+    <div class="card-header">Agregar asistente</div>
+    <div class="card-body">
+      <label class="form-label" for="buscar-asistente">Buscar por nombre, apellido, email o RUT</label>
+      <select id="buscar-asistente" placeholder="Escribe 2 o más letras…" style="width:100%"></select>
+      <div id="buscar-status" class="mt-2" aria-live="polite" style="min-height:1.25rem"></div>
+      <p class="text-muted small mt-1 mb-0">Toca un nombre para agregarlo. El campo se limpia automáticamente.</p>
     </div>
   </div>
 
@@ -138,7 +112,7 @@
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="asistentes-tbody">
           {% for item in asistencias %}
           <tr>
             <td><a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
@@ -156,7 +130,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">Sin asistentes.</td></tr>
+          <tr data-empty-row><td colspan="5" class="text-center text-muted">Sin asistentes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -226,61 +200,133 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-  (function () {
-    const normalizeText = (value) =>
-      (value || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+(function () {
+  var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}";
+  var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}";
+  var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+  var statusEl = document.getElementById('buscar-status');
+  var counterEl = document.getElementById('total-asistentes');
+  var tbody = document.getElementById('asistentes-tbody');
 
-    const input = document.getElementById("estudiantes_search_detalle");
-    const selectVisibleBtn = document.getElementById("seleccionar_visibles_detalle");
-    const clearBtn = document.getElementById("limpiar_seleccion_detalle");
-    const rows = Array.from(document.querySelectorAll(".estudiante-opcion-detalle"));
+  function esc(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(String(str || '')));
+    return d.innerHTML;
+  }
 
-    if (!rows.length) return;
-
-    const aplicarFiltro = function () {
-      const term = normalizeText(input ? input.value : "");
-      rows.forEach((row) => {
-        const text = normalizeText(row.dataset.text || "");
-        row.style.display = !term || text.includes(term) ? "" : "none";
-      });
-    };
-
-    if (input) {
-      input.addEventListener("input", aplicarFiltro);
+  function mostrarEstado(tipo, texto, autoDismiss) {
+    if (!statusEl) return;
+    statusEl.innerHTML = '<span class="small text-' + tipo + '">' + esc(texto) + '</span>';
+    if (autoDismiss) {
+      setTimeout(function () { statusEl.innerHTML = ''; }, 3000);
     }
+  }
 
-    if (selectVisibleBtn) {
-      selectVisibleBtn.addEventListener("click", function () {
-        rows.forEach((row) => {
-          if (row.style.display === "none") return;
-          const check = row.querySelector(".estudiante-check-detalle");
-          if (check) check.checked = true;
-        });
-      });
-    }
+  function actualizarContador(total) {
+    if (counterEl) counterEl.textContent = String(total);
+  }
 
-    if (clearBtn) {
-      clearBtn.addEventListener("click", function () {
-        rows.forEach((row) => {
-          const check = row.querySelector(".estudiante-check-detalle");
-          if (check) check.checked = false;
-        });
+  function agregarFila(data) {
+    if (!tbody) return;
+    var emptyRow = tbody.querySelector('[data-empty-row]');
+    if (emptyRow) emptyRow.remove();
+    var a = data.asistencia;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><a href="' + esc(a.persona_url || '#') + '">' + esc(a.nombre) + '</a></td>' +
+      '<td>Presente</td>' +
+      '<td><span class="badge text-bg-light">Sin consumo</span></td>' +
+      '<td>' + esc(a.hora || '--:--') + '</td>' +
+      '<td class="text-end">' +
+        '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
+          '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
+          '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
+          '<button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">' +
+            '<i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>' +
+          '</button>' +
+        '</form>' +
+      '</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+  }
+
+  function agregarAsistente(value, tomInstance) {
+    tomInstance.lock();
+    mostrarEstado('muted', 'Agregando…', false);
+    var fd = new FormData();
+    fd.append('persona_id', value);
+    fd.append('csrfmiddlewaretoken', CSRF);
+    fetch(AGREGAR_URL, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok) {
+          agregarFila(data);
+          actualizarContador(data.total);
+          mostrarEstado('success', data.mensaje || 'Asistente agregado.', true);
+        } else if (data.codigo === 'ASISTENCIA_DUPLICADA') {
+          mostrarEstado('warning', data.mensaje || 'La persona ya está en esta sesión.', false);
+        } else {
+          mostrarEstado('danger', data.mensaje || 'Error al agregar.', false);
+        }
+      })
+      .catch(function () {
+        mostrarEstado('danger', 'Error de red. Intenta de nuevo.', false);
+      })
+      .finally(function () {
+        tomInstance.unlock();
+        tomInstance.clear(true);
+        tomInstance.clearOptions();
+        tomInstance.focus();
       });
-    }
-  })();
+  }
+
+  if (typeof TomSelect !== 'undefined') {
+    var tomInstance = new TomSelect('#buscar-asistente', {
+      valueField: 'id',
+      labelField: 'nombre',
+      searchField: ['nombre'],
+      maxOptions: 10,
+      maxItems: 1,
+      preload: false,
+      shouldLoad: function (q) { return q.length >= 2; },
+      load: function (query, callback) {
+        fetch(BUSCAR_URL + '?q=' + encodeURIComponent(query))
+          .then(function (r) { return r.json(); })
+          .then(function (data) { callback(data.resultados || []); })
+          .catch(function () { callback(); });
+      },
+      render: {
+        option: function (data, escape) {
+          var badge = data.inactivo
+            ? ' <span class="badge text-bg-warning small ms-1">Inactivo</span>'
+            : '';
+          return '<div class="py-2 px-1">' + escape(data.nombre) + badge + '</div>';
+        },
+        item: function (data, escape) {
+          return '<div>' + escape(data.nombre) + '</div>';
+        },
+        no_results: function (data, escape) {
+          return '<div class="no-results px-2 py-2 text-muted small">Sin resultados para "' + escape(data.input) + '"</div>';
+        },
+        loading: function () {
+          return '<div class="no-results px-2 py-2 text-muted small">Buscando…</div>';
+        },
+      },
+      onItemAdd: function (value) {
+        agregarAsistente(value, this);
+      },
+    });
+  }
 
   {% if open_nueva_persona %}
-  document.addEventListener("DOMContentLoaded", function () {
-    const modal = document.getElementById("nuevaPersonaSesionModal");
+  document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('nuevaPersonaSesionModal');
     if (modal && window.bootstrap) {
       bootstrap.Modal.getOrCreateInstance(modal).show();
     }
   });
   {% endif %}
+})();
 </script>
 {% endblock %}

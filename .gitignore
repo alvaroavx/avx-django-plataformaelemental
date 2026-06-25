@@ -33,3 +33,7 @@ Thumbs.db
 .DS_Store
 
 node_modules/
+
+# Reportes locales de trabajo (no versionados)
+docs/reporte.md
+REPORTE.md

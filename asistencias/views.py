@@ -1,18 +1,25 @@
 import calendar
+import json
 from datetime import date
 from decimal import Decimal
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from finanzas.models import AttendanceConsumption, Payment
+from finanzas.services import asignar_consumo_asistencia
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
+    ACCION_ADMINISTRAR_SESIONES,
     ACCION_EXPORTAR_DATOS,
     ACCION_OPERAR_PAGOS,
     ACCION_VER_FINANZAS,
@@ -40,7 +47,7 @@ from .forms import (
 from .models import Asistencia, Disciplina, SesionClase
 from .selectors import asistencias_export_queryset, estudiantes_operativos_periodo
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
-from .utils import ROLE_ADMIN
+from .utils import ROLE_ADMIN, usuario_tiene_roles
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
@@ -188,6 +195,44 @@ def _reactivar_estudiante_para_asistencia(persona, organizacion):
         rol__codigo="ESTUDIANTE",
         organizacion=organizacion,
     ).update(activo=True)
+
+
+def _usuario_puede_operar_sesion(user, sesion):
+    if not usuario_tiene_roles(user, [ROLE_ADMIN]):
+        return False
+    return usuario_tiene_permiso(
+        user,
+        ACCION_ADMINISTRAR_SESIONES,
+        organizacion=sesion.disciplina.organizacion,
+    )
+
+
+def _json_error(codigo, mensaje, *, status=400):
+    return JsonResponse(
+        {
+            "ok": False,
+            "codigo": codigo,
+            "mensaje": mensaje,
+        },
+        status=status,
+    )
+
+
+def _sesion_para_endpoint_json(pk):
+    try:
+        return SesionClase.objects.select_related("disciplina", "disciplina__organizacion").get(pk=pk)
+    except SesionClase.DoesNotExist:
+        return None
+
+
+def _post_data_json_o_form(request):
+    content_type = request.META.get("CONTENT_TYPE", "")
+    if content_type.startswith("application/json"):
+        try:
+            return json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return None
+    return request.POST
 
 
 def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
@@ -923,6 +968,8 @@ def sesion_detail(request, pk):
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
         pk=pk,
     )
+    if not _usuario_puede_operar_sesion(request.user, sesion):
+        raise PermissionDenied("No tienes permisos para acceder a esta sesión.")
     estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
@@ -1106,6 +1153,129 @@ def sesion_detail(request, pk):
         }
     )
     return render(request, "asistencias/sesion_detail.html", context)
+
+
+@require_GET
+def sesion_asistentes_buscar(request, pk):
+    sesion = _sesion_para_endpoint_json(pk)
+    if not sesion:
+        return _json_error("SESION_NO_ENCONTRADA", "La sesión no existe.", status=404)
+    if not request.user.is_authenticated or not _usuario_puede_operar_sesion(request.user, sesion):
+        return _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+
+    termino = request.GET.get("q", "").strip()
+    if len(termino) < 2:
+        return JsonResponse({"ok": True, "resultados": []})
+
+    asistentes_ids = Asistencia.objects.filter(sesion=sesion).values_list("persona_id", flat=True)
+    estudiantes_qs = (
+        _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+        .exclude(pk__in=asistentes_ids)
+        .filter(
+            Q(nombres__icontains=termino)
+            | Q(apellidos__icontains=termino)
+            | Q(rut__icontains=termino)
+            | Q(email__icontains=termino)
+        )
+    )
+
+    estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs[:10], sesion.disciplina.organizacion)
+    return JsonResponse(
+        {
+            "ok": True,
+            "resultados": [
+                {
+                    "id": estudiante.pk,
+                    "nombre": estudiante.nombre_completo,
+                    "inactivo": estudiante.asistencia_inactivo,
+                }
+                for estudiante in estudiantes
+            ],
+        }
+    )
+
+
+@require_POST
+def sesion_asistente_agregar(request, pk):
+    sesion = _sesion_para_endpoint_json(pk)
+    if not sesion:
+        return _json_error("SESION_NO_ENCONTRADA", "La sesión no existe.", status=404)
+    if not request.user.is_authenticated or not _usuario_puede_operar_sesion(request.user, sesion):
+        return _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
+
+    data = _post_data_json_o_form(request)
+    if data is None:
+        return _json_error("JSON_INVALIDO", "El cuerpo JSON no es válido.", status=400)
+
+    persona_id_raw = data.get("persona_id")
+    if not persona_id_raw:
+        return _json_error("PERSONA_REQUERIDA", "Debes indicar una persona.", status=400)
+    try:
+        persona_id = int(persona_id_raw)
+    except (TypeError, ValueError):
+        return _json_error("PERSONA_INVALIDA", "La persona no es estudiante válido de esta organización.", status=400)
+
+    if Asistencia.objects.filter(sesion=sesion, persona_id=persona_id).exists():
+        return _json_error("ASISTENCIA_DUPLICADA", "La persona ya está agregada.", status=409)
+
+    persona = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion).filter(pk=persona_id).first()
+    if not persona:
+        return _json_error("PERSONA_INVALIDA", "La persona no es estudiante válido de esta organización.", status=400)
+
+    with transaction.atomic():
+        sesion = SesionClase.objects.select_for_update().select_related("disciplina", "disciplina__organizacion").get(
+            pk=sesion.pk
+        )
+        asistencia, created = Asistencia.objects.get_or_create(
+            sesion=sesion,
+            persona=persona,
+            defaults={"estado": Asistencia.Estado.PRESENTE},
+        )
+        if not created:
+            return _json_error("ASISTENCIA_DUPLICADA", "La persona ya está agregada.", status=409)
+
+        _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
+        asignar_consumo_asistencia(asistencia)
+        estado_anterior = sesion.estado
+        if sesion.estado == SesionClase.Estado.PROGRAMADA:
+            sesion.estado = SesionClase.Estado.COMPLETADA
+            sesion.save(update_fields=["estado"])
+
+        registrar_auditoria(
+            usuario=request.user,
+            accion=AuditLog.ACCION_AGREGAR_ASISTENTES,
+            dominio="asistencias",
+            objeto=sesion,
+            organizacion=sesion.disciplina.organizacion,
+            resumen="Asistente agregado a sesión desde endpoint móvil",
+            metadata={
+                **_metadata_sesion(sesion),
+                "asistencia_id": asistencia.pk,
+                "persona_id": persona.pk,
+                "estado_asistencia": asistencia.estado,
+                "estado_anterior": estado_anterior,
+                "estado_despues": sesion.estado,
+                "origen": "sesion_detail_mobile",
+            },
+        )
+
+    total = sesion.asistencias.count()
+    return JsonResponse(
+        {
+            "ok": True,
+            "asistencia": {
+                "id": asistencia.pk,
+                "persona_id": persona.pk,
+                "nombre": persona.nombre_completo,
+                "estado": asistencia.estado,
+                "persona_url": reverse("personas:persona_detail", args=[persona.pk]),
+                "hora": timezone.localtime(asistencia.registrada_en).strftime("%H:%M"),
+            },
+            "total": total,
+            "mensaje": "Asistente agregado",
+        },
+        status=201,
+    )
 
 
 @role_required(ROLE_ADMIN)
