@@ -75,6 +75,8 @@ Reglas:
 - No implementar chequeos de permiso dispersos sin test.
 - Si una accion modifica datos criticos, debe tener permiso explicito o al menos quedar cubierta por test de acceso.
 - Las reglas de permisos deben considerar organizacion activa, no solo rol global.
+- Para usuarios que no sean `staff` ni `superuser`, las vistas operativas de Personas, Asistencias y exportaciones requieren una organización explícita del filtro global. `Todas` no amplía el acceso: se deniega en servidor. Una organización ajena también se deniega antes de construir consultas.
+- `personas.gestionar_solicitudes_acceso` es un permiso Django global independiente. No se deriva de `staff` ni de `PersonaRol`; solo superusuarios y usuarios a quienes se asigna deliberadamente el permiso pueden administrar solicitudes.
 
 ## API
 La API usa:

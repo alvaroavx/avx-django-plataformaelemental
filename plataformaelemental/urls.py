@@ -21,6 +21,12 @@ from django.conf.urls.static import static
 from django.urls import include, path
 from django.views.generic import RedirectView
 
+from personas.auth_views import (
+    LoginEmergenciaView,
+    LoginOperacionalView,
+    callback_google,
+    inicio_google,
+)
 from asistencias.forms import CustomLoginForm
 from .views import elemental_apps
 from django.utils.translation import gettext_lazy as _
@@ -34,13 +40,19 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path(
         "accounts/login/",
-        auth_views.LoginView.as_view(
+        LoginOperacionalView.as_view(
             extra_context={"hide_nav": True},
             authentication_form=CustomLoginForm,
             template_name="registration/login.html",
         ),
         name="login",
     ),
+    path("accounts/emergencia/", LoginEmergenciaView.as_view(
+        extra_context={"hide_nav": True},
+        template_name="registration/login.html",
+    ), name="login_emergencia"),
+    path("accounts/google/iniciar/", inicio_google, name="google_login_iniciar"),
+    path("accounts/google/login/callback/", callback_google, name="google_callback"),
     path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("api/", include("api.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

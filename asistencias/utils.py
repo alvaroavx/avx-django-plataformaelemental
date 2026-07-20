@@ -21,7 +21,7 @@ def get_persona_for_user(user):
         raise PermissionDenied("Tu usuario no está vinculado a una persona.")
 
 
-def usuario_tiene_roles(user, roles: list[str]) -> bool:
+def usuario_tiene_roles(user, roles: list[str], *, organizacion=None) -> bool:
     if not roles:
         return True
     if user.is_superuser:
@@ -32,16 +32,20 @@ def usuario_tiene_roles(user, roles: list[str]) -> bool:
     persona = getattr(user, "persona", None)
     if not persona:
         return False
+    roles_qs = PersonaRol.objects.filter(
+        persona=persona,
+        activo=True,
+    )
+    if organizacion is not None:
+        roles_qs = roles_qs.filter(organizacion=organizacion)
     roles_usuario = {
         normalizar_codigo_rol(codigo)
-        for codigo in PersonaRol.objects.filter(
-            persona=persona,
-            activo=True,
-        ).values_list("rol__codigo", flat=True)
+        for codigo in roles_qs.values_list("rol__codigo", flat=True)
     }
     return bool(roles_usuario.intersection(roles_normalizados)) or PersonaRol.objects.filter(
         persona=persona,
         activo=True,
+        organizacion=organizacion,
         rol__codigo__in=roles,
     ).exists()
 

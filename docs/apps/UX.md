@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-07-20
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -30,10 +30,11 @@ Si un usuario autenticado no tiene accesos visibles, se muestra un mensaje contr
 El login usa una pantalla limpia y centrada con el nombre `Elemental Apps`.
 
 Reglas:
-- no cambia backend de autenticacion
-- mantiene CSRF
-- respeta `next`
-- muestra errores del formulario existente
+- Google muestra el titulo `Accede a Plataforma Elemental`, texto explicativo y boton visible `Continuar con Google` cuando `GOOGLE_AUTH_ENABLED=true`.
+- El inicio Google es POST con CSRF; `next` se valida en servidor y no acepta destinos externos. El servidor fija los scopes, `access_type=online` y `process=login`.
+- Mientras `GOOGLE_AUTH_ENFORCED=false`, el formulario local existente sigue disponible. Cuando se fuerza Google, el acceso local operacional se oculta y rechaza POST.
+- La ruta no enlazada `/accounts/emergencia/` mantiene recuperacion local solo para superusuarios.
+- La bandeja de solicitudes de acceso usa listado paginado, filtros y tarjetas móviles; el detalle busca candidatos de forma explícita y acotada. Los formularios anuncian errores, deshabilitan la acción durante el envío y mantienen foco visible. Esta revisión cubre teclado, reflow y zoom manualmente, sin declarar conformidad WCAG formal.
 
 ## Navegacion
 La navegacion principal vive en un sidebar global responsive.

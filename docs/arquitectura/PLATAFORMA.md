@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-07-20
 
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.
@@ -93,6 +93,11 @@ La politica detallada de sesiones, cookies, HTTPS, headers, API key y throttling
 Documentos duenios:
 - Seguridad produccion: [docs/operacion/SEGURIDAD_PRODUCCION.md](../operacion/SEGURIDAD_PRODUCCION.md)
 - API auth/throttling: [docs/apps/API.md](../apps/API.md)
+- Autenticacion Google y solicitudes de acceso: [docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md](../adr/0001-autenticacion-google-y-solicitudes-acceso.md)
+
+Regla de frontera:
+- Google autentica una identidad, pero no concede organizaciones, roles ni permisos. La autorizacion sigue viviendo en `PersonaRol` y permisos Django.
+- La aprobacion de nuevos accesos queda detras de security gates hasta corregir y probar aislamiento multi-organizacion.
 
 ## Deploy
 Dominio publico vigente: `apps.espacioelementos.cl`.

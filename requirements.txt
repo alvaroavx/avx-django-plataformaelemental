@@ -1,4 +1,8 @@
 Django==5.2.9
+django-allauth==65.18.0
+cryptography==46.0.7
+PyJWT==2.10.1
+requests==2.32.3
 djangorestframework==3.16.1
 gunicorn==23.0.0
 openpyxl==3.1.5

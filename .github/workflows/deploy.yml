@@ -56,7 +56,7 @@ jobs:
         run: ruff check .
 
       - name: Run test suite
-        run: python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
+        run: python manage.py test
 
   deploy:
     runs-on: ubuntu-latest

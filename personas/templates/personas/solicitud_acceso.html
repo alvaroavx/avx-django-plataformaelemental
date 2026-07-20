@@ -1,0 +1,27 @@
+{% extends "asistencias/base_app.html" %}
+{% block title %}Solicitud de acceso{% endblock %}
+{% block content %}
+<main class="container py-4" style="max-width: 42rem">
+  <h1 class="h3">No encontramos un acceso habilitado</h1>
+  <p>Iniciaste sesión con <strong>{{ identidad.email }}</strong>. Puedes solicitar acceso para que un administrador revise tu caso.</p>
+  {% for message in messages %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endfor %}
+  {% if solicitud %}
+    {% if solicitud.estado == "RECHAZADA" %}
+      <div class="alert alert-secondary" role="status">Tu solicitud no fue aprobada. Si crees que es un error, contacta al administrador.</div>
+    {% elif solicitud.estado == "APROBADA" %}
+      <div class="alert alert-info" role="status">Tu acceso fue aprobado. Vuelve a ingresar con la misma cuenta de Google.</div>
+    {% else %}
+      {% if creada %}<div class="alert alert-success" role="status">Solicitud enviada</div>{% else %}<div class="alert alert-info" role="status">Tu solicitud está pendiente. Ya la recibimos el {{ solicitud.creada_en|date:"d/m/Y" }}; no necesitas enviarla nuevamente.</div>{% endif %}
+      <p>Tu solicitud quedó pendiente de revisión. No recibirás un correo por ahora; vuelve a ingresar con la misma cuenta para consultar su estado.</p>
+    {% endif %}
+  {% else %}
+    <form method="post" data-solicitud-form>{% csrf_token %}<button class="btn btn-primary" type="submit">Solicitar acceso</button></form>
+  {% endif %}
+  <form method="post" action="{% url 'google_login_iniciar' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="cambiar_cuenta" value="1"><button class="btn btn-link" type="submit">Usar otra cuenta de Google</button></form>
+</main>
+<script>
+document.querySelectorAll('[data-solicitud-form]').forEach((form) => form.addEventListener('submit', () => {
+  const button = form.querySelector('button[type="submit"]'); button.disabled = true; button.textContent = 'Procesando…';
+}));
+</script>
+{% endblock %}

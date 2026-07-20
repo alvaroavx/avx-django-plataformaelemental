@@ -1,6 +1,6 @@
 {% extends "asistencias/base_app.html" %}
 {% load static %}
-{% block title %}Ingresar · Elemental Apps{% endblock %}
+{% block title %}Accede a Plataforma Elemental{% endblock %}
 {% block extra_head %}
 <style>
   .login-page {
@@ -42,14 +42,29 @@
       <div class="login-mark mb-3">
         <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
       </div>
-      <h1 class="h2 fw-bold mb-1">Elemental Apps</h1>
+      <p class="h2 fw-bold mb-1">Elemental Apps</p>
       <p class="text-muted mb-0">Plataforma Elemental</p>
     </div>
     <div class="card login-card">
       <div class="card-body p-4">
-        <h2 class="h5 mb-1">Ingresar</h2>
-        <p class="text-muted mb-4">Accede a la operación mensual de tu organización.</p>
-        <form method="post">
+        <h1 class="h5 mb-1">{% if modo_emergencia %}Acceso local de emergencia{% else %}Accede a Plataforma Elemental{% endif %}</h1>
+        {% if modo_emergencia %}
+          <p class="text-muted mb-4">Disponible únicamente para superusuarios autorizados.</p>
+        {% else %}
+          <p class="text-muted mb-3">Usa la cuenta de Google asociada a tu acceso.</p>
+          {% if google_auth_enabled %}
+            <form method="post" action="{% url 'google_login_iniciar' %}" class="mb-3">
+              {% csrf_token %}
+              {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+              <button class="btn btn-outline-dark w-100" type="submit">
+                <span>Continuar con Google</span>
+              </button>
+            </form>
+          {% endif %}
+          <p class="small text-muted mb-4">El acceso está disponible solo para personas autorizadas.</p>
+        {% endif %}
+        {% if not google_auth_enforced or modo_emergencia %}
+        <form method="post" aria-label="{% if modo_emergencia %}Acceso local de emergencia{% else %}Acceso local{% endif %}">
           {% csrf_token %}
           {% if request.GET.next %}
             <input type="hidden" name="next" value="{{ request.GET.next }}">
@@ -76,9 +91,10 @@
             {% endfor %}
           </div>
           <button class="btn btn-dark w-100" type="submit">
-            <i class="bi bi-box-arrow-in-right"></i><span class="ms-1">Ingresar</span>
+            <i class="bi bi-box-arrow-in-right"></i><span class="ms-1">{% if modo_emergencia %}Acceder como superusuario{% else %}Ingresar{% endif %}</span>
           </button>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>

@@ -27,6 +27,11 @@ class DisciplinaForm(forms.ModelForm):
             "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
+    def __init__(self, *args, organizaciones=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if organizaciones is not None:
+            self.fields["organizacion"].queryset = organizaciones
+
 
 class SesionBasicaForm(forms.Form):
     disciplina = forms.ModelChoiceField(

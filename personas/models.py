@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -152,3 +153,81 @@ class PersonaRol(models.Model):
     @property
     def valor_clase_normalizado(self):
         return self.valor_clase if self.valor_clase is not None else Decimal("0")
+
+
+class SolicitudAcceso(models.Model):
+    class Estado(models.TextChoices):
+        PENDIENTE = "PENDIENTE", "Pendiente"
+        APROBADA = "APROBADA", "Aprobada"
+        RECHAZADA = "RECHAZADA", "Rechazada"
+
+    class TipoResolucion(models.TextChoices):
+        USUARIO_EXISTENTE = "USUARIO_EXISTENTE", "Usuario existente"
+        PERSONA_EXISTENTE = "PERSONA_EXISTENTE", "Persona existente"
+        USUARIO_NUEVO = "USUARIO_NUEVO", "Usuario nuevo"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    provider = models.CharField(max_length=30, default="google")
+    provider_subject = models.CharField(max_length=255)
+    email = models.EmailField()
+    email_normalizado = models.EmailField()
+    nombre = models.CharField(max_length=255, blank=True)
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
+    tipo_resolucion = models.CharField(max_length=30, choices=TipoResolucion.choices, blank=True)
+    usuario_resuelto = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="solicitudes_acceso_resueltas"
+    )
+    organizacion_resuelta = models.ForeignKey(
+        Organizacion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="solicitudes_acceso_resueltas",
+    )
+    rol_resuelto = models.ForeignKey(
+        Rol,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="solicitudes_acceso_resueltas",
+    )
+    resuelta_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="solicitudes_acceso_gestionadas"
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+    resuelta_en = models.DateTimeField(null=True, blank=True)
+    nota_interna = models.TextField(blank=True)
+    excepcion_correo_confirmada = models.BooleanField(default=False)
+    motivo_rechazo = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Solicitud de acceso"
+        verbose_name_plural = "Solicitudes de acceso"
+        ordering = ["-creada_en"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "provider_subject"], condition=models.Q(estado="PENDIENTE"), name="solicitud_acceso_pendiente_provider_subject"
+            ),
+            models.UniqueConstraint(
+                fields=["email_normalizado"], condition=models.Q(estado="PENDIENTE"), name="solicitud_acceso_pendiente_email_normalizado"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["estado", "creada_en"], name="solacceso_estado_fecha_idx"),
+            models.Index(fields=["provider", "provider_subject"], name="solacceso_provider_sub_idx"),
+            models.Index(fields=["email_normalizado"], name="solacceso_email_norm_idx"),
+        ]
+        permissions = [
+            ("gestionar_solicitudes_acceso", "Puede gestionar solicitudes de acceso"),
+        ]
+
+    def __str__(self):
+        return f"Solicitud {self.provider} {self.estado}"
+
+    def clean(self):
+        super().clean()
+        self.email_normalizado = (self.email or "").strip().lower()
+
+    def save(self, *args, **kwargs):
+        self.email_normalizado = (self.email or "").strip().lower()
+        super().save(*args, **kwargs)

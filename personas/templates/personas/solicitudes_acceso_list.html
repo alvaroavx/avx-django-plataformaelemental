@@ -1,0 +1,84 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}Solicitudes de acceso · Elemental Apps{% endblock %}
+{% block content %}
+<section class="container-fluid px-0 solicitudes-acceso" aria-labelledby="titulo-solicitudes">
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 id="titulo-solicitudes" class="h3 mb-1">Solicitudes de acceso</h1>
+      <p class="text-secondary mb-0">Revisa identidades pendientes sin crear permisos de manera automática.</p>
+    </div>
+    <div class="card border-warning-subtle bg-warning-subtle px-3 py-2" aria-label="Solicitudes pendientes">
+      <span class="small text-secondary">Pendientes</span>
+      <strong class="fs-4">{{ pendientes_count }}</strong>
+    </div>
+  </div>
+
+  <form method="get" class="card card-body shadow-sm mb-4" aria-label="Filtros de solicitudes">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="solicitudes-q">Buscar</label>
+        <input class="form-control" id="solicitudes-q" name="q" value="{{ q }}" type="search" autocomplete="off" placeholder="Correo, nombre o identificador Google">
+      </div>
+      <div class="col-12 col-sm-7 col-md-3">
+        <label class="form-label" for="solicitudes-estado">Estado</label>
+        <select class="form-select" id="solicitudes-estado" name="estado">
+          <option value="">Todos los estados</option>
+          <option value="PENDIENTE" {% if estado == "PENDIENTE" %}selected{% endif %}>Pendiente</option>
+          <option value="APROBADA" {% if estado == "APROBADA" %}selected{% endif %}>Aprobada</option>
+          <option value="RECHAZADA" {% if estado == "RECHAZADA" %}selected{% endif %}>Rechazada</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-5 col-md-3 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit">Filtrar</button>
+        <a class="btn btn-outline-secondary" href="{% url 'personas:solicitudes_acceso_list' %}">Limpiar</a>
+      </div>
+    </div>
+  </form>
+
+  {% if solicitudes %}
+    <div class="d-md-none vstack gap-3" aria-label="Resultados de solicitudes">
+      {% for solicitud in solicitudes %}
+        <article class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between gap-2 mb-2">
+              <span class="badge text-bg-{% if solicitud.estado == 'PENDIENTE' %}warning{% elif solicitud.estado == 'APROBADA' %}success{% else %}secondary{% endif %}">{{ solicitud.get_estado_display }}</span>
+              <small class="text-secondary">{{ solicitud.creada_en|timesince }}</small>
+            </div>
+            <p class="mb-1 text-break">{{ solicitud.email }}</p>
+            <p class="small text-secondary mb-3">Google · {{ solicitud.creada_en|date:"d/m/Y H:i" }}</p>
+            <a class="btn btn-outline-primary w-100" href="{% url 'personas:solicitud_acceso_detail' solicitud.pk %}">Revisar solicitud</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+    <div class="card shadow-sm d-none d-md-block overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th scope="col">Estado</th><th scope="col">Identidad</th><th scope="col">Creada</th><th scope="col">Resolución</th><th scope="col"><span class="visually-hidden">Acción</span></th></tr></thead>
+          <tbody>
+            {% for solicitud in solicitudes %}
+              <tr>
+                <td><span class="badge text-bg-{% if solicitud.estado == 'PENDIENTE' %}warning{% elif solicitud.estado == 'APROBADA' %}success{% else %}secondary{% endif %}">{{ solicitud.get_estado_display }}</span></td>
+                <td><div class="text-break">{{ solicitud.email }}</div><small class="text-secondary">{{ solicitud.nombre|default:"Sin nombre informado" }}</small></td>
+                <td><time datetime="{{ solicitud.creada_en|date:'c' }}">{{ solicitud.creada_en|date:"d/m/Y H:i" }}</time><small class="d-block text-secondary">hace {{ solicitud.creada_en|timesince }}</small></td>
+                <td>{% if solicitud.organizacion_resuelta %}{{ solicitud.organizacion_resuelta }} · {{ solicitud.rol_resuelto }}{% else %}<span class="text-secondary">Sin resolver</span>{% endif %}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'personas:solicitud_acceso_detail' solicitud.pk %}">Revisar</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="card card-body text-center py-5" role="status"><i class="bi bi-inbox fs-2 text-secondary" aria-hidden="true"></i><h2 class="h5 mt-3">No hay solicitudes para mostrar</h2><p class="text-secondary mb-0">Prueba con otro estado o término de búsqueda.</p></div>
+  {% endif %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-4" aria-label="Paginación de solicitudes"><ul class="pagination justify-content-center flex-wrap">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?{{ querystring_sin_page }}{% if querystring_sin_page %}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?{{ querystring_sin_page }}{% if querystring_sin_page %}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente</a></li>{% endif %}
+    </ul></nav>
+  {% endif %}
+</section>
+{% endblock %}

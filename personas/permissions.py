@@ -81,6 +81,8 @@ def permiso_requerido(accion, *, accion_lectura=None, mensaje=None):
 
             accion_requerida = accion_lectura if request.method in SAFE_METHODS and accion_lectura else accion
             organizacion = organizacion_desde_request(request)
+            if not (request.user.is_superuser or request.user.is_staff) and organizacion is None:
+                raise PermissionDenied("Debes seleccionar una organización autorizada para operar.")
             if usuario_tiene_permiso(request.user, accion_requerida, organizacion=organizacion):
                 return view_func(request, *args, **kwargs)
             raise PermissionDenied(mensaje or "No tienes permisos para acceder.")

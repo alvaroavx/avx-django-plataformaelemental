@@ -1,0 +1,82 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}Revisar solicitud · Elemental Apps{% endblock %}
+{% block content %}
+<section class="container-fluid px-0 solicitudes-acceso" aria-labelledby="titulo-solicitud">
+  <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+    <div>
+      <a class="btn btn-sm btn-outline-secondary mb-3" href="{% url 'personas:solicitudes_acceso_list' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Volver a solicitudes</a>
+      <h1 id="titulo-solicitud" class="h3 mb-1">Revisar solicitud de acceso</h1>
+      <p class="text-secondary mb-0">Pendientes actuales: {{ pendientes_count }}</p>
+    </div>
+    <span class="align-self-start badge fs-6 text-bg-{% if solicitud.estado == 'PENDIENTE' %}warning{% elif solicitud.estado == 'APROBADA' %}success{% else %}secondary{% endif %}">{{ solicitud.get_estado_display }}</span>
+  </div>
+
+  {% if conflicto %}<div class="alert alert-danger" role="alert">{{ conflicto }}</div>{% endif %}
+  {% if modificado_por_otro %}<div class="alert alert-warning" role="alert">Esta solicitud fue modificada por otro administrador. Actualiza la página antes de continuar.</div>{% endif %}
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-4">
+      <article class="card shadow-sm h-100"><div class="card-body">
+        <h2 class="h5">Identidad recibida</h2>
+        <dl class="row mb-0 small">
+          <dt class="col-sm-5">Proveedor</dt><dd class="col-sm-7">{{ solicitud.provider|upper }}</dd>
+          <dt class="col-sm-5">Correo verificado</dt><dd class="col-sm-7 text-break">{{ solicitud.email }}</dd>
+          <dt class="col-sm-5">Nombre</dt><dd class="col-sm-7">{{ solicitud.nombre|default:"No informado" }}</dd>
+          <dt class="col-sm-5">Identificador Google</dt><dd class="col-sm-7 text-break"><code>{{ solicitud.provider_subject }}</code></dd>
+          <dt class="col-sm-5">Creada</dt><dd class="col-sm-7">{{ solicitud.creada_en|date:"d/m/Y H:i" }}</dd>
+          {% if solicitud.resuelta_en %}<dt class="col-sm-5">Resuelta</dt><dd class="col-sm-7">{{ solicitud.resuelta_en|date:"d/m/Y H:i" }}</dd>{% endif %}
+        </dl>
+        {% if solicitud.estado == "APROBADA" %}<hr><p class="mb-1"><strong>Usuario:</strong> {{ solicitud.usuario_resuelto }}</p><p class="mb-1"><strong>Organización:</strong> {{ solicitud.organizacion_resuelta }}</p><p class="mb-0"><strong>Rol:</strong> {{ solicitud.rol_resuelto }}</p>{% endif %}
+      </div></article>
+    </div>
+
+    <div class="col-12 col-xl-8">
+      {% if solicitud.estado == "PENDIENTE" %}
+        <form method="get" class="card card-body shadow-sm mb-4" aria-label="Buscar candidato para resolver">
+          <h2 class="h5">Buscar candidato</h2>
+          <p class="small text-secondary">Busca antes de seleccionar. Se muestran como máximo diez resultados por búsqueda.</p>
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-5"><label class="form-label" for="usuario-q">Usuario existente</label><input class="form-control" id="usuario-q" name="usuario_q" value="{{ usuario_q }}" type="search" autocomplete="off" placeholder="Nombre, username o correo"></div>
+            <div class="col-12 col-md-5"><label class="form-label" for="persona-q">Persona sin User</label><input class="form-control" id="persona-q" name="persona_q" value="{{ persona_q }}" type="search" autocomplete="off" placeholder="Nombre o correo"></div>
+            <div class="col-12 col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Buscar</button></div>
+          </div>
+          {% if usuario_q and not usuarios_encontrados %}<p class="small text-secondary mt-3 mb-0" role="status">No se encontraron usuarios activos.</p>{% endif %}
+          {% if persona_q and not personas_encontradas %}<p class="small text-secondary mt-3 mb-0" role="status">No se encontraron Personas disponibles.</p>{% endif %}
+        </form>
+
+        <form method="post" action="{% url 'personas:solicitud_acceso_aprobar' solicitud.pk %}" class="card shadow-sm" data-procesar-form>
+          {% csrf_token %}<div class="card-body">
+            <h2 class="h5">Resolución</h2>
+            {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="row g-3">
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.tipo_resolucion.id_for_label }}">{{ form.tipo_resolucion.label }}</label>{{ form.tipo_resolucion }}{% if form.tipo_resolucion.errors %}<div class="invalid-feedback d-block">{{ form.tipo_resolucion.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.organizacion.id_for_label }}">{{ form.organizacion.label }}</label>{{ form.organizacion }}{% if form.organizacion.errors %}<div class="invalid-feedback d-block">{{ form.organizacion.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.rol.id_for_label }}">{{ form.rol.label }}</label>{{ form.rol }}{% if form.rol.errors %}<div class="invalid-feedback d-block">{{ form.rol.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.usuario.id_for_label }}">{{ form.usuario.label }}</label>{{ form.usuario }}{% if usuarios_encontrados %}<div class="form-text">Resultados: {% for user in usuarios_encontrados %}<span class="d-block">{{ user.username }}{% if user.persona %} · {{ user.persona.nombre_completo }}{% endif %}</span>{% endfor %}</div>{% endif %}{% if form.usuario.errors %}<div class="invalid-feedback d-block">{{ form.usuario.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.persona.id_for_label }}">{{ form.persona.label }}</label>{{ form.persona }}{% if personas_encontradas %}<div class="form-text">Resultados: {% for persona in personas_encontradas %}<span class="d-block">{{ persona.nombre_completo }}</span>{% endfor %}</div>{% endif %}{% if form.persona.errors %}<div class="invalid-feedback d-block">{{ form.persona.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.nombres.id_for_label }}">{{ form.nombres.label }}</label>{{ form.nombres }}{% if form.nombres.errors %}<div class="invalid-feedback d-block">{{ form.nombres.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12 col-md-6"><label class="form-label" for="{{ form.apellidos.id_for_label }}">{{ form.apellidos.label }}</label>{{ form.apellidos }}{% if form.apellidos.errors %}<div class="invalid-feedback d-block">{{ form.apellidos.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12"><label class="form-label" for="{{ form.nota_interna.id_for_label }}">{{ form.nota_interna.label }}</label>{{ form.nota_interna }}<div class="form-text">Obligatoria si confirmas una diferencia de correo. No se muestra al solicitante.</div>{% if form.nota_interna.errors %}<div class="invalid-feedback d-block">{{ form.nota_interna.errors|join:', ' }}</div>{% endif %}</div>
+              <div class="col-12"><div class="form-check">{{ form.confirmar_correo_distinto }}<label class="form-check-label" for="{{ form.confirmar_correo_distinto.id_for_label }}">{{ form.confirmar_correo_distinto.label }}</label></div><p class="form-text mb-0">Correo Google: <strong>{{ solicitud.email }}</strong>. Si difiere del User seleccionado, confirma y explica la excepción.</p></div>
+            </div>
+          </div>
+          <div class="card-footer d-flex flex-column flex-sm-row justify-content-between gap-2"><span class="small text-secondary">Revisa el resumen antes de aprobar; la operación no se puede deshacer desde esta pantalla.</span><button class="btn btn-success" type="submit"><span class="boton-texto">Aprobar solicitud</span></button></div>
+        </form>
+        <form method="post" action="{% url 'personas:solicitud_acceso_rechazar' solicitud.pk %}" class="card card-body shadow-sm mt-4" data-procesar-form>{% csrf_token %}<h2 class="h5">Rechazar solicitud</h2><label class="form-label" for="motivo-rechazo">Nota interna de rechazo</label><textarea class="form-control" id="motivo-rechazo" name="motivo_rechazo" rows="3"></textarea><div class="d-flex justify-content-end mt-3"><button class="btn btn-outline-danger" type="submit"><span class="boton-texto">Rechazar</span></button></div></form>
+      {% elif solicitud.estado == "RECHAZADA" %}
+        <form method="post" action="{% url 'personas:solicitud_acceso_reabrir' solicitud.pk %}" class="card card-body shadow-sm" data-procesar-form>{% csrf_token %}<h2 class="h5">Reabrir solicitud</h2><p class="text-secondary">La reapertura devuelve la solicitud a pendiente. Debes dejar una nota interna.</p><label class="form-label" for="nota-reapertura">Nota interna</label><textarea class="form-control" id="nota-reapertura" name="nota_interna" rows="3" required></textarea><div class="d-flex justify-content-end mt-3"><button class="btn btn-primary" type="submit"><span class="boton-texto">Reabrir solicitud</span></button></div></form>
+      {% else %}
+        <div class="card card-body shadow-sm" role="status"><h2 class="h5">Solicitud resuelta</h2><p class="mb-0">El próximo ingreso Google validado completará el vínculo con el usuario aprobado. No hay acciones adicionales disponibles.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-procesar-form]').forEach((form) => form.addEventListener('submit', () => {
+  const button = form.querySelector('button[type="submit"]');
+  if (button) { button.disabled = true; button.querySelector('.boton-texto').textContent = 'Procesando…'; }
+}));
+</script>
+{% endblock %}

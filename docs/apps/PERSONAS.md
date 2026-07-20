@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-07-20
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -23,6 +23,13 @@ Debe concentrar:
 - Para crear o editar una persona debe existir al menos un dato de identidad operacional: `RUT`, email o telefono.
 - El telefono se normaliza en backend para uso operacional; no es unico porque puede compartirse entre familia, apoderados o contactos.
 - Los modelos propios de personas, roles y organizaciones viven en `personas.models`.
+- Antes de adoptar autenticacion Google o cualquier cambio de unicidad en `auth_user.email`, se debe ejecutar `python manage.py auditar_identidades_acceso`. El comando es read-only y revisa correos vacios/duplicados normalizados, diferencias User/Persona, ausencias de vinculo, inactividad, candidatos tecnicos, superusuarios y roles activos por usuario. No corrige datos ni imprime correos completos.
+- La decision arquitectonica de autenticacion Google y solicitudes de acceso vive en `docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md`. Hasta que sus security gates y pruebas de aislamiento multi-organizacion esten aprobados, no se deben habilitar aprobaciones de accesos nuevos.
+- La Fase 1 incorpora `django-allauth` con adaptador propio. Solo vincula una identidad Google cuando el `sub` ya existe o el correo verificado coincide de forma normalizada con exactamente un `User` activo y sin otro Google asociado; no crea usuarios ni roles. `SocialAccount` y tokens no se gestionan manualmente.
+- El login Google se inicia exclusivamente por POST con CSRF y expone solo su inicio controlado y callback canonico; la ruta local oculta `/accounts/emergencia/` acepta solo superusuarios y se conserva para recuperacion cuando se fuerce Google.
+- `SolicitudAcceso` pertenece a `personas`. Una identidad Google verificada y sin acceso se conserva temporalmente en sesion por 10 minutos; el POST no acepta correo, subject ni estado desde el navegador. La solicitud es idempotente mientras exista una pendiente y no crea identidad, permisos ni roles. Una rechazada conserva historia: solo un gestor autorizado puede reabrirla con nota interna; el flujo público no la recrea.
+- La resolución aprobada conserva explícitamente el `User`, la organización y el rol seleccionados. La pantalla busca Users y Personas de forma acotada; no expone directorios completos en controles HTML.
+- Las decisiones sobre una identidad Google se serializan con bloqueos transaccionales de PostgreSQL por `provider + provider_subject` y por `provider + User`. Lo usan tanto la resolución administrativa como el siguiente `SocialLogin` validado por django-allauth, porque una `SocialAccount` aún inexistente no se protege solo con `select_for_update`. El servicio de Personas no crea ni actualiza `SocialAccount`.
 
 ## Decisiones funcionales vigentes
 - Debe existir listado, detalle, creacion y edicion de organizaciones.

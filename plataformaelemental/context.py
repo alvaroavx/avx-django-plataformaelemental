@@ -3,7 +3,21 @@ from datetime import date, timedelta
 from django.utils import timezone
 from django.utils.formats import date_format
 
-from personas.models import Organizacion
+from django.core.exceptions import PermissionDenied
+
+from personas.models import Organizacion, PersonaRol
+
+
+def organizaciones_visibles_para_usuario(user):
+    """Organizaciones disponibles en el filtro global sin ampliar el alcance del usuario."""
+    if not getattr(user, "is_authenticated", False):
+        return Organizacion.objects.all().order_by("nombre")
+    if user.is_superuser or user.is_staff:
+        return Organizacion.objects.all().order_by("nombre")
+    persona = getattr(user, "persona", None)
+    if not persona:
+        return Organizacion.objects.none()
+    return Organizacion.objects.filter(persona_roles__persona=persona, persona_roles__activo=True).distinct().order_by("nombre")
 
 
 MESES_PERIODO = [
@@ -111,9 +125,17 @@ def nav_context(request):
 
 def organizacion_desde_request(request):
     org_id = request.GET.get("organizacion")
-    if not org_id:
+    if not org_id or str(org_id).strip().lower() in {"todos", "todas"}:
         return None
-    return Organizacion.objects.filter(pk=org_id).first()
+    user = getattr(request, "user", None)
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return Organizacion.objects.filter(pk=org_id).first()
+    organizacion = organizaciones_visibles_para_usuario(user).filter(pk=org_id).first()
+    if organizacion:
+        return organizacion
+    if getattr(getattr(request, "user", None), "is_authenticated", False):
+        raise PermissionDenied("La organización seleccionada no está disponible para este usuario.")
+    return None
 
 
 def periodo_context(request):
@@ -131,7 +153,7 @@ def periodo_context(request):
         "periodo_meses": MESES_PERIODO,
         "periodo_descripcion": descripcion_periodo(request=request, corta=False),
         "periodo_descripcion_corta": descripcion_periodo(request=request, corta=True),
-        "organizaciones_global": Organizacion.objects.all().order_by("nombre"),
+        "organizaciones_global": organizaciones_visibles_para_usuario(getattr(request, "user", None)),
         "organizacion_id": str(organizacion_id),
         "organizacion_activa": organizacion_activa,
     }

@@ -31,6 +31,7 @@ from plataformaelemental.context import (
     filtros_periodo,
     nav_context,
     organizacion_desde_request,
+    organizaciones_visibles_para_usuario,
     resolver_periodo,
 )
 from plataformaelemental.exports import periodo_sufijo_archivo, xlsx_response
@@ -649,6 +650,8 @@ def disciplina_detail(request, pk):
     """Detalle de disciplina con métricas de sesiones y asistencias por período."""
     context = nav_context(request)
     disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
+    if not usuario_tiene_permiso(request.user, ACCION_ADMINISTRAR_SESIONES, organizacion=disciplina.organizacion):
+        raise PermissionDenied("No tienes permisos para acceder a esta disciplina.")
 
     sesiones = (
         SesionClase.objects.filter(
@@ -706,7 +709,7 @@ def disciplina_create(request):
     if request.GET.get("organizacion"):
         initial["organizacion"] = request.GET.get("organizacion")
 
-    form = DisciplinaForm(request.POST or None, initial=initial)
+    form = DisciplinaForm(request.POST or None, initial=initial, organizaciones=organizaciones_visibles_para_usuario(request.user))
     if request.method == "POST" and form.is_valid():
         disciplina = form.save()
         messages.success(request, "Disciplina creada correctamente.")
@@ -727,7 +730,9 @@ def disciplina_edit(request, pk):
     """Edita una disciplina existente."""
     context = nav_context(request)
     disciplina = get_object_or_404(Disciplina, pk=pk)
-    form = DisciplinaForm(request.POST or None, instance=disciplina)
+    if not usuario_tiene_permiso(request.user, ACCION_ADMINISTRAR_SESIONES, organizacion=disciplina.organizacion):
+        raise PermissionDenied("No tienes permisos para editar esta disciplina.")
+    form = DisciplinaForm(request.POST or None, instance=disciplina, organizaciones=organizaciones_visibles_para_usuario(request.user))
 
     if request.method == "POST" and form.is_valid():
         disciplina = form.save()
@@ -973,7 +978,7 @@ def asistencias_list(request):
             "estudiantes_total_disciplina_periodo": estudiantes_total_disciplina_periodo,
             "disciplinas": disciplinas_vigentes_qs(organizacion=organizacion),
             "profesores": profesores_vigentes_qs(organizacion=organizacion),
-            "organizaciones": Organizacion.objects.all(),
+            "organizaciones": organizaciones_visibles_para_usuario(request.user),
         }
     )
     return render(request, "asistencias/asistencias_list.html", context)
@@ -1316,6 +1321,8 @@ def sesion_edit(request, pk):
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores"),
         pk=pk,
     )
+    if not _usuario_puede_operar_sesion(request.user, sesion):
+        raise PermissionDenied("No tienes permisos para editar esta sesión.")
     form = SesionBasicaForm(
         request.POST or None,
         organizacion=sesion.disciplina.organizacion,

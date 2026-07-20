@@ -120,6 +120,28 @@
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
   }
 
+  :focus-visible {
+    outline: 3px solid #0f766e;
+    outline-offset: 3px;
+  }
+
+  .solicitudes-acceso .card {
+    border-color: #e5e7eb;
+  }
+
+  .solicitudes-acceso code {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  @media (max-width: 575.98px) {
+    .solicitudes-acceso .btn,
+    .solicitudes-acceso .form-control,
+    .solicitudes-acceso .form-select {
+      min-height: 44px;
+    }
+  }
+
   @media (min-width: 992px) {
     .elemental-content {
       padding: 1.5rem;

@@ -202,7 +202,7 @@ flowchart TD
 2. instalar dependencias Python
 3. instalar dependencias de desarrollo para lint
 4. correr `ruff check .`
-5. correr `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+5. correr `python manage.py test`
 6. validar secrets obligatorios
 7. escribir la llave privada en `~/.ssh/deploy_key`
 8. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
@@ -218,6 +218,7 @@ flowchart TD
 - El workflow define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=postgres`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
 - Las credenciales de CI no son credenciales productivas; existen solo dentro del runner.
 - SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
+- `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
 
 ## SSH En CI
 - El workflow valida `DEPLOY_SSH_KEY_B64` como secret obligatorio.

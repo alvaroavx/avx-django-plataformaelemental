@@ -1,10 +1,17 @@
 ﻿from decimal import Decimal
 
+from functools import wraps
+
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import Http404
+from django.core.exceptions import ValidationError
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.urls import reverse
 
 from auditoria.models import AuditLog
@@ -20,16 +27,219 @@ from plataformaelemental.context import (
     filtros_periodo,
     nav_context,
     organizacion_desde_request,
+    organizaciones_visibles_para_usuario,
     resolver_periodo,
 )
 
-from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm
-from .models import Organizacion, Persona, PersonaRol, Rol
+from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm, ResolverSolicitudAccesoForm
+from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
+from .solicitudes_acceso import crear_o_recuperar_solicitud, obtener_identidad_pendiente, solicitud_pendiente_o_ultima
 
 
 MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
 PERSONA_AUDIT_FIELDS = ["nombres", "apellidos", "rut", "email", "telefono", "activo"]
 PERSONA_ROL_AUDIT_FIELDS = ["activo", "valor_clase", "retencion_sii"]
+
+
+def solicitud_acceso(request):
+    from django.conf import settings
+
+    if not settings.ACCESS_REQUESTS_ENABLED:
+        raise Http404
+    identidad = obtener_identidad_pendiente(request)
+    if not identidad:
+        return redirect("login")
+    solicitud = solicitud_pendiente_o_ultima(identidad)
+    creada = None
+    if request.method == "POST":
+        try:
+            solicitud, creada = crear_o_recuperar_solicitud(request, identidad)
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+    return render(
+        request,
+        "personas/solicitud_acceso.html",
+        {"hide_nav": True, "identidad": identidad, "solicitud": solicitud, "creada": creada},
+    )
+
+
+def _gestionar_solicitudes_requerido(view):
+    @login_required
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        from django.conf import settings
+
+        if not settings.ACCESS_REQUESTS_ENABLED:
+            raise Http404
+        if not request.user.has_perm("personas.gestionar_solicitudes_acceso"):
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_ASOCIAR,
+                dominio="personas",
+                modelo="personas.SolicitudAcceso",
+                objeto_id=str(kwargs.get("pk", "")),
+                resumen="Acceso a gestión de solicitudes denegado",
+                metadata={"denegado": True},
+            )
+            raise PermissionDenied("No tienes permiso para gestionar solicitudes de acceso.")
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
+def _termino_busqueda(request, nombre):
+    return (request.GET.get(nombre) or "").strip()
+
+
+def _candidatos_resolucion(request):
+    """Busca de forma acotada; el formulario nunca expone directorios completos."""
+    termino_usuario = _termino_busqueda(request, "usuario_q")
+    termino_persona = _termino_busqueda(request, "persona_q")
+    User = get_user_model()
+    usuarios = User.objects.none()
+    personas = Persona.objects.none()
+    if len(termino_usuario) >= 2:
+        usuarios = (
+            User.objects.filter(is_active=True)
+            .filter(
+                Q(username__icontains=termino_usuario)
+                | Q(email__icontains=termino_usuario)
+                | Q(first_name__icontains=termino_usuario)
+                | Q(last_name__icontains=termino_usuario)
+            )
+            .select_related("persona")
+            .prefetch_related("persona__roles__rol", "persona__roles__organizacion")
+            .order_by("username")[:10]
+        )
+    if len(termino_persona) >= 2:
+        personas = (
+            Persona.objects.filter(user__isnull=True, activo=True)
+            .filter(Q(nombres__icontains=termino_persona) | Q(apellidos__icontains=termino_persona) | Q(email__icontains=termino_persona))
+            .prefetch_related("roles__rol", "roles__organizacion")
+            .order_by("apellidos", "nombres")[:10]
+        )
+    return termino_usuario, termino_persona, usuarios, personas
+
+
+def _formulario_resolucion(request, *, data=None):
+    """En POST se valida solo el id enviado, sin cargar directorios completos."""
+    User = get_user_model()
+    usuarios = User.objects.none()
+    personas = Persona.objects.none()
+    if data is not None:
+        if data.get("usuario"):
+            usuarios = User.objects.filter(pk=data.get("usuario"), is_active=True).select_related("persona")
+        if data.get("persona"):
+            personas = Persona.objects.filter(pk=data.get("persona"), user__isnull=True, activo=True)
+    else:
+        _, _, usuarios, personas = _candidatos_resolucion(request)
+    return ResolverSolicitudAccesoForm(data, usuarios=usuarios, personas=personas)
+
+
+def _contexto_detalle_solicitud(request, solicitud, *, form=None, conflicto=None, modificado_por_otro=False):
+    termino_usuario, termino_persona, usuarios, personas = _candidatos_resolucion(request)
+    if form is None:
+        form = ResolverSolicitudAccesoForm(usuarios=usuarios, personas=personas)
+    return {
+        "solicitud": solicitud,
+        "form": form,
+        "usuarios_encontrados": usuarios,
+        "personas_encontradas": personas,
+        "usuario_q": termino_usuario,
+        "persona_q": termino_persona,
+        "conflicto": conflicto,
+        "modificado_por_otro": modificado_por_otro,
+        "pendientes_count": SolicitudAcceso.objects.filter(estado=SolicitudAcceso.Estado.PENDIENTE).count(),
+    }
+
+
+@_gestionar_solicitudes_requerido
+def solicitudes_acceso_list(request):
+    estado = (request.GET.get("estado") or "PENDIENTE").upper()
+    termino = (request.GET.get("q") or "").strip()
+    solicitudes = SolicitudAcceso.objects.select_related("usuario_resuelto", "organizacion_resuelta", "rol_resuelto", "resuelta_por")
+    if estado in dict(SolicitudAcceso.Estado.choices):
+        solicitudes = solicitudes.filter(estado=estado)
+    else:
+        estado = ""
+    if termino:
+        solicitudes = solicitudes.filter(Q(email__icontains=termino) | Q(nombre__icontains=termino) | Q(provider_subject__icontains=termino))
+    paginator = Paginator(solicitudes, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    parametros = request.GET.copy()
+    parametros.pop("page", None)
+    return render(
+        request,
+        "personas/solicitudes_acceso_list.html",
+        {
+            "page_obj": page_obj,
+            "solicitudes": page_obj.object_list,
+            "estado": estado,
+            "q": termino,
+            "querystring_sin_page": parametros.urlencode(),
+            "pendientes_count": SolicitudAcceso.objects.filter(estado=SolicitudAcceso.Estado.PENDIENTE).count(),
+        },
+    )
+
+
+@_gestionar_solicitudes_requerido
+def solicitud_acceso_detail(request, pk):
+    solicitud = get_object_or_404(
+        SolicitudAcceso.objects.select_related("usuario_resuelto__persona", "organizacion_resuelta", "rol_resuelto", "resuelta_por"), pk=pk
+    )
+    return render(request, "personas/solicitud_acceso_detail.html", _contexto_detalle_solicitud(request, solicitud))
+
+
+@_gestionar_solicitudes_requerido
+def solicitud_acceso_aprobar(request, pk):
+    from django.conf import settings
+
+    if request.method != "POST":
+        raise Http404
+    if not settings.ACCESS_REQUEST_APPROVAL_ENABLED:
+        raise Http404
+    form = _formulario_resolucion(request, data=request.POST)
+    if not form.is_valid():
+        return render(request, "personas/solicitud_acceso_detail.html", _contexto_detalle_solicitud(request, get_object_or_404(SolicitudAcceso, pk=pk), form=form), status=400)
+    try:
+        aprobar_solicitud(solicitud_id=pk, administrador=request.user, **form.cleaned_data)
+    except ValidationError as error:
+        form.add_error(None, error)
+        solicitud = get_object_or_404(SolicitudAcceso, pk=pk)
+        return render(request, "personas/solicitud_acceso_detail.html", _contexto_detalle_solicitud(request, solicitud, form=form, conflicto=error.messages[0], modificado_por_otro=solicitud.estado != SolicitudAcceso.Estado.PENDIENTE), status=409 if solicitud.estado != SolicitudAcceso.Estado.PENDIENTE else 400)
+    messages.success(request, "Solicitud aprobada. El vínculo Google se completará en el próximo ingreso validado.")
+    return redirect("personas:solicitud_acceso_detail", pk=pk)
+
+
+@_gestionar_solicitudes_requerido
+def solicitud_acceso_rechazar(request, pk):
+    from django.conf import settings
+
+    if request.method != "POST" or not settings.ACCESS_REQUEST_APPROVAL_ENABLED:
+        raise Http404
+    try:
+        rechazar_solicitud(solicitud_id=pk, administrador=request.user, motivo_rechazo=request.POST.get("motivo_rechazo", ""))
+    except ValidationError as error:
+        solicitud = get_object_or_404(SolicitudAcceso, pk=pk)
+        return render(request, "personas/solicitud_acceso_detail.html", _contexto_detalle_solicitud(request, solicitud, conflicto=error.messages[0], modificado_por_otro=solicitud.estado != SolicitudAcceso.Estado.PENDIENTE), status=409 if solicitud.estado != SolicitudAcceso.Estado.PENDIENTE else 400)
+    messages.success(request, "Solicitud rechazada.")
+    return redirect("personas:solicitud_acceso_detail", pk=pk)
+
+
+@_gestionar_solicitudes_requerido
+def solicitud_acceso_reabrir(request, pk):
+    from django.conf import settings
+
+    if request.method != "POST" or not settings.ACCESS_REQUEST_APPROVAL_ENABLED:
+        raise Http404
+    try:
+        reabrir_solicitud(solicitud_id=pk, administrador=request.user, nota_interna=request.POST.get("nota_interna", ""))
+    except ValidationError as error:
+        solicitud = get_object_or_404(SolicitudAcceso, pk=pk)
+        return render(request, "personas/solicitud_acceso_detail.html", _contexto_detalle_solicitud(request, solicitud, conflicto=error.messages[0], modificado_por_otro=solicitud.estado != SolicitudAcceso.Estado.RECHAZADA), status=409 if solicitud.estado != SolicitudAcceso.Estado.RECHAZADA else 400)
+    messages.success(request, "Solicitud reabierta y devuelta a pendiente.")
+    return redirect("personas:solicitud_acceso_detail", pk=pk)
 
 
 def _base_context(request):
@@ -297,7 +507,8 @@ def organizaciones_list(request):
 def organizacion_detail(request, pk):
     context = _base_context(request)
     periodo = resolver_periodo(request)
-    organizacion = get_object_or_404(Organizacion, pk=pk)
+    organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
+    organizacion = get_object_or_404(organizaciones_autorizadas, pk=pk)
     disciplinas = Disciplina.objects.filter(organizacion=organizacion).order_by("nombre")
     metricas = _organizacion_metricas(organizacion, mes=periodo["mes"], anio=periodo["anio"])
     context.update(
@@ -327,7 +538,7 @@ def organizacion_create(request):
 @role_required(ROLE_ADMIN)
 def organizacion_edit(request, pk):
     context = _base_context(request)
-    organizacion = get_object_or_404(Organizacion, pk=pk)
+    organizacion = get_object_or_404(organizaciones_visibles_para_usuario(request.user), pk=pk)
     form = OrganizacionCRMForm(request.POST or None, instance=organizacion)
     if request.method == "POST" and form.is_valid():
         organizacion = form.save()
@@ -429,8 +640,9 @@ def personas_list(request):
 @role_required(ROLE_ADMIN)
 def persona_create(request):
     context = _base_context(request)
+    organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
     form = PersonaCRMForm(request.POST or None)
-    rol_form = PersonaRolCRMForm(request.POST or None, prefix="rol")
+    rol_form = PersonaRolCRMForm(request.POST or None, prefix="rol", organizaciones=organizaciones_autorizadas)
     if request.method == "POST":
         persona_valida = form.is_valid()
         rol_valido = rol_form.is_valid()
@@ -471,11 +683,15 @@ def persona_detail(request, pk):
     context = _base_context(request)
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
+    organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
+    roles_visibles = PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre")
+    if organizacion:
+        roles_visibles = roles_visibles.filter(organizacion=organizacion)
     persona = get_object_or_404(
         Persona.objects.select_related("user").prefetch_related(
             Prefetch(
                 "roles",
-                queryset=PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre"),
+                queryset=roles_visibles,
             ),
             Prefetch(
                 "asistencias",
@@ -498,6 +714,8 @@ def persona_detail(request, pk):
         ),
         pk=pk,
     )
+    if not (request.user.is_superuser or request.user.is_staff) and not persona.roles.filter(organizacion=organizacion).exists():
+        raise Http404
     if request.method == "POST":
         accion = request.POST.get("accion")
         if "asociar_pago_asistencia" in request.POST:
@@ -512,6 +730,9 @@ def persona_detail(request, pk):
                 persona=persona,
                 **filtros_periodo("fecha_pago", request=request),
             )
+            if organizacion and asistencia.sesion.disciplina.organizacion_id != organizacion.id:
+                messages.error(request, "La asistencia seleccionada no pertenece a la organización filtrada.")
+                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
             if organizacion and pago.organizacion_id != organizacion.id:
                 messages.error(request, "El pago seleccionado no pertenece a la organizacion filtrada.")
                 return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
@@ -523,7 +744,7 @@ def persona_detail(request, pk):
                 messages.success(request, "Asistencia asociada al pago correctamente.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         if accion == "agregar_rol":
-            rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol")
+            rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol", organizaciones=organizaciones_autorizadas)
             if rol_form_post.is_valid() and rol_form_post.cleaned_data.get("rol") and rol_form_post.cleaned_data.get("organizacion"):
                 persona_rol_existente = PersonaRol.objects.filter(
                     persona=persona,
@@ -547,7 +768,7 @@ def persona_detail(request, pk):
             else:
                 messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
         elif accion == "guardar_configuracion_profesor":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
             if persona_rol.rol.codigo != "PROFESOR":
                 messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
                 return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
@@ -591,13 +812,15 @@ def persona_detail(request, pk):
             messages.success(request, "Estado de la sesión actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
         elif accion == "toggle_rol":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
             antes = _snapshot_persona_rol(persona_rol)
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])
             _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
             messages.success(request, "Estado del rol actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+    # La pre-carga está acotada al filtro efectivo. Esto evita exponer los
+    # roles de otra organización cuando una Persona participa en más de una.
     roles_asignados = list(persona.roles.all())
     asistencias = persona.asistencias.all()
     pagos = persona.pagos_financieros.all()
@@ -697,7 +920,7 @@ def persona_detail(request, pk):
         {
             "persona_obj": persona,
             "roles_asignados": roles_asignados,
-            "rol_form": PersonaRolCRMForm(prefix="rol"),
+            "rol_form": PersonaRolCRMForm(prefix="rol", organizaciones=organizaciones_autorizadas),
             "asistencias": asistencias,
             "pagos": pagos,
             "consumos": consumos,
@@ -730,17 +953,24 @@ def persona_detail(request, pk):
 @role_required(ROLE_ADMIN)
 def persona_edit(request, pk):
     context = _base_context(request)
+    organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
+    organizacion = organizacion_desde_request(request)
+    roles_visibles = PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre")
+    if organizacion:
+        roles_visibles = roles_visibles.filter(organizacion=organizacion)
     persona = get_object_or_404(
         Persona.objects.select_related("user").prefetch_related(
             Prefetch(
                 "roles",
-                queryset=PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre"),
+                queryset=roles_visibles,
             )
         ),
         pk=pk,
     )
+    if not (request.user.is_superuser or request.user.is_staff) and not persona.roles.filter(organizacion=organizacion).exists():
+        raise Http404
     form = PersonaCRMForm(request.POST or None, instance=persona)
-    rol_form = PersonaRolCRMForm(prefix="rol")
+    rol_form = PersonaRolCRMForm(prefix="rol", organizaciones=organizaciones_autorizadas)
 
     if request.method == "POST":
         accion = request.POST.get("accion")
@@ -753,7 +983,7 @@ def persona_edit(request, pk):
                     usuario=request.user,
                     dominio="personas",
                     objeto=persona,
-                    organizacion=organizacion_desde_request(request),
+                    organizacion=organizacion,
                     resumen="Persona actualizada",
                     antes=antes,
                     despues=_snapshot_persona(persona),
@@ -762,7 +992,7 @@ def persona_edit(request, pk):
                 messages.success(request, "Perfil de persona actualizado.")
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "agregar_rol":
-            rol_form = PersonaRolCRMForm(request.POST, prefix="rol")
+            rol_form = PersonaRolCRMForm(request.POST, prefix="rol", organizaciones=organizaciones_autorizadas)
             if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
                 persona_rol_existente = PersonaRol.objects.filter(
                     persona=persona,
@@ -786,7 +1016,7 @@ def persona_edit(request, pk):
             else:
                 messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
         elif accion == "guardar_configuracion_profesor":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
             if persona_rol.rol.codigo != "PROFESOR":
                 messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
@@ -800,7 +1030,7 @@ def persona_edit(request, pk):
             messages.success(request, "Configuración de honorarios actualizada.")
             return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
         elif accion == "toggle_rol":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona)
+            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
             antes = _snapshot_persona_rol(persona_rol)
             persona_rol.activo = not persona_rol.activo
             persona_rol.save(update_fields=["activo"])

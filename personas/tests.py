@@ -1,11 +1,24 @@
 from io import StringIO
+from datetime import timedelta
+from time import time
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
-from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
+from django.http import HttpResponse
+from django.test import Client, TestCase
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.urls import reverse
+from django.utils import timezone
+
+from allauth.core.exceptions import ImmediateHttpResponse
+from allauth.core.context import request_context
+from allauth.socialaccount.models import EmailAddress, SocialAccount, SocialLogin, SocialToken
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 
 from auditoria.models import AuditLog
 from asistencias.forms import PersonaRapidaForm
@@ -13,8 +26,12 @@ from asistencias.models import Asistencia, Disciplina, SesionClase
 from finanzas.models import AttendanceConsumption, Payment
 
 from .admin import PersonaRolBulkForm
+from .auth_google import AdaptadorSocialGoogleElemental
+from .auth_views import GoogleOAuth2AdapterElemental
 from .forms import PersonaCRMForm
-from .models import Organizacion, Persona, PersonaRol, Rol
+from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .solicitudes_acceso import SESION_IDENTIDAD_PENDIENTE
+from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud
 
 
 TEST_PASSWORD = "not-a-real-test-password"
@@ -57,6 +74,466 @@ class PersonaRolBulkFormTests(TestCase):
         )
 
         self.assertTrue(form.is_valid(), form.errors)
+
+
+class AuditarIdentidadesAccesoCommandTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Auditoria Identidades",
+            razon_social="Org Auditoria Identidades SPA",
+            rut="11.111.111-1",
+        )
+        self.rol = Rol.objects.create(nombre="Lectura Auditoria", codigo="LECTURA")
+        self.usuario_sin_email = User.objects.create_user("sin_email", password=TEST_PASSWORD)
+        self.usuario_duplicado_a = User.objects.create_user(
+            "duplicado_a",
+            email="Duplicado@example.com",
+            password=TEST_PASSWORD,
+        )
+        self.usuario_duplicado_b = User.objects.create_user(
+            "duplicado_b",
+            email=" duplicado@example.com ",
+            password=TEST_PASSWORD,
+        )
+        self.usuario_distinto = User.objects.create_user(
+            "correo_distinto",
+            email="user@example.com",
+            password=TEST_PASSWORD,
+            is_active=False,
+        )
+        self.superusuario = User.objects.create_superuser(
+            "super_auditoria",
+            "super@example.com",
+            TEST_PASSWORD,
+        )
+        self.persona_distinta = Persona.objects.create(
+            nombres="Correo",
+            apellidos="Distinto",
+            email="persona@example.com",
+            user=self.usuario_distinto,
+        )
+        self.persona_sin_usuario = Persona.objects.create(
+            nombres="Sin",
+            apellidos="Usuario",
+            email="sin.usuario@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=self.persona_distinta,
+            rol=self.rol,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+
+    def test_auditoria_identidades_es_read_only_y_no_expone_correos_completos(self):
+        salida = StringIO()
+        usuarios_antes = get_user_model().objects.count()
+        personas_antes = Persona.objects.count()
+        roles_antes = PersonaRol.objects.count()
+
+        call_command("auditar_identidades_acceso", stdout=salida)
+
+        contenido = salida.getvalue()
+        self.assertIn("Users sin email: 1", contenido)
+        self.assertIn("Emails User duplicados (trim/lower): 1 grupos", contenido)
+        self.assertIn("User.email distinto de Persona.email: 1", contenido)
+        self.assertIn("Users sin Persona:", contenido)
+        self.assertIn("Personas sin User: 1", contenido)
+        self.assertIn("Usuarios inactivos: 1", contenido)
+        self.assertIn("Superusuarios: 1", contenido)
+        self.assertIn(f"User {self.usuario_distinto.id}: rol={self.rol.id}/org={self.organizacion.id}", contenido)
+        self.assertNotIn("Duplicado@example.com", contenido)
+        self.assertNotIn("persona@example.com", contenido)
+        self.assertEqual(get_user_model().objects.count(), usuarios_antes)
+        self.assertEqual(Persona.objects.count(), personas_antes)
+        self.assertEqual(PersonaRol.objects.count(), roles_antes)
+
+
+class AutenticacionGoogleFaseUnoTests(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user(
+            "usuario_google",
+            email="acceso@example.com",
+            password=TEST_PASSWORD,
+        )
+        self.adaptador = AdaptadorSocialGoogleElemental()
+
+    def _solicitud(self):
+        solicitud = self.client.post("/cuenta-interna-de-prueba/").wsgi_request
+        solicitud.session.save()
+        return solicitud
+
+    def _social_login(self, *, email="acceso@example.com", verificado=True, subject="google-sub-1"):
+        cuenta = SocialAccount(
+            provider="google",
+            uid=subject,
+            extra_data={"email": email, "token": "no-persistir"},
+        )
+        candidato = get_user_model()(username="temporal_google", email=email)
+        return SocialLogin(
+            user=candidato,
+            account=cuenta,
+            email_addresses=[EmailAddress(email=email, verified=verificado, primary=True)],
+        )
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_vincula_solo_un_user_activo_con_correo_verificado(self):
+        solicitud = self._solicitud()
+        social_login = self._social_login()
+
+        with patch.object(SocialLogin, "connect", autospec=True) as conectar:
+            self.adaptador.pre_social_login(solicitud, social_login)
+
+        conectar.assert_called_once_with(social_login, solicitud, self.usuario)
+        self.assertEqual(social_login.account.extra_data, {})
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    @patch.object(SocialAccount, "get_provider")
+    def test_primer_vinculo_persiste_solo_la_identidad_social_sin_token(self, _get_provider):
+        solicitud = self._solicitud()
+        social_login = self._social_login()
+
+        self.adaptador.pre_social_login(solicitud, social_login)
+
+        cuenta = SocialAccount.objects.get(provider="google", uid="google-sub-1")
+        self.assertEqual(cuenta.user, self.usuario)
+        self.assertEqual(cuenta.extra_data, {})
+        self.assertFalse(SocialToken.objects.exists())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_identidad_social_existente_conserva_el_mismo_user_activo(self):
+        cuenta = SocialAccount.objects.create(
+            user=self.usuario,
+            provider="google",
+            uid="google-sub-existente",
+            extra_data={"dato": "temporal"},
+        )
+        social_login = SocialLogin(user=self.usuario, account=cuenta)
+
+        self.adaptador.pre_social_login(self._solicitud(), social_login)
+
+        cuenta.refresh_from_db()
+        self.assertEqual(social_login.user, self.usuario)
+        self.assertEqual(cuenta.extra_data, {})
+
+    def test_adaptador_oauth_limpia_claims_antes_del_lookup_de_allauth(self):
+        social_login = self._social_login()
+        solicitud = self._solicitud()
+        adaptador_oauth = GoogleOAuth2AdapterElemental(solicitud)
+
+        with patch.object(GoogleOAuth2Adapter, "complete_login", return_value=social_login):
+            resultado = adaptador_oauth.complete_login(solicitud, app=None, token=None, response={})
+
+        self.assertIs(resultado, social_login)
+        self.assertEqual(resultado.account.extra_data, {})
+
+    def test_lookup_recibe_extra_data_vacio_antes_de_actualizar_cuenta_existente(self):
+        SocialAccount.objects.create(
+            user=self.usuario,
+            provider="google",
+            uid="google-sub-1",
+            extra_data={},
+        )
+        social_login = self._social_login()
+        solicitud = self._solicitud()
+        adaptador_oauth = GoogleOAuth2AdapterElemental(solicitud)
+
+        with patch.object(GoogleOAuth2Adapter, "complete_login", return_value=social_login):
+            resultado = adaptador_oauth.complete_login(solicitud, app=None, token=None, response={})
+        with request_context(solicitud):
+            resultado.lookup()
+
+        cuenta = SocialAccount.objects.get(provider="google", uid="google-sub-1")
+        self.assertEqual(cuenta.extra_data, {})
+        self.assertEqual(resultado.user, self.usuario)
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_rechaza_correo_sin_verificar(self):
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login(verificado=False))
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_rechaza_correo_duplicado_normalizado(self):
+        get_user_model().objects.create_user(
+            "usuario_google_duplicado",
+            email=" ACCESO@example.com ",
+            password=TEST_PASSWORD,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_rechaza_user_inactivo(self):
+        self.usuario.is_active = False
+        self.usuario.save(update_fields=["is_active"])
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_rechaza_un_segundo_google_sub_para_el_mismo_user(self):
+        SocialAccount.objects.create(
+            user=self.usuario,
+            provider="google",
+            uid="google-sub-anterior",
+            extra_data={},
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=False)
+    def test_callback_no_vincula_si_el_flag_google_se_apaga(self):
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+    def test_inicio_google_es_solo_post_y_esta_apagado_por_defecto(self):
+        respuesta_get = self.client.get(reverse("google_login_iniciar"))
+        respuesta_post = self.client.post(reverse("google_login_iniciar"))
+
+        self.assertRedirects(respuesta_get, reverse("login"), fetch_redirect_response=False)
+        self.assertRedirects(respuesta_post, reverse("login"), fetch_redirect_response=False)
+
+    def test_inicio_google_exige_csrf(self):
+        cliente_csrf = Client(enforce_csrf_checks=True)
+
+        respuesta = cliente_csrf.post(reverse("google_login_iniciar"))
+
+        self.assertEqual(respuesta.status_code, 403)
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, GOOGLE_OAUTH_CONFIGURED=True)
+    def test_inicio_google_rechaza_next_externo_antes_del_provider(self):
+        with patch.object(GoogleOAuth2AdapterElemental, "get_provider") as provider:
+            respuesta = self.client.post(
+                reverse("google_login_iniciar"),
+                {"next": "https://ejemplo-invalido.test/"},
+            )
+
+        self.assertRedirects(respuesta, reverse("login"), fetch_redirect_response=False)
+        provider.assert_not_called()
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, GOOGLE_OAUTH_CONFIGURED=True)
+    def test_inicio_google_fuerza_parametros_invariantes_ante_post_malicioso(self):
+        with patch.object(GoogleOAuth2AdapterElemental, "get_provider") as get_provider:
+            get_provider.return_value.redirect.return_value = HttpResponse(status=204)
+            respuesta = self.client.post(
+                reverse("google_login_iniciar"),
+                {
+                    "next": "/personas/",
+                    "scope": "openid,email,perfil-adicional",
+                    "auth_params": "access_type=offline",
+                    "process": "connect",
+                },
+            )
+
+        self.assertEqual(respuesta.status_code, 204)
+        get_provider.return_value.redirect.assert_called_once_with(
+            respuesta.wsgi_request,
+            process="login",
+            next_url="/personas/",
+            scope=["openid", "email", "profile"],
+            auth_params={"access_type": "online"},
+        )
+
+    def test_rutas_allauth_no_expuestas_responden_404(self):
+        for ruta in (
+            "/accounts/signup/",
+            "/accounts/password/reset/",
+            "/accounts/google/login/",
+            "/accounts/google/login/token/",
+        ):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.post(ruta).status_code, 404)
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, GOOGLE_OAUTH_CONFIGURED=True)
+    def test_callback_google_cancelado_consumo_el_state_y_vuelve_al_login(self):
+        state_id = "state-cancelado-prueba"
+        sesion = self.client.session
+        sesion["socialaccount_states"] = {state_id: [{"process": "login"}, time()]}
+        sesion.save()
+
+        with patch.object(
+            GoogleOAuth2AdapterElemental,
+            "get_provider",
+            return_value=SimpleNamespace(id="google"),
+        ):
+            respuesta = self.client.get(
+                reverse("google_callback"),
+                {"error": "access_denied", "state": state_id},
+            )
+
+        self.assertRedirects(respuesta, reverse("login"), fetch_redirect_response=False)
+        self.assertNotIn(state_id, self.client.session.get("socialaccount_states", {}))
+        self.assertFalse(SocialToken.objects.exists())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, GOOGLE_AUTH_ENFORCED=True)
+    def test_login_operacional_rechaza_password_cuando_google_se_fuerza(self):
+        respuesta = self.client.post(
+            reverse("login"),
+            {"username": self.usuario.username, "password": TEST_PASSWORD},
+        )
+
+        self.assertRedirects(respuesta, reverse("login"), fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_emergencia_autentica_solo_superusuario_y_next_es_seguro(self):
+        superusuario = get_user_model().objects.create_superuser(
+            "super_emergencia", "super@example.com", TEST_PASSWORD
+        )
+        respuesta_normal = self.client.post(
+            reverse("login_emergencia"),
+            {"username": self.usuario.username, "password": TEST_PASSWORD},
+        )
+        self.assertEqual(respuesta_normal.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+        respuesta_super = self.client.post(
+            f"{reverse('login_emergencia')}?next=/personas/",
+            {"username": superusuario.username, "password": TEST_PASSWORD},
+        )
+        self.assertRedirects(respuesta_super, "/personas/", fetch_redirect_response=False)
+
+        self.client.logout()
+        respuesta_externa = self.client.post(
+            f"{reverse('login_emergencia')}?next=https://ejemplo-invalido.test/",
+            {"username": superusuario.username, "password": TEST_PASSWORD},
+        )
+        self.assertRedirects(respuesta_externa, "/", fetch_redirect_response=False)
+
+
+class SolicitudAccesoTests(TestCase):
+    identidad = {
+        "provider": "google",
+        "provider_subject": "sub-prueba",
+        "email": "acceso@example.com",
+        "nombre": "Nombre Google",
+        "expira_en": "2099-01-01T00:00:00+00:00",
+    }
+
+    def _sesion(self, identidad=None):
+        sesion = self.client.session
+        sesion[SESION_IDENTIDAD_PENDIENTE] = identidad or self.identidad
+        sesion.save()
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=False)
+    def test_flag_apagado_oculta_ruta(self):
+        self._sesion()
+        self.assertEqual(self.client.get(reverse("personas:solicitud_acceso")).status_code, 404)
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_sesion_invalida_expirada_o_manipulada_redirige_sin_crear(self):
+        for identidad in (
+            None,
+            {**self.identidad, "expira_en": "2000-01-01T00:00:00+00:00"},
+            {"provider": "google"},
+            {**self.identidad, "provider_subject": ""},
+            {**self.identidad, "email": ""},
+            {**self.identidad, "provider": "otro"},
+        ):
+            self.client.session.flush()
+            if identidad is not None:
+                self._sesion(identidad)
+            respuesta = self.client.get(reverse("personas:solicitud_acceso"))
+            self.assertRedirects(respuesta, reverse("login"), fetch_redirect_response=False)
+        self.assertFalse(SolicitudAcceso.objects.exists())
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_post_usa_solo_sesion_es_idempotente_y_no_crea_cuentas(self):
+        self._sesion()
+        url = reverse("personas:solicitud_acceso")
+        usuarios, personas, roles = get_user_model().objects.count(), Persona.objects.count(), PersonaRol.objects.count()
+        primera = self.client.post(url, {"email": "falso@example.com", "provider_subject": "falso"})
+        segunda = self.client.post(url)
+        self.assertContains(primera, "Solicitud enviada")
+        self.assertContains(segunda, "Ya la recibimos")
+        self.assertEqual(SolicitudAcceso.objects.count(), 1)
+        self.assertEqual(get_user_model().objects.count(), usuarios)
+        self.assertEqual(Persona.objects.count(), personas)
+        self.assertEqual(PersonaRol.objects.count(), roles)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_rechazada_conserva_historia_y_no_se_recrea_publicamente(self):
+        anterior = SolicitudAcceso.objects.create(**{k: v for k, v in self.identidad.items() if k != "expira_en"}, email_normalizado="acceso@example.com", estado=SolicitudAcceso.Estado.RECHAZADA)
+        self._sesion()
+        respuesta = self.client.get(reverse("personas:solicitud_acceso"))
+        self.assertContains(respuesta, "no fue aprobada")
+        self.client.post(reverse("personas:solicitud_acceso"))
+        self.assertEqual(SolicitudAcceso.objects.filter(provider_subject=anterior.provider_subject).count(), 1)
+        self.assertEqual(SolicitudAcceso.objects.filter(estado=SolicitudAcceso.Estado.PENDIENTE).count(), 0)
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_rate_limit_persistente_no_bloquea_recuperar_pendiente(self):
+        for numero in range(5):
+            SolicitudAcceso.objects.create(
+                provider="google",
+                provider_subject=f"sub-historico-{numero}",
+                email=f"historico{numero}@example.com",
+                nombre="Histórico",
+                estado=SolicitudAcceso.Estado.RECHAZADA,
+            )
+        self._sesion()
+        respuesta = self.client.post(reverse("personas:solicitud_acceso"))
+        self.assertContains(respuesta, "Solicitud enviada")
+        pendiente = SolicitudAcceso.objects.get(estado=SolicitudAcceso.Estado.PENDIENTE)
+        for numero in range(5):
+            SolicitudAcceso.objects.create(
+                provider="google",
+                provider_subject="sub-prueba",
+                email=f"rechazada{numero}@example.com",
+                nombre="Histórico",
+                estado=SolicitudAcceso.Estado.RECHAZADA,
+            )
+        respuesta_reintento = self.client.post(reverse("personas:solicitud_acceso"))
+        self.assertContains(respuesta_reintento, "Ya la recibimos")
+        self.assertEqual(SolicitudAcceso.objects.filter(estado=SolicitudAcceso.Estado.PENDIENTE).count(), 1)
+        self.assertEqual(pendiente.pk, SolicitudAcceso.objects.get(estado=SolicitudAcceso.Estado.PENDIENTE).pk)
+
+    def test_email_normalizado_se_impone_al_guardar_modelo(self):
+        solicitud = SolicitudAcceso.objects.create(
+            provider="google", provider_subject="sub-normalizado", email=" Correo@Example.COM ", email_normalizado="incorrecto"
+        )
+        self.assertEqual(solicitud.email_normalizado, "correo@example.com")
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_rate_limit_ventana_reautenticacion_y_expiracion(self):
+        for numero in range(5):
+            SolicitudAcceso.objects.create(
+                provider="google", provider_subject="sub-prueba", email=f"limite{numero}@example.com", estado=SolicitudAcceso.Estado.RECHAZADA
+            )
+        self._sesion()
+        respuesta = self.client.post(reverse("personas:solicitud_acceso"))
+        self.assertContains(respuesta, "no fue aprobada")
+        self._sesion()  # Simula una nueva autenticación Google de la misma identidad.
+        self.assertContains(self.client.post(reverse("personas:solicitud_acceso")), "no fue aprobada")
+        SolicitudAcceso.objects.filter(provider_subject="sub-prueba").update(creada_en=timezone.now() - timedelta(hours=25))
+        self.assertContains(self.client.post(reverse("personas:solicitud_acceso")), "no fue aprobada")
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, ACCESS_REQUESTS_ENABLED=True)
+    def test_google_desconocido_verificado_guarda_solo_identidad_pendiente(self):
+        solicitud = self.client.get("/integracion-google/").wsgi_request
+        social_login = SocialLogin(
+            user=get_user_model()(username="temporal", email="nuevo@example.com"),
+            account=SocialAccount(provider="google", uid="sub-integracion", extra_data={}),
+            email_addresses=[EmailAddress(email="nuevo@example.com", verified=True, primary=True)],
+        )
+        usuarios, personas, roles, sociales = get_user_model().objects.count(), Persona.objects.count(), PersonaRol.objects.count(), SocialAccount.objects.count()
+        with self.assertRaises(ImmediateHttpResponse) as respuesta:
+            AdaptadorSocialGoogleElemental().pre_social_login(solicitud, social_login)
+        solicitud.session.save()
+        self.assertEqual(respuesta.exception.response.url, reverse("personas:solicitud_acceso"))
+        self.assertEqual(solicitud.session[SESION_IDENTIDAD_PENDIENTE]["provider_subject"], "sub-integracion")
+        self.assertNotIn("_auth_user_id", solicitud.session)
+        self.assertEqual((get_user_model().objects.count(), Persona.objects.count(), PersonaRol.objects.count(), SocialAccount.objects.count()), (usuarios, personas, roles, sociales))
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_post_solicitud_exige_csrf(self):
+        cliente_csrf = Client(enforce_csrf_checks=True)
+        sesion = cliente_csrf.session
+        sesion[SESION_IDENTIDAD_PENDIENTE] = self.identidad
+        sesion.save()
+        self.assertEqual(cliente_csrf.post(reverse("personas:solicitud_acceso")).status_code, 403)
 
 
 class PersonasOrganizacionesTests(TestCase):
@@ -586,3 +1063,73 @@ class AuditarDatosV1CommandTests(TestCase):
         self.assertIn("Personas sin RUT, email ni telefono: 1", out.getvalue())
         self.assertIn(str(persona.id), out.getvalue())
         self.assertIn("No se modificaron datos.", out.getvalue())
+
+
+class ResolucionSolicitudAccesoTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_user("gestor", password=TEST_PASSWORD)
+        self.admin.user_permissions.add(Permission.objects.get(codename="gestionar_solicitudes_acceso"))
+        self.sin_permiso = User.objects.create_user("staff_sin_permiso", password=TEST_PASSWORD, is_staff=True)
+        self.org = Organizacion.objects.create(nombre="Org resolución", razon_social="Org resolución SPA", rut="66.666.666-6")
+        self.rol = Rol.objects.create(nombre="Rol resolución", codigo="RESOLUCION")
+        self.solicitud = SolicitudAcceso.objects.create(provider="google", provider_subject="sub-resolver", email="resolver@example.com")
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)
+    def test_aprobacion_crea_identidad_y_rol_explicitos_sin_socialaccount(self):
+        solicitud, _ = aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="Resuelta", apellidos="Persona")
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, SolicitudAcceso.Estado.APROBADA)
+        self.assertTrue(PersonaRol.objects.filter(persona__user=solicitud.usuario_resuelto, organizacion=self.org, rol=self.rol, activo=True).exists())
+        self.assertEqual(SocialAccount.objects.count(), 0)
+        with self.assertRaises(ValidationError):
+            aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="Otra", apellidos="Persona")
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)
+    def test_rollback_total_si_falla_personarol(self):
+        with patch("personas.resolucion_solicitudes.PersonaRol.objects.get_or_create", side_effect=RuntimeError("falla")):
+            with self.assertRaises(RuntimeError):
+                aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="Rollback", apellidos="Persona")
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, SolicitudAcceso.Estado.PENDIENTE)
+        self.assertFalse(get_user_model().objects.filter(email="resolver@example.com").exists())
+
+    def test_flags_y_permiso_bloquean_servicio(self):
+        with self.assertRaises(ValidationError):
+            aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="No", apellidos="Persona")
+        with self.settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True):
+            with self.assertRaises(ValidationError):
+                aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.sin_permiso, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="No", apellidos="Persona")
+
+    def test_endpoints_exigen_flags_permiso_y_post(self):
+        listado = reverse("personas:solicitudes_acceso_list")
+        aprobar = reverse("personas:solicitud_acceso_aprobar", args=[self.solicitud.pk])
+        rechazar = reverse("personas:solicitud_acceso_rechazar", args=[self.solicitud.pk])
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(listado).status_code, 404)
+        self.assertEqual(self.client.post(aprobar).status_code, 404)
+        with self.settings(ACCESS_REQUESTS_ENABLED=True):
+            self.assertEqual(self.client.get(listado).status_code, 200)
+            self.assertEqual(self.client.post(aprobar).status_code, 404)
+            self.assertEqual(self.client.post(rechazar).status_code, 404)
+        with self.settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True):
+            self.assertEqual(self.client.get(aprobar).status_code, 404)
+            self.assertEqual(self.client.get(rechazar).status_code, 404)
+        self.client.force_login(self.sin_permiso)
+        with self.settings(ACCESS_REQUESTS_ENABLED=True):
+            self.assertEqual(self.client.get(listado).status_code, 403)
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)
+    def test_conflictos_google_y_excepcion_correo_fallan_cerrado(self):
+        usuario = get_user_model().objects.create_user("destino", email="otro@example.com")
+        persona = Persona.objects.create(nombres="Destino", apellidos="Uno", email="destino@example.com", user=usuario)
+        SocialAccount.objects.create(user=usuario, provider="google", uid="otro-sub", extra_data={})
+        with self.assertRaises(ValidationError):
+            aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_EXISTENTE, organizacion=self.org, rol=self.rol, usuario=usuario)
+        self.assertEqual(self.solicitud.estado, SolicitudAcceso.Estado.PENDIENTE)
+        SocialAccount.objects.filter(user=usuario).delete()
+        with self.assertRaises(ValidationError):
+            aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_EXISTENTE, organizacion=self.org, rol=self.rol, usuario=usuario)
+        aprobado, _ = aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_EXISTENTE, organizacion=self.org, rol=self.rol, usuario=usuario, confirmar_correo_distinto=True, nota_interna="Confirmado por administrador")
+        self.assertTrue(aprobado.excepcion_correo_confirmada)
+        self.assertEqual(persona.user, usuario)
