@@ -134,11 +134,11 @@ En el archivo de entorno de produccion conviene definir al menos:
 El deploy en produccion usa estas mismas variables para ejecutar un backup con `pg_dump` antes de aplicar migraciones.
 
 Dominio publico vigente:
-- `apps.avx.cl`
+- `apps.espacioelementos.cl`
 
 Valores recomendados:
-- `DJANGO_ALLOWED_HOSTS=apps.avx.cl`
-- `DJANGO_CSRF_TRUSTED_ORIGINS=https://apps.avx.cl`
+- `DJANGO_ALLOWED_HOSTS=apps.espacioelementos.cl`
+- `DJANGO_CSRF_TRUSTED_ORIGINS=https://apps.espacioelementos.cl`
 
 Nota operativa:
 - `DEPLOY_HOST` es el host/IP usado para SSH por GitHub Actions. No necesariamente debe ser el mismo dominio publico de Django.

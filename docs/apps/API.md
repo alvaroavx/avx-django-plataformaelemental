@@ -77,9 +77,9 @@ Estos endpoints deben responder `404` al no estar registrados en `api.urls`.
 Comandos utiles:
 
 ```bash
-curl https://apps.avx.cl/api/health/
-curl https://apps.avx.cl/api/status/
-curl https://apps.avx.cl/api/version/
+curl https://apps.espacioelementos.cl/api/health/
+curl https://apps.espacioelementos.cl/api/status/
+curl https://apps.espacioelementos.cl/api/version/
 ```
 
 ## Decision arquitectonica

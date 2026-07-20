@@ -154,4 +154,4 @@ jobs:
       - name: Healthcheck production
         run: |
           set -euo pipefail
-          curl -fsSI --retry 5 --retry-delay 2 --retry-all-errors https://apps.avx.cl/ >/dev/null
+          curl -fsSI --retry 5 --retry-delay 2 --retry-all-errors https://apps.espacioelementos.cl/ >/dev/null

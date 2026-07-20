@@ -95,7 +95,7 @@ Documentos duenios:
 - API auth/throttling: [docs/apps/API.md](../apps/API.md)
 
 ## Deploy
-Dominio publico vigente: `apps.avx.cl`.
+Dominio publico vigente: `apps.espacioelementos.cl`.
 
 El detalle de GitHub Actions, SSH, variables de entorno, backup PostgreSQL, `systemd` y rollback vive en:
 - [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)
