@@ -140,6 +140,12 @@ TRANSACCION_AUDIT_FIELDS = [
 ]
 
 
+def _queryset_en_organizacion_activa(queryset, request):
+    """Restringe recursos organizacionales a la organización activa del request."""
+    organizacion = organizacion_desde_request(request)
+    return queryset.filter(organizacion=organizacion) if organizacion is not None else queryset
+
+
 def _snapshot_pago(pago):
     return {campo: getattr(pago, campo) for campo in PAGO_AUDIT_FIELDS}
 
@@ -225,15 +231,19 @@ def _review_context_from_payload(request, payload, *, token_importacion=None, do
     if token_importacion:
         archivo_pdf = cargar_archivo_importacion_temporal(request, token_importacion, "pdf")
         if archivo_pdf:
-            archivo_pdf_url = reverse(
+            archivo_pdf_url = _url_with_query(
+                request,
                 "finanzas:documento_tributario_importacion_archivo",
-                kwargs={"token": token_importacion, "tipo_archivo": "pdf"},
+                token=token_importacion,
+                tipo_archivo="pdf",
             )
         archivo_xml = cargar_archivo_importacion_temporal(request, token_importacion, "xml")
         if archivo_xml:
-            archivo_xml_url = reverse(
+            archivo_xml_url = _url_with_query(
+                request,
                 "finanzas:documento_tributario_importacion_archivo",
-                kwargs={"token": token_importacion, "tipo_archivo": "xml"},
+                token=token_importacion,
+                tipo_archivo="xml",
             )
             archivo_xml_preview = _leer_xml_temporal(archivo_xml["path"])
     return {
@@ -400,7 +410,7 @@ def planes_list(request):
 def plan_edit(request, pk):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
-    plan = get_object_or_404(PaymentPlan, pk=pk)
+    plan = get_object_or_404(_queryset_en_organizacion_activa(PaymentPlan.objects.all(), request), pk=pk)
     planes_qs = planes_queryset(organizacion=organizacion)
 
     form_creacion = PaymentPlanForm()
@@ -424,7 +434,7 @@ def plan_edit(request, pk):
 
 @pagos_required
 def plan_delete(request, pk):
-    plan = get_object_or_404(PaymentPlan, pk=pk)
+    plan = get_object_or_404(_queryset_en_organizacion_activa(PaymentPlan.objects.all(), request), pk=pk)
     if request.method == "POST":
         plan.delete()
         messages.success(request, "Plan eliminado.")
@@ -465,7 +475,9 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     editar_pago_id = request.GET.get("editar_pago")
     if not edit_form and editar_pago_id:
         edit_pago = get_object_or_404(
-            Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"),
+            _queryset_en_organizacion_activa(
+                Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"), request
+            ),
             pk=editar_pago_id,
         )
         edit_form = PaymentForm(
@@ -556,7 +568,7 @@ def pagos_list(request):
 
 @pagos_required
 def pago_edit(request, pk):
-    pago = get_object_or_404(Payment, pk=pk)
+    pago = get_object_or_404(_queryset_en_organizacion_activa(Payment.objects.all(), request), pk=pk)
     if request.method == "GET":
         return redirect(_url_pagos_list_con_edicion(request, pago.pk))
 
@@ -592,7 +604,7 @@ def pago_edit(request, pk):
 @finanzas_read_required
 def pago_detail(request, pk):
     context = _base_context(request)
-    pago = get_object_or_404(pago_detail_queryset(), pk=pk)
+    pago = get_object_or_404(_queryset_en_organizacion_activa(pago_detail_queryset(), request), pk=pk)
     resumen_consumos = resumen_consumos_pago(pago)
     context.update(
         {
@@ -610,7 +622,7 @@ def pago_detail(request, pk):
 
 @pagos_required
 def pago_delete(request, pk):
-    pago = get_object_or_404(Payment, pk=pk)
+    pago = get_object_or_404(_queryset_en_organizacion_activa(Payment.objects.all(), request), pk=pk)
     if request.method == "POST":
         registrar_auditoria(
             usuario=request.user,
@@ -895,15 +907,18 @@ def documento_tributario_importacion_archivo(request, token, tipo_archivo):
 def documento_tributario_detail(request, pk):
     context = _base_context(request)
     documento = get_object_or_404(
-        DocumentoTributario.objects.select_related(
-            "organizacion",
-            "documento_relacionado",
-            "persona_relacionada",
-            "organizacion_relacionada",
-        ).prefetch_related(
-            "pagos_asociados",
-            "transacciones_asociadas",
-            "documentos_hijos",
+        _queryset_en_organizacion_activa(
+            DocumentoTributario.objects.select_related(
+                "organizacion",
+                "documento_relacionado",
+                "persona_relacionada",
+                "organizacion_relacionada",
+            ).prefetch_related(
+                "pagos_asociados",
+                "transacciones_asociadas",
+                "documentos_hijos",
+            ),
+            request,
         ),
         pk=pk,
     )
@@ -923,7 +938,7 @@ def documento_tributario_detail(request, pk):
 @finanzas_read_required
 @xframe_options_sameorigin
 def documento_tributario_archivo(request, pk, tipo_archivo):
-    documento = get_object_or_404(DocumentoTributario, pk=pk)
+    documento = get_object_or_404(_queryset_en_organizacion_activa(DocumentoTributario.objects.all(), request), pk=pk)
     archivo = documento.archivo_pdf if tipo_archivo == "pdf" else documento.archivo_xml
     if not archivo:
         raise Http404("El documento no tiene ese archivo adjunto.")
@@ -941,7 +956,7 @@ def documento_tributario_archivo(request, pk, tipo_archivo):
 
 @documentos_required
 def documento_tributario_edit(request, pk):
-    documento = get_object_or_404(DocumentoTributario, pk=pk)
+    documento = get_object_or_404(_queryset_en_organizacion_activa(DocumentoTributario.objects.all(), request), pk=pk)
     antes = _snapshot_documento(documento) if request.method == "POST" else None
     form = DocumentoTributarioForm(request.POST or None, request.FILES or None, instance=documento)
     if request.method == "POST" and form.is_valid():
@@ -975,7 +990,7 @@ def documento_tributario_edit(request, pk):
 
 @documentos_required
 def documento_tributario_delete(request, pk):
-    documento = get_object_or_404(DocumentoTributario, pk=pk)
+    documento = get_object_or_404(_queryset_en_organizacion_activa(DocumentoTributario.objects.all(), request), pk=pk)
     if request.method == "POST":
         registrar_auditoria(
             usuario=request.user,
@@ -1093,7 +1108,10 @@ def transacciones_list(request):
 def transaccion_detail(request, pk):
     context = _base_context(request)
     transaccion = get_object_or_404(
-        Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios"),
+        _queryset_en_organizacion_activa(
+            Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios"),
+            request,
+        ),
         pk=pk,
     )
     tipo_archivo = _tipo_visualizacion_archivo(transaccion.archivo.name if transaccion.archivo else "")
@@ -1112,7 +1130,7 @@ def transaccion_detail(request, pk):
 @finanzas_read_required
 @xframe_options_sameorigin
 def transaccion_archivo(request, pk):
-    transaccion = get_object_or_404(Transaction, pk=pk)
+    transaccion = get_object_or_404(_queryset_en_organizacion_activa(Transaction.objects.all(), request), pk=pk)
     if not transaccion.archivo:
         raise Http404("La transaccion no tiene archivo adjunto.")
 
@@ -1129,7 +1147,7 @@ def transaccion_archivo(request, pk):
 
 @transacciones_required
 def transaccion_edit(request, pk):
-    transaccion = get_object_or_404(Transaction, pk=pk)
+    transaccion = get_object_or_404(_queryset_en_organizacion_activa(Transaction.objects.all(), request), pk=pk)
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
     antes = _snapshot_transaccion(transaccion) if request.method == "POST" else None
@@ -1164,7 +1182,7 @@ def transaccion_edit(request, pk):
 
 @transacciones_required
 def transaccion_delete(request, pk):
-    transaccion = get_object_or_404(Transaction, pk=pk)
+    transaccion = get_object_or_404(_queryset_en_organizacion_activa(Transaction.objects.all(), request), pk=pk)
     if request.method == "POST":
         registrar_auditoria(
             usuario=request.user,

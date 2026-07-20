@@ -1,23 +1,82 @@
 {% extends "asistencias/base_app.html" %}
+{% load static %}
 {% block title %}Solicitud de acceso{% endblock %}
+{% block extra_head %}
+<style>
+  .solicitud-publica-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background:
+      radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 32rem),
+      radial-gradient(circle at bottom right, rgba(17, 24, 39, 0.12), transparent 28rem),
+      #f7f7f5;
+  }
+
+  .solicitud-publica-shell {
+    width: min(100%, 34rem);
+  }
+
+  .solicitud-publica-mark {
+    width: 88px;
+    height: 88px;
+    border-radius: 1.4rem;
+    background: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .solicitud-publica-mark img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .solicitud-publica-card {
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1.5rem;
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
+  }
+</style>
+{% endblock %}
 {% block content %}
-<main class="container py-4" style="max-width: 42rem">
-  <h1 class="h3">No encontramos un acceso habilitado</h1>
-  <p>Iniciaste sesión con <strong>{{ identidad.email }}</strong>. Puedes solicitar acceso para que un administrador revise tu caso.</p>
-  {% for message in messages %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endfor %}
-  {% if solicitud %}
-    {% if solicitud.estado == "RECHAZADA" %}
-      <div class="alert alert-secondary" role="status">Tu solicitud no fue aprobada. Si crees que es un error, contacta al administrador.</div>
-    {% elif solicitud.estado == "APROBADA" %}
-      <div class="alert alert-info" role="status">Tu acceso fue aprobado. Vuelve a ingresar con la misma cuenta de Google.</div>
-    {% else %}
-      {% if creada %}<div class="alert alert-success" role="status">Solicitud enviada</div>{% else %}<div class="alert alert-info" role="status">Tu solicitud está pendiente. Ya la recibimos el {{ solicitud.creada_en|date:"d/m/Y" }}; no necesitas enviarla nuevamente.</div>{% endif %}
-      <p>Tu solicitud quedó pendiente de revisión. No recibirás un correo por ahora; vuelve a ingresar con la misma cuenta para consultar su estado.</p>
-    {% endif %}
-  {% else %}
-    <form method="post" data-solicitud-form>{% csrf_token %}<button class="btn btn-primary" type="submit">Solicitar acceso</button></form>
-  {% endif %}
-  <form method="post" action="{% url 'google_login_iniciar' %}" class="d-inline">{% csrf_token %}<input type="hidden" name="cambiar_cuenta" value="1"><button class="btn btn-link" type="submit">Usar otra cuenta de Google</button></form>
+<main class="solicitud-publica-page">
+  <div class="solicitud-publica-shell text-center">
+    <div class="solicitud-publica-mark mb-3">
+      <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="56" height="56">
+    </div>
+    <p class="h3 fw-bold mb-4">Elemental Apps</p>
+
+    <section class="card solicitud-publica-card text-start" aria-labelledby="titulo-solicitud-publica">
+      <div class="card-body p-4 p-sm-5">
+        <header class="text-center mb-4">
+          <h1 id="titulo-solicitud-publica" class="h4 mb-3">No encontramos un acceso habilitado</h1>
+          <p class="mb-0">Iniciaste sesión con <strong class="text-break">{{ identidad.email }}</strong>. Puedes solicitar acceso para que un administrador revise tu caso.</p>
+        </header>
+
+        {% for message in messages %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endfor %}
+
+        {% if solicitud %}
+          {% if solicitud.estado == "RECHAZADA" %}
+            <div class="alert alert-secondary mb-0" role="status">Tu solicitud no fue aprobada. Si crees que es un error, contacta al administrador.</div>
+          {% elif solicitud.estado == "APROBADA" %}
+            <div class="alert alert-info mb-0" role="status">Tu acceso fue aprobado. Vuelve a ingresar con la misma cuenta de Google.</div>
+          {% else %}
+            {% if creada %}<div class="alert alert-success" role="status">Solicitud enviada</div>{% else %}<div class="alert alert-info" role="status">Tu solicitud está pendiente. Ya la recibimos el {{ solicitud.creada_en|date:"d/m/Y" }}; no necesitas enviarla nuevamente.</div>{% endif %}
+            <p class="text-secondary mb-0">Tu solicitud quedó pendiente de revisión. No recibirás un correo por ahora; vuelve a ingresar con la misma cuenta para consultar su estado.</p>
+          {% endif %}
+        {% else %}
+          <form method="post" data-solicitud-form class="d-grid">{% csrf_token %}<button class="btn btn-primary" type="submit">Solicitar acceso</button></form>
+        {% endif %}
+
+        <form method="post" action="{% url 'google_login_iniciar' %}" class="d-grid mt-3">
+          {% csrf_token %}<input type="hidden" name="cambiar_cuenta" value="1">
+          <button class="btn btn-outline-secondary" type="submit">Usar otra cuenta de Google</button>
+        </form>
+      </div>
+    </section>
+  </div>
 </main>
 <script>
 document.querySelectorAll('[data-solicitud-form]').forEach((form) => form.addEventListener('submit', () => {

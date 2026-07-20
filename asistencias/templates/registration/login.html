@@ -25,13 +25,18 @@
   }
 
   .login-mark {
-    width: 54px;
-    height: 54px;
-    border-radius: 1.1rem;
+    width: 216px;
+    height: 216px;
+    border-radius: 2.5rem;
     background: #111827;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .login-mark img {
+    width: 136px;
+    height: 136px;
   }
 </style>
 {% endblock %}
@@ -40,15 +45,15 @@
   <div class="login-shell">
     <div class="text-center mb-4">
       <div class="login-mark mb-3">
-        <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
+        <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="136" height="136">
       </div>
-      <p class="h2 fw-bold mb-1">Elemental Apps</p>
+      <h1 class="h2 fw-bold mb-1">Elemental Apps</h1>
       <p class="text-muted mb-0">Plataforma Elemental</p>
     </div>
     <div class="card login-card">
       <div class="card-body p-4">
-        <h1 class="h5 mb-1">{% if modo_emergencia %}Acceso local de emergencia{% else %}Accede a Plataforma Elemental{% endif %}</h1>
         {% if modo_emergencia %}
+          <h2 class="h5 mb-1">Acceso local de emergencia</h2>
           <p class="text-muted mb-4">Disponible únicamente para superusuarios autorizados.</p>
         {% else %}
           <p class="text-muted mb-3">Usa la cuenta de Google asociada a tu acceso.</p>
@@ -57,7 +62,7 @@
               {% csrf_token %}
               {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
               <button class="btn btn-outline-dark w-100" type="submit">
-                <span>Continuar con Google</span>
+                <i class="bi bi-google me-2" aria-hidden="true"></i><span>Continuar con Google</span>
               </button>
             </form>
           {% endif %}

@@ -2,6 +2,7 @@ import csv
 from io import BytesIO
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
@@ -145,6 +146,9 @@ class FinanzasAccessTests(TestCase):
             user=self.user_sin_rol,
         )
 
+    def _url_con_organizacion(self, url, **params):
+        return f"{url}?{urlencode({'organizacion': self.org.pk, **params})}"
+
     def test_finanzas_dashboard_requiere_admin(self):
         self.client.force_login(self.user_no_admin)
         response = self.client.get(reverse("finanzas:dashboard"))
@@ -152,7 +156,7 @@ class FinanzasAccessTests(TestCase):
 
     def test_finanzas_dashboard_admin_ok(self):
         self.client.force_login(self.user_admin)
-        response = self.client.get(reverse("finanzas:dashboard"))
+        response = self.client.get(reverse("finanzas:dashboard"), {"organizacion": self.org.pk})
         self.assertEqual(response.status_code, 200)
 
     def test_usuario_finanzas_accede_a_pagos_documentos_y_transacciones(self):
@@ -665,7 +669,7 @@ class FinanzasAccessTests(TestCase):
             clases_asignadas=1,
         )
         self.client.force_login(self.user_admin)
-        query = "periodo_mes=2&periodo_anio=2026&organizacion=1&q=ana&metodo=transferencia"
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}&q=ana&metodo=transferencia"
         response = self.client.get(f"{reverse('finanzas:pago_edit', kwargs={'pk': pago.pk})}?{query}")
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
@@ -777,7 +781,7 @@ class FinanzasAccessTests(TestCase):
             ).exists()
         )
 
-    def test_pagos_list_nueva_persona_exige_organizacion_filtrada(self):
+    def test_pagos_list_nueva_persona_sin_organizacion_se_deniega(self):
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
@@ -790,13 +794,8 @@ class FinanzasAccessTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(Persona.objects.filter(nombres="Mario", apellidos="Lopez").exists())
-        self.assertTrue(response.context["open_nueva_persona"])
-        self.assertContains(
-            response,
-            "Debes seleccionar una organizacion en el filtro superior antes de crear a la persona.",
-        )
 
     def test_transaccion_detail_muestra_iframe_pdf(self):
         categoria = Category.objects.create(nombre="Arriendo", tipo="egreso", activa=True)
@@ -816,7 +815,7 @@ class FinanzasAccessTests(TestCase):
         )
 
         self.client.force_login(self.user_admin)
-        query = "periodo_mes=2&periodo_anio=2026&organizacion=1"
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}"
         response = self.client.get(f"{reverse('finanzas:transaccion_detail', kwargs={'pk': transaccion.pk})}?{query}")
 
         self.assertEqual(response.status_code, 200)
@@ -842,7 +841,10 @@ class FinanzasAccessTests(TestCase):
         )
 
         self.client.force_login(self.user_admin)
-        response = self.client.get(reverse("finanzas:transaccion_detail", kwargs={"pk": transaccion.pk}))
+        response = self.client.get(
+            reverse("finanzas:transaccion_detail", kwargs={"pk": transaccion.pk}),
+            {"organizacion": self.org.pk},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["archivo_es_pdf"])
@@ -868,7 +870,10 @@ class FinanzasAccessTests(TestCase):
         )
 
         self.client.force_login(self.user_admin)
-        response = self.client.get(reverse("finanzas:transaccion_archivo", kwargs={"pk": transaccion.pk}))
+        response = self.client.get(
+            reverse("finanzas:transaccion_archivo", kwargs={"pk": transaccion.pk}),
+            {"organizacion": self.org.pk},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
@@ -887,7 +892,9 @@ class FinanzasAccessTests(TestCase):
         )
         self.client.force_login(self.user_admin)
         response = self.client.post(
-            reverse("finanzas:documento_tributario_edit", kwargs={"pk": documento.pk}),
+            self._url_con_organizacion(
+                reverse("finanzas:documento_tributario_edit", kwargs={"pk": documento.pk})
+            ),
             {
                 "organizacion": self.org.pk,
                 "tipo_documento": DocumentoTributario.TipoDocumento.BOLETA_HONORARIOS,
@@ -1229,7 +1236,7 @@ class FinanzasAccessTests(TestCase):
         transaccion.documentos_tributarios.add(documento)
 
         self.client.force_login(self.user_admin)
-        query = "periodo_mes=2&periodo_anio=2026&organizacion=1"
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}"
         response = self.client.get(
             f"{reverse('finanzas:documento_tributario_detail', kwargs={'pk': documento.pk})}?{query}"
         )
@@ -1483,14 +1490,16 @@ class FinanzasAccessTests(TestCase):
         )
         self.client.force_login(self.user_admin)
 
-        upload_response = self.client.get(reverse("finanzas:documento_tributario_importar"))
+        upload_response = self.client.get(
+            reverse("finanzas:documento_tributario_importar"), {"organizacion": self.org.pk}
+        )
         self.assertEqual(upload_response.status_code, 200)
         self.assertContains(upload_response, 'name="archivo"', html=False)
         self.assertNotContains(upload_response, 'name="archivo_xml"', html=False)
         self.assertNotContains(upload_response, 'name="archivo_pdf"', html=False)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_importar"),
+            self._url_con_organizacion(reverse("finanzas:documento_tributario_importar")),
             {"accion": "parsear", "archivo": xml},
         )
 
@@ -1615,7 +1624,7 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_importar"),
+            self._url_con_organizacion(reverse("finanzas:documento_tributario_importar")),
             {"accion": "parsear", "archivo": pdf},
         )
 
@@ -1643,7 +1652,7 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, visor_url)
         self.assertContains(response, "<iframe", html=False)
 
-        visor_response = self.client.get(visor_url)
+        visor_response = self.client.get(self._url_con_organizacion(visor_url))
         self.assertEqual(visor_response.status_code, 200)
         self.assertEqual(visor_response["X-Frame-Options"], "SAMEORIGIN")
         self.assertIn("inline;", visor_response["Content-Disposition"])
@@ -1687,7 +1696,7 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_importar"),
+            self._url_con_organizacion(reverse("finanzas:documento_tributario_importar")),
             {"accion": "parsear", "archivo": pdf},
         )
 
@@ -1745,7 +1754,7 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_importar"),
+            self._url_con_organizacion(reverse("finanzas:documento_tributario_importar")),
             {"accion": "parsear", "archivo": pdf},
         )
 
@@ -1791,7 +1800,7 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_importar"),
+            self._url_con_organizacion(reverse("finanzas:documento_tributario_importar")),
             {"accion": "parsear", "archivo": xml},
         )
 
@@ -2700,7 +2709,7 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
         self.client.force_login(self.user_admin)
 
         response = self.client.post(
-            reverse("finanzas:documento_tributario_edit", kwargs={"pk": documento.pk}),
+            f"{reverse('finanzas:documento_tributario_edit', kwargs={'pk': documento.pk})}?organizacion={self.org.pk}",
             {
                 "organizacion": self.org.pk,
                 "tipo_documento": DocumentoTributario.TipoDocumento.FACTURA_EXENTA,

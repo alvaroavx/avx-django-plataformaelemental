@@ -14,6 +14,7 @@
           {% for child in item.children %}
             <a class="elemental-nav-child" href="{{ child.url }}">
               <i class="bi {{ child.icon }}"></i><span>{{ child.label }}</span>
+              {% if child.badge %}<span class="badge rounded-pill text-bg-warning ms-auto" aria-label="{{ child.badge }} solicitudes pendientes">{{ child.badge }}</span>{% endif %}
             </a>
           {% endfor %}
         </div>

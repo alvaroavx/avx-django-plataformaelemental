@@ -137,12 +137,12 @@
                 <i class="bi bi-file-earmark-text"></i><span class="finanzas-btn-label">Ver documento</span>
               </a>
               {% if pago.documento_tributario.archivo_pdf %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'pdf' %}" target="_blank" title="PDF">
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'pdf' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="PDF">
                 <i class="bi bi-file-earmark-pdf"></i><span class="finanzas-btn-label">PDF</span>
               </a>
               {% endif %}
               {% if pago.documento_tributario.archivo_xml %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'xml' %}" target="_blank" title="XML">
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'xml' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="XML">
                 <i class="bi bi-filetype-xml"></i><span class="finanzas-btn-label">XML</span>
               </a>
               {% endif %}

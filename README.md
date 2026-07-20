@@ -191,7 +191,6 @@ La guía operativa completa está en:
 Obligatorios:
 - `DEPLOY_HOST`
 - `DEPLOY_USER`
-- `DEPLOY_SSH_KEY`
 - `DEPLOY_SSH_KEY_B64`
 - `DEPLOY_PATH`
 - `DEPLOY_SERVICE`
@@ -201,8 +200,8 @@ Obligatorios:
 Opcionales:
 - `DEPLOY_PORT`
   - default: `22`
-- `DEPLOY_ENV_FILE`
-  - si no se define, `scripts/deploy.sh` no carga archivo de entorno externo
+- `DEPLOY_ENV_FILE` es obligatorio para despliegue productivo.
+  - contiene una ruta absoluta al archivo de entorno local del servidor; no contiene ni transporta su contenido.
 - `DEPLOY_VENV_DIR`
   - si no se define, usa `.venv` dentro del repo
 - `DEPLOY_PYTHON_BIN`

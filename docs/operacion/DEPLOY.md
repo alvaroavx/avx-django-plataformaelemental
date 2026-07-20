@@ -41,6 +41,24 @@ Este documento describe el CI/CD minimo del proyecto:
 - `DEPLOY_ENV_FILE`
   - ruta absoluta del archivo de entorno productivo del servidor, por ejemplo `/srv/elementos/.env.prod`
   - `scripts/deploy.sh` falla si esta variable viene vacia o si el archivo no existe
+  - es una ruta, no el contenido del archivo; GitHub Actions la pasa por SSH y el servidor carga el archivo local
+
+## Archivo de entorno productivo
+
+`DEPLOY_ENV_FILE` identifica un archivo existente solo en el servidor. `scripts/deploy.sh` lo carga para migraciones y validaciones, y el unit de systemd debe referenciar el mismo archivo mediante `EnvironmentFile` para Gunicorn.
+
+El archivo debe incluir las credenciales sensibles (`DJANGO_SECRET_KEY`, PostgreSQL y `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`) y las configuraciones no sensibles de Django, hosts, cookies y HSTS. No se copia a GitHub Actions, no se imprime y no se versiona.
+
+Para el despliegue oscuro inicial, mantener explícitamente:
+
+```dotenv
+GOOGLE_AUTH_ENABLED=false
+ACCESS_REQUESTS_ENABLED=false
+ACCESS_REQUEST_APPROVAL_ENABLED=false
+GOOGLE_AUTH_ENFORCED=false
+```
+
+Los jobs de prueba también fijan esos cuatro flags en `false` de forma explícita.
 
 ### Opcionales
 - `DEPLOY_PORT`
@@ -123,8 +141,9 @@ Si eso no funciona desde tu maquina, el workflow tampoco va a funcionar.
 En el archivo de entorno de produccion conviene definir al menos:
 - `DJANGO_ENV=prod`
 - `DJANGO_SECRET_KEY`
-- `DJANGO_ALLOWED_HOSTS`
-- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET`
+- los cuatro flags de Google y solicitudes, inicialmente en `false`
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`

@@ -65,12 +65,12 @@
         <div class="card-body">
           <div class="d-flex gap-2 mb-3 flex-wrap">
             {% if documento.archivo_pdf %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}" target="_blank" title="Abrir PDF">
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="Abrir PDF">
                 <i class="bi bi-file-earmark-pdf"></i><span class="finanzas-btn-label">Abrir PDF</span>
               </a>
             {% endif %}
             {% if documento.archivo_xml %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'xml' %}" target="_blank" title="Abrir XML">
+              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' documento.pk 'xml' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="Abrir XML">
                 <i class="bi bi-filetype-xml"></i><span class="finanzas-btn-label">Abrir XML</span>
               </a>
             {% endif %}
@@ -83,7 +83,7 @@
           {% if archivo_es_pdf %}
             <div class="border rounded overflow-hidden">
               <iframe
-                src="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}#toolbar=1&navpanes=0&scrollbar=1"
+                src="{% url 'finanzas:documento_tributario_archivo' documento.pk 'pdf' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}#toolbar=1&navpanes=0&scrollbar=1"
                 title="PDF documento {{ documento.pk }}"
                 width="100%"
                 height="720"

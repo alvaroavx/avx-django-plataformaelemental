@@ -1,7 +1,9 @@
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.urls import reverse
 
+from personas.models import SolicitudAcceso
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
@@ -27,7 +29,7 @@ def _url(request, view_name):
     return f"{reverse(view_name)}{_query_filtros(request)}"
 
 
-def _item(request, *, label, icon, url_name=None, url=None, children=None, active_prefixes=None):
+def _item(request, *, label, icon, url_name=None, url=None, children=None, active_prefixes=None, badge=None):
     href = url or (_url(request, url_name) if url_name else "#")
     path = request.path
     active = any(path.startswith(prefix) for prefix in (active_prefixes or []))
@@ -37,6 +39,7 @@ def _item(request, *, label, icon, url_name=None, url=None, children=None, activ
         "url": href,
         "children": children or [],
         "active": active,
+        "badge": badge,
     }
 
 
@@ -56,6 +59,14 @@ def build_navigation(request):
     can_personas = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_PERSONAS, organizacion=organizacion)
     can_asistencias = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion)
     can_finanzas = usuario_tiene_permiso(user, ACCION_VER_FINANZAS, organizacion=organizacion)
+    can_gestionar_solicitudes = settings.ACCESS_REQUESTS_ENABLED and user.has_perm(
+        "personas.gestionar_solicitudes_acceso"
+    )
+    pendientes_solicitudes = (
+        SolicitudAcceso.objects.filter(estado=SolicitudAcceso.Estado.PENDIENTE).count()
+        if can_gestionar_solicitudes
+        else 0
+    )
 
     items = [
         _item(
@@ -116,15 +127,11 @@ def build_navigation(request):
             )
         )
 
-    if can_personas:
-        items.append(
-            _item(
-                request,
-                label="Personas",
-                icon="bi-people",
-                url_name="personas:dashboard",
-                active_prefixes=["/personas/"],
-                children=[
+    if can_personas or can_gestionar_solicitudes:
+        hijos_personas = []
+        if can_personas:
+            hijos_personas.extend(
+                [
                     _item(request, label="Panel", icon="bi-grid", url_name="personas:dashboard"),
                     _item(request, label="Personas", icon="bi-people", url_name="personas:personas_list"),
                     _item(
@@ -133,7 +140,26 @@ def build_navigation(request):
                         icon="bi-building",
                         url_name="personas:organizaciones_list",
                     ),
-                ],
+                ]
+            )
+        if can_gestionar_solicitudes:
+            hijos_personas.append(
+                _item(
+                    request,
+                    label="Solicitudes de acceso",
+                    icon="bi-person-lock",
+                    url_name="personas:solicitudes_acceso_list",
+                    badge=pendientes_solicitudes or None,
+                )
+            )
+        items.append(
+            _item(
+                request,
+                label="Personas",
+                icon="bi-people",
+                url_name="personas:dashboard" if can_personas else "personas:solicitudes_acceso_list",
+                active_prefixes=["/personas/"],
+                children=hijos_personas,
             )
         )
 
