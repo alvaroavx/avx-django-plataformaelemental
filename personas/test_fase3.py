@@ -165,7 +165,7 @@ class MatrizAislamientoOrganizacionalTests(TestCase):
         detalle_disciplina = self.client.get(reverse("asistencias:disciplina_detail", args=[self.disciplina_b.pk]), self._query_a())
         self.assertEqual(detalle_disciplina.status_code, 403)
         detalle_sesion = self.client.get(reverse("asistencias:sesion_detail", args=[self.sesion_b.pk]), self._query_a())
-        self.assertEqual(detalle_sesion.status_code, 403)
+        self.assertEqual(detalle_sesion.status_code, 404)
         json_busqueda = self.client.get(reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion_b.pk]), {"q": "Oculta"})
         self.assertEqual(json_busqueda.status_code, 404)
         self.assertNotIn("Oculta", json_busqueda.content.decode())
