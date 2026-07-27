@@ -21,6 +21,14 @@ JavaScript durante cada operación.
 
 - [Detalle de sesión](capturas/sprint3/detalle-320x900.png)
 
+## Zoom al 200 %
+
+- [Detalle a escala efectiva 200 %](capturas/sprint3/detalle-zoom200-390x844.png)
+
+La comprobación automatizada usó un viewport físico de 390 × 844 px con
+`devicePixelRatio=2`, equivalente a 195 CSS px de ancho. Chrome informó
+`clientWidth=180`, `scrollWidth=180` y ningún elemento fuera del ancho visible.
+
 La revisión visual confirma que no existe desplazamiento horizontal en ambos
 anchos, las acciones principales mantienen área táctil cercana o superior a
 44 px y la jerarquía sesión → agregar → asistentes permanece estable.

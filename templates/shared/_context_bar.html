@@ -51,8 +51,8 @@
           </div>
         </form>
       {% endif %}
-      <div class="d-flex align-items-center justify-content-between justify-content-xl-end gap-2">
-        <span class="small text-muted d-inline-flex align-items-center gap-1">
+      <div class="elemental-user-actions d-flex align-items-center justify-content-between justify-content-xl-end gap-2">
+        <span class="elemental-user-name small text-muted d-inline-flex align-items-center gap-1">
           <i class="bi bi-person-circle"></i>{{ request.user.get_username }}
         </span>
         <form method="post" action="{% url 'logout' %}" class="d-inline">
