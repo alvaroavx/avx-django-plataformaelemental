@@ -1091,7 +1091,7 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(data["estado_financiero"]["codigo"], "deuda")
         self.assertEqual(data["estado_financiero"]["label"], "Deuda")
 
-    def test_agregar_asistente_mobile_estado_financiero_pendiente_sin_cobro(self):
+    def test_agregar_asistente_mobile_ausente_sin_pago_queda_deuda(self):
         self._login_admin_organizacion(self.organizacion)
         dispatch_uid = "test_asistencia_mobile_inicia_ausente"
 
@@ -1117,12 +1117,12 @@ class AsistenciasViewTests(TestCase):
         asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
         consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
         self.assertEqual(asistencia.estado, Asistencia.Estado.AUSENTE)
-        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.PENDIENTE)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
         self.assertEqual(
             response.json()["estado_financiero"],
             {
-                "codigo": "pendiente",
-                "label": "Sin cobro",
+                "codigo": "deuda",
+                "label": "Deuda",
             },
         )
 
@@ -2505,13 +2505,13 @@ class SprintDosDominioAsistenciasTests(TestCase):
 
     def test_matriz_transiciones_recalcula_consumo_sin_duplicados(self):
         casos = (
-            (Asistencia.Estado.PRESENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.PENDIENTE),
-            (Asistencia.Estado.PRESENTE, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.PENDIENTE),
+            (Asistencia.Estado.PRESENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.CONSUMIDO),
+            (Asistencia.Estado.PRESENTE, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.CONSUMIDO),
             (Asistencia.Estado.AUSENTE, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
             (Asistencia.Estado.JUSTIFICADA, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
             (Asistencia.Estado.PRESENTE, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
-            (Asistencia.Estado.AUSENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.PENDIENTE),
-            (Asistencia.Estado.JUSTIFICADA, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.PENDIENTE),
+            (Asistencia.Estado.AUSENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.CONSUMIDO),
+            (Asistencia.Estado.JUSTIFICADA, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.CONSUMIDO),
         )
         for indice, (origen, destino, esperado) in enumerate(casos):
             persona = Persona.objects.create(
@@ -2557,7 +2557,7 @@ class SprintDosDominioAsistenciasTests(TestCase):
                 else:
                     self.assertIsNone(consumo.pago_id)
 
-    def test_correccion_retroactiva_revierte_y_recupera_clase(self):
+    def test_correccion_entre_estados_ordinarios_no_recupera_clase(self):
         pago = self._crear_pago(clases=1)
         asistencia = Asistencia.objects.create(
             sesion=self.sesion,
@@ -2572,7 +2572,10 @@ class SprintDosDominioAsistenciasTests(TestCase):
             usuario=self.admin,
         )
         pago.refresh_from_db()
-        self.assertEqual(pago.saldo_clases, 1)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(pago.saldo_clases, 0)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
 
         cambiar_estado_asistencia(
             asistencia=asistencia,
@@ -2581,6 +2584,70 @@ class SprintDosDominioAsistenciasTests(TestCase):
         )
         pago.refresh_from_db()
         self.assertEqual(pago.saldo_clases, 0)
+        self.assertEqual(
+            AttendanceConsumption.objects.filter(asistencia=asistencia).count(),
+            1,
+        )
+
+    def test_ausencia_con_pago_valido_queda_consumida(self):
+        pago = self._crear_pago(clases=1)
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.AUSENTE,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
+
+    def test_ausencia_sin_pago_valido_queda_deuda(self):
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.AUSENTE,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+
+    def test_justificacion_con_pago_valido_queda_consumida(self):
+        pago = self._crear_pago(clases=1)
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.JUSTIFICADA,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
+
+    def test_plan_o_pago_mes_anterior_no_se_arrastra(self):
+        plan = PaymentPlan.objects.create(
+            organizacion=self.organizacion,
+            nombre="Plan junio",
+            num_clases=2,
+            precio=20000,
+            fecha_inicio=date(2026, 6, 1),
+            fecha_fin=date(2026, 6, 30),
+        )
+        Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            plan=plan,
+            fecha_pago=date(2026, 6, 2),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=20000,
+            clases_asignadas=2,
+        )
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.AUSENTE,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
 
     def test_presente_sin_pago_o_derecho_queda_deuda(self):
         asistencia = Asistencia.objects.create(
@@ -2677,6 +2744,28 @@ class SprintDosDominioAsistenciasTests(TestCase):
             ).exists()
         )
 
+    def test_reversa_clase_liberada_sin_derecho_genera_deuda(self):
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.JUSTIFICADA,
+        )
+        liberacion, consumo = liberar_clase(
+            asistencia=asistencia,
+            motivo="Excepción sin pago",
+            usuario=self.admin,
+        )
+        self.assertTrue(liberacion.activa)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.PENDIENTE)
+        self.assertIsNone(consumo.pago)
+
+        _, consumo = revertir_clase_liberada(
+            asistencia=asistencia,
+            usuario=self.admin,
+        )
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+
     def test_liberar_clase_exige_motivo_y_es_idempotente_controlado(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
         with self.assertRaisesMessage(ValidationError, "motivo"):
@@ -2736,13 +2825,11 @@ class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
     reset_sequences = True
 
     def test_dos_asistencias_compiten_por_un_cupo_sin_sobreconsumo(self):
-        User = get_user_model()
         organizacion = Organizacion.objects.create(
             nombre="Org Concurrencia Sprint 2",
             razon_social="Org Concurrencia Sprint 2 SpA",
             rut="70.000.000-3",
         )
-        admin = User.objects.create_user("admin_concurrencia_s2", password=TEST_PASSWORD)
         disciplina = Disciplina.objects.create(organizacion=organizacion, nombre="Concurrencia")
         estudiante = Persona.objects.create(nombres="Estudiante", apellidos="Concurrente")
         pago = Payment.objects.create(
@@ -2752,7 +2839,7 @@ class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
             metodo_pago=Payment.Metodo.EFECTIVO,
             aplica_iva=False,
             monto_referencia=10000,
-            clases_asignadas=1,
+            clases_asignadas=0,
         )
         asistencias = []
         for dia in (10, 11):
@@ -2767,22 +2854,18 @@ class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
                     estado=Asistencia.Estado.AUSENTE,
                 )
             )
+        Payment.objects.filter(pk=pago.pk).update(clases_asignadas=1)
 
-        def marcar_presente(asistencia_id):
+        def recalcular_consumo(asistencia_id):
             close_old_connections()
             try:
                 asistencia = Asistencia.objects.get(pk=asistencia_id)
-                usuario = get_user_model().objects.get(pk=admin.pk)
-                cambiar_estado_asistencia(
-                    asistencia=asistencia,
-                    estado=Asistencia.Estado.PRESENTE,
-                    usuario=usuario,
-                )
+                asignar_consumo_asistencia(asistencia)
             finally:
                 close_old_connections()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
-            list(executor.map(marcar_presente, [item.pk for item in asistencias]))
+            list(executor.map(recalcular_consumo, [item.pk for item in asistencias]))
 
         estados = list(
             AttendanceConsumption.objects.filter(asistencia__in=asistencias)

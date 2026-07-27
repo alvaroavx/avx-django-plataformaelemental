@@ -301,16 +301,22 @@ Regla:
 - Solo administración autorizada de la organización puede revertir pagos; finanzas, profesoras y otras organizaciones no pueden hacerlo.
 - Un pago revertido se muestra como histórico, no otorga clases y se excluye de saldos, totales y reportes operacionales vigentes.
 - Al revertir un pago, sus consumos se recalculan: se reasignan a otro derecho válido del mismo periodo o quedan como deuda.
-- Las clases pagadas no se arrastran entre meses.
-- Una asistencia solo puede consumirse contra pagos del mismo mes y anio de la clase.
-- Si no existe pago del mismo mes con saldo disponible, la asistencia debe generar deuda.
+- Pago, plan y clase deben corresponder al mismo mes y año. Las clases pagadas no se arrastran entre meses, no se recuperan en el mes siguiente y no existe vigencia móvil de 30 días.
+- `PRESENTE`, `AUSENTE` y `JUSTIFICADA` consumen un derecho mensual cuando existe; si no existe pago válido con saldo, generan `DEUDA`.
+- Una ausencia o justificación conserva su significado académico, pero no recupera el cupo financiero.
+- `PENDIENTE` queda reservado para excepciones explícitas que no consumen ni generan deuda, como una clase liberada activa.
 - Un pago asociado a plan solo otorga derecho si la fecha de la clase está dentro de `fecha_inicio` y `fecha_fin` cuando esos límites existen. Un pago directo sin plan conserva el derecho por sus clases asignadas.
+- Eliminar una asistencia elimina en cascada su único consumo y vuelve a disponibilizar ese cupo en el pago.
+- Varios consumos pueden compartir un `Payment` mientras el total no supere `clases_asignadas`; compartirlo no constituye por sí mismo una inconsistencia.
+- Las promociones se administran ajustando manualmente `clases_asignadas`. No existe modelo, detección ni duplicación automática de cupos promocionales.
 
 ## Reconciliación de integridad
 
 `python manage.py reconciliar_integridad_dominio` ejecuta un diagnóstico de solo lectura.
 
-Detecta consumos duplicados, consumidos sin derecho válido, clases liberadas consumiendo, cruces de organización o persona, pagos revertidos todavía imputados y estados incompatibles entre asistencia y consumo. La salida contiene conteos e identificadores técnicos; devuelve error si encuentra problemas y nunca repara datos.
+Detecta por separado consumos fuera del periodo mensual, consumos sin pago, sobreconsumo respecto de `clases_asignadas`, duplicados reales, clases liberadas consumiendo, cruces de organización o persona, pagos revertidos todavía imputados, planes fuera de vigencia y estados incompatibles. La salida contiene conteos e identificadores técnicos; devuelve error si encuentra problemas y nunca repara datos.
+
+Los datos históricos fuera de regla se regularizan manualmente por el gestor. El diagnóstico no separa pagos, reasigna consumos, modifica cupos ni repara registros.
 - Si luego aparece un pago, solo puede imputar deudas del mismo mes y anio.
 
 ## Carga asistida de documentos

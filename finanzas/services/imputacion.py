@@ -60,8 +60,6 @@ def pago_otorga_derecho(pago, asistencia, *, consumo_actual=None):
 def consumo_tiene_derecho_valido(consumo):
     if consumo.estado != AttendanceConsumption.Estado.CONSUMIDO or not consumo.pago_id:
         return False
-    if consumo.asistencia.estado != Asistencia.Estado.PRESENTE:
-        return False
     if ClaseLiberada.objects.filter(asistencia=consumo.asistencia, revertida_en__isnull=True).exists():
         return False
     return pago_otorga_derecho(
@@ -93,7 +91,7 @@ def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
         asistencia=asistencia,
         revertida_en__isnull=True,
     ).exists()
-    if asistencia.estado != Asistencia.Estado.PRESENTE or esta_liberada:
+    if esta_liberada:
         consumo.pago = None
         consumo.estado = AttendanceConsumption.Estado.PENDIENTE
         consumo.save(update_fields=["persona", "clase_fecha", "pago", "estado", "actualizado_en"])
@@ -208,8 +206,6 @@ def asociar_asistencia_a_pago(asistencia: Asistencia, pago: Payment) -> Attendan
         .select_related("plan")
         .get(pk=pago.pk)
     )
-    if asistencia.estado != Asistencia.Estado.PRESENTE:
-        raise ValueError("Solo se pueden asociar asistencias presentes a un pago.")
     if ClaseLiberada.objects.filter(asistencia=asistencia, revertida_en__isnull=True).exists():
         raise ValueError("Una clase liberada no puede asociarse a un pago.")
     if pago.persona_id != asistencia.persona_id:

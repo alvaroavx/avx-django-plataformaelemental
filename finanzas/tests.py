@@ -3347,29 +3347,104 @@ class SprintDosReconciliacionTests(TestCase):
             fecha=date(2026, 7, 20),
         )
 
-    def _pago(self, organizacion=None):
+    def _pago(self, organizacion=None, *, clases=1, fecha_pago=None):
         return Payment.objects.create(
             persona=self.estudiante,
             organizacion=organizacion or self.organizacion,
-            fecha_pago=date(2026, 7, 1),
+            fecha_pago=fecha_pago or date(2026, 7, 1),
             metodo_pago=Payment.Metodo.EFECTIVO,
             aplica_iva=False,
             monto_referencia=10000,
-            clases_asignadas=1,
+            clases_asignadas=clases,
         )
 
-    def test_reconciliacion_consistente_no_reporta_hallazgos(self):
-        self._pago()
-        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+    def _otra_asistencia(self, *, dia=21):
+        sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=date(2026, 7, dia),
+        )
+        return Asistencia.objects.create(sesion=sesion, persona=self.estudiante)
+
+    def test_reconciliacion_permite_consumos_compartidos_con_cupo_suficiente(self):
+        pago = self._pago(clases=2)
+        primera = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+        )
+        segunda = self._otra_asistencia()
         resultado = reconciliar_integridad_dominio()
+
         self.assertTrue(resultado["ok"])
         self.assertFalse(any(resultado["resumen"].values()))
+        self.assertEqual(
+            AttendanceConsumption.objects.filter(
+                asistencia__in=[primera, segunda],
+                pago=pago,
+                estado=AttendanceConsumption.Estado.CONSUMIDO,
+            ).count(),
+            2,
+        )
 
         salida = StringIO()
         call_command("reconciliar_integridad_dominio", stdout=salida)
         self.assertIn("Sin inconsistencias de dominio", salida.getvalue())
 
-    def test_reconciliacion_detecta_consumido_sin_derecho_y_otra_organizacion(self):
+    def test_reconciliacion_detecta_sobreconsumo_respecto_de_clases_asignadas(self):
+        pago = self._pago(clases=1)
+        primera = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+        )
+        segunda = self._otra_asistencia()
+        AttendanceConsumption.objects.filter(asistencia=segunda).update(
+            estado=AttendanceConsumption.Estado.CONSUMIDO,
+            pago=pago,
+        )
+
+        resultado = reconciliar_integridad_dominio()
+
+        self.assertEqual(resultado["resumen"]["sobreconsumo_pago"], 1)
+        self.assertEqual(
+            resultado["detalle"]["sobreconsumo_pago"],
+            [
+                {
+                    "pago_id": pago.pk,
+                    "organizacion_id": self.organizacion.pk,
+                    "clases_asignadas": 1,
+                    "consumos_consumidos": 2,
+                }
+            ],
+        )
+        self.assertEqual(
+            AttendanceConsumption.objects.filter(
+                asistencia__in=[primera, segunda],
+                pago=pago,
+            ).count(),
+            2,
+        )
+
+    def test_reconciliacion_detecta_consumo_fuera_periodo_y_sin_pago(self):
+        pago_anterior = self._pago(fecha_pago=date(2026, 6, 1))
+        fuera_periodo = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+        )
+        huerfano = self._otra_asistencia()
+        AttendanceConsumption.objects.filter(asistencia=fuera_periodo).update(
+            estado=AttendanceConsumption.Estado.CONSUMIDO,
+            pago=pago_anterior,
+        )
+        AttendanceConsumption.objects.filter(asistencia=huerfano).update(
+            estado=AttendanceConsumption.Estado.CONSUMIDO,
+            pago=None,
+        )
+
+        resultado = reconciliar_integridad_dominio()
+
+        self.assertEqual(resultado["resumen"]["consumo_fuera_periodo"], 1)
+        self.assertEqual(resultado["resumen"]["consumo_sin_pago"], 1)
+
+    def test_reconciliacion_detecta_consumo_de_otra_persona_u_organizacion(self):
         pago_ajeno = self._pago(organizacion=self.otra_organizacion)
         asistencia = Asistencia.objects.create(
             sesion=self.sesion,
@@ -3382,9 +3457,10 @@ class SprintDosReconciliacionTests(TestCase):
         )
         resultado = reconciliar_integridad_dominio()
         self.assertFalse(resultado["ok"])
-        self.assertEqual(resultado["resumen"]["consumido_sin_derecho"], 1)
-        self.assertEqual(resultado["resumen"]["consumo_otra_organizacion"], 1)
-        self.assertEqual(resultado["resumen"]["estado_asistencia_incompatible"], 1)
+        self.assertEqual(
+            resultado["resumen"]["consumo_otra_persona_organizacion"],
+            1,
+        )
 
         with self.assertRaises(CommandError):
             call_command("reconciliar_integridad_dominio", stdout=StringIO())
@@ -3407,3 +3483,18 @@ class SprintDosReconciliacionTests(TestCase):
         resultado = reconciliar_integridad_dominio()
         self.assertEqual(resultado["resumen"]["clase_liberada_consumiendo"], 1)
         self.assertEqual(resultado["resumen"]["pago_revertido_incluido"], 1)
+
+    def test_reconciliacion_detecta_estado_ordinario_pendiente(self):
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.JUSTIFICADA,
+        )
+        AttendanceConsumption.objects.filter(asistencia=asistencia).update(
+            estado=AttendanceConsumption.Estado.PENDIENTE,
+            pago=None,
+        )
+
+        resultado = reconciliar_integridad_dominio()
+
+        self.assertEqual(resultado["resumen"]["estado_asistencia_incompatible"], 1)

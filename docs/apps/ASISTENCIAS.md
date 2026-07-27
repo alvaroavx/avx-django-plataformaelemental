@@ -183,17 +183,23 @@ flowchart TD
 
 ## Transiciones de asistencia y consumo
 
-El servicio de dominio recalcula el mismo `AttendanceConsumption` dentro de una transacción:
+El servicio de dominio recalcula el mismo `AttendanceConsumption` dentro de una transacción. La presencia académica no cambia: `AUSENTE` y `JUSTIFICADA` siguen registrando lo ocurrido en clase, pero financieramente pierden el cupo mensual igual que una asistencia presente.
 
-| Transición | Estado de consumo | Efecto |
-| --- | --- | --- |
-| `PRESENTE → AUSENTE` | `PENDIENTE`, sin pago | recupera la clase consumida |
-| `PRESENTE → JUSTIFICADA` | `PENDIENTE`, sin pago | recupera la clase consumida |
-| `AUSENTE → PRESENTE` | `CONSUMIDO` o `DEUDA` | consume un derecho válido o registra deuda |
-| `JUSTIFICADA → PRESENTE` | `CONSUMIDO` o `DEUDA` | consume un derecho válido o registra deuda |
-| mismo estado | se recalcula sin duplicar | operación idempotente |
+| Estado o transición | Resultado esperado |
+| --- | --- |
+| creación `PRESENTE` | `CONSUMIDO` con derecho mensual; de lo contrario `DEUDA` |
+| creación `AUSENTE` | `CONSUMIDO` con derecho mensual; de lo contrario `DEUDA` |
+| creación `JUSTIFICADA` | `CONSUMIDO` con derecho mensual; de lo contrario `DEUDA` |
+| `PRESENTE → AUSENTE` | mantiene o recalcula el consumo; no recupera cupo |
+| `PRESENTE → JUSTIFICADA` | mantiene o recalcula el consumo; no recupera cupo |
+| `AUSENTE/JUSTIFICADA → PRESENTE` | recalcula idempotentemente sin duplicar consumo |
+| mismo estado | no duplica ni consume una clase adicional |
+| clase liberada activa | `PENDIENTE`, sin pago ni deuda |
+| reversa de clase liberada | vuelve al cálculo ordinario según la asistencia |
 
-Las correcciones retroactivas usan las mismas reglas. Solo una asistencia `PRESENTE`, no liberada, puede consumir. La eliminación vigente de una asistencia elimina en cascada su consumo y recupera el cupo; la acción permanece auditada desde la vista.
+`PENDIENTE` se reserva para excepciones explícitas que no consumen, como una clase liberada. Las correcciones entre estados ordinarios no devuelven clases.
+
+La eliminación vigente de una asistencia elimina en cascada su único consumo; el pago deja de contabilizarlo y recupera el cupo. La acción permanece auditada desde la vista y no se incorpora una reversa histórica de asistencia en este sprint.
 
 El signal de `Asistencia` invoca el servicio tanto en creación como en actualización. El servicio bloquea la asistencia, su consumo y los pagos candidatos para impedir sobreconsumo por reintentos o carreras.
 
@@ -211,6 +217,14 @@ El signal de `Asistencia` invoca el servicio tanto en creación como en actualiz
 - profesora asignada puede consultar el resultado, pero no liberar ni revertir.
 
 No equivale a ausencia, justificación, deuda, beca ni eliminación.
+
+## Periodo mensual y promociones
+
+- Pago, plan y clase deben pertenecer al mismo mes y año; no existe arrastre, recuperación posterior ni vigencia móvil de 30 días.
+- Un pago puede respaldar varios consumos siempre que `clases_asignadas` tenga cupo suficiente.
+- Las promociones, incluido un eventual beneficio 2x1, se gestionan ajustando manualmente `clases_asignadas`.
+- No existe detección, asignación ni duplicación automática de promociones.
+- Los consumos históricos fuera de estas reglas requieren saneamiento manual por el gestor; el reconciliador solo los identifica.
 
 ## Exportaciones Excel v1.0
 - `asistencias_YYYY_MM.xlsx` exporta asistencias operativas desde `Asistencia`, `SesionClase`, `Disciplina` y `Persona`.
