@@ -2,6 +2,12 @@
 {% load finanzas_format %}
 {% block title %}Detalle de pago{% endblock %}
 {% block content %}
+{% if pago.esta_revertido %}
+<div class="alert alert-warning mt-4">
+  <strong>Pago revertido.</strong>
+  {{ pago.revertido_en|date:"d/m/Y H:i" }} · {{ pago.motivo_reversa }}
+</div>
+{% endif %}
 <div class="mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Detalle de pago</h2>
@@ -9,9 +15,11 @@
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ back_url }}" title="Volver">
         <i class="bi bi-arrow-left"></i><span class="finanzas-btn-label">Volver</span>
       </a>
-      <a class="btn btn-sm btn-primary finanzas-btn" href="{% url 'finanzas:pago_edit' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Editar pago">
-        <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar pago</span>
-      </a>
+      {% if not pago.esta_revertido %}
+        <a class="btn btn-sm btn-primary finanzas-btn" href="{% url 'finanzas:pago_edit' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Editar pago">
+          <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar pago</span>
+        </a>
+      {% endif %}
     </div>
   </div>
 

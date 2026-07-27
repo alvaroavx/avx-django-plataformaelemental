@@ -73,7 +73,7 @@ def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
 
 
 def resumen_pagos(queryset):
-    return queryset.aggregate(
+    return queryset.filter(revertido_en__isnull=True).aggregate(
         total_pagos_monto=Sum("monto_total"),
         total_iva_monto=Sum("monto_iva"),
         total_clases_pagadas=Sum("clases_asignadas"),
@@ -100,7 +100,11 @@ def documentos_tributarios_queryset(request, *, organizacion=None):
         "persona_relacionada",
         "organizacion_relacionada",
     ).annotate(
-        pagos_asociados_total=Count("pagos_asociados", distinct=True),
+        pagos_asociados_total=Count(
+            "pagos_asociados",
+            filter=Q(pagos_asociados__revertido_en__isnull=True),
+            distinct=True,
+        ),
         transacciones_asociadas_total=Count("transacciones_asociadas", distinct=True),
     )
     queryset = aplicar_periodo(queryset, "fecha_emision", request=request)
@@ -141,7 +145,11 @@ def resumen_transacciones(queryset):
 
 
 def dashboard_querysets(request, *, organizacion=None):
-    pagos_qs = aplicar_periodo(Payment.objects.select_related("persona", "organizacion"), "fecha_pago", request=request)
+    pagos_qs = aplicar_periodo(
+        Payment.objects.filter(revertido_en__isnull=True).select_related("persona", "organizacion"),
+        "fecha_pago",
+        request=request,
+    )
     transacciones_qs = aplicar_periodo(
         Transaction.objects.select_related("categoria", "organizacion").prefetch_related("documentos_tributarios"),
         "fecha",
@@ -241,7 +249,12 @@ def categorias_queryset():
 
 def pagos_export_queryset(request, *, organizacion=None):
     queryset = aplicar_periodo(
-        Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario")
+        Payment.objects.filter(revertido_en__isnull=True).select_related(
+            "persona",
+            "organizacion",
+            "plan",
+            "documento_tributario",
+        )
         .annotate(
             clases_consumidas_calculadas=Count(
                 "consumos",

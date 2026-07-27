@@ -11,8 +11,6 @@ from .services import asignar_consumo_asistencia, imputar_pago_a_deudas
 def crear_consumo_financiero(sender, instance, created, raw=False, **kwargs):
     if raw:
         return
-    if not created:
-        return
     asignar_consumo_asistencia(instance)
 
 

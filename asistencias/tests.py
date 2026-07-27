@@ -1,4 +1,5 @@
 ﻿import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
 from io import BytesIO, StringIO
@@ -7,20 +8,25 @@ from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
 from django.core.management.base import CommandError
+from django.db import close_old_connections
 from django.db.models.signals import pre_save
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 
 from auditoria.models import AuditLog
-from finanzas.models import AttendanceConsumption, Payment
+from finanzas.models import AttendanceConsumption, Payment, PaymentPlan
+from finanzas.services import asignar_consumo_asistencia
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.test_factories import asignar_profesora_a_sesion, crear_usuario_con_rol
 from plataformaelemental.context import nav_context, organizacion_desde_request, periodo_context
 
-from .models import Asistencia, Disciplina, SesionClase
+from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
+from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
 
 
 TEST_PASSWORD = "not-a-real-test-password"
@@ -2399,3 +2405,398 @@ class AsistenciasViewTests(TestCase):
             html=False,
         )
         self.assertContains(response, "Marta Liberada")
+
+
+class SprintDosDominioAsistenciasTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Sprint 2",
+            razon_social="Org Sprint 2 SpA",
+            rut="70.000.000-1",
+        )
+        self.otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org Sprint 2",
+            razon_social="Otra Org Sprint 2 SpA",
+            rut="70.000.000-2",
+        )
+        self.rol_admin = Rol.objects.create(nombre="Admin Sprint 2", codigo="ADMIN")
+        self.rol_profesor = Rol.objects.create(nombre="Profesor Sprint 2", codigo="PROFESOR")
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante Sprint 2", codigo="ESTUDIANTE")
+        self.admin = User.objects.create_user("admin_sprint2", password=TEST_PASSWORD)
+        self.persona_admin = Persona.objects.create(
+            nombres="Admin",
+            apellidos="Sprint",
+            user=self.admin,
+        )
+        PersonaRol.objects.create(
+            persona=self.persona_admin,
+            rol=self.rol_admin,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.profesor_asignado = self._crear_profesor(
+            "profesor_asignado",
+            self.organizacion,
+        )
+        self.profesor_no_asignado = self._crear_profesor(
+            "profesor_no_asignado",
+            self.organizacion,
+        )
+        self.profesor_otra_org = self._crear_profesor(
+            "profesor_otra_org",
+            self.otra_organizacion,
+        )
+        self.admin_otra_org = User.objects.create_user(
+            "admin_otra_org_sprint2",
+            password=TEST_PASSWORD,
+        )
+        persona_admin_otra = Persona.objects.create(
+            nombres="Admin",
+            apellidos="Otra org",
+            user=self.admin_otra_org,
+        )
+        PersonaRol.objects.create(
+            persona=persona_admin_otra,
+            rol=self.rol_admin,
+            organizacion=self.otra_organizacion,
+            activo=True,
+        )
+        self.estudiante = Persona.objects.create(
+            nombres="Estudiante",
+            apellidos="Sprint",
+        )
+        PersonaRol.objects.create(
+            persona=self.estudiante,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Yoga Sprint 2",
+        )
+        self.sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=date(2026, 7, 15),
+        )
+        asignar_profesora_a_sesion(user=self.profesor_asignado, sesion=self.sesion)
+
+    def _crear_profesor(self, username, organizacion):
+        return crear_usuario_con_rol(
+            username=username,
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=organizacion,
+            apellidos="Sprint",
+        )
+
+    def _crear_pago(self, *, clases=10, plan=None, organizacion=None):
+        return Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=organizacion or self.organizacion,
+            plan=plan,
+            fecha_pago=date(2026, 7, 2),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=clases,
+        )
+
+    def test_matriz_transiciones_recalcula_consumo_sin_duplicados(self):
+        casos = (
+            (Asistencia.Estado.PRESENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.PENDIENTE),
+            (Asistencia.Estado.PRESENTE, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.PENDIENTE),
+            (Asistencia.Estado.AUSENTE, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
+            (Asistencia.Estado.JUSTIFICADA, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
+            (Asistencia.Estado.PRESENTE, Asistencia.Estado.PRESENTE, AttendanceConsumption.Estado.CONSUMIDO),
+            (Asistencia.Estado.AUSENTE, Asistencia.Estado.AUSENTE, AttendanceConsumption.Estado.PENDIENTE),
+            (Asistencia.Estado.JUSTIFICADA, Asistencia.Estado.JUSTIFICADA, AttendanceConsumption.Estado.PENDIENTE),
+        )
+        for indice, (origen, destino, esperado) in enumerate(casos):
+            persona = Persona.objects.create(
+                nombres=f"Transición {indice}",
+                apellidos="Sprint",
+            )
+            PersonaRol.objects.create(
+                persona=persona,
+                rol=self.rol_estudiante,
+                organizacion=self.organizacion,
+                activo=True,
+            )
+            Payment.objects.create(
+                persona=persona,
+                organizacion=self.organizacion,
+                fecha_pago=date(2026, 7, 2),
+                metodo_pago=Payment.Metodo.EFECTIVO,
+                aplica_iva=False,
+                monto_referencia=10000,
+                clases_asignadas=1,
+            )
+            asistencia = Asistencia.objects.create(
+                sesion=self.sesion,
+                persona=persona,
+                estado=origen,
+            )
+            with self.subTest(origen=origen, destino=destino):
+                asistencia, consumo = cambiar_estado_asistencia(
+                    asistencia=asistencia,
+                    estado=destino,
+                    usuario=self.admin,
+                )
+                segundo = asignar_consumo_asistencia(asistencia)
+                self.assertEqual(asistencia.estado, destino)
+                self.assertEqual(consumo.estado, esperado)
+                self.assertEqual(segundo.pk, consumo.pk)
+                self.assertEqual(
+                    AttendanceConsumption.objects.filter(asistencia=asistencia).count(),
+                    1,
+                )
+                if esperado == AttendanceConsumption.Estado.CONSUMIDO:
+                    self.assertIsNotNone(consumo.pago_id)
+                else:
+                    self.assertIsNone(consumo.pago_id)
+
+    def test_correccion_retroactiva_revierte_y_recupera_clase(self):
+        pago = self._crear_pago(clases=1)
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+        )
+        self.assertEqual(pago.saldo_clases, 0)
+
+        cambiar_estado_asistencia(
+            asistencia=asistencia,
+            estado=Asistencia.Estado.JUSTIFICADA,
+            usuario=self.admin,
+        )
+        pago.refresh_from_db()
+        self.assertEqual(pago.saldo_clases, 1)
+
+        cambiar_estado_asistencia(
+            asistencia=asistencia,
+            estado=Asistencia.Estado.PRESENTE,
+            usuario=self.admin,
+        )
+        pago.refresh_from_db()
+        self.assertEqual(pago.saldo_clases, 0)
+
+    def test_presente_sin_pago_o_derecho_queda_deuda(self):
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.PRESENTE,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+
+    def test_plan_vencido_no_otorga_derecho(self):
+        plan = PaymentPlan.objects.create(
+            organizacion=self.organizacion,
+            nombre="Plan vencido",
+            num_clases=2,
+            precio=20000,
+            fecha_fin=date(2026, 6, 30),
+        )
+        self._crear_pago(clases=2, plan=plan)
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+
+    def test_plan_sin_saldo_no_consume_clase_adicional(self):
+        pago = self._crear_pago(clases=1)
+        primera = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        otra_sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=date(2026, 7, 16),
+        )
+        segunda = Asistencia.objects.create(sesion=otra_sesion, persona=self.estudiante)
+        self.assertEqual(
+            AttendanceConsumption.objects.get(asistencia=primera).estado,
+            AttendanceConsumption.Estado.CONSUMIDO,
+        )
+        self.assertEqual(
+            AttendanceConsumption.objects.get(asistencia=segunda).estado,
+            AttendanceConsumption.Estado.DEUDA,
+        )
+        self.assertEqual(pago.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(), 1)
+
+    def test_pago_de_otra_organizacion_no_otorga_derecho(self):
+        self._crear_pago(clases=3, organizacion=self.otra_organizacion)
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+
+    def test_eliminar_asistencia_elimina_consumo_y_recupera_saldo(self):
+        pago = self._crear_pago(clases=1)
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        self.assertEqual(pago.saldo_clases, 0)
+        asistencia.delete()
+        pago.refresh_from_db()
+        self.assertEqual(pago.saldo_clases, 1)
+        self.assertFalse(AttendanceConsumption.objects.filter(asistencia_id=asistencia.pk).exists())
+
+    def test_clase_liberada_es_explicita_auditable_y_reversible(self):
+        pago = self._crear_pago(clases=1)
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        with self.captureOnCommitCallbacks(execute=True):
+            liberacion, consumo = liberar_clase(
+                asistencia=asistencia,
+                motivo="Invitación institucional",
+                usuario=self.admin,
+            )
+        self.assertTrue(liberacion.activa)
+        self.assertEqual(liberacion.organizacion, self.organizacion)
+        self.assertEqual(liberacion.liberada_por, self.admin)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.PENDIENTE)
+        self.assertIsNone(consumo.pago)
+        pago.refresh_from_db()
+        self.assertEqual(pago.saldo_clases, 1)
+        self.assertTrue(AuditLog.objects.filter(objeto_id=str(liberacion.pk), resumen="Clase liberada").exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            liberacion, consumo = revertir_clase_liberada(
+                asistencia=asistencia,
+                usuario=self.admin,
+            )
+        self.assertFalse(liberacion.activa)
+        self.assertEqual(liberacion.revertida_por, self.admin)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                objeto_id=str(liberacion.pk),
+                resumen="Clase liberada revertida",
+            ).exists()
+        )
+
+    def test_liberar_clase_exige_motivo_y_es_idempotente_controlado(self):
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        with self.assertRaisesMessage(ValidationError, "motivo"):
+            liberar_clase(asistencia=asistencia, motivo="", usuario=self.admin)
+        liberar_clase(asistencia=asistencia, motivo="Primera liberación", usuario=self.admin)
+        with self.assertRaisesMessage(ValidationError, "ya tiene"):
+            liberar_clase(asistencia=asistencia, motivo="Duplicada", usuario=self.admin)
+        self.assertEqual(ClaseLiberada.objects.filter(asistencia=asistencia).count(), 1)
+
+    def test_matriz_permisos_sesion_por_asignacion_y_organizacion(self):
+        url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+        casos_get = (
+            (self.admin, 200),
+            (self.profesor_asignado, 200),
+            (self.profesor_no_asignado, 403),
+            (self.profesor_otra_org, 403),
+            (self.admin_otra_org, 403),
+        )
+        for usuario, esperado in casos_get:
+            with self.subTest(usuario=usuario.username):
+                self.client.force_login(usuario)
+                response = self.client.get(url, {"organizacion": self.organizacion.pk})
+                self.assertEqual(response.status_code, esperado)
+
+        self.client.force_login(self.profesor_asignado)
+        response = self.client.post(
+            url + f"?organizacion={self.organizacion.pk}",
+            {
+                "cambiar_estado_asistencia": "1",
+                "asistencia_id": Asistencia.objects.create(
+                    sesion=self.sesion,
+                    persona=self.estudiante,
+                    estado=Asistencia.Estado.AUSENTE,
+                ).pk,
+                "estado_asistencia": Asistencia.Estado.PRESENTE,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_profesora_no_puede_liberar_clase(self):
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        self.client.force_login(self.profesor_asignado)
+        response = self.client.post(
+            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+            + f"?organizacion={self.organizacion.pk}",
+            {
+                "liberar_clase": "1",
+                "asistencia_id": asistencia.pk,
+                "motivo_liberacion": "No autorizado",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ClaseLiberada.objects.filter(asistencia=asistencia).exists())
+
+
+class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
+    reset_sequences = True
+
+    def test_dos_asistencias_compiten_por_un_cupo_sin_sobreconsumo(self):
+        User = get_user_model()
+        organizacion = Organizacion.objects.create(
+            nombre="Org Concurrencia Sprint 2",
+            razon_social="Org Concurrencia Sprint 2 SpA",
+            rut="70.000.000-3",
+        )
+        admin = User.objects.create_user("admin_concurrencia_s2", password=TEST_PASSWORD)
+        disciplina = Disciplina.objects.create(organizacion=organizacion, nombre="Concurrencia")
+        estudiante = Persona.objects.create(nombres="Estudiante", apellidos="Concurrente")
+        pago = Payment.objects.create(
+            persona=estudiante,
+            organizacion=organizacion,
+            fecha_pago=date(2026, 7, 1),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        asistencias = []
+        for dia in (10, 11):
+            sesion = SesionClase.objects.create(
+                disciplina=disciplina,
+                fecha=date(2026, 7, dia),
+            )
+            asistencias.append(
+                Asistencia.objects.create(
+                    sesion=sesion,
+                    persona=estudiante,
+                    estado=Asistencia.Estado.AUSENTE,
+                )
+            )
+
+        def marcar_presente(asistencia_id):
+            close_old_connections()
+            try:
+                asistencia = Asistencia.objects.get(pk=asistencia_id)
+                usuario = get_user_model().objects.get(pk=admin.pk)
+                cambiar_estado_asistencia(
+                    asistencia=asistencia,
+                    estado=Asistencia.Estado.PRESENTE,
+                    usuario=usuario,
+                )
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            list(executor.map(marcar_presente, [item.pk for item in asistencias]))
+
+        estados = list(
+            AttendanceConsumption.objects.filter(asistencia__in=asistencias)
+            .order_by("id")
+            .values_list("estado", flat=True)
+        )
+        self.assertCountEqual(
+            estados,
+            [
+                AttendanceConsumption.Estado.CONSUMIDO,
+                AttendanceConsumption.Estado.DEUDA,
+            ],
+        )
+        self.assertEqual(
+            pago.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),
+            1,
+        )

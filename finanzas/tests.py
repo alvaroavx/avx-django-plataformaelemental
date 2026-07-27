@@ -1,13 +1,17 @@
 import csv
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import date
 from pathlib import Path
 from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from decimal import Decimal
 from openpyxl import load_workbook
 from unittest.mock import patch
@@ -17,6 +21,8 @@ from finanzas.documentos.services import parse_tax_document
 from finanzas.documentos.temp_storage import SESSION_KEY
 from finanzas.forms import DocumentoTributarioForm, PaymentForm, TransactionForm
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
+from finanzas.services.reconciliacion import reconciliar_integridad_dominio
+from finanzas.services.reversas import revertir_pago
 from finanzas.services.pagos import (
     crear_persona_estudiante_desde_modal,
     enriquecer_pagos_para_listado,
@@ -25,8 +31,9 @@ from finanzas.services.pagos import (
 )
 
 from asistencias.forms import PersonaRapidaForm
-from asistencias.models import Asistencia, Disciplina, SesionClase
+from asistencias.models import Asistencia, ClaseLiberada, Disciplina, SesionClase
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.test_factories import crear_usuario_con_rol
 
 from finanzas.models import (
     AttendanceConsumption,
@@ -3144,3 +3151,259 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
             texto_copiable_operativo_pago(pago),
             "Taller de Sin disciplina - Sin plan (Ana Diaz)",
         )
+
+
+class SprintDosReversaPagosTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Reversa Sprint 2",
+            razon_social="Org Reversa Sprint 2 SpA",
+            rut="71.000.000-1",
+        )
+        self.otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Reversa Sprint 2",
+            razon_social="Otra Reversa Sprint 2 SpA",
+            rut="71.000.000-2",
+        )
+        self.rol_admin = Rol.objects.create(nombre="Admin Reversa", codigo="ADMIN")
+        self.rol_finanzas = Rol.objects.create(nombre="Finanzas Reversa", codigo="FINANZAS")
+        self.rol_profesor = Rol.objects.create(nombre="Profesor Reversa", codigo="PROFESOR")
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante Reversa", codigo="ESTUDIANTE")
+        self.admin = self._crear_usuario_rol("admin_reversa", self.rol_admin, self.organizacion)
+        self.finanzas = self._crear_usuario_rol("finanzas_reversa", self.rol_finanzas, self.organizacion)
+        self.profesor = self._crear_usuario_rol("profesor_reversa", self.rol_profesor, self.organizacion)
+        self.admin_otra = self._crear_usuario_rol("admin_reversa_otra", self.rol_admin, self.otra_organizacion)
+        self.estudiante = Persona.objects.create(nombres="Alumno", apellidos="Reversa")
+        PersonaRol.objects.create(
+            persona=self.estudiante,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Disciplina Reversa",
+        )
+        self.sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=date(2026, 7, 15),
+        )
+
+    def _crear_usuario_rol(self, username, rol, organizacion):
+        return crear_usuario_con_rol(
+            username=username,
+            password=TEST_PASSWORD,
+            rol=rol,
+            organizacion=organizacion,
+            apellidos="Sprint",
+        )
+
+    def _crear_pago(self, *, clases=1):
+        return Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago=date(2026, 7, 2),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=20000,
+            clases_asignadas=clases,
+        )
+
+    def test_revertir_pago_preserva_historia_traza_y_recalcula_consumo(self):
+        pago = self._crear_pago()
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            revertido = revertir_pago(
+                pago=pago,
+                motivo="Transferencia anulada por banco",
+                usuario=self.admin,
+            )
+
+        self.assertEqual(revertido.pk, pago.pk)
+        self.assertIsNotNone(revertido.revertido_en)
+        self.assertEqual(revertido.revertido_por, self.admin)
+        self.assertEqual(revertido.motivo_reversa, "Transferencia anulada por banco")
+        consumo.refresh_from_db()
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.DEUDA)
+        self.assertIsNone(consumo.pago)
+        self.assertTrue(Payment.objects.filter(pk=pago.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(objeto_id=str(pago.pk), resumen="Pago revertido").exists())
+
+    def test_revertir_pago_reasigna_consumo_a_otro_derecho_valido(self):
+        primero = self._crear_pago()
+        segundo = self._crear_pago()
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.pago, primero)
+
+        revertir_pago(pago=primero, motivo="Pago duplicado", usuario=self.admin)
+
+        consumo.refresh_from_db()
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, segundo)
+
+    def test_revertir_pago_exige_motivo_e_impide_segunda_reversa(self):
+        pago = self._crear_pago()
+        with self.assertRaisesMessage(ValidationError, "motivo"):
+            revertir_pago(pago=pago, motivo="", usuario=self.admin)
+        revertir_pago(pago=pago, motivo="Primera reversa", usuario=self.admin)
+        with self.assertRaisesMessage(ValidationError, "ya fue revertido"):
+            revertir_pago(pago=pago, motivo="Segunda reversa", usuario=self.admin)
+
+    def test_reversa_pago_restringida_a_admin_de_la_organizacion(self):
+        pago = self._crear_pago()
+        url = (
+            reverse("finanzas:pago_revertir", kwargs={"pk": pago.pk})
+            + f"?organizacion={self.organizacion.pk}"
+        )
+        for usuario, esperado in (
+            (self.admin, 302),
+            (self.finanzas, 403),
+            (self.profesor, 403),
+            (self.admin_otra, 403),
+        ):
+            with self.subTest(usuario=usuario.username):
+                if pago.revertido_en:
+                    pago = self._crear_pago()
+                    url = (
+                        reverse("finanzas:pago_revertir", kwargs={"pk": pago.pk})
+                        + f"?organizacion={self.organizacion.pk}"
+                    )
+                self.client.force_login(usuario)
+                response = self.client.post(url, {"motivo": "Motivo de prueba"})
+                self.assertEqual(response.status_code, esperado)
+                pago.refresh_from_db()
+
+    def test_accion_reversa_solo_es_visible_para_admin_autorizado(self):
+        pago = self._crear_pago()
+        url = reverse("finanzas:pagos_list")
+        params = {
+            "periodo_mes": 7,
+            "periodo_anio": 2026,
+            "organizacion": self.organizacion.pk,
+        }
+        self.client.force_login(self.admin)
+        response_admin = self.client.get(url, params)
+        self.assertContains(
+            response_admin,
+            reverse("finanzas:pago_revertir", kwargs={"pk": pago.pk}),
+        )
+
+        for usuario in (self.finanzas, self.profesor, self.admin_otra):
+            with self.subTest(usuario=usuario.username):
+                self.client.force_login(usuario)
+                response = self.client.get(url, params)
+                if usuario == self.finanzas:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertNotContains(
+                        response,
+                        reverse("finanzas:pago_revertir", kwargs={"pk": pago.pk}),
+                    )
+                else:
+                    self.assertEqual(response.status_code, 403)
+
+    def test_listado_muestra_revertido_y_excluye_pago_de_resumen(self):
+        vigente = self._crear_pago(clases=2)
+        revertido = self._crear_pago(clases=3)
+        revertir_pago(pago=revertido, motivo="No vigente", usuario=self.admin)
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse("finanzas:pagos_list"),
+            {
+                "periodo_mes": 7,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Revertido")
+        self.assertEqual(response.context["total_clases_pagadas"], vigente.clases_asignadas)
+        self.assertEqual(response.context["total_pagos_monto"], vigente.monto_total)
+
+
+class SprintDosReconciliacionTests(TestCase):
+    def setUp(self):
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Reconciliación",
+            razon_social="Org Reconciliación SpA",
+            rut="71.000.000-3",
+        )
+        self.otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Reconciliación",
+            razon_social="Otra Reconciliación SpA",
+            rut="71.000.000-4",
+        )
+        self.estudiante = Persona.objects.create(nombres="Alumno", apellidos="Reconciliación")
+        self.disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Reconciliación",
+        )
+        self.sesion = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=date(2026, 7, 20),
+        )
+
+    def _pago(self, organizacion=None):
+        return Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=organizacion or self.organizacion,
+            fecha_pago=date(2026, 7, 1),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+
+    def test_reconciliacion_consistente_no_reporta_hallazgos(self):
+        self._pago()
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        resultado = reconciliar_integridad_dominio()
+        self.assertTrue(resultado["ok"])
+        self.assertFalse(any(resultado["resumen"].values()))
+
+        salida = StringIO()
+        call_command("reconciliar_integridad_dominio", stdout=salida)
+        self.assertIn("Sin inconsistencias de dominio", salida.getvalue())
+
+    def test_reconciliacion_detecta_consumido_sin_derecho_y_otra_organizacion(self):
+        pago_ajeno = self._pago(organizacion=self.otra_organizacion)
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion,
+            persona=self.estudiante,
+            estado=Asistencia.Estado.AUSENTE,
+        )
+        AttendanceConsumption.objects.filter(asistencia=asistencia).update(
+            estado=AttendanceConsumption.Estado.CONSUMIDO,
+            pago=pago_ajeno,
+        )
+        resultado = reconciliar_integridad_dominio()
+        self.assertFalse(resultado["ok"])
+        self.assertEqual(resultado["resumen"]["consumido_sin_derecho"], 1)
+        self.assertEqual(resultado["resumen"]["consumo_otra_organizacion"], 1)
+        self.assertEqual(resultado["resumen"]["estado_asistencia_incompatible"], 1)
+
+        with self.assertRaises(CommandError):
+            call_command("reconciliar_integridad_dominio", stdout=StringIO())
+
+    def test_reconciliacion_detecta_liberada_consumiendo_y_pago_revertido(self):
+        user = get_user_model().objects.create_user("audit_reconciliacion", password=TEST_PASSWORD)
+        pago = self._pago()
+        asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        ClaseLiberada.objects.create(
+            asistencia=asistencia,
+            organizacion=self.organizacion,
+            motivo="Inconsistencia inducida",
+            liberada_por=user,
+        )
+        Payment.objects.filter(pk=pago.pk).update(
+            revertido_en=timezone.now(),
+            revertido_por=user,
+            motivo_reversa="Inconsistencia inducida",
+        )
+        resultado = reconciliar_integridad_dominio()
+        self.assertEqual(resultado["resumen"]["clase_liberada_consumiendo"], 1)
+        self.assertEqual(resultado["resumen"]["pago_revertido_incluido"], 1)

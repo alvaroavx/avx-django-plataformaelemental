@@ -297,9 +297,20 @@ Regla:
 - Al registrar correctamente un pago, el redirect conserva los filtros vigentes y elimina `open=registrar_pago`; ante errores de validacion, el modal permanece abierto con el formulario ligado y sus errores.
 - Al editar un pago desde modal, el parametro `editar_pago` solo debe usarse para abrir el modal. Al cancelar, cerrar o guardar correctamente, la URL debe volver al listado preservando filtros, pero sin `editar_pago`, para evitar que el modal se reabra.
 - Al editar una transaccion, el campo HTML de fecha debe precargar el valor persistido en formato `YYYY-MM-DD` y conservar el valor enviado cuando el formulario es invalido.
+- Un pago no se elimina desde la aplicación. La acción disponible es una reversa controlada que conserva el registro, exige motivo, guarda autor y fecha, mantiene la organización y rechaza una segunda reversa.
+- Solo administración autorizada de la organización puede revertir pagos; finanzas, profesoras y otras organizaciones no pueden hacerlo.
+- Un pago revertido se muestra como histórico, no otorga clases y se excluye de saldos, totales y reportes operacionales vigentes.
+- Al revertir un pago, sus consumos se recalculan: se reasignan a otro derecho válido del mismo periodo o quedan como deuda.
 - Las clases pagadas no se arrastran entre meses.
 - Una asistencia solo puede consumirse contra pagos del mismo mes y anio de la clase.
 - Si no existe pago del mismo mes con saldo disponible, la asistencia debe generar deuda.
+- Un pago asociado a plan solo otorga derecho si la fecha de la clase está dentro de `fecha_inicio` y `fecha_fin` cuando esos límites existen. Un pago directo sin plan conserva el derecho por sus clases asignadas.
+
+## Reconciliación de integridad
+
+`python manage.py reconciliar_integridad_dominio` ejecuta un diagnóstico de solo lectura.
+
+Detecta consumos duplicados, consumidos sin derecho válido, clases liberadas consumiendo, cruces de organización o persona, pagos revertidos todavía imputados y estados incompatibles entre asistencia y consumo. La salida contiene conteos e identificadores técnicos; devuelve error si encuentra problemas y nunca repara datos.
 - Si luego aparece un pago, solo puede imputar deudas del mismo mes y anio.
 
 ## Carga asistida de documentos

@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -230,6 +231,15 @@ class Payment(TimeStampedModel):
     monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     clases_asignadas = models.PositiveIntegerField(default=0)
     observaciones = models.TextField(blank=True)
+    revertido_en = models.DateTimeField(null=True, blank=True)
+    revertido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_revertidos",
+    )
+    motivo_reversa = models.TextField(blank=True)
 
     class Meta:
         verbose_name = "Pago"
@@ -267,11 +277,19 @@ class Payment(TimeStampedModel):
 
     @property
     def clases_consumidas(self):
+        if self.revertido_en:
+            return 0
         return self.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count()
 
     @property
     def saldo_clases(self):
+        if self.revertido_en:
+            return 0
         return self.clases_asignadas - self.clases_consumidas
+
+    @property
+    def esta_revertido(self):
+        return self.revertido_en is not None
 
     def save(self, *args, **kwargs):
         if self.plan_id and not self.clases_asignadas:

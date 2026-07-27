@@ -4,7 +4,8 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
 from django.http import JsonResponse
@@ -19,8 +20,11 @@ from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
     ACCION_ADMINISTRAR_SESIONES,
+    ACCION_EDITAR_ASISTENCIAS,
     ACCION_EXPORTAR_DATOS,
+    ACCION_LIBERAR_CLASE,
     ACCION_OPERAR_PAGOS,
+    ACCION_VER_SESION,
     ACCION_VER_FINANZAS,
     permiso_requerido,
     usuario_tiene_permiso,
@@ -44,9 +48,10 @@ from .forms import (
     SesionBasicaForm,
     SesionesMasivasForm,
 )
-from .models import Asistencia, Disciplina, SesionClase
+from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
 from .selectors import asistencias_export_queryset, estudiantes_operativos_periodo
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
+from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
 from .utils import ROLE_ADMIN, usuario_tiene_roles
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
@@ -197,12 +202,46 @@ def _reactivar_estudiante_para_asistencia(persona, organizacion):
     ).update(activo=True)
 
 
-def _usuario_puede_operar_sesion(user, sesion):
-    if not usuario_tiene_roles(user, [ROLE_ADMIN]):
+def _usuario_es_profesor_asignado(user, sesion):
+    persona = getattr(user, "persona", None)
+    if not persona:
         return False
+    return (
+        sesion.profesores.filter(pk=persona.pk).exists()
+        and usuario_tiene_permiso(
+            user,
+            ACCION_VER_SESION,
+            organizacion=sesion.disciplina.organizacion,
+        )
+    )
+
+
+def _usuario_puede_administrar_sesion(user, sesion):
     return usuario_tiene_permiso(
         user,
         ACCION_ADMINISTRAR_SESIONES,
+        organizacion=sesion.disciplina.organizacion,
+    )
+
+
+def _usuario_puede_ver_sesion(user, sesion):
+    return _usuario_puede_administrar_sesion(user, sesion) or _usuario_es_profesor_asignado(user, sesion)
+
+
+def _usuario_puede_registrar_asistencia(user, sesion):
+    if _usuario_puede_administrar_sesion(user, sesion):
+        return True
+    return _usuario_es_profesor_asignado(user, sesion) and usuario_tiene_permiso(
+        user,
+        ACCION_EDITAR_ASISTENCIAS,
+        organizacion=sesion.disciplina.organizacion,
+    )
+
+
+def _usuario_puede_liberar_clase(user, sesion):
+    return usuario_tiene_permiso(
+        user,
+        ACCION_LIBERAR_CLASE,
         organizacion=sesion.disciplina.organizacion,
     )
 
@@ -236,12 +275,10 @@ def _verificar_acceso_sesion_json(user, pk):
     """
     if not user.is_authenticated:
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
-    if not usuario_tiene_permiso(user, ACCION_ADMINISTRAR_SESIONES):
+    if not usuario_tiene_permiso(user, ACCION_VER_SESION):
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
     sesion = _sesion_para_endpoint_json(pk)
-    if not sesion or not usuario_tiene_permiso(
-        user, ACCION_ADMINISTRAR_SESIONES, organizacion=sesion.disciplina.organizacion
-    ):
+    if not sesion or not _usuario_puede_registrar_asistencia(user, sesion):
         return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
     return sesion, None
 
@@ -314,6 +351,7 @@ def dashboard(request):
     estudiantes_ids = list(estudiantes_qs.values_list("id", flat=True))
     pagos_periodo_qs = Payment.objects.filter(
         persona_id__in=estudiantes_ids,
+        revertido_en__isnull=True,
         **filtros_periodo("fecha_pago", request=request),
     )
     consumos_periodo_qs = AttendanceConsumption.objects.filter(
@@ -984,7 +1022,7 @@ def asistencias_list(request):
     return render(request, "asistencias/asistencias_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@login_required
 def sesion_detail(request, pk):
     """Detalle de la sesión y estado de sus asistentes."""
     context = nav_context(request)
@@ -993,7 +1031,10 @@ def sesion_detail(request, pk):
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
         pk=pk,
     )
-    if not _usuario_puede_operar_sesion(request.user, sesion):
+    puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
+    puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
+    puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
+    if not _usuario_puede_ver_sesion(request.user, sesion):
         raise PermissionDenied("No tienes permisos para acceder a esta sesión.")
     estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
@@ -1001,6 +1042,8 @@ def sesion_detail(request, pk):
     open_nueva_persona = False
     if request.method == "POST":
         if "eliminar_sesion" in request.POST:
+            if not puede_administrar:
+                raise PermissionDenied("No tienes permisos para eliminar esta sesión.")
             sesion_resumen = str(sesion)
             registrar_auditoria(
                 usuario=request.user,
@@ -1015,6 +1058,8 @@ def sesion_detail(request, pk):
             messages.success(request, f"Sesión eliminada: {sesion_resumen}.")
             return redirect(_url_con_filtros(request, "asistencias:sesiones_list"))
         elif "crear_persona_estudiante" in request.POST:
+            if not puede_administrar:
+                raise PermissionDenied("No tienes permisos para crear personas desde esta sesión.")
             persona_form = PersonaRapidaForm(request.POST)
             open_nueva_persona = True
             if persona_form.is_valid():
@@ -1077,6 +1122,8 @@ def sesion_detail(request, pk):
                         messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
                     return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "eliminar_asistente" in request.POST:
+            if not puede_registrar:
+                raise PermissionDenied("No tienes permisos para corregir asistencias en esta sesión.")
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
             registrar_auditoria(
@@ -1092,6 +1139,8 @@ def sesion_detail(request, pk):
             messages.success(request, f"Asistente eliminado de la sesión: {persona_nombre}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "cambiar_estado" in request.POST:
+            if not puede_administrar:
+                raise PermissionDenied("No tienes permisos para cambiar el estado de la sesión.")
             estado = request.POST.get("estado")
             if estado in dict(SesionClase.Estado.choices):
                 estado_anterior = sesion.estado
@@ -1111,7 +1160,65 @@ def sesion_detail(request, pk):
                 )
                 messages.success(request, "Estado de la sesión actualizado.")
                 return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
+        elif "cambiar_estado_asistencia" in request.POST:
+            if not puede_registrar:
+                raise PermissionDenied("No tienes permisos para corregir asistencias en esta sesión.")
+            asistencia = get_object_or_404(
+                Asistencia,
+                pk=request.POST.get("asistencia_id"),
+                sesion=sesion,
+            )
+            try:
+                cambiar_estado_asistencia(
+                    asistencia=asistencia,
+                    estado=request.POST.get("estado_asistencia"),
+                    usuario=request.user,
+                )
+            except ValidationError as exc:
+                messages.error(request, exc.messages[0])
+            else:
+                messages.success(request, "Estado de asistencia actualizado.")
+            return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
+        elif "liberar_clase" in request.POST:
+            if not puede_liberar:
+                raise PermissionDenied("No tienes permisos para liberar clases.")
+            asistencia = get_object_or_404(
+                Asistencia,
+                pk=request.POST.get("asistencia_id"),
+                sesion=sesion,
+            )
+            try:
+                liberar_clase(
+                    asistencia=asistencia,
+                    motivo=request.POST.get("motivo_liberacion"),
+                    usuario=request.user,
+                )
+            except ValidationError as exc:
+                messages.error(request, exc.messages[0])
+            else:
+                messages.success(request, "Clase liberada correctamente.")
+            return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
+        elif "revertir_clase_liberada" in request.POST:
+            if not puede_liberar:
+                raise PermissionDenied("No tienes permisos para revertir clases liberadas.")
+            asistencia = get_object_or_404(
+                Asistencia,
+                pk=request.POST.get("asistencia_id"),
+                sesion=sesion,
+            )
+            try:
+                revertir_clase_liberada(
+                    asistencia=asistencia,
+                    usuario=request.user,
+                )
+            except ValidationError as exc:
+                messages.error(request, exc.messages[0])
+            else:
+                messages.success(request, "Clase liberada revertida.")
+            return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "agregar_asistentes" in request.POST:
+            if not puede_registrar:
+                raise PermissionDenied("No tienes permisos para registrar asistencias en esta sesión.")
             estudiantes_ids = request.POST.getlist("estudiantes")
             estudiantes_seleccionados = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
             creados = 0
@@ -1149,10 +1256,19 @@ def sesion_detail(request, pk):
             messages.success(request, f"Asistencias agregadas: {creados}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
 
-    asistencias = sesion.asistencias.select_related("persona", "consumo_financiero__pago").order_by("-registrada_en")
+    asistencias = sesion.asistencias.select_related(
+        "persona",
+        "consumo_financiero__pago",
+        "clase_liberada",
+    ).order_by("-registrada_en")
     for asistencia in asistencias:
         consumo = getattr(asistencia, "consumo_financiero", None)
-        if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
+        liberacion = getattr(asistencia, "clase_liberada", None)
+        asistencia.clase_liberada_activa = bool(liberacion and liberacion.revertida_en is None)
+        if asistencia.clase_liberada_activa:
+            asistencia.estado_financiero_label = "Liberada"
+            asistencia.estado_financiero_clase = "info"
+        elif consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
             asistencia.estado_financiero_label = "Pagada"
             asistencia.estado_financiero_clase = "success"
         elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
@@ -1174,6 +1290,9 @@ def sesion_detail(request, pk):
             "asistentes_ids": asistentes_ids,
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,
+            "puede_administrar_sesion": puede_administrar,
+            "puede_registrar_asistencia": puede_registrar,
+            "puede_liberar_clase": puede_liberar,
             "back_url": request.META.get("HTTP_REFERER") or _url_con_filtros(request, "asistencias:sesiones_list"),
         }
     )
@@ -1321,7 +1440,7 @@ def sesion_edit(request, pk):
         SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores"),
         pk=pk,
     )
-    if not _usuario_puede_operar_sesion(request.user, sesion):
+    if not _usuario_puede_administrar_sesion(request.user, sesion):
         raise PermissionDenied("No tienes permisos para editar esta sesión.")
     form = SesionBasicaForm(
         request.POST or None,

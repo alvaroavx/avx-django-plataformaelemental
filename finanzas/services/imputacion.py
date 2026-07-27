@@ -1,7 +1,8 @@
-from django.db.models import Count, Q, Sum
+from django.db import transaction
+from django.db.models import Sum
 from django.utils.dateparse import parse_date
 
-from asistencias.models import Asistencia
+from asistencias.models import Asistencia, ClaseLiberada
 from personas.models import Persona
 from plataformaelemental.context import aplicar_periodo
 
@@ -29,8 +30,55 @@ def _misma_clave_periodo_mensual(fecha_a, fecha_b):
     return fecha_a.year == fecha_b.year and fecha_a.month == fecha_b.month
 
 
+def _plan_vigente_para_fecha(pago, fecha):
+    if not pago.plan_id:
+        return True
+    if pago.plan.fecha_inicio and fecha < pago.plan.fecha_inicio:
+        return False
+    if pago.plan.fecha_fin and fecha > pago.plan.fecha_fin:
+        return False
+    return True
+
+
+def pago_otorga_derecho(pago, asistencia, *, consumo_actual=None):
+    if pago.revertido_en:
+        return False
+    if pago.persona_id != asistencia.persona_id:
+        return False
+    if pago.organizacion_id != asistencia.sesion.disciplina.organizacion_id:
+        return False
+    if not _misma_clave_periodo_mensual(pago.fecha_pago, asistencia.sesion.fecha):
+        return False
+    if not _plan_vigente_para_fecha(pago, asistencia.sesion.fecha):
+        return False
+    usados = pago.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO)
+    if consumo_actual and consumo_actual.pago_id == pago.pk:
+        usados = usados.exclude(pk=consumo_actual.pk)
+    return pago.clases_asignadas > usados.count()
+
+
+def consumo_tiene_derecho_valido(consumo):
+    if consumo.estado != AttendanceConsumption.Estado.CONSUMIDO or not consumo.pago_id:
+        return False
+    if consumo.asistencia.estado != Asistencia.Estado.PRESENTE:
+        return False
+    if ClaseLiberada.objects.filter(asistencia=consumo.asistencia, revertida_en__isnull=True).exists():
+        return False
+    return pago_otorga_derecho(
+        consumo.pago,
+        consumo.asistencia,
+        consumo_actual=consumo,
+    )
+
+
+@transaction.atomic
 def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
-    consumo, _ = AttendanceConsumption.objects.get_or_create(
+    asistencia = (
+        Asistencia.objects.select_for_update()
+        .select_related("persona", "sesion__disciplina__organizacion")
+        .get(pk=asistencia.pk)
+    )
+    consumo, _ = AttendanceConsumption.objects.select_for_update().get_or_create(
         asistencia=asistencia,
         defaults={
             "persona": asistencia.persona,
@@ -41,37 +89,52 @@ def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
     consumo.persona = asistencia.persona
     consumo.clase_fecha = asistencia.sesion.fecha
 
-    if asistencia.estado != Asistencia.Estado.PRESENTE:
+    esta_liberada = ClaseLiberada.objects.filter(
+        asistencia=asistencia,
+        revertida_en__isnull=True,
+    ).exists()
+    if asistencia.estado != Asistencia.Estado.PRESENTE or esta_liberada:
         consumo.pago = None
         consumo.estado = AttendanceConsumption.Estado.PENDIENTE
         consumo.save(update_fields=["persona", "clase_fecha", "pago", "estado", "actualizado_en"])
         return consumo
 
-    if consumo.estado == AttendanceConsumption.Estado.CONSUMIDO and consumo.pago_id:
-        return consumo
+    if consumo.pago_id:
+        pago_actual = (
+            Payment.objects.select_for_update(of=("self",))
+            .select_related("plan")
+            .filter(pk=consumo.pago_id)
+            .first()
+        )
+        if pago_actual and pago_otorga_derecho(
+            pago_actual,
+            asistencia,
+            consumo_actual=consumo,
+        ):
+            consumo.estado = AttendanceConsumption.Estado.CONSUMIDO
+            consumo.save(update_fields=["persona", "clase_fecha", "estado", "actualizado_en"])
+            return consumo
 
     pagos = (
-        Payment.objects.filter(
+        Payment.objects.select_for_update(of=("self",))
+        .select_related("plan")
+        .filter(
             persona=asistencia.persona,
             organizacion=asistencia.sesion.disciplina.organizacion,
+            revertido_en__isnull=True,
+            clases_asignadas__gt=0,
             **_filtro_mismo_periodo_mensual(asistencia.sesion.fecha, "fecha_pago"),
         )
-        .annotate(
-            consumos_contador=Count(
-                "consumos",
-                filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
-            )
-        )
-        .filter(clases_asignadas__gt=0)
         .order_by("fecha_pago", "id")
     )
-
-    pago_disponible = None
-    for pago in pagos:
-        if (pago.clases_asignadas - pago.consumos_contador) > 0:
-            pago_disponible = pago
-            break
-
+    pago_disponible = next(
+        (
+            pago
+            for pago in pagos
+            if pago_otorga_derecho(pago, asistencia, consumo_actual=consumo)
+        ),
+        None,
+    )
     consumo.pago = pago_disponible
     consumo.estado = (
         AttendanceConsumption.Estado.CONSUMIDO
@@ -83,7 +146,7 @@ def asignar_consumo_asistencia(asistencia: Asistencia) -> AttendanceConsumption:
 
 
 def resumen_financiero_estudiante(persona: Persona, organizacion=None):
-    pagos = Payment.objects.filter(persona=persona)
+    pagos = Payment.objects.filter(persona=persona, revertido_en__isnull=True)
     consumos = AttendanceConsumption.objects.filter(persona=persona)
     if organizacion:
         pagos = pagos.filter(organizacion=organizacion)
@@ -114,7 +177,7 @@ def resumen_financiero_estudiante_periodo(
     mes=None,
     anio=None,
 ):
-    pagos = Payment.objects.filter(persona=persona)
+    pagos = Payment.objects.filter(persona=persona, revertido_en__isnull=True)
     consumos = AttendanceConsumption.objects.filter(persona=persona)
     if mes is not None or anio is not None:
         pagos = aplicar_periodo(pagos, "fecha_pago", mes=mes, anio=anio)
@@ -134,20 +197,36 @@ def resumen_financiero_estudiante_periodo(
     return _resumen_financiero_estudiante_queryset(pagos, consumos)
 
 
+@transaction.atomic
 def asociar_asistencia_a_pago(asistencia: Asistencia, pago: Payment) -> AttendanceConsumption:
+    asistencia = Asistencia.objects.select_for_update().select_related(
+        "persona",
+        "sesion__disciplina__organizacion",
+    ).get(pk=asistencia.pk)
+    pago = (
+        Payment.objects.select_for_update(of=("self",))
+        .select_related("plan")
+        .get(pk=pago.pk)
+    )
     if asistencia.estado != Asistencia.Estado.PRESENTE:
         raise ValueError("Solo se pueden asociar asistencias presentes a un pago.")
+    if ClaseLiberada.objects.filter(asistencia=asistencia, revertida_en__isnull=True).exists():
+        raise ValueError("Una clase liberada no puede asociarse a un pago.")
     if pago.persona_id != asistencia.persona_id:
         raise ValueError("El pago seleccionado no corresponde a la misma persona.")
     if pago.organizacion_id != asistencia.sesion.disciplina.organizacion_id:
         raise ValueError("El pago seleccionado pertenece a otra organizacion.")
     if not _misma_clave_periodo_mensual(pago.fecha_pago, asistencia.sesion.fecha):
         raise ValueError("Solo se pueden asociar pagos del mismo mes y anio de la asistencia.")
-
-    consumo = getattr(asistencia, "consumo_financiero", None) or asignar_consumo_asistencia(asistencia)
-    if consumo.pago_id != pago.id and pago.saldo_clases <= 0:
+    if pago.revertido_en:
+        raise ValueError("El pago seleccionado está revertido.")
+    if not _plan_vigente_para_fecha(pago, asistencia.sesion.fecha):
+        raise ValueError("El plan del pago no está vigente para la fecha de la asistencia.")
+    consumo = AttendanceConsumption.objects.filter(asistencia=asistencia).first()
+    if not pago_otorga_derecho(pago, asistencia, consumo_actual=consumo):
         raise ValueError("El pago seleccionado no tiene saldo disponible.")
 
+    consumo = consumo or asignar_consumo_asistencia(asistencia)
     consumo.persona = asistencia.persona
     consumo.clase_fecha = asistencia.sesion.fecha
     consumo.pago = pago
@@ -156,19 +235,36 @@ def asociar_asistencia_a_pago(asistencia: Asistencia, pago: Payment) -> Attendan
     return consumo
 
 
+@transaction.atomic
 def imputar_pago_a_deudas(pago: Payment) -> int:
+    pago = (
+        Payment.objects.select_for_update(of=("self",))
+        .select_related("plan")
+        .get(pk=pago.pk)
+    )
+    if pago.revertido_en:
+        return 0
     saldo = pago.saldo_clases
     if saldo <= 0:
         return 0
-    deudas = AttendanceConsumption.objects.filter(
-        persona=pago.persona,
-        asistencia__sesion__disciplina__organizacion=pago.organizacion,
-        **_filtro_mismo_periodo_mensual(pago.fecha_pago, "clase_fecha"),
-        estado=AttendanceConsumption.Estado.DEUDA,
-        pago__isnull=True,
-    ).order_by("clase_fecha", "id")[:saldo]
+    deudas = (
+        AttendanceConsumption.objects.select_for_update()
+        .select_related("asistencia__sesion__disciplina__organizacion")
+        .filter(
+            persona=pago.persona,
+            asistencia__sesion__disciplina__organizacion=pago.organizacion,
+            **_filtro_mismo_periodo_mensual(pago.fecha_pago, "clase_fecha"),
+            estado=AttendanceConsumption.Estado.DEUDA,
+            pago__isnull=True,
+        )
+        .order_by("clase_fecha", "id")
+    )
     actualizadas = 0
     for consumo in deudas:
+        if actualizadas >= saldo:
+            break
+        if not pago_otorga_derecho(pago, consumo.asistencia, consumo_actual=consumo):
+            continue
         consumo.pago = pago
         consumo.estado = AttendanceConsumption.Estado.CONSUMIDO
         consumo.save(update_fields=["pago", "estado", "actualizado_en"])

@@ -1,6 +1,6 @@
 # Modelo De Datos
 
-Fecha de actualizacion: 2026-05-25
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 Este documento resume el mapa relacional vigente de Plataforma Elemental.
@@ -83,6 +83,14 @@ erDiagram
         date clase_fecha
         string estado
     }
+    CLASE_LIBERADA {
+        int id PK
+        int asistencia_id UK
+        int organizacion_id FK
+        string motivo
+        datetime liberada_en
+        datetime revertida_en
+    }
     DOCUMENTO_TRIBUTARIO {
         int id PK
         int organizacion_id FK
@@ -130,6 +138,7 @@ erDiagram
     PAYMENT_PLAN ||--o{ PAYMENT : define_clases_precio
     PAYMENT ||--o{ ATTENDANCE_CONSUMPTION : consume
     ASISTENCIA ||--|| ATTENDANCE_CONSUMPTION : genera
+    ASISTENCIA ||--o| CLASE_LIBERADA : exceptua
     PERSONA ||--o{ ATTENDANCE_CONSUMPTION : acumula
 
     ORGANIZACION ||--o{ DOCUMENTO_TRIBUTARIO : registra
@@ -156,10 +165,12 @@ erDiagram
 - `BloqueHorario`: horario recurrente opcionalmente asociado a disciplina.
 - `SesionClase`: clase concreta en una fecha, con disciplina, bloque opcional, profesores y estado.
 - `Asistencia`: registro de persona en una sesion, con estado presente, ausente o justificada.
+- `ClaseLiberada`: excepcion historica y reversible que evita cobro sin eliminar la asistencia.
 
 ### Finanzas
 - `PaymentPlan`: plan comercial por organizacion, con clases y precio.
 - `Payment`: pago operacional de clases asociado a persona, organizacion, plan y opcionalmente documento tributario.
+- `Payment` conserva motivo, autor y fecha cuando se revierte; una reversa no elimina el registro.
 - `AttendanceConsumption`: imputacion financiera de una asistencia contra un pago o deuda.
 - `DocumentoTributario`: snapshot fiscal con folio, emisor, receptor, montos, archivos, metadata y contraparte opcional.
 - `Category`: categoria contable para transacciones.

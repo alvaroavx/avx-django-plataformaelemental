@@ -5,6 +5,7 @@ from pathlib import Path
 from decimal import Decimal
 
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.db import IntegrityError
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
@@ -41,12 +42,14 @@ from .decorators import (
     exportar_finanzas_required,
     finanzas_read_required,
     pagos_required,
+    revertir_pago_required,
     transacciones_required,
 )
 from personas.permissions import (
     ACCION_OPERAR_DOCUMENTOS,
     ACCION_OPERAR_PAGOS,
     ACCION_OPERAR_TRANSACCIONES,
+    ACCION_REVERTIR_PAGO,
     usuario_tiene_permiso,
 )
 from .forms import (
@@ -56,6 +59,7 @@ from .forms import (
     DocumentoTributarioImportUploadForm,
     PaymentForm,
     PaymentPlanForm,
+    ReversaPagoForm,
     TransactionForm,
 )
 from .forms_helpers import (
@@ -92,6 +96,7 @@ from .services.pagos import (
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
 )
+from .services.reversas import revertir_pago
 from .services.reportes import (
     PAGOS_ALUMNOS_XLSX_HEADERS,
     PAGOS_CSV_HEADERS,
@@ -479,6 +484,7 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             _queryset_en_organizacion_activa(
                 Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"), request
             ),
+            revertido_en__isnull=True,
             pk=editar_pago_id,
         )
         edit_form = PaymentForm(
@@ -507,6 +513,11 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,
             "open_registrar_pago": request.GET.get("open") == "registrar_pago",
+            "puede_revertir_pago": usuario_tiene_permiso(
+                request.user,
+                ACCION_REVERTIR_PAGO,
+                organizacion=organizacion,
+            ),
             "ayuda_seccion": _ayuda_finanzas("pagos"),
         }
     )
@@ -575,7 +586,10 @@ def pagos_list(request):
 
 @pagos_required
 def pago_edit(request, pk):
-    pago = get_object_or_404(_queryset_en_organizacion_activa(Payment.objects.all(), request), pk=pk)
+    pago = get_object_or_404(
+        _queryset_en_organizacion_activa(Payment.objects.filter(revertido_en__isnull=True), request),
+        pk=pk,
+    )
     if request.method == "GET":
         return redirect(_url_pagos_list_con_edicion(request, pago.pk))
 
@@ -627,26 +641,31 @@ def pago_detail(request, pk):
     return render(request, "finanzas/pago_detail.html", context)
 
 
-@pagos_required
-def pago_delete(request, pk):
+@revertir_pago_required
+def pago_revertir(request, pk):
     pago = get_object_or_404(_queryset_en_organizacion_activa(Payment.objects.all(), request), pk=pk)
+    form = ReversaPagoForm(request.POST or None)
     if request.method == "POST":
-        registrar_auditoria(
-            usuario=request.user,
-            accion=AuditLog.ACCION_ELIMINAR,
-            dominio="finanzas",
-            objeto=pago,
-            organizacion=pago.organizacion,
-            resumen="Pago eliminado",
-            metadata=_snapshot_pago(pago),
-        )
-        pago.delete()
-        messages.success(request, "Pago eliminado.")
-        return _redirect_with_query(request, "finanzas:pagos_list")
+        if form.is_valid():
+            try:
+                revertir_pago(
+                    pago=pago,
+                    motivo=form.cleaned_data["motivo"],
+                    usuario=request.user,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc.messages[0])
+            else:
+                messages.success(request, "Pago revertido.")
+                return _redirect_with_query(request, "finanzas:pagos_list")
     return render(
         request,
-        "finanzas/confirm_delete.html",
-        {"obj": pago, "title": "Eliminar pago", "back_url": _url_with_query(request, "finanzas:pagos_list")},
+        "finanzas/pago_revertir.html",
+        {
+            "pago": pago,
+            "form": form,
+            "back_url": _url_with_query(request, "finanzas:pagos_list"),
+        },
     )
 
 

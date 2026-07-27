@@ -259,6 +259,20 @@ class PaymentForm(forms.ModelForm):
         return cleaned
 
 
+class ReversaPagoForm(forms.Form):
+    motivo = forms.CharField(
+        required=True,
+        min_length=3,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Indica por qué se revierte este pago",
+            }
+        ),
+    )
+
+
 class DocumentoTributarioForm(forms.ModelForm):
     monto_neto = forms.CharField(required=False)
     monto_exento = forms.CharField(required=False)

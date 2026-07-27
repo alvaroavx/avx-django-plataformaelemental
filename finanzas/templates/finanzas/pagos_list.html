@@ -124,11 +124,16 @@
         </thead>
         <tbody>
           {% for pago in pagos %}
-          <tr>
+          <tr{% if pago.esta_revertido %} class="table-secondary"{% endif %}>
             <td data-order="{{ pago.fecha_pago|date:'Ymd' }}">{{ pago.fecha_pago|date:"d/m/Y" }}</td>
             <td>{{ pago.persona }}</td>
             <td>{{ pago.plan|default:"-" }}</td>
-            <td data-order="{{ pago.monto_iva }}">
+            <td>
+              {% if pago.esta_revertido %}
+                <span class="badge text-bg-secondary">Revertido</span>
+              {% else %}
+                <span class="badge text-bg-success">Vigente</span>
+              {% endif %}
               <span class="badge {{ pago.estado_fiscal_badge_class }}">{{ pago.estado_fiscal_label }}</span>
             </td>
             <td data-order="{{ pago.monto_neto }}">
@@ -187,12 +192,16 @@
               <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:pago_detail' pago.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Detalle">
                 <i class="bi bi-eye"></i><span class="finanzas-btn-label">Detalle</span>
               </a>
+              {% if not pago.esta_revertido %}
               <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ pago.url_edicion }}" title="Editar">
                 <i class="bi bi-pencil"></i><span class="finanzas-btn-label">Editar</span>
               </a>
-              <a class="btn btn-sm btn-outline-danger finanzas-btn" href="{% url 'finanzas:pago_delete' pago.pk %}?{{ request.GET.urlencode }}" title="Eliminar">
-                <i class="bi bi-trash"></i><span class="finanzas-btn-label">Eliminar</span>
-              </a>
+              {% if puede_revertir_pago %}
+                <a class="btn btn-sm btn-outline-warning finanzas-btn" href="{% url 'finanzas:pago_revertir' pago.pk %}?{{ request.GET.urlencode }}" title="Revertir">
+                  <i class="bi bi-arrow-counterclockwise"></i><span class="finanzas-btn-label">Revertir</span>
+                </a>
+              {% endif %}
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

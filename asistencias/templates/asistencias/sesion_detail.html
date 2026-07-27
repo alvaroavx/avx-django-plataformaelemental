@@ -16,13 +16,16 @@
       <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}" title="Volver" aria-label="Volver">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
       </a>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-        <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>
-      </a>
+      {% if puede_administrar_sesion %}
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+          <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>
+        </a>
+      {% endif %}
       <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
       </a>
     </div>
+    {% if puede_administrar_sesion %}
     <div class="d-flex gap-2">
       <button class="btn btn-success btn-sm" type="button" title="Nueva persona" data-bs-toggle="modal" data-bs-target="#nuevaPersonaSesionModal">
         <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
@@ -34,6 +37,7 @@
         </button>
       </form>
     </div>
+    {% endif %}
   </div>
 
   <div class="card mb-3">
@@ -63,6 +67,7 @@
           {% else %}
             <span class="badge text-bg-secondary">Cancelada</span>
           {% endif %}
+          {% if puede_administrar_sesion %}
           <form method="post" class="mt-2">
             {% csrf_token %}
             <select name="estado" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
@@ -72,6 +77,7 @@
             </select>
             <input type="hidden" name="cambiar_estado" value="1">
           </form>
+          {% endif %}
           {% if sesion.cupo_maximo %}
             <div class="text-muted small mt-1">Cupo {{ sesion.cupo_maximo }}</div>
           {% endif %}
@@ -89,6 +95,7 @@
     </div>
   </div>
 
+  {% if puede_registrar_asistencia %}
   <div class="card mb-3">
     <div class="card-header">Agregar asistente</div>
     <div class="card-body">
@@ -98,6 +105,7 @@
       <p class="text-muted small mt-1 mb-0">Toca un nombre para agregarlo. El campo se limpia automáticamente.</p>
     </div>
   </div>
+  {% endif %}
 
   <div class="card mt-3">
     <div class="card-header">Listado de asistentes</div>
@@ -116,10 +124,56 @@
           {% for item in asistencias %}
           <tr>
             <td><a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
-            <td>{{ item.get_estado_display }}</td>
-            <td><span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span></td>
+            <td>
+              {% if puede_registrar_asistencia %}
+                <form method="post" class="d-flex gap-2 align-items-center">
+                  {% csrf_token %}
+                  <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                  <select name="estado_asistencia" class="form-select form-select-sm" aria-label="Estado de asistencia de {{ item.persona }}">
+                    {% for value, label in item.Estado.choices %}
+                      <option value="{{ value }}" {% if value == item.estado %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn btn-sm btn-outline-primary" name="cambiar_estado_asistencia" type="submit">Guardar</button>
+                </form>
+              {% else %}
+                {{ item.get_estado_display }}
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
+              {% if item.clase_liberada_activa %}
+                <div class="small text-muted mt-1">{{ item.clase_liberada.motivo }}</div>
+              {% endif %}
+            </td>
             <td>{{ item.registrada_en|date:"H:i" }}</td>
             <td class="text-end">
+              {% if puede_liberar_clase %}
+                {% if item.clase_liberada_activa %}
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                    <button class="btn btn-sm btn-outline-warning" name="revertir_clase_liberada" type="submit">
+                      Revertir liberación
+                    </button>
+                  </form>
+                {% else %}
+                  <form method="post" class="d-inline-flex gap-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                    <label class="visually-hidden" for="motivo-liberacion-{{ item.pk }}">Motivo</label>
+                    <input
+                      id="motivo-liberacion-{{ item.pk }}"
+                      class="form-control form-control-sm"
+                      name="motivo_liberacion"
+                      required
+                      placeholder="Motivo"
+                    >
+                    <button class="btn btn-sm btn-outline-info" name="liberar_clase" type="submit">Liberar</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+              {% if puede_registrar_asistencia %}
               <form method="post" class="d-inline" onsubmit="return window.confirm('Se eliminara este asistente de la sesión. ¿Continuar?');">
                 {% csrf_token %}
                 <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
@@ -127,6 +181,7 @@
                   <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>
                 </button>
               </form>
+              {% endif %}
             </td>
           </tr>
           {% empty %}
@@ -140,6 +195,7 @@
 {% endblock %}
 
 {% block modals %}
+{% if puede_administrar_sesion %}
 <div class="modal fade" id="nuevaPersonaSesionModal" tabindex="-1" aria-labelledby="nuevaPersonaSesionModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -197,6 +253,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

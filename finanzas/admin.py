@@ -20,6 +20,7 @@ class PaymentAdmin(admin.ModelAdmin):
         "monto_total",
         "metodo_pago",
         "clases_asignadas",
+        "revertido_en",
         "documento_tributario",
         "creado_en",
     )
@@ -31,7 +32,16 @@ class PaymentAdmin(admin.ModelAdmin):
         "documento_tributario__folio",
         "numero_comprobante",
     )
-    readonly_fields = ("monto_neto", "monto_iva", "monto_total", "creado_en", "actualizado_en")
+    readonly_fields = (
+        "monto_neto",
+        "monto_iva",
+        "monto_total",
+        "revertido_en",
+        "revertido_por",
+        "motivo_reversa",
+        "creado_en",
+        "actualizado_en",
+    )
     list_select_related = ("persona", "organizacion", "documento_tributario", "plan")
     actions = None
 

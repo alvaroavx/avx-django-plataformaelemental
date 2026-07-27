@@ -3,7 +3,7 @@ from django.db.models import Count
 
 from personas.models import Persona
 
-from .models import Asistencia, BloqueHorario, Disciplina, SesionClase
+from .models import Asistencia, BloqueHorario, ClaseLiberada, Disciplina, SesionClase
 
 
 @admin.register(Disciplina)
@@ -95,3 +95,26 @@ class AsistenciaAdmin(admin.ModelAdmin):
     @admin.display(description="Fecha sesion", ordering="sesion__fecha")
     def fecha_sesion(self, obj):
         return obj.sesion.fecha
+
+
+@admin.register(ClaseLiberada)
+class ClaseLiberadaAdmin(admin.ModelAdmin):
+    list_display = (
+        "asistencia",
+        "organizacion",
+        "motivo",
+        "liberada_por",
+        "liberada_en",
+        "revertida_en",
+    )
+    list_filter = ("organizacion", "liberada_en", "revertida_en")
+    readonly_fields = (
+        "asistencia",
+        "organizacion",
+        "motivo",
+        "liberada_por",
+        "liberada_en",
+        "revertida_por",
+        "revertida_en",
+    )
+    actions = None

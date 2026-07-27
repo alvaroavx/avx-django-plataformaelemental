@@ -69,10 +69,12 @@ Asistencias:
 - Agregar asistentes con log agregado por operacion.
 - Eliminar asistente.
 - Eliminar sesion.
+- Liberar y revertir clases, incluyendo actor, organización, motivo y asistencia.
 
 Finanzas:
 
-- Crear, editar y eliminar pagos.
+- Crear y editar pagos.
+- Revertir pagos, incluyendo actor, fecha, motivo y consumos recalculados.
 - Crear persona rapida desde pagos.
 - Crear, editar, importar y eliminar documentos tributarios.
 - Crear pago sugerido al confirmar importacion tributaria.

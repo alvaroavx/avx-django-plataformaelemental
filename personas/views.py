@@ -353,7 +353,7 @@ def _organizacion_metricas(organizacion, *, mes=None, anio=None):
         anio=anio,
     )
     pagos_qs = aplicar_periodo(
-        Payment.objects.filter(organizacion=organizacion),
+        Payment.objects.filter(organizacion=organizacion, revertido_en__isnull=True),
         "fecha_pago",
         mes=mes,
         anio=anio,
@@ -385,6 +385,7 @@ def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=No
     )
     pagos_qs = Payment.objects.filter(
         persona=OuterRef("pk"),
+        revertido_en__isnull=True,
         **filtros_periodo("fecha_pago", mes=mes, anio=anio),
     )
     consumos_qs = AttendanceConsumption.objects.filter(
@@ -444,7 +445,11 @@ def dashboard(request):
         anio=periodo["anio"],
         organizacion=organizacion,
     )
-    pagos_qs = aplicar_periodo(Payment.objects.all(), "fecha_pago", request=request)
+    pagos_qs = aplicar_periodo(
+        Payment.objects.filter(revertido_en__isnull=True),
+        "fecha_pago",
+        request=request,
+    )
     consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
     asistencias_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
     if organizacion:
@@ -516,7 +521,10 @@ def organizacion_detail(request, pk):
             "organizacion_obj": organizacion,
             "metricas": metricas,
             "disciplinas": disciplinas[:8],
-            "pagos_recientes": Payment.objects.filter(organizacion=organizacion).select_related("persona").order_by("-fecha_pago", "-id")[:8],
+            "pagos_recientes": Payment.objects.filter(
+                organizacion=organizacion,
+                revertido_en__isnull=True,
+            ).select_related("persona").order_by("-fecha_pago", "-id")[:8],
             "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
         }
     )
@@ -723,6 +731,7 @@ def persona_detail(request, pk):
                 Payment,
                 pk=request.POST.get("pago_id"),
                 persona=persona,
+                revertido_en__isnull=True,
                 **filtros_periodo("fecha_pago", request=request),
             )
             if organizacion and asistencia.sesion.disciplina.organizacion_id != organizacion.id:
@@ -841,11 +850,12 @@ def persona_detail(request, pk):
     roles_codigos = {item.rol.codigo for item in roles_asignados if item.activo}
     es_estudiante = "ESTUDIANTE" in roles_codigos
     es_profesor = "PROFESOR" in roles_codigos
+    pagos_vigentes = pagos.filter(revertido_en__isnull=True)
     documentos_tributarios = [pago.documento_tributario for pago in pagos if pago.documento_tributario_id]
     finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if es_estudiante else None
     if es_estudiante:
         pagos_asociables_periodo = list(
-            pagos.annotate(
+            pagos_vigentes.annotate(
                 clases_consumidas_total=Count(
                     "consumos",
                     filter=Q(consumos__estado=AttendanceConsumption.Estado.CONSUMIDO),
@@ -922,7 +932,7 @@ def persona_detail(request, pk):
             "sesiones_profesor": sesiones_profesor,
             "documentos_tributarios": documentos_tributarios,
             "finanzas_resumen": finanzas_resumen,
-            "monto_pagado": pagos.aggregate(total=Sum("monto_total")).get("total") or 0,
+            "monto_pagado": pagos_vigentes.aggregate(total=Sum("monto_total")).get("total") or 0,
             "consumos_consumidos": consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),
             "consumos_pendientes": consumos.filter(estado=AttendanceConsumption.Estado.PENDIENTE).count(),
             "consumos_deuda": consumos.filter(estado=AttendanceConsumption.Estado.DEUDA).count(),

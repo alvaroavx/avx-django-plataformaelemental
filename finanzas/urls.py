@@ -12,7 +12,7 @@ urlpatterns = [
     path("pagos/", views.pagos_list, name="pagos_list"),
     path("pagos/<int:pk>/", views.pago_detail, name="pago_detail"),
     path("pagos/<int:pk>/editar/", views.pago_edit, name="pago_edit"),
-    path("pagos/<int:pk>/eliminar/", views.pago_delete, name="pago_delete"),
+    path("pagos/<int:pk>/revertir/", views.pago_revertir, name="pago_revertir"),
     path("documentos-tributarios/", views.documentos_tributarios_list, name="documentos_tributarios_list"),
     path(
         "documentos-tributarios/importar/",

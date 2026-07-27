@@ -1,6 +1,6 @@
 # Permisos Y Roles
 
-Fecha de actualizacion: 2026-05-30
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 Este documento define la matriz minima de permisos v1.0 para vistas HTML internas.
@@ -44,5 +44,20 @@ La fuente de roles sigue siendo `PersonaRol`: una persona puede tener permisos d
 ## Limitaciones conocidas
 - La matriz no reemplaza permisos granulares de Django `auth_permission`.
 - Las apps `asistencias` y `personas` aun usan decoradores historicos por rol admin para varias pantallas.
+
+## Matriz operativa Sprint 2
+
+| Acción | Administración autorizada | Profesora asignada | Profesora no asignada | Otra organización |
+| --- | ---: | ---: | ---: | ---: |
+| Ver sesión | Sí | Sí | No | No |
+| Registrar/corregir asistencia | Sí | Sí | No | No |
+| Ver estado de consumo necesario para operar | Sí | Sí, limitado a la sesión | No | No |
+| Liberar clase | Sí | No | No | No |
+| Revertir clase liberada | Sí | No | No | No |
+| Revertir pago | Sí | No | No | No |
+
+La asignación de profesora se comprueba contra `SesionClase.profesores` y el rol `PROFESOR` activo en la organización real de la sesión. El filtro de organización enviado por la interfaz no concede acceso.
+
+Google continúa siendo solo autenticación detrás de sus flags. No crea roles, asignaciones ni permisos, y el acceso real para profesoras continúa sin activarse.
 - `staff` conserva bypass total; si se quiere separar soporte tecnico de operacion, debe revisarse antes de abrir acceso a terceros.
 - La opcion `solo_lectura` puede ver finanzas, pero no debe crear, editar, borrar ni exportar.

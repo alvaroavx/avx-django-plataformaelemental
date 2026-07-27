@@ -114,6 +114,7 @@ def estudiantes_operativos_periodo(request, *, organizacion=None):
     )
     asistencias_historicas_qs = Asistencia.objects.filter(persona_id__in=persona_ids)
     pagos_qs = Payment.objects.filter(
+        revertido_en__isnull=True,
         persona_id__in=persona_ids,
         **filtros_periodo("fecha_pago", request=request),
     )

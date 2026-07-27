@@ -1,0 +1,36 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% block title %}Revertir pago{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="card border-warning">
+    <div class="card-header text-bg-warning">Revertir pago</div>
+    <div class="card-body">
+      {% if pago.esta_revertido %}
+        <div class="alert alert-secondary">
+          Este pago ya fue revertido el {{ pago.revertido_en|date:"d/m/Y H:i" }}.
+        </div>
+      {% else %}
+        <p>
+          El pago de <strong>{{ pago.persona }}</strong> se conservará como registro histórico,
+          pero dejará de otorgar clases y sus consumos serán recalculados.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.motivo.id_for_label }}">Motivo obligatorio</label>
+            {{ form.motivo }}
+            {% if form.motivo.errors %}<div class="text-danger small">{{ form.motivo.errors }}</div>{% endif %}
+          </div>
+          <button class="btn btn-warning finanzas-btn" type="submit">
+            <i class="bi bi-arrow-counterclockwise"></i><span class="finanzas-btn-label">Revertir pago</span>
+          </button>
+          <a class="btn btn-outline-secondary finanzas-btn" href="{{ back_url }}">Cancelar</a>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

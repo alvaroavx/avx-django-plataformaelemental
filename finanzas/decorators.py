@@ -3,6 +3,7 @@ from personas.permissions import (
     ACCION_OPERAR_DOCUMENTOS,
     ACCION_OPERAR_PAGOS,
     ACCION_OPERAR_TRANSACCIONES,
+    ACCION_REVERTIR_PAGO,
     ACCION_VER_FINANZAS,
     permiso_requerido,
     usuario_tiene_permiso,
@@ -37,3 +38,7 @@ exportar_finanzas_required = permiso_requerido(
     mensaje="Debes tener permiso de exportacion para descargar datos.",
 )
 admin_finanzas_required = pagos_required
+revertir_pago_required = permiso_requerido(
+    ACCION_REVERTIR_PAGO,
+    mensaje="Debes tener permiso administrativo para revertir pagos.",
+)

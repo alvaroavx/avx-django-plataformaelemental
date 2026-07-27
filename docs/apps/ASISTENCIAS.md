@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-05-29
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -180,6 +180,37 @@ flowchart TD
 - La logica global de pagos, documentos y caja vive en `finanzas`.
 - Los consumos de clases y deudas usan modelos de `finanzas`, pero las entidades academicas base son propias de `asistencias`.
 - La tabla enriquecida de estudiantes usa `Payment` y `AttendanceConsumption` solo como cobranza operacional; no usa `Transaction` ni representa contabilidad.
+
+## Transiciones de asistencia y consumo
+
+El servicio de dominio recalcula el mismo `AttendanceConsumption` dentro de una transacción:
+
+| Transición | Estado de consumo | Efecto |
+| --- | --- | --- |
+| `PRESENTE → AUSENTE` | `PENDIENTE`, sin pago | recupera la clase consumida |
+| `PRESENTE → JUSTIFICADA` | `PENDIENTE`, sin pago | recupera la clase consumida |
+| `AUSENTE → PRESENTE` | `CONSUMIDO` o `DEUDA` | consume un derecho válido o registra deuda |
+| `JUSTIFICADA → PRESENTE` | `CONSUMIDO` o `DEUDA` | consume un derecho válido o registra deuda |
+| mismo estado | se recalcula sin duplicar | operación idempotente |
+
+Las correcciones retroactivas usan las mismas reglas. Solo una asistencia `PRESENTE`, no liberada, puede consumir. La eliminación vigente de una asistencia elimina en cascada su consumo y recupera el cupo; la acción permanece auditada desde la vista.
+
+El signal de `Asistencia` invoca el servicio tanto en creación como en actualización. El servicio bloquea la asistencia, su consumo y los pagos candidatos para impedir sobreconsumo por reintentos o carreras.
+
+## Clase liberada
+
+`ClaseLiberada` es una excepción explícita e histórica:
+
+- conserva la asistencia;
+- exige motivo;
+- registra organización, autor y fecha;
+- fuerza el consumo a `PENDIENTE` sin pago;
+- no genera cobro ni usa saldo;
+- solo administración autorizada de la organización puede crearla o revertirla;
+- la reversa conserva el registro y vuelve a ejecutar el recálculo ordinario;
+- profesora asignada puede consultar el resultado, pero no liberar ni revertir.
+
+No equivale a ausencia, justificación, deuda, beca ni eliminación.
 
 ## Exportaciones Excel v1.0
 - `asistencias_YYYY_MM.xlsx` exporta asistencias operativas desde `Asistencia`, `SesionClase`, `Disciplina` y `Persona`.

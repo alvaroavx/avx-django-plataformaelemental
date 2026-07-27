@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -187,3 +188,45 @@ class Asistencia(models.Model):
 
     def __str__(self) -> str:
         return f"{self.persona} - {self.sesion} ({self.estado})"
+
+
+class ClaseLiberada(models.Model):
+    asistencia = models.OneToOneField(
+        Asistencia,
+        on_delete=models.CASCADE,
+        related_name="clase_liberada",
+    )
+    organizacion = models.ForeignKey(
+        "personas.Organizacion",
+        on_delete=models.PROTECT,
+        related_name="clases_liberadas",
+    )
+    motivo = models.TextField()
+    liberada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="clases_liberadas_registradas",
+    )
+    liberada_en = models.DateTimeField(auto_now_add=True)
+    revertida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clases_liberadas_revertidas",
+    )
+    revertida_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Clase liberada"
+        verbose_name_plural = "Clases liberadas"
+        db_table = "asistencias_claseliberada"
+
+    @property
+    def activa(self):
+        return self.revertida_en is None
+
+    def __str__(self):
+        estado = "activa" if self.activa else "revertida"
+        return f"Clase liberada {self.asistencia_id} ({estado})"
