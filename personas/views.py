@@ -553,12 +553,7 @@ def personas_list(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
-    personas_qs = _annotate_personas_resumen(
-        _personas_queryset(organizacion),
-        mes=periodo["mes"],
-        anio=periodo["anio"],
-        organizacion=organizacion,
-    )
+    personas_qs = _personas_queryset(organizacion)
 
     q = (request.GET.get("q") or "").strip()
     rol = (request.GET.get("rol") or "").strip()

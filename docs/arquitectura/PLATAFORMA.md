@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-07-20
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.
@@ -111,7 +111,7 @@ La fuente de verdad ejecutable es el codigo con sus tests vigentes.
 Comando principal esperado:
 
 ```bash
-python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
+python manage.py test
 ```
 
 ## Observaciones tecnicas

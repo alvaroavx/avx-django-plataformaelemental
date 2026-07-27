@@ -410,7 +410,7 @@ class TransactionForm(forms.ModelForm):
             "archivo",
         ]
         widgets = {
-            "fecha": forms.DateInput(attrs={"type": "date"}),
+            "fecha": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "descripcion": forms.Textarea(attrs={"rows": 2}),
             "documentos_tributarios": forms.SelectMultiple(attrs={"size": 6}),
         }

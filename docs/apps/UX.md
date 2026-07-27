@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-07-20
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -79,6 +79,10 @@ Regla:
 
 ## Lenguaje Visible
 Desde v1.0 se usa `Panel` para vistas principales. `Dashboard` queda reservado solo para nombres internos de rutas/views cuando cambiarlo podria romper compatibilidad.
+
+## Acciones En Formularios
+- El boton `Agregar` de roles en detalle y edicion de Persona usa el componente solido de Bootstrap, conserva foco visible y tiene una altura minima de 44 px.
+- En mobile, el formulario apila sus campos y la accion ocupa el ancho disponible sin provocar desplazamiento horizontal a 320 px.
 
 ## Visibilidad Por Permisos
 La navegacion usa permisos existentes:

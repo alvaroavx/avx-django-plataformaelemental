@@ -216,6 +216,47 @@ class AutenticacionGoogleFaseUnoTests(TestCase):
         self.assertEqual(social_login.user, self.usuario)
         self.assertEqual(cuenta.extra_data, {})
 
+    @override_settings(GOOGLE_AUTH_ENABLED=True)
+    def test_google_vinculado_no_otorga_acceso_funcional_a_profesora(self):
+        organizacion = Organizacion.objects.create(
+            nombre="Org profesora Google",
+            razon_social="Org profesora Google SpA",
+            rut="91.111.111-1",
+        )
+        rol_profesor = Rol.objects.create(nombre="Profesora Google", codigo="PROFESOR")
+        persona = Persona.objects.create(
+            nombres="Profesora",
+            apellidos="Google",
+            email=self.usuario.email,
+            user=self.usuario,
+        )
+        PersonaRol.objects.create(
+            persona=persona,
+            rol=rol_profesor,
+            organizacion=organizacion,
+            activo=True,
+        )
+        cuenta = SocialAccount.objects.create(
+            user=self.usuario,
+            provider="google",
+            uid="google-sub-profesora",
+            extra_data={},
+        )
+        social_login = SocialLogin(user=self.usuario, account=cuenta)
+
+        self.adaptador.pre_social_login(self._solicitud(), social_login)
+        self.client.force_login(self.usuario)
+        respuesta = self.client.get(
+            reverse("personas:dashboard"),
+            {"organizacion": organizacion.pk},
+        )
+
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(
+            set(persona.roles.values_list("rol__codigo", flat=True)),
+            {"PROFESOR"},
+        )
+
     def test_adaptador_oauth_limpia_claims_antes_del_lookup_de_allauth(self):
         social_login = self._social_login()
         solicitud = self._solicitud()
@@ -288,6 +329,7 @@ class AutenticacionGoogleFaseUnoTests(TestCase):
         with self.assertRaises(ImmediateHttpResponse):
             self.adaptador.pre_social_login(self._solicitud(), self._social_login())
 
+    @override_settings(GOOGLE_AUTH_ENABLED=False, GOOGLE_OAUTH_CONFIGURED=False)
     def test_inicio_google_es_solo_post_y_esta_apagado_por_defecto(self):
         respuesta_get = self.client.get(reverse("google_login_iniciar"))
         respuesta_post = self.client.post(reverse("google_login_iniciar"))
@@ -980,6 +1022,39 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertLessEqual(len(response.context["personas"]), 25)
         self.assertLessEqual(len(queries), 20)
 
+    def test_personas_list_pagina_antes_de_calcular_metricas(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(
+                reverse("personas:personas_list"),
+                {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+            )
+
+        consultas_paginador = [
+            query["sql"]
+            for query in queries.captured_queries
+            if query["sql"].startswith("SELECT COUNT(*) FROM (SELECT DISTINCT")
+        ]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(consultas_paginador), 1)
+        self.assertNotIn("COALESCE((SELECT", consultas_paginador[0])
+
+    def test_botones_agregar_rol_son_visibles_y_tienen_area_tactil(self):
+        for url_name in ("personas:persona_detail", "personas:persona_edit"):
+            with self.subTest(url_name=url_name):
+                response = self.client.get(
+                    reverse(url_name, kwargs={"pk": self.estudiante.pk}),
+                    {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    'class="btn btn-success w-100 d-inline-flex align-items-center justify-content-center"',
+                    html=False,
+                )
+                self.assertContains(response, 'style="min-height: 44px;"', html=False)
+                self.assertContains(response, ">Agregar</button>", html=False)
+
 
 class PersonasRutFormTests(TestCase):
     def _data_persona(self, **overrides):
@@ -1094,6 +1169,7 @@ class ResolucionSolicitudAccesoTests(TestCase):
         self.assertEqual(self.solicitud.estado, SolicitudAcceso.Estado.PENDIENTE)
         self.assertFalse(get_user_model().objects.filter(email="resolver@example.com").exists())
 
+    @override_settings(ACCESS_REQUESTS_ENABLED=False, ACCESS_REQUEST_APPROVAL_ENABLED=False)
     def test_flags_y_permiso_bloquean_servicio(self):
         with self.assertRaises(ValidationError):
             aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.admin, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="No", apellidos="Persona")
@@ -1101,6 +1177,7 @@ class ResolucionSolicitudAccesoTests(TestCase):
             with self.assertRaises(ValidationError):
                 aprobar_solicitud(solicitud_id=self.solicitud.pk, administrador=self.sin_permiso, tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO, organizacion=self.org, rol=self.rol, nombres="No", apellidos="Persona")
 
+    @override_settings(ACCESS_REQUESTS_ENABLED=False, ACCESS_REQUEST_APPROVAL_ENABLED=False)
     def test_endpoints_exigen_flags_permiso_y_post(self):
         listado = reverse("personas:solicitudes_acceso_list")
         aprobar = reverse("personas:solicitud_acceso_aprobar", args=[self.solicitud.pk])

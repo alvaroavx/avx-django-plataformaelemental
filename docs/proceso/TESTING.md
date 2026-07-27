@@ -1,6 +1,6 @@
 # Testing
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 Este documento define la estrategia de pruebas vigente.
@@ -11,10 +11,10 @@ La meta no es tener tests por cantidad. La meta es proteger reglas criticas del 
 El set principal esperado es:
 
 ```bash
-python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
+python manage.py test
 ```
 
-Este comando es el que usa CI.
+Este comando descubre la suite completa y es el que usan los workflows de test y deploy. Los comandos por app se reservan para validaciones focalizadas.
 
 ## Checks Base
 Para cambios generales:
@@ -126,7 +126,7 @@ No conviene testear:
 ## CI Actual
 El workflow ejecuta:
 - `ruff check .`
-- `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
+- `python manage.py test`
 
 La base de datos de CI usa PostgreSQL mediante service container.
 

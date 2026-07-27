@@ -68,6 +68,7 @@ from .forms_helpers import (
     url_pagos_list_con_edicion as _url_pagos_list_con_edicion,
     url_pagos_list_sin_edicion as _url_pagos_list_sin_edicion,
     url_with_query as _url_with_query,
+    url_with_query_without as _url_with_query_without,
 )
 from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 from .selectors import (
@@ -560,7 +561,13 @@ def pagos_list(request):
                 metadata=_snapshot_pago(pago),
             )
             messages.success(request, "Pago registrado.")
-            return _redirect_with_query(request, "finanzas:pagos_list")
+            return redirect(
+                _url_with_query_without(
+                    request,
+                    "finanzas:pagos_list",
+                    remove_params=["open"],
+                )
+            )
 
     context = _contexto_pagos_list(request, form=form, persona_form=persona_form, open_nueva_persona=open_nueva_persona)
     return render(request, "finanzas/pagos_list.html", context)

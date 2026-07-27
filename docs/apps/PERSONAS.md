@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-07-20
+Fecha de actualizacion: 2026-07-26
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -43,6 +43,7 @@ Debe concentrar:
 - En `personas/listado`, la tabla usa paginacion Django en servidor de 25 filas por pagina. DataTables no debe cargar todas las personas en HTML inicial.
 - El listado conserva filtros `periodo_mes`, `periodo_anio`, `organizacion`, busqueda y filtros propios al cambiar de pagina.
 - Las metricas por persona del listado se calculan para el periodo/organizacion activos y se evalúan solo sobre la pagina visible.
+- El queryset base se filtra y pagina antes de calcular metricas correlacionadas. Solo el filtro explicito de deuda puede calcular esa metrica antes de paginar porque la necesita para definir el universo.
 - Si la organizacion esta en `Todas`, el listado sigue siendo paginado para evitar una carga inicial masiva.
 - El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.

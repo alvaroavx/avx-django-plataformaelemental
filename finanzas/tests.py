@@ -658,6 +658,91 @@ class FinanzasAccessTests(TestCase):
             ).exists()
         )
 
+    def test_pagos_list_exito_redirige_sin_open_registrar_pago(self):
+        self.client.force_login(self.user_admin)
+        url = (
+            reverse("finanzas:pagos_list")
+            + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}"
+            "&open=registrar_pago"
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "guardar_pago": "1",
+                "organizacion": self.org.pk,
+                "persona": self.persona_no_admin.pk,
+                "plan": "",
+                "documento_tributario": "",
+                "fecha_pago": "2026-02-27",
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "numero_comprobante": "",
+                "monto_referencia": "15000",
+                "clases_asignadas": "2",
+                "observaciones": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("open=registrar_pago", response.url)
+        recarga = self.client.get(response.url)
+        self.assertFalse(recarga.context["open_registrar_pago"])
+
+    def test_pagos_list_error_validacion_mantiene_modal_abierto(self):
+        self.client.force_login(self.user_admin)
+        response = self.client.post(
+            reverse("finanzas:pagos_list")
+            + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}"
+            "&open=registrar_pago",
+            {
+                "guardar_pago": "1",
+                "organizacion": self.org.pk,
+                "persona": "",
+                "fecha_pago": "2026-02-27",
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "monto_referencia": "",
+                "clases_asignadas": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["open_registrar_pago"])
+        self.assertTrue(response.context["form"].errors)
+        self.assertContains(response, "registrarPagoModal")
+
+    def test_pagos_list_exito_conserva_filtros_al_quitar_open(self):
+        self.client.force_login(self.user_admin)
+        url = (
+            reverse("finanzas:pagos_list")
+            + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}"
+            "&q=No&metodo=efectivo&open=registrar_pago"
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "guardar_pago": "1",
+                "organizacion": self.org.pk,
+                "persona": self.persona_no_admin.pk,
+                "plan": "",
+                "documento_tributario": "",
+                "fecha_pago": "2026-02-27",
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "numero_comprobante": "",
+                "monto_referencia": "18000",
+                "clases_asignadas": "3",
+                "observaciones": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("periodo_mes=2", response.url)
+        self.assertIn("periodo_anio=2026", response.url)
+        self.assertIn(f"organizacion={self.org.pk}", response.url)
+        self.assertIn("q=No", response.url)
+        self.assertIn("metodo=efectivo", response.url)
+        self.assertNotIn("open=", response.url)
+
     def test_pago_edit_get_redirige_a_listado_con_modal(self):
         pago = Payment.objects.create(
             persona=self.persona_no_admin,
@@ -1177,6 +1262,88 @@ class FinanzasAccessTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         transaccion = form.save(commit=False)
         self.assertEqual(transaccion.tipo, Transaction.Tipo.INGRESO)
+
+    def test_transaccion_edit_get_precarga_fecha_en_formato_html(self):
+        categoria = Category.objects.create(nombre="Ingreso edición", tipo=Category.Tipo.INGRESO)
+        transaccion = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-27",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Movimiento a editar",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("finanzas:transaccion_edit", kwargs={"pk": transaccion.pk}),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<input type="date" name="fecha"', html=False)
+        self.assertContains(response, 'value="2026-02-27"', html=False)
+
+    def test_transaccion_edit_post_actualiza_sin_regresion(self):
+        categoria = Category.objects.create(nombre="Egreso edición", tipo=Category.Tipo.EGRESO)
+        transaccion = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-27",
+            tipo=Transaction.Tipo.EGRESO,
+            monto=25000,
+            descripcion="Movimiento original",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:transaccion_edit", kwargs={"pk": transaccion.pk})
+            + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+            {
+                "organizacion": self.org.pk,
+                "categoria": categoria.pk,
+                "fecha": "2026-02-28",
+                "monto": "30000",
+                "descripcion": "Movimiento actualizado",
+                "documentos_tributarios": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        transaccion.refresh_from_db()
+        self.assertEqual(transaccion.fecha, date(2026, 2, 28))
+        self.assertEqual(transaccion.monto, 30000)
+        self.assertEqual(transaccion.descripcion, "Movimiento actualizado")
+
+    def test_transaccion_edit_error_conserva_fecha_enviada(self):
+        categoria = Category.objects.create(nombre="Ingreso inválido", tipo=Category.Tipo.INGRESO)
+        transaccion = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-27",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Movimiento original",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.post(
+            reverse("finanzas:transaccion_edit", kwargs={"pk": transaccion.pk})
+            + f"?periodo_mes=2&periodo_anio=2026&organizacion={self.org.pk}",
+            {
+                "organizacion": self.org.pk,
+                "categoria": categoria.pk,
+                "fecha": "2026-02-26",
+                "monto": "",
+                "descripcion": "Movimiento inválido",
+                "documentos_tributarios": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertContains(response, '<input type="date" name="fecha"', html=False)
+        self.assertContains(response, 'value="2026-02-26"', html=False)
 
     def test_transacciones_list_precarga_organizacion_del_filtro_en_formulario(self):
         self.client.force_login(self.user_admin)

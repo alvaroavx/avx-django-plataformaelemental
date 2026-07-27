@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from asistencias.models import Asistencia, Disciplina, SesionClase
@@ -77,6 +77,7 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Elemental Apps")
         self.assertContains(response, "Plataforma Elemental")
 
+    @override_settings(GOOGLE_AUTH_ENFORCED=False)
     def test_login_post_valido_respeta_next(self):
         response = self.client.post(
             f"{reverse('login')}?next=/finanzas/",
@@ -86,6 +87,7 @@ class ElementalAppsUXTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, "/finanzas/")
 
+    @override_settings(GOOGLE_AUTH_ENFORCED=False)
     def test_login_post_invalido_muestra_error(self):
         response = self.client.post(
             reverse("login"),
