@@ -214,7 +214,9 @@ Busca estudiantes elegibles para agregar a la sesión.
 **Restricciones de búsqueda:**
 - Mínimo 2 caracteres en `q`; con menos de 2 se devuelve `{"ok": true, "resultados": []}` sin consultar DB.
 - Excluye personas ya registradas en la sesión.
-- Filtra por `ESTUDIANTE` activo de la organización de la sesión.
+
+La búsqueda filtra personas con rol ESTUDIANTE en la organización de la sesión. Puede incluir roles inactivos, marcados con inactivo=true, para permitir su reactivación mediante el flujo existente.
+
 - Limita a 10 resultados.
 - Devuelve solo `id`, `nombre` e `inactivo`; no expone email ni RUT.
 

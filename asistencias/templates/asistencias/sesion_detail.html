@@ -223,6 +223,21 @@
     return d.innerHTML;
   }
 
+  function fetchJson(url, options) {
+    return fetch(url, options).then(function (response) {
+      return response.text().then(function (texto) {
+        if (!texto.trim()) {
+          return { status: response.status, json: null, tipo: 'http_sin_json' };
+        }
+        try {
+          return { status: response.status, json: JSON.parse(texto), tipo: 'http_json' };
+        } catch (error) {
+          return { status: response.status, json: null, tipo: 'json_invalido' };
+        }
+      });
+    });
+  }
+
   function mostrarEstado(tipo, texto, autoDismiss) {
     if (!statusEl) return;
     statusEl.innerHTML = '<span class="small text-' + tipo + '">' + esc(texto) + '</span>';
@@ -269,19 +284,13 @@
     fd.append('persona_id', value);
     fd.append('csrfmiddlewaretoken', CSRF);
 
-    fetch(AGREGAR_URL, { method: 'POST', body: fd })
-      .then(function (r) {
-        var status = r.status;
-        return r.text().then(function (texto) {
-          var json = null;
-          try { json = JSON.parse(texto); } catch (e) {}
-          return { status: status, json: json };
-        });
-      })
+    fetchJson(AGREGAR_URL, { method: 'POST', body: fd })
       .then(function (resp) {
         var data = resp.json;
         var status = resp.status;
-        if (status === 201 && data && data.ok) {
+        if (resp.tipo === 'json_invalido') {
+          mostrarEstado('danger', 'Respuesta inválida del servidor. Intenta nuevamente.', false);
+        } else if (status === 201 && data && data.ok) {
           agregarFila(data);
           actualizarContador(data.total);
           mostrarEstado('success', data.mensaje || 'Asistente agregado.', true);
@@ -317,9 +326,10 @@
       preload: false,
       shouldLoad: function (q) { return q.length >= 2; },
       load: function (query, callback) {
-        fetch(BUSCAR_URL + '?q=' + encodeURIComponent(query))
-          .then(function (r) { return r.json(); })
-          .then(function (data) { callback(data.resultados || []); })
+        fetchJson(BUSCAR_URL + '?q=' + encodeURIComponent(query))
+          .then(function (resp) {
+            callback((resp.json && resp.json.resultados) || []);
+          })
           .catch(function () { callback(); });
       },
       render: {

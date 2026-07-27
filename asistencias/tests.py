@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db.models.signals import pre_save
 from django.test import RequestFactory, TestCase
 from django.test import override_settings
 from django.urls import reverse
@@ -1083,6 +1084,77 @@ class AsistenciasViewTests(TestCase):
         self.assertIsNone(consumo.pago)
         self.assertEqual(data["estado_financiero"]["codigo"], "deuda")
         self.assertEqual(data["estado_financiero"]["label"], "Deuda")
+
+    def test_agregar_asistente_mobile_estado_financiero_pendiente_sin_cobro(self):
+        self._login_admin_organizacion(self.organizacion)
+        dispatch_uid = "test_asistencia_mobile_inicia_ausente"
+
+        def iniciar_asistencia_ausente(sender, instance, **kwargs):
+            if instance.sesion_id == self.sesion.pk and instance.persona_id == self.estudiante.pk:
+                instance.estado = Asistencia.Estado.AUSENTE
+
+        pre_save.connect(
+            iniciar_asistencia_ausente,
+            sender=Asistencia,
+            dispatch_uid=dispatch_uid,
+            weak=False,
+        )
+        try:
+            response = self.client.post(
+                reverse("asistencias:sesion_asistente_agregar", kwargs={"pk": self.sesion.pk}),
+                {"persona_id": self.estudiante.pk},
+            )
+        finally:
+            pre_save.disconnect(sender=Asistencia, dispatch_uid=dispatch_uid)
+
+        self.assertEqual(response.status_code, 201)
+        asistencia = Asistencia.objects.get(sesion=self.sesion, persona=self.estudiante)
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(asistencia.estado, Asistencia.Estado.AUSENTE)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.PENDIENTE)
+        self.assertEqual(
+            response.json()["estado_financiero"],
+            {
+                "codigo": "pendiente",
+                "label": "Sin cobro",
+            },
+        )
+
+    def test_sesion_detail_fetch_distingue_error_de_red(self):
+        response = self.client.get(reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}))
+
+        self.assertContains(response, "return fetch(url, options).then")
+        self.assertContains(response, ".catch(function () {")
+        self.assertContains(response, "No se pudo conectar. Revisa tu conexión e intenta nuevamente.")
+
+    def test_sesion_detail_fetch_distingue_error_http_con_json_valido(self):
+        response = self.client.get(reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}))
+
+        self.assertContains(
+            response,
+            "return { status: response.status, json: JSON.parse(texto), tipo: 'http_json' };",
+        )
+        self.assertContains(response, "(data && data.mensaje) || 'Error al agregar. Intenta de nuevo.'")
+
+    def test_sesion_detail_fetch_distingue_error_http_sin_json(self):
+        response = self.client.get(reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}))
+
+        self.assertContains(response, "if (!texto.trim())")
+        self.assertContains(
+            response,
+            "return { status: response.status, json: null, tipo: 'http_sin_json' };",
+        )
+        self.assertContains(response, "Ocurrió un error del servidor. Intenta nuevamente.")
+
+    def test_sesion_detail_fetch_distingue_json_invalido(self):
+        response = self.client.get(reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}))
+
+        self.assertContains(
+            response,
+            "return { status: response.status, json: null, tipo: 'json_invalido' };",
+        )
+        self.assertContains(response, "if (resp.tipo === 'json_invalido')")
+        self.assertContains(response, "Respuesta inválida del servidor. Intenta nuevamente.")
 
     def test_agregar_asistente_mobile_crea_exactamente_un_consumo(self):
         """El post_save signal crea el consumo; no debe haber duplicados."""
