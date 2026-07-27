@@ -6,14 +6,39 @@
 <style>
   .ts-control { min-height: 44px; font-size: 1rem; }
   .ts-dropdown .option { padding: 0.5rem 0.75rem; }
+  .jornada-sesion { max-width: 980px; margin-inline: auto; }
+  .jornada-sesion .jornada-touch { min-height: 44px; }
+  .jornada-sesion .estado-rapido {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(44px, 1fr));
+    gap: 0.4rem;
+  }
+  .jornada-sesion .estado-rapido button {
+    min-height: 44px;
+    white-space: normal;
+  }
+  .jornada-sesion .estado-rapido button[aria-pressed="true"] {
+    color: #fff;
+    background: #0f766e;
+    border-color: #0f766e;
+  }
+  .jornada-sesion .asistente-mobile {
+    border: 1px solid #dbe3df;
+    border-radius: 0.9rem;
+  }
+  @media (max-width: 575.98px) {
+    .jornada-sesion { margin-top: 0.25rem !important; }
+    .jornada-sesion .sesion-actions { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
+    .jornada-sesion .sesion-actions .btn { min-height: 44px; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ back_url }}" title="Volver" aria-label="Volver">
+<div class="jornada-sesion mt-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex gap-2 sesion-actions">
+      <a class="btn btn-outline-secondary btn-sm jornada-touch" href="{{ back_url }}" title="Volver" aria-label="Volver">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
       </a>
       {% if puede_administrar_sesion %}
@@ -21,9 +46,15 @@
           <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>
         </a>
       {% endif %}
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-        <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
-      </a>
+      {% if puede_administrar_sesion %}
+        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+          <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
+        </a>
+      {% else %}
+        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_hoy' %}">
+          <i class="bi bi-sun"></i><span class="ms-1">Hoy</span>
+        </a>
+      {% endif %}
     </div>
     {% if puede_administrar_sesion %}
     <div class="d-flex gap-2">
@@ -45,14 +76,26 @@
       <div class="row g-3 align-items-center">
         <div class="col-md-4">
           <div class="h5 mb-1">{{ sesion.disciplina }}</div>
-          <div class="text-muted">{{ sesion.fecha|date:"d/m/Y" }}</div>
+          <div class="text-muted">{{ sesion.disciplina.organizacion }}</div>
+          <div>{{ sesion.fecha|date:"d/m/Y" }}</div>
+          <div>
+            {% if sesion.bloque %}
+              {{ sesion.bloque.hora_inicio|time:"H:i" }}–{{ sesion.bloque.hora_fin|time:"H:i" }}
+            {% else %}
+              Horario no informado
+            {% endif %}
+          </div>
         </div>
         <div class="col-md-4">
           <div class="fw-semibold">Profesores</div>
           <div>
             {% if sesion.profesores.all %}
               {% for profe in sesion.profesores.all %}
-                <a href="{% url 'personas:persona_detail' profe.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ profe }}</a>{% if not forloop.last %}, {% endif %}
+                {% if puede_administrar_sesion %}
+                  <a href="{% url 'personas:persona_detail' profe.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ profe }}</a>
+                {% else %}
+                  {{ profe }}
+                {% endif %}{% if not forloop.last %}, {% endif %}
               {% endfor %}
             {% else %}
               -
@@ -99,9 +142,10 @@
   <div class="card mb-3">
     <div class="card-header">Agregar asistente</div>
     <div class="card-body">
+      <div class="d-none" aria-hidden="true">{% csrf_token %}</div>
       <label id="buscar-asistente-label" class="form-label" for="buscar-asistente">Buscar por nombre, apellido, email o RUT</label>
       <select id="buscar-asistente" placeholder="Escribe 2 o más letras…" style="width:100%"></select>
-      <div id="buscar-status" class="mt-2" aria-live="polite" style="min-height:1.25rem"></div>
+      <div id="buscar-status" class="mt-2" role="status" aria-live="polite" aria-atomic="true" style="min-height:1.5rem"></div>
       <p class="text-muted small mt-1 mb-0">Toca un nombre para agregarlo. El campo se limpia automáticamente.</p>
     </div>
   </div>
@@ -109,13 +153,14 @@
 
   <div class="card mt-3">
     <div class="card-header">Listado de asistentes</div>
-    <div class="card-body table-responsive">
+    <div class="card-body">
+      <div class="table-responsive{% if es_jornada_profesora %} d-none d-md-block{% endif %}">
       <table class="table table-sm">
         <thead>
           <tr>
             <th>Persona</th>
             <th>Estado</th>
-            <th>Estado de pago</th>
+            <th>{% if puede_administrar_sesion %}Estado de pago{% else %}Observación{% endif %}</th>
             <th>Hora</th>
             <th class="text-end">Acciones</th>
           </tr>
@@ -123,7 +168,13 @@
         <tbody id="asistentes-tbody">
           {% for item in asistencias %}
           <tr>
-            <td><a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a></td>
+            <td>
+              {% if puede_administrar_sesion %}
+                <a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
+              {% else %}
+                {{ item.persona }}
+              {% endif %}
+            </td>
             <td>
               {% if puede_registrar_asistencia %}
                 <form method="post" class="d-flex gap-2 align-items-center">
@@ -141,9 +192,15 @@
               {% endif %}
             </td>
             <td>
-              <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
-              {% if item.clase_liberada_activa %}
-                <div class="small text-muted mt-1">{{ item.clase_liberada.motivo }}</div>
+              {% if puede_administrar_sesion %}
+                <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
+                {% if item.clase_liberada_activa %}
+                  <div class="small text-muted mt-1">{{ item.clase_liberada.motivo }}</div>
+                {% endif %}
+              {% elif item.clase_liberada_activa %}
+                <span class="badge text-bg-info">Clase liberada</span>
+              {% else %}
+                <span class="text-muted">Sin excepción</span>
               {% endif %}
             </td>
             <td>{{ item.registrada_en|date:"H:i" }}</td>
@@ -173,7 +230,7 @@
                   </form>
                 {% endif %}
               {% endif %}
-              {% if puede_registrar_asistencia %}
+              {% if puede_quitar_asistente %}
               <form method="post" class="d-inline" onsubmit="return window.confirm('Se eliminara este asistente de la sesión. ¿Continuar?');">
                 {% csrf_token %}
                 <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
@@ -189,6 +246,66 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
+
+      <div class="d-grid gap-3{% if puede_administrar_sesion %} d-none{% else %} d-md-none{% endif %}" id="asistentes-mobile">
+        {% for item in asistencias %}
+          <article class="asistente-mobile p-3" data-asistencia-card="{{ item.pk }}">
+            <div class="d-flex justify-content-between gap-2 align-items-start mb-3">
+              <div>
+                <h3 class="h6 mb-1">{{ item.persona }}</h3>
+                <div class="small text-muted">Agregada a las {{ item.registrada_en|date:"H:i" }}</div>
+              </div>
+              {% if item.clase_liberada_activa %}
+                <span class="badge text-bg-info">
+                  <i class="bi bi-info-circle" aria-hidden="true"></i> Clase liberada
+                </span>
+              {% elif puede_administrar_sesion %}
+                <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
+              {% endif %}
+            </div>
+
+            {% if puede_registrar_asistencia %}
+              <div
+                class="estado-rapido"
+                role="group"
+                aria-label="Estado de asistencia de {{ item.persona }}"
+                data-estado-control
+                data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}"
+              >
+                {% for value, label in item.Estado.choices %}
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    data-estado="{{ value }}"
+                    aria-pressed="{% if value == item.estado %}true{% else %}false{% endif %}"
+                  >
+                    {% if value == "presente" %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% endif %}
+                    {% if value == "ausente" %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% endif %}
+                    {% if value == "justificada" %}<i class="bi bi-file-earmark-check" aria-hidden="true"></i>{% endif %}
+                    {{ label }}
+                  </button>
+                {% endfor %}
+              </div>
+              <div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>
+            {% else %}
+              <div>{{ item.get_estado_display }}</div>
+            {% endif %}
+
+            {% if puede_quitar_asistente %}
+              <form method="post" class="mt-3" onsubmit="return window.confirm('Se eliminara este asistente de la sesión. ¿Continuar?');">
+                {% csrf_token %}
+                <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                <button class="btn btn-outline-danger jornada-touch w-100" name="eliminar_asistente" type="submit">
+                  <i class="bi bi-trash"></i> Quitar
+                </button>
+              </form>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="text-center text-muted py-4" data-empty-mobile>Sin asistentes.</div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </div>
@@ -262,15 +379,19 @@
 (function () {
   var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}";
   var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}";
+  var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}";
+  var PUEDE_ADMINISTRAR = {{ puede_administrar_sesion|yesno:"true,false" }};
   var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
   var statusEl = document.getElementById('buscar-status');
   var counterEl = document.getElementById('total-asistentes');
   var tbody = document.getElementById('asistentes-tbody');
+  var mobileList = document.getElementById('asistentes-mobile');
 
   var FIN_CLASES = {
     consumido: 'success',
     deuda: 'danger',
     pendiente: 'secondary',
+    liberada: 'info',
     sin_consumo: 'light',
   };
 
@@ -307,34 +428,139 @@
     if (counterEl) counterEl.textContent = String(total);
   }
 
+  function urlEstado(asistenciaId) {
+    return ESTADO_URL.replace('/0/estado/', '/' + asistenciaId + '/estado/');
+  }
+
+  function botonesEstado(a) {
+    var estados = [
+      ['presente', 'bi-check-circle', 'Presente'],
+      ['ausente', 'bi-x-circle', 'Ausente'],
+      ['justificada', 'bi-file-earmark-check', 'Justificada'],
+    ];
+    return estados.map(function (estado) {
+      var seleccionado = a.estado === estado[0] ? 'true' : 'false';
+      return '<button class="btn btn-outline-secondary" type="button" data-estado="' + estado[0] +
+        '" aria-pressed="' + seleccionado + '"><i class="bi ' + estado[1] +
+        '" aria-hidden="true"></i> ' + estado[2] + '</button>';
+    }).join('');
+  }
+
   function agregarFila(data) {
-    if (!tbody) return;
-    var emptyRow = tbody.querySelector('[data-empty-row]');
-    if (emptyRow) emptyRow.remove();
     var a = data.asistencia;
     var fin = data.estado_financiero || {};
     var finCodigo = fin.codigo || 'sin_consumo';
-    var finLabel = fin.label || 'Sin consumo';
+    var finLabel = fin.label || (a.clase_liberada ? 'Clase liberada' : 'Sin excepción');
     var finClase = FIN_CLASES[finCodigo] || 'light';
-    var tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td><a href="' + esc(a.persona_url || '#') + '">' + esc(a.nombre) + '</a></td>' +
-      '<td>' + esc(a.estado_label || a.estado || '') + '</td>' +
-      '<td><span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span></td>' +
-      '<td>' + esc(a.hora || '--:--') + '</td>' +
-      '<td class="text-end">' +
-        '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
+    var nombre = a.persona_url
+      ? '<a href="' + esc(a.persona_url) + '">' + esc(a.nombre) + '</a>'
+      : esc(a.nombre);
+    var accionQuitar = PUEDE_ADMINISTRAR
+      ? '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
           '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
           '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
           '<button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">' +
             '<i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>' +
           '</button>' +
-        '</form>' +
-      '</td>';
-    tbody.insertBefore(tr, tbody.firstChild);
+        '</form>'
+      : '';
+
+    if (tbody) {
+      var emptyRow = tbody.querySelector('[data-empty-row]');
+      if (emptyRow) emptyRow.remove();
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + nombre + '</td>' +
+        '<td>' + esc(a.estado_label || a.estado || '') + '</td>' +
+        '<td><span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span></td>' +
+        '<td>' + esc(a.hora || '--:--') + '</td>' +
+        '<td class="text-end">' + accionQuitar + '</td>';
+      tbody.insertBefore(tr, tbody.firstChild);
+    }
+
+    if (mobileList) {
+      var emptyMobile = mobileList.querySelector('[data-empty-mobile]');
+      if (emptyMobile) emptyMobile.remove();
+      var article = document.createElement('article');
+      article.className = 'asistente-mobile p-3';
+      article.setAttribute('data-asistencia-card', a.id);
+      article.innerHTML =
+        '<div class="d-flex justify-content-between gap-2 align-items-start mb-3">' +
+          '<div><h3 class="h6 mb-1">' + esc(a.nombre) + '</h3>' +
+          '<div class="small text-muted">Agregada a las ' + esc(a.hora || '--:--') + '</div></div>' +
+          (a.clase_liberada
+            ? '<span class="badge text-bg-info"><i class="bi bi-info-circle" aria-hidden="true"></i> Clase liberada</span>'
+            : (PUEDE_ADMINISTRAR
+              ? '<span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span>'
+              : '')) +
+        '</div>' +
+        '<div class="estado-rapido" role="group" aria-label="Estado de asistencia de ' + esc(a.nombre) +
+          '" data-estado-control data-estado-url="' + esc(urlEstado(a.id)) + '">' +
+          botonesEstado(a) +
+        '</div>' +
+        '<div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>' +
+        (PUEDE_ADMINISTRAR
+          ? '<form method="post" class="mt-3" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
+              '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
+              '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
+              '<button class="btn btn-outline-danger jornada-touch w-100" name="eliminar_asistente" type="submit">' +
+                '<i class="bi bi-trash"></i> Quitar</button></form>'
+          : '');
+      mobileList.insertBefore(article, mobileList.firstChild);
+    }
+  }
+
+  function cambiarEstado(control, boton) {
+    var status = control.parentElement.querySelector('[data-estado-status]');
+    var botones = Array.prototype.slice.call(control.querySelectorAll('[data-estado]'));
+    if (boton.getAttribute('aria-pressed') === 'true') {
+      if (status) status.textContent = 'El estado ya estaba guardado.';
+      return;
+    }
+    botones.forEach(function (item) { item.disabled = true; });
+    if (status) status.textContent = 'Guardando…';
+    var fd = new FormData();
+    fd.append('estado', boton.dataset.estado);
+    fd.append('csrfmiddlewaretoken', CSRF);
+    fetchJson(control.dataset.estadoUrl, { method: 'POST', body: fd })
+      .then(function (resp) {
+        if (resp.tipo === 'json_invalido') {
+          if (status) status.textContent = 'Respuesta inválida del servidor. Intenta nuevamente.';
+        } else if (resp.status === 200 && resp.json && resp.json.ok) {
+          botones.forEach(function (item) {
+            item.setAttribute('aria-pressed', item.dataset.estado === resp.json.asistencia.estado ? 'true' : 'false');
+          });
+          if (status) status.textContent = resp.json.mensaje || 'Asistencia guardada.';
+        } else {
+          if (status) status.textContent = (resp.json && resp.json.mensaje) || 'No se pudo guardar el estado.';
+        }
+      })
+      .catch(function () {
+        if (status) status.textContent = 'Sin conexión. El cambio no fue confirmado; intenta nuevamente.';
+      })
+      .finally(function () {
+        botones.forEach(function (item) { item.disabled = false; });
+      });
+  }
+
+  if (mobileList) {
+    mobileList.addEventListener('click', function (event) {
+      var boton = event.target.closest('[data-estado]');
+      if (!boton || boton.disabled) return;
+      var control = boton.closest('[data-estado-control]');
+      if (control) cambiarEstado(control, boton);
+    });
+  }
+
+  function conservarBusqueda(ts, value, textoOriginal) {
+    ts.removeItem(value, true);
+    ts.setTextboxValue(textoOriginal);
+    ts.focus();
   }
 
   function agregarAsistente(value, ts) {
+    var item = ts.getItem(value);
+    var textoOriginal = item ? item.textContent.trim() : '';
     ts.lock();
     mostrarEstado('muted', 'Agregando…', false);
     var fd = new FormData();
@@ -347,6 +573,7 @@
         var status = resp.status;
         if (resp.tipo === 'json_invalido') {
           mostrarEstado('danger', 'Respuesta inválida del servidor. Intenta nuevamente.', false);
+          conservarBusqueda(ts, value, textoOriginal);
         } else if (status === 201 && data && data.ok) {
           agregarFila(data);
           actualizarContador(data.total);
@@ -356,17 +583,18 @@
           ts.focus();
         } else if (status === 409) {
           mostrarEstado('warning', (data && data.mensaje) || 'La persona ya está en esta sesión.', false);
-          ts.clear(true);
-          ts.clearOptions();
-          ts.focus();
+          conservarBusqueda(ts, value, textoOriginal);
         } else if (status >= 500 || !data) {
           mostrarEstado('danger', 'Ocurrió un error del servidor. Intenta nuevamente.', false);
+          conservarBusqueda(ts, value, textoOriginal);
         } else {
           mostrarEstado('danger', (data && data.mensaje) || 'Error al agregar. Intenta de nuevo.', false);
+          conservarBusqueda(ts, value, textoOriginal);
         }
       })
       .catch(function () {
         mostrarEstado('danger', 'No se pudo conectar. Revisa tu conexión e intenta nuevamente.', false);
+        conservarBusqueda(ts, value, textoOriginal);
       })
       .finally(function () {
         ts.unlock();
@@ -374,7 +602,7 @@
   }
 
   if (typeof TomSelect !== 'undefined') {
-    var tomInstance = new TomSelect('#buscar-asistente', {
+    new TomSelect('#buscar-asistente', {
       valueField: 'id',
       labelField: 'nombre',
       searchField: ['nombre'],
@@ -383,11 +611,31 @@
       preload: false,
       shouldLoad: function (q) { return q.length >= 2; },
       load: function (query, callback) {
+        mostrarEstado('muted', 'Buscando…', false);
         fetchJson(BUSCAR_URL + '?q=' + encodeURIComponent(query))
           .then(function (resp) {
-            callback((resp.json && resp.json.resultados) || []);
+            if (resp.tipo === 'json_invalido') {
+              mostrarEstado('danger', 'Respuesta inválida del servidor. Intenta nuevamente.', false);
+              callback();
+              return;
+            }
+            if (resp.status !== 200 || !resp.json || !resp.json.ok) {
+              mostrarEstado('danger', (resp.json && resp.json.mensaje) || 'No se pudo completar la búsqueda.', false);
+              callback();
+              return;
+            }
+            var resultados = resp.json.resultados || [];
+            mostrarEstado(
+              resultados.length ? 'muted' : 'secondary',
+              resultados.length ? resultados.length + ' resultado(s).' : 'Sin resultados.',
+              false
+            );
+            callback(resultados);
           })
-          .catch(function () { callback(); });
+          .catch(function () {
+            mostrarEstado('danger', 'Sin conexión. No se pudo completar la búsqueda.', false);
+            callback();
+          });
       },
       render: {
         option: function (data, escape) {
@@ -409,10 +657,14 @@
       onInitialize: function () {
         var ts = this;
         this.control_input.setAttribute('aria-labelledby', 'buscar-asistente-label');
+        this.control_input.setAttribute('aria-describedby', 'buscar-status');
         var lbl = document.getElementById('buscar-asistente-label');
         if (lbl) {
           lbl.addEventListener('click', function () { ts.focus(); });
         }
+      },
+      onType: function (query) {
+        if (!query) mostrarEstado('muted', 'Escribe al menos 2 letras para buscar.', false);
       },
       onItemAdd: function (value) {
         agregarAsistente(value, this);

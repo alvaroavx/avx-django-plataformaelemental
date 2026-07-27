@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.core.management.base import CommandError
-from django.db import close_old_connections
+from django.db import close_old_connections, connection
 from django.db.models.signals import pre_save
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.test import override_settings
@@ -25,7 +25,7 @@ from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.test_factories import asignar_profesora_a_sesion, crear_usuario_con_rol
 from plataformaelemental.context import nav_context, organizacion_desde_request, periodo_context
 
-from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
+from .models import Asistencia, BloqueHorario, ClaseLiberada, Disciplina, SesionClase
 from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
 
 
@@ -1355,7 +1355,7 @@ class AsistenciasViewTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         self.assertFalse(Persona.objects.filter(nombres="No", apellidos="Autorizado").exists())
 
     def test_sesion_detail_muestra_modal_para_crear_persona(self):
@@ -2780,9 +2780,9 @@ class SprintDosDominioAsistenciasTests(TestCase):
         casos_get = (
             (self.admin, 200),
             (self.profesor_asignado, 200),
-            (self.profesor_no_asignado, 403),
-            (self.profesor_otra_org, 403),
-            (self.admin_otra_org, 403),
+            (self.profesor_no_asignado, 404),
+            (self.profesor_otra_org, 404),
+            (self.admin_otra_org, 404),
         )
         for usuario, esperado in casos_get:
             with self.subTest(usuario=usuario.username):
@@ -2819,6 +2819,461 @@ class SprintDosDominioAsistenciasTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
         self.assertFalse(ClaseLiberada.objects.filter(asistencia=asistencia).exists())
+
+
+class SprintTresJornadaMovilTests(TestCase):
+    def setUp(self):
+        self.hoy = timezone.localdate()
+        self.organizacion = Organizacion.objects.create(
+            nombre="Org Jornada",
+            razon_social="Org Jornada SpA",
+            rut="72.000.000-1",
+        )
+        self.otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Jornada",
+            razon_social="Otra Jornada SpA",
+            rut="72.000.000-2",
+        )
+        self.rol_profesor = Rol.objects.create(
+            nombre="Profesora Jornada",
+            codigo="PROFESOR",
+        )
+        self.rol_estudiante = Rol.objects.create(
+            nombre="Estudiante Jornada",
+            codigo="ESTUDIANTE",
+        )
+        self.profesora_asignada = crear_usuario_con_rol(
+            username="profesora_jornada",
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=self.organizacion,
+            nombres="Paula",
+            apellidos="Asignada",
+        )
+        self.profesora_no_asignada = crear_usuario_con_rol(
+            username="profesora_no_asignada_jornada",
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=self.organizacion,
+            nombres="Nora",
+            apellidos="No asignada",
+        )
+        self.profesora_otra_organizacion = crear_usuario_con_rol(
+            username="profesora_otra_jornada",
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=self.otra_organizacion,
+            nombres="Olga",
+            apellidos="Otra",
+        )
+        self.estudiante = Persona.objects.create(
+            nombres="Elena",
+            apellidos="Elegible",
+            email="elena.jornada@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=self.estudiante,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.estudiante_otra_org = Persona.objects.create(
+            nombres="Alicia",
+            apellidos="Ajena",
+            email="alicia.ajena@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=self.estudiante_otra_org,
+            rol=self.rol_estudiante,
+            organizacion=self.otra_organizacion,
+            activo=True,
+        )
+        self.disciplina = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Yoga Jornada",
+        )
+        self.disciplina_otra = Disciplina.objects.create(
+            organizacion=self.otra_organizacion,
+            nombre="Pilates Ajeno",
+        )
+        self.bloque_temprano = BloqueHorario.objects.create(
+            organizacion=self.organizacion,
+            nombre="Temprano",
+            dia_semana=self.hoy.weekday(),
+            hora_inicio="09:00",
+            hora_fin="10:00",
+            disciplina=self.disciplina,
+        )
+        self.bloque_tarde = BloqueHorario.objects.create(
+            organizacion=self.organizacion,
+            nombre="Tarde",
+            dia_semana=self.hoy.weekday(),
+            hora_inicio="18:00",
+            hora_fin="19:00",
+            disciplina=self.disciplina,
+        )
+        self.sesion_tarde = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            bloque=self.bloque_tarde,
+            fecha=self.hoy,
+        )
+        self.sesion_temprano = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            bloque=self.bloque_temprano,
+            fecha=self.hoy,
+        )
+        self.sesion_no_asignada = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha=self.hoy,
+        )
+        self.sesion_otra_org = SesionClase.objects.create(
+            disciplina=self.disciplina_otra,
+            fecha=self.hoy,
+        )
+        asignar_profesora_a_sesion(
+            user=self.profesora_asignada,
+            sesion=self.sesion_temprano,
+        )
+        asignar_profesora_a_sesion(
+            user=self.profesora_asignada,
+            sesion=self.sesion_tarde,
+        )
+        asignar_profesora_a_sesion(
+            user=self.profesora_otra_organizacion,
+            sesion=self.sesion_otra_org,
+        )
+
+    def _login_asignada(self):
+        self.client.force_login(self.profesora_asignada)
+
+    def test_integracion_jornada_usa_postgresql(self):
+        self.assertEqual(connection.vendor, "postgresql")
+        self.assertEqual(connection.settings_dict["ENGINE"], "django.db.backends.postgresql")
+
+    def test_hoy_muestra_solo_sesiones_asignadas_en_orden_cronologico(self):
+        self._login_asignada()
+        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [sesion.pk for sesion in response.context["sesiones"]],
+            [self.sesion_temprano.pk, self.sesion_tarde.pk],
+        )
+        self.assertContains(response, "Yoga Jornada")
+        self.assertContains(response, "Org Jornada")
+        self.assertContains(response, "09:00")
+        self.assertContains(response, "18:00")
+        self.assertContains(response, "Paula Asignada")
+        self.assertNotContains(response, "Pilates Ajeno")
+        self.assertNotContains(
+            response,
+            reverse(
+                "asistencias:sesion_detail",
+                kwargs={"pk": self.sesion_no_asignada.pk},
+            ),
+        )
+
+    def test_hoy_muestra_estado_vacio_comprensible(self):
+        self.client.force_login(self.profesora_no_asignada)
+        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No tienes clases asignadas hoy")
+        self.assertEqual(list(response.context["sesiones"]), [])
+
+    def test_detalle_restringe_profesora_no_asignada_y_otra_organizacion(self):
+        url = reverse(
+            "asistencias:sesion_detail",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        for usuaria, esperado in (
+            (self.profesora_asignada, 200),
+            (self.profesora_no_asignada, 404),
+            (self.profesora_otra_organizacion, 404),
+        ):
+            with self.subTest(usuaria=usuaria.username):
+                self.client.force_login(usuaria)
+                self.assertEqual(self.client.get(url).status_code, esperado)
+
+    def test_busqueda_profesora_limita_resultados_a_organizacion_y_sesion(self):
+        Asistencia.objects.create(
+            sesion=self.sesion_temprano,
+            persona=self.estudiante,
+        )
+        elegible = Persona.objects.create(
+            nombres="Elena",
+            apellidos="Disponible",
+            email="elena.disponible@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=elegible,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self._login_asignada()
+        response = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            ),
+            {"q": "Elena"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        resultados = response.json()["resultados"]
+        self.assertEqual([item["id"] for item in resultados], [elegible.pk])
+        self.assertNotIn(self.estudiante_otra_org.pk, [item["id"] for item in resultados])
+        self.assertEqual(set(resultados[0]), {"id", "nombre", "inactivo"})
+
+    def test_busqueda_directa_sesion_no_asignada_es_indistinguible_de_inexistente(self):
+        self._login_asignada()
+        responses = (
+            self.client.get(
+                reverse(
+                    "asistencias:sesion_asistentes_buscar",
+                    kwargs={"pk": self.sesion_no_asignada.pk},
+                ),
+                {"q": "Elena"},
+            ),
+            self.client.get(
+                reverse(
+                    "asistencias:sesion_asistentes_buscar",
+                    kwargs={"pk": 999991},
+                ),
+                {"q": "Elena"},
+            ),
+        )
+        for response in responses:
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.json()["codigo"], "SESION_NO_ENCONTRADA")
+
+    def test_agregado_profesora_crea_consumo_mensual_sin_exponer_finanzas(self):
+        pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago=self.hoy,
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        self._login_asignada()
+        response = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            ),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        asistencia = Asistencia.objects.get(
+            sesion=self.sesion_temprano,
+            persona=self.estudiante,
+        )
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
+        self.assertIsNone(response.json()["estado_financiero"])
+        self.assertNotIn("persona_url", response.json()["asistencia"])
+
+    def test_agregado_profesora_rechaza_persona_ajena_y_reintento(self):
+        self._login_asignada()
+        url = reverse(
+            "asistencias:sesion_asistente_agregar",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        ajena = self.client.post(
+            url,
+            {"persona_id": self.estudiante_otra_org.pk},
+        )
+        primera = self.client.post(url, {"persona_id": self.estudiante.pk})
+        reintento = self.client.post(url, {"persona_id": self.estudiante.pk})
+
+        self.assertEqual(ajena.status_code, 400)
+        self.assertEqual(ajena.json()["codigo"], "PERSONA_INVALIDA")
+        self.assertEqual(primera.status_code, 201)
+        self.assertEqual(reintento.status_code, 409)
+        self.assertEqual(reintento.json()["codigo"], "ASISTENCIA_DUPLICADA")
+        self.assertEqual(
+            Asistencia.objects.filter(
+                sesion=self.sesion_temprano,
+                persona=self.estudiante,
+            ).count(),
+            1,
+        )
+
+    def test_edicion_rapida_es_idempotente_y_no_recupera_cupo(self):
+        pago = Payment.objects.create(
+            persona=self.estudiante,
+            organizacion=self.organizacion,
+            fecha_pago=self.hoy,
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion_temprano,
+            persona=self.estudiante,
+        )
+        self._login_asignada()
+        url = reverse(
+            "asistencias:sesion_asistencia_estado",
+            kwargs={
+                "pk": self.sesion_temprano.pk,
+                "asistencia_pk": asistencia.pk,
+            },
+        )
+
+        ausencia = self.client.post(url, {"estado": Asistencia.Estado.AUSENTE})
+        repeticion = self.client.post(url, {"estado": Asistencia.Estado.AUSENTE})
+        justificada = self.client.post(
+            url,
+            {"estado": Asistencia.Estado.JUSTIFICADA},
+        )
+
+        self.assertEqual(ausencia.status_code, 200)
+        self.assertEqual(repeticion.status_code, 200)
+        self.assertEqual(justificada.status_code, 200)
+        self.assertIsNone(justificada.json()["estado_financiero"])
+        self.assertNotIn("estado_financiero", justificada.json()["asistencia"])
+        asistencia.refresh_from_db()
+        consumo = AttendanceConsumption.objects.get(asistencia=asistencia)
+        self.assertEqual(asistencia.estado, Asistencia.Estado.JUSTIFICADA)
+        self.assertEqual(consumo.estado, AttendanceConsumption.Estado.CONSUMIDO)
+        self.assertEqual(consumo.pago, pago)
+        self.assertEqual(
+            AttendanceConsumption.objects.filter(asistencia=asistencia).count(),
+            1,
+        )
+        pago.refresh_from_db()
+        self.assertEqual(pago.saldo_clases, 0)
+
+    def test_edicion_rapida_rechaza_identificador_ajeno_y_estado_invalido(self):
+        asistencia_ajena = Asistencia.objects.create(
+            sesion=self.sesion_otra_org,
+            persona=self.estudiante_otra_org,
+        )
+        self._login_asignada()
+        url_ajena = reverse(
+            "asistencias:sesion_asistencia_estado",
+            kwargs={
+                "pk": self.sesion_temprano.pk,
+                "asistencia_pk": asistencia_ajena.pk,
+            },
+        )
+        url_valida = reverse(
+            "asistencias:sesion_asistencia_estado",
+            kwargs={
+                "pk": self.sesion_temprano.pk,
+                "asistencia_pk": 999992,
+            },
+        )
+
+        ajena = self.client.post(
+            url_ajena,
+            {"estado": Asistencia.Estado.AUSENTE},
+        )
+        inexistente = self.client.post(
+            url_valida,
+            {"estado": Asistencia.Estado.AUSENTE},
+        )
+        invalido = self.client.post(
+            reverse(
+                "asistencias:sesion_asistencia_estado",
+                kwargs={
+                    "pk": self.sesion_temprano.pk,
+                    "asistencia_pk": Asistencia.objects.create(
+                        sesion=self.sesion_temprano,
+                        persona=self.estudiante,
+                    ).pk,
+                },
+            ),
+            {"estado": "desconocido"},
+        )
+
+        self.assertEqual(ajena.status_code, 404)
+        self.assertEqual(ajena.json()["codigo"], "ASISTENCIA_NO_ENCONTRADA")
+        self.assertEqual(inexistente.status_code, 404)
+        self.assertEqual(inexistente.json()["codigo"], "ASISTENCIA_NO_ENCONTRADA")
+        self.assertEqual(invalido.status_code, 400)
+        self.assertEqual(invalido.json()["codigo"], "ESTADO_INVALIDO")
+
+        self.client.force_login(self.profesora_no_asignada)
+        no_asignada = self.client.post(
+            reverse(
+                "asistencias:sesion_asistencia_estado",
+                kwargs={
+                    "pk": self.sesion_temprano.pk,
+                    "asistencia_pk": Asistencia.objects.get(
+                        sesion=self.sesion_temprano,
+                        persona=self.estudiante,
+                    ).pk,
+                },
+            ),
+            {"estado": Asistencia.Estado.AUSENTE},
+        )
+        self.assertEqual(no_asignada.status_code, 404)
+        self.assertEqual(no_asignada.json()["codigo"], "SESION_NO_ENCONTRADA")
+
+    def test_profesora_no_puede_quitar_liberar_ni_ver_detalles_financieros(self):
+        asistencia = Asistencia.objects.create(
+            sesion=self.sesion_temprano,
+            persona=self.estudiante,
+        )
+        liberar_clase(
+            asistencia=asistencia,
+            motivo="Motivo administrativo reservado",
+            usuario=self.profesora_asignada,
+        )
+        self._login_asignada()
+        url = reverse(
+            "asistencias:sesion_detail",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["puede_quitar_asistente"])
+        self.assertFalse(response.context["puede_liberar_clase"])
+        self.assertFalse(response.context["puede_administrar_sesion"])
+        self.assertNotContains(response, "Estado de pago")
+        self.assertNotContains(response, reverse("personas:persona_detail", args=[self.estudiante.pk]))
+        self.assertContains(response, "Clase liberada")
+        self.assertNotContains(response, "Motivo administrativo reservado")
+        self.assertContains(response, "data-estado-control")
+        self.assertContains(response, 'aria-live="polite"', html=False)
+        self.assertContains(response, 'aria-pressed="true"', html=False)
+
+        eliminar = self.client.post(
+            url,
+            {
+                "eliminar_asistente": "1",
+                "asistencia_id": asistencia.pk,
+            },
+        )
+        self.assertEqual(eliminar.status_code, 403)
+        self.assertTrue(Asistencia.objects.filter(pk=asistencia.pk).exists())
+
+    def test_navegacion_profesora_expone_hoy_sin_panel_administrativo(self):
+        self._login_asignada()
+        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+
+        self.assertContains(response, reverse("asistencias:sesiones_hoy"))
+        self.assertNotContains(
+            response,
+            f'href="{reverse("asistencias:dashboard")}"',
+            html=False,
+        )
+        self.assertNotContains(
+            response,
+            f'href="{reverse("finanzas:dashboard")}"',
+            html=False,
+        )
+        self.assertContains(response, 'aria-label="Abrir menú"', html=False)
+        self.assertContains(response, 'min-height: 44px', html=False)
 
 
 class SprintDosConcurrenciaConsumosTests(TransactionTestCase):

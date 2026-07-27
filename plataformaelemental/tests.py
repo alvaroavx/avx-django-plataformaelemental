@@ -138,7 +138,9 @@ class ElementalAppsUXTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Finanzas")
-        self.assertContains(response, "no tiene accesos operativos visibles")
+        self.assertContains(response, "Hoy")
+        self.assertContains(response, reverse("asistencias:sesiones_hoy"))
+        self.assertNotContains(response, "no tiene accesos operativos visibles")
 
     def test_dashboard_general_staff_ve_admin(self):
         self.client.force_login(self.user_staff)

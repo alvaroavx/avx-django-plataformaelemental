@@ -1,0 +1,151 @@
+{% extends "asistencias/base_app.html" %}
+{% block title %}Hoy · Clases{% endblock %}
+
+{% block extra_head %}
+<style>
+  .jornada-hoy {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  .jornada-hoy .sesion-card {
+    border: 1px solid #dbe3df;
+    border-radius: 1rem;
+    box-shadow: 0 0.4rem 1.2rem rgba(15, 23, 42, 0.06);
+  }
+  .jornada-hoy .sesion-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .jornada-hoy .jornada-action {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .jornada-hoy .jornada-meta {
+    display: grid;
+    gap: 0.4rem;
+  }
+  @media (max-width: 575.98px) {
+    .jornada-hoy {
+      margin-top: 0.25rem !important;
+    }
+    .jornada-hoy .sesion-card__header {
+      display: grid;
+    }
+    .jornada-hoy .jornada-action {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="jornada-hoy mt-3" aria-labelledby="jornada-hoy-title">
+  <header class="mb-3">
+    <div class="text-uppercase small fw-semibold text-success">Jornada de clases</div>
+    <h1 class="h3 mb-1" id="jornada-hoy-title">Hoy</h1>
+    <p class="text-muted mb-0">{{ fecha_hoy|date:"l d \d\e F \d\e Y" }}</p>
+  </header>
+
+  <div
+    id="jornada-hoy-status"
+    class="alert alert-light border py-2"
+    role="status"
+    aria-live="polite"
+    hidden
+  ></div>
+
+  <div class="d-grid gap-3" id="sesiones-hoy-list">
+    {% for sesion in sesiones %}
+      <article class="card sesion-card" data-sesion-id="{{ sesion.pk }}">
+        <div class="card-body d-grid gap-3">
+          <div class="sesion-card__header">
+            <div>
+              <h2 class="h5 mb-1">{{ sesion.disciplina }}</h2>
+              <div class="text-muted">{{ sesion.disciplina.organizacion }}</div>
+            </div>
+            <span class="badge text-bg-{{ sesion.momento_clase }}">
+              <i class="bi {{ sesion.momento_icono }}" aria-hidden="true"></i>
+              {{ sesion.momento_label }}
+            </span>
+          </div>
+
+          <div class="jornada-meta">
+            <div>
+              <i class="bi bi-clock me-1" aria-hidden="true"></i>
+              {% if sesion.bloque %}
+                {{ sesion.bloque.hora_inicio|time:"H:i" }}–{{ sesion.bloque.hora_fin|time:"H:i" }}
+              {% else %}
+                Horario no informado
+              {% endif %}
+            </div>
+            <div>
+              <i class="bi bi-person-workspace me-1" aria-hidden="true"></i>
+              {% for profesora in sesion.profesores.all %}
+                {{ profesora }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                Sin profesora asignada
+              {% endfor %}
+            </div>
+            <div>
+              <i class="bi bi-people me-1" aria-hidden="true"></i>
+              {{ sesion.total_asistentes }} asistente{{ sesion.total_asistentes|pluralize }}
+            </div>
+          </div>
+
+          <a
+            class="btn btn-success jornada-action"
+            href="{% url 'asistencias:sesion_detail' sesion.pk %}"
+            data-abrir-sesion
+          >
+            Abrir sesión
+            <i class="bi bi-arrow-right ms-2" aria-hidden="true"></i>
+          </a>
+        </div>
+      </article>
+    {% empty %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-calendar2-check display-5 text-muted" aria-hidden="true"></i>
+          <h2 class="h5 mt-3">No tienes clases asignadas hoy</h2>
+          <p class="text-muted mb-0">Cuando exista una sesión asignada aparecerá aquí.</p>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var statusEl = document.getElementById('jornada-hoy-status');
+  function anunciar(texto, tipo) {
+    if (!statusEl) return;
+    statusEl.hidden = false;
+    statusEl.className = 'alert py-2 alert-' + tipo;
+    statusEl.textContent = texto;
+  }
+
+  document.querySelectorAll('[data-abrir-sesion]').forEach(function (enlace) {
+    enlace.addEventListener('click', function (event) {
+      if (!navigator.onLine) {
+        event.preventDefault();
+        anunciar('Sin conexión. La sesión no se abrió; revisa tu conexión e intenta nuevamente.', 'danger');
+        enlace.focus();
+        return;
+      }
+      enlace.setAttribute('aria-busy', 'true');
+      anunciar('Abriendo sesión…', 'info');
+    });
+  });
+
+  window.addEventListener('offline', function () {
+    anunciar('Sin conexión. Los datos mostrados pueden no estar actualizados.', 'warning');
+  });
+})();
+</script>
+{% endblock %}

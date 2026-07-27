@@ -8,6 +8,7 @@ from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
     ACCION_VER_FINANZAS,
+    ACCION_VER_SESION,
     usuario_tiene_permiso,
 )
 
@@ -58,6 +59,7 @@ def build_navigation(request):
 
     can_personas = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_PERSONAS, organizacion=organizacion)
     can_asistencias = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion)
+    can_jornada = usuario_tiene_permiso(user, ACCION_VER_SESION, organizacion=organizacion)
     can_finanzas = usuario_tiene_permiso(user, ACCION_VER_FINANZAS, organizacion=organizacion)
     can_gestionar_solicitudes = settings.ACCESS_REQUESTS_ENABLED and user.has_perm(
         "personas.gestionar_solicitudes_acceso"
@@ -88,6 +90,7 @@ def build_navigation(request):
                 url_name="asistencias:dashboard",
                 active_prefixes=["/asistencias/"],
                 children=[
+                    _item(request, label="Hoy", icon="bi-sun", url_name="asistencias:sesiones_hoy"),
                     _item(request, label="Panel", icon="bi-grid", url_name="asistencias:dashboard"),
                     _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
                     _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),
@@ -95,6 +98,16 @@ def build_navigation(request):
                     _item(request, label="Profesores", icon="bi-person-workspace", url_name="asistencias:profesores_list"),
                     _item(request, label="Disciplinas", icon="bi-tags", url_name="asistencias:disciplinas_list"),
                 ],
+            )
+        )
+    elif can_jornada:
+        items.append(
+            _item(
+                request,
+                label="Hoy",
+                icon="bi-sun",
+                url_name="asistencias:sesiones_hoy",
+                active_prefixes=["/asistencias/hoy/", "/asistencias/sesiones/"],
             )
         )
 

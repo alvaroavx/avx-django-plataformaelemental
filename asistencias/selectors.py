@@ -1,8 +1,56 @@
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Case, Count, IntegerField, Max, Q, Sum, Value, When
 
+from personas.models import PersonaRol
+from personas.permissions import normalizar_codigo_rol
 from plataformaelemental.context import aplicar_periodo, filtros_periodo, resolver_periodo
 
 from .models import Asistencia, SesionClase
+
+
+def sesiones_visibles_para_usuario(user):
+    sesiones = (
+        SesionClase.objects.select_related(
+            "disciplina",
+            "disciplina__organizacion",
+            "bloque",
+        )
+        .prefetch_related("profesores")
+        .annotate(
+            total_asistentes=Count("asistencias", distinct=True),
+            sin_horario=Case(
+                When(bloque__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
+        )
+    )
+    if not user.is_authenticated:
+        return sesiones.none()
+    if user.is_superuser or user.is_staff:
+        return sesiones
+
+    persona = getattr(user, "persona", None)
+    if not persona:
+        return sesiones.none()
+    roles = PersonaRol.objects.filter(persona=persona, activo=True).values_list(
+        "organizacion_id",
+        "rol__codigo",
+    )
+    organizaciones_administradas = set()
+    organizaciones_profesora = set()
+    for organizacion_id, codigo in roles:
+        codigo_normalizado = normalizar_codigo_rol(codigo)
+        if codigo_normalizado in {"admin", "staff_asistencia"}:
+            organizaciones_administradas.add(organizacion_id)
+        elif codigo_normalizado == "profesor":
+            organizaciones_profesora.add(organizacion_id)
+
+    filtro = Q(disciplina__organizacion_id__in=organizaciones_administradas)
+    filtro |= Q(
+        disciplina__organizacion_id__in=organizaciones_profesora,
+        profesores=persona,
+    )
+    return sesiones.filter(filtro).distinct()
 
 
 def asistencias_export_queryset(request, *, organizacion=None):

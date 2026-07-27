@@ -49,7 +49,11 @@ from .forms import (
     SesionesMasivasForm,
 )
 from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
-from .selectors import asistencias_export_queryset, estudiantes_operativos_periodo
+from .selectors import (
+    asistencias_export_queryset,
+    estudiantes_operativos_periodo,
+    sesiones_visibles_para_usuario,
+)
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
 from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
 from .utils import ROLE_ADMIN, usuario_tiene_roles
@@ -224,10 +228,6 @@ def _usuario_puede_administrar_sesion(user, sesion):
     )
 
 
-def _usuario_puede_ver_sesion(user, sesion):
-    return _usuario_puede_administrar_sesion(user, sesion) or _usuario_es_profesor_asignado(user, sesion)
-
-
 def _usuario_puede_registrar_asistencia(user, sesion):
     if _usuario_puede_administrar_sesion(user, sesion):
         return True
@@ -293,6 +293,38 @@ def _post_data_json_o_form(request):
     return request.POST
 
 
+def _payload_asistencia(asistencia, *, puede_ver_finanzas):
+    consumo = getattr(asistencia, "consumo_financiero", None)
+    liberacion = getattr(asistencia, "clase_liberada", None)
+    liberada = bool(liberacion and liberacion.revertida_en is None)
+    if liberada:
+        estado_financiero = {
+            "codigo": "liberada",
+            "label": "Clase liberada",
+        }
+    elif puede_ver_finanzas and consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
+        estado_financiero = {"codigo": "consumido", "label": "Pagada"}
+    elif puede_ver_finanzas and consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
+        estado_financiero = {"codigo": "deuda", "label": "Deuda"}
+    elif puede_ver_finanzas and consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
+        estado_financiero = {"codigo": "pendiente", "label": "Sin cobro"}
+    elif puede_ver_finanzas:
+        estado_financiero = {"codigo": "sin_consumo", "label": "Sin consumo"}
+    else:
+        estado_financiero = None
+
+    return {
+        "id": asistencia.pk,
+        "persona_id": asistencia.persona_id,
+        "nombre": asistencia.persona.nombre_completo,
+        "estado": asistencia.estado,
+        "estado_label": asistencia.get_estado_display(),
+        "hora": timezone.localtime(asistencia.registrada_en).strftime("%H:%M"),
+        "clase_liberada": liberada,
+        "estado_financiero": estado_financiero,
+    }
+
+
 def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
     _, ultimo_dia = calendar.monthrange(year, month)
     fechas = [
@@ -303,6 +335,53 @@ def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
     if max_sesiones:
         return fechas[:max_sesiones]
     return fechas
+
+
+@login_required
+def sesiones_hoy(request):
+    hoy = timezone.localdate()
+    ahora = timezone.localtime()
+    sesiones = list(
+        sesiones_visibles_para_usuario(request.user)
+        .filter(fecha=hoy)
+        .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
+    )
+    hora_actual = ahora.time()
+    for sesion in sesiones:
+        if sesion.estado == SesionClase.Estado.CANCELADA:
+            sesion.momento_label = "Cancelada"
+            sesion.momento_clase = "secondary"
+            sesion.momento_icono = "bi-x-circle"
+        elif sesion.estado == SesionClase.Estado.COMPLETADA:
+            sesion.momento_label = "Finalizada"
+            sesion.momento_clase = "success"
+            sesion.momento_icono = "bi-check-circle"
+        elif sesion.bloque and hora_actual < sesion.bloque.hora_inicio:
+            sesion.momento_label = "Próxima"
+            sesion.momento_clase = "primary"
+            sesion.momento_icono = "bi-clock"
+        elif sesion.bloque and hora_actual <= sesion.bloque.hora_fin:
+            sesion.momento_label = "En curso"
+            sesion.momento_clase = "warning"
+            sesion.momento_icono = "bi-play-circle"
+        elif sesion.bloque:
+            sesion.momento_label = "Horario finalizado"
+            sesion.momento_clase = "secondary"
+            sesion.momento_icono = "bi-clock-history"
+        else:
+            sesion.momento_label = "Programada · sin horario"
+            sesion.momento_clase = "info"
+            sesion.momento_icono = "bi-calendar-event"
+
+    context = nav_context(request)
+    context.update(
+        {
+            "hide_periodo": True,
+            "fecha_hoy": hoy,
+            "sesiones": sesiones,
+        }
+    )
+    return render(request, "asistencias/sesiones_hoy.html", context)
 
 
 @role_required(ROLE_ADMIN)
@@ -1028,14 +1107,14 @@ def sesion_detail(request, pk):
     context = nav_context(request)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
-        SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores", "asistencias__persona"),
+        sesiones_visibles_para_usuario(request.user).prefetch_related(
+            "asistencias__persona",
+        ),
         pk=pk,
     )
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
-    if not _usuario_puede_ver_sesion(request.user, sesion):
-        raise PermissionDenied("No tienes permisos para acceder a esta sesión.")
     estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
@@ -1122,8 +1201,8 @@ def sesion_detail(request, pk):
                         messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
                     return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "eliminar_asistente" in request.POST:
-            if not puede_registrar:
-                raise PermissionDenied("No tienes permisos para corregir asistencias en esta sesión.")
+            if not puede_administrar:
+                raise PermissionDenied("No tienes permisos para quitar asistentes de esta sesión.")
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
             registrar_auditoria(
@@ -1293,7 +1372,14 @@ def sesion_detail(request, pk):
             "puede_administrar_sesion": puede_administrar,
             "puede_registrar_asistencia": puede_registrar,
             "puede_liberar_clase": puede_liberar,
-            "back_url": request.META.get("HTTP_REFERER") or _url_con_filtros(request, "asistencias:sesiones_list"),
+            "puede_quitar_asistente": puede_administrar,
+            "es_jornada_profesora": puede_registrar and not puede_administrar,
+            "back_url": request.META.get("HTTP_REFERER")
+            or (
+                reverse("asistencias:sesiones_hoy")
+                if not puede_administrar
+                else _url_con_filtros(request, "asistencias:sesiones_list")
+            ),
         }
     )
     return render(request, "asistencias/sesion_detail.html", context)
@@ -1398,37 +1484,80 @@ def sesion_asistente_agregar(request, pk):
             },
         )
 
-    consumo = AttendanceConsumption.objects.filter(asistencia=asistencia).first()
-    if consumo and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
-        estado_fin_codigo, estado_fin_label = "consumido", "Pagada"
-    elif consumo and consumo.estado == AttendanceConsumption.Estado.DEUDA:
-        estado_fin_codigo, estado_fin_label = "deuda", "Deuda"
-    elif consumo and consumo.estado == AttendanceConsumption.Estado.PENDIENTE:
-        estado_fin_codigo, estado_fin_label = "pendiente", "Sin cobro"
-    else:
-        estado_fin_codigo, estado_fin_label = "sin_consumo", "Sin consumo"
+    asistencia = Asistencia.objects.select_related(
+        "persona",
+        "consumo_financiero",
+        "clase_liberada",
+    ).get(pk=asistencia.pk)
+    puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
+    payload = _payload_asistencia(
+        asistencia,
+        puede_ver_finanzas=puede_administrar,
+    )
+    estado_financiero = payload.pop("estado_financiero")
+    if puede_administrar:
+        payload["persona_url"] = reverse("personas:persona_detail", args=[persona.pk])
 
     total = sesion.asistencias.count()
     return JsonResponse(
         {
             "ok": True,
-            "asistencia": {
-                "id": asistencia.pk,
-                "persona_id": persona.pk,
-                "nombre": persona.nombre_completo,
-                "estado": asistencia.estado,
-                "estado_label": asistencia.get_estado_display(),
-                "persona_url": reverse("personas:persona_detail", args=[persona.pk]),
-                "hora": timezone.localtime(asistencia.registrada_en).strftime("%H:%M"),
-            },
-            "estado_financiero": {
-                "codigo": estado_fin_codigo,
-                "label": estado_fin_label,
-            },
+            "asistencia": payload,
+            "estado_financiero": estado_financiero,
             "total": total,
             "mensaje": "Asistente agregado",
         },
         status=201,
+    )
+
+
+@require_POST
+def sesion_asistencia_estado(request, pk, asistencia_pk):
+    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    if error:
+        return error
+
+    data = _post_data_json_o_form(request)
+    if data is None:
+        return _json_error("JSON_INVALIDO", "El cuerpo JSON no es válido.", status=400)
+    estado = data.get("estado")
+    if estado not in dict(Asistencia.Estado.choices):
+        return _json_error("ESTADO_INVALIDO", "El estado de asistencia no es válido.", status=400)
+
+    asistencia = (
+        Asistencia.objects.select_related("persona", "sesion")
+        .filter(pk=asistencia_pk, sesion=sesion)
+        .first()
+    )
+    if not asistencia:
+        return _json_error("ASISTENCIA_NO_ENCONTRADA", "Asistencia no encontrada.", status=404)
+
+    try:
+        asistencia, _ = cambiar_estado_asistencia(
+            asistencia=asistencia,
+            estado=estado,
+            usuario=request.user,
+        )
+    except ValidationError as exc:
+        return _json_error("ESTADO_INVALIDO", exc.messages[0], status=400)
+
+    asistencia = Asistencia.objects.select_related(
+        "persona",
+        "consumo_financiero",
+        "clase_liberada",
+    ).get(pk=asistencia.pk)
+    payload = _payload_asistencia(
+        asistencia,
+        puede_ver_finanzas=_usuario_puede_administrar_sesion(request.user, sesion),
+    )
+    estado_financiero = payload.pop("estado_financiero")
+    return JsonResponse(
+        {
+            "ok": True,
+            "asistencia": payload,
+            "estado_financiero": estado_financiero,
+            "mensaje": f"Asistencia guardada: {payload['estado_label']}.",
+        }
     )
 
 
