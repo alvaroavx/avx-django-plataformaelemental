@@ -88,6 +88,30 @@ Desde v1.0 se usa `Panel` para vistas principales. `Dashboard` queda reservado s
 
 La gramática mínima de `Hoy`, detalle de sesión y resumen administrativo se documenta en `docs/apps/GRAMATICA_MOVIL_SPRINT2.md`. El prototipo vive en `docs/prototipos/`, separado de rutas activas. Su validación con Beisics y dos profesoras continúa pendiente.
 
+## Jornada móvil de clases — Sprint 3
+
+La ruta activa `/asistencias/hoy/` materializa la parte operativa del prototipo
+para profesoras autorizadas. La experiencia incluye:
+
+- sesiones del día ordenadas por horario, con organización, equipo, cantidad de
+  asistentes y estado temporal expresado con texto e icono;
+- detalle de sesión en tarjetas móviles, sin controles administrativos ni
+  detalles financieros para profesoras;
+- búsqueda incremental de estudiantes elegibles de la organización;
+- agregado consecutivo sin recargar la pantalla, con limpieza y reenfoque tras
+  el éxito;
+- conservación del texto y mensaje anunciable en errores, duplicados o pérdida
+  de conexión;
+- cambio rápido entre presente, ausente y justificada con estado textual,
+  `aria-pressed` y confirmación mediante `aria-live`;
+- objetivos principales de al menos 44 px, foco visible, reflow a 390 y 320 px
+  y navegación por teclado.
+
+La implementación no añade funcionamiento offline: cuando se pierde conexión
+informa que la operación no fue confirmada y permite reintentar. La validación
+usuaria con Beisics y dos profesoras continúa pendiente. La evidencia renderizada
+con fixtures de prueba está en `docs/prototipos/SPRINT3_EVIDENCIA.md`.
+
 ## Visibilidad Por Permisos
 La navegacion usa permisos existentes:
 - `Personas`: permisos administrativos de personas

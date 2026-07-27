@@ -50,8 +50,12 @@ La fuente de roles sigue siendo `PersonaRol`: una persona puede tener permisos d
 | Acción | Administración autorizada | Profesora asignada | Profesora no asignada | Otra organización |
 | --- | ---: | ---: | ---: | ---: |
 | Ver sesión | Sí | Sí | No | No |
+| Ver asistentes | Sí | Sí | No | No |
+| Buscar personas elegibles | Sí | Sí, limitada a la organización de la sesión | No | No |
+| Agregar asistente | Sí | Sí | No | No |
 | Registrar/corregir asistencia | Sí | Sí | No | No |
 | Ver estado de consumo necesario para operar | Sí | Sí, limitado a la sesión | No | No |
+| Quitar asistente | Sí | No | No | No |
 | Liberar clase | Sí | No | No | No |
 | Revertir clase liberada | Sí | No | No | No |
 | Revertir pago | Sí | No | No | No |

@@ -254,7 +254,10 @@ No permitido:
 
 Busca estudiantes elegibles para agregar a la sesión.
 
-**Autenticación:** requiere usuario autenticado con rol `admin` o `staff_asistencia` en alguna organización.
+**Autenticación:** requiere administración autorizada o una profesora con rol
+`PROFESOR` activo y asignación efectiva a la sesión. La sesión se filtra por su
+organización real; una profesora no asignada y una persona de otra organización
+reciben la misma respuesta que una sesión inexistente.
 
 **Restricciones de búsqueda:**
 - Mínimo 2 caracteres en `q`; con menos de 2 se devuelve `{"ok": true, "resultados": []}` sin consultar DB.
@@ -312,6 +315,11 @@ Crea una `Asistencia` y su `AttendanceConsumption` para la sesión.
 }
 ```
 
+Para una profesora, `persona_url` no se entrega y `estado_financiero` se devuelve
+como `null`. La única excepción financiera visible es `clase_liberada=true`,
+presentada como información de solo lectura. Administración conserva el contrato
+financiero operacional existente.
+
 **Mapeo de `codigo` a clase Bootstrap (responsabilidad del frontend):**
 
 | codigo | clase |
@@ -335,6 +343,66 @@ Crea una `Asistencia` y su `AttendanceConsumption` para la sesión.
 | 409 | `ASISTENCIA_DUPLICADA` | persona ya está en la sesión |
 
 ---
+
+### `POST sesiones/<pk>/asistencias/<asistencia_pk>/estado/`
+
+Cambia rápidamente el estado entre `PRESENTE`, `AUSENTE` y `JUSTIFICADA`.
+Valida en servidor la sesión, su organización, la asignación de la profesora y
+que la asistencia pertenezca a esa sesión. Delega el recálculo al servicio
+idempotente del dominio; ausencias y justificaciones no recuperan cupo.
+
+**Body:** `multipart/form-data` o `application/json` con campo `estado`.
+
+**Respuesta exitosa (200):**
+```json
+{
+  "ok": true,
+  "asistencia": {
+    "id": 42,
+    "persona_id": 7,
+    "nombre": "Ana García",
+    "estado": "ausente",
+    "estado_label": "Ausente",
+    "hora": "10:30",
+    "clase_liberada": false
+  },
+  "estado_financiero": null,
+  "mensaje": "Asistencia guardada."
+}
+```
+
+**Códigos de error:**
+
+| HTTP | codigo | condición |
+|------|--------|-----------|
+| 400 | `JSON_INVALIDO` | body `application/json` malformado |
+| 400 | `ESTADO_INVALIDO` | estado ausente o fuera de las opciones válidas |
+| 403 | `PERMISO_DENEGADO` | no autenticado o sin rol base |
+| 404 | `SESION_NO_ENCONTRADA` | sesión inexistente o no autorizada |
+| 404 | `ASISTENCIA_NO_ENCONTRADA` | asistencia inexistente o ajena a la sesión |
+
+## Jornada móvil de profesoras — Sprint 3
+
+- `GET /asistencias/hoy/` lista solamente las sesiones del día accesibles para
+  el usuario. Para profesoras exige rol activo en la organización y asignación
+  en `SesionClase.profesores`; el queryset aplica ambas restricciones.
+- El detalle reutiliza ese mismo queryset: una sesión inexistente, no asignada
+  o de otra organización responde 404 sin revelar si el identificador existe.
+- La lista se ordena cronológicamente, deja sesiones sin horario al final y
+  expresa con texto si una sesión está pasada, en curso, próxima, finalizada o
+  cancelada.
+- El detalle prioriza identidad de sesión, búsqueda incremental, asistentes y
+  edición rápida. Después de agregar, el buscador se limpia y recupera foco; en
+  un error corregible conserva el texto para reintentar.
+- Doble envío y reintentos no crean asistencias duplicadas. El servidor responde
+  `ASISTENCIA_DUPLICADA` con HTTP 409.
+- La profesora no recibe enlaces a fichas de personas, datos financieros,
+  controles de liberación, pagos ni eliminación de asistentes. Una clase
+  liberada se muestra únicamente como estado informativo.
+- La navegación de profesora incorpora solo el acceso `Hoy`; no abre el panel
+  administrativo de Asistencias.
+- Google sigue detrás de los flags existentes. Autenticarse no crea rol,
+  organización ni asignación y no concede por sí solo acceso a la jornada.
 
 ## API
 La API de datos de `asistencias` queda desactivada en v1.0.
