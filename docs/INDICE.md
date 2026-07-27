@@ -32,6 +32,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md): decisiones de `personas`.
 - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md): decisiones de `finanzas`.
 - [docs/apps/UX.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/UX.md): navegacion, login y UX responsive de `Elemental Apps`.
+- [docs/apps/GRAMATICA_MOVIL_SPRINT2.md](apps/GRAMATICA_MOVIL_SPRINT2.md): especificacion y evidencia del prototipo movil aislado de Sprint 2.
 - [docs/apps/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERMISOS_Y_ROLES.md): matriz minima de permisos HTML v1.0.
 - [docs/apps/AUDITORIA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/AUDITORIA.md): trazabilidad operativa minima de acciones sensibles.
 - [docs/apps/ADMIN.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ADMIN.md): uso del Django Admin como soporte y diagnostico.

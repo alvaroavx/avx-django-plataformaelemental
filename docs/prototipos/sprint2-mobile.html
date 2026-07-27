@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elemental Apps · Prototipo móvil Sprint 2</title>
+  <style>
+    :root {
+      --brand: #146c43;
+      --brand-dark: #0f5132;
+      --ink: #17221d;
+      --muted: #5c6962;
+      --surface: #fff;
+      --canvas: #eef3f0;
+      --line: #cbd7d0;
+      --warning: #8a4b08;
+      --danger: #a61e2b;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--canvas); }
+    button, input, select { font: inherit; }
+    button, a, input, select { min-height: 44px; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid #ffbf47;
+      outline-offset: 2px;
+    }
+    .app { width: 100%; max-width: 430px; min-height: 100vh; margin: 0 auto; background: var(--surface); }
+    .topbar { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; z-index: 2; }
+    .eyebrow { color: var(--brand-dark); font-size: .75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    h1 { font-size: 1.45rem; line-height: 1.2; margin: 3px 0; }
+    h2 { font-size: 1.05rem; margin: 0; }
+    p { margin: 0; }
+    .context { color: var(--muted); font-size: .85rem; }
+    .main { padding: 14px 16px 92px; display: grid; gap: 12px; }
+    .screen { display: none; gap: 12px; }
+    .screen.active { display: grid; }
+    .card { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fff; }
+    .card-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .stack { display: grid; gap: 8px; }
+    .meta { color: var(--muted); font-size: .82rem; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 9px; font-size: .75rem; font-weight: 750; border: 1px solid currentColor; }
+    .badge::before { content: "●"; font-size: .65rem; }
+    .badge-success { color: #0f5132; background: #d1e7dd; }
+    .badge-warning { color: #664d03; background: #fff3cd; }
+    .badge-neutral { color: #41464b; background: #e9ecef; }
+    .primary { width: 100%; border: 0; border-radius: 11px; color: #fff; background: var(--brand); padding: 11px 14px; font-weight: 800; }
+    .secondary { border: 1px solid var(--brand); border-radius: 11px; color: var(--brand-dark); background: #fff; padding: 10px 12px; font-weight: 700; }
+    .search { width: 100%; border: 1px solid #7a8981; border-radius: 11px; padding: 10px 12px; }
+    .person { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-top: 1px solid #e3e9e5; }
+    .person:first-of-type { border-top: 0; }
+    .segmented { display: grid; grid-template-columns: repeat(3, 44px); gap: 5px; }
+    .segmented button { min-width: 44px; border: 1px solid #748078; background: #fff; border-radius: 10px; font-weight: 800; }
+    .segmented .selected { color: #fff; background: var(--brand-dark); border-color: var(--brand-dark); }
+    .filters { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .filters summary { min-height: 44px; display: flex; align-items: center; padding: 10px 12px; cursor: pointer; font-weight: 750; }
+    .filters .body { padding: 0 12px 12px; display: grid; gap: 8px; }
+    .filters select { width: 100%; border: 1px solid #7a8981; border-radius: 10px; padding: 8px; }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .metric { padding: 12px; border-radius: 12px; background: #edf7f1; border: 1px solid #c6e4d2; }
+    .metric strong { display: block; font-size: 1.45rem; }
+    .state-panel { border-left: 4px solid #5c6962; background: #f4f6f5; padding: 10px 12px; border-radius: 8px; font-size: .83rem; }
+    .state-panel strong { display: block; }
+    .state-list { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .state-list div { padding: 8px; border: 1px dashed #98a69e; border-radius: 8px; font-size: .75rem; }
+    .bottom { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 430px); display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border-top: 1px solid var(--line); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); }
+    .bottom a { color: #39473f; text-decoration: none; display: grid; place-items: center; align-content: center; font-size: .74rem; border-radius: 9px; }
+    .bottom a[aria-current="page"] { color: var(--brand-dark); background: #e4f2e9; font-weight: 800; }
+    .offline { color: var(--danger); }
+    @media (max-width: 340px) {
+      .topbar, .main { padding-left: 12px; padding-right: 12px; }
+      .card { padding: 12px; }
+      .card-row { align-items: flex-start; }
+      .person { grid-template-columns: 1fr; }
+      .segmented { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
+      .metric-grid, .state-list { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="eyebrow">Elemental Apps · prototipo aislado</div>
+      <h1 id="screen-title">Hoy</h1>
+      <p class="context">Beisics · julio 2026</p>
+    </header>
+    <main class="main">
+      <section id="hoy" class="screen active" aria-labelledby="screen-title">
+        <div class="state-panel"><strong>2 clases hoy</strong>Organización y periodo permanecen visibles aunque no haya filtros abiertos.</div>
+        <article class="card stack">
+          <div class="card-row">
+            <div><h2>Yoga inicial</h2><p class="meta">10:00 · Sala principal</p></div>
+            <span class="badge badge-warning">Pendiente</span>
+          </div>
+          <p class="meta">8 estudiantes esperados</p>
+          <button class="primary">Abrir sesión</button>
+        </article>
+        <article class="card stack">
+          <div class="card-row">
+            <div><h2>Pilates</h2><p class="meta">18:30 · Sala 2</p></div>
+            <span class="badge badge-success">Completada</span>
+          </div>
+          <button class="secondary">Ver resumen</button>
+        </article>
+        <div class="state-list" aria-label="Estados del prototipo">
+          <div><strong>Carga</strong><br>Esqueleto y texto “Cargando clases”.</div>
+          <div><strong>Vacío</strong><br>“No tienes clases asignadas hoy”.</div>
+          <div class="offline"><strong>Sin conexión</strong><br>Reintentar; no ocultar datos ya cargados.</div>
+          <div><strong>Error</strong><br>Mensaje, referencia y acción de reintento.</div>
+        </div>
+      </section>
+
+      <section id="sesion" class="screen" aria-labelledby="screen-title">
+        <div class="card stack">
+          <div class="card-row">
+            <div><h2>Yoga inicial · 10:00</h2><p class="meta">Beisics · 15 julio 2026</p></div>
+            <span class="badge badge-neutral">3 de 8</span>
+          </div>
+          <label for="buscar"><strong>Agregar consecutivamente</strong></label>
+          <input id="buscar" class="search" type="search" placeholder="Buscar nombre o RUT">
+          <p class="meta">Resultados incrementales desde 2 caracteres. Enter agrega el primer resultado.</p>
+        </div>
+        <article class="card">
+          <div class="person">
+            <div><strong>Ana García</strong><p class="meta">Pagada · estado expresado con texto e icono</p></div>
+            <div class="segmented" aria-label="Asistencia de Ana García">
+              <button class="selected" aria-label="Presente">P</button><button aria-label="Ausente">A</button><button aria-label="Justificada">J</button>
+            </div>
+          </div>
+          <div class="person">
+            <div><strong>Camila Soto</strong><p class="meta">Deuda · no depende solo del color</p></div>
+            <div class="segmented" aria-label="Asistencia de Camila Soto">
+              <button class="selected" aria-label="Presente">P</button><button aria-label="Ausente">A</button><button aria-label="Justificada">J</button>
+            </div>
+          </div>
+        </article>
+        <button class="primary">Guardar asistencia</button>
+        <div class="state-panel"><strong>Feedback de éxito</strong>“Asistencia guardada” con confirmación textual y región aria-live.</div>
+      </section>
+
+      <section id="admin" class="screen" aria-labelledby="screen-title">
+        <details class="filters">
+          <summary>Filtros · Beisics · julio 2026</summary>
+          <div class="body">
+            <label>Organización<select><option>Beisics</option></select></label>
+            <label>Periodo<select><option>Julio 2026</option></select></label>
+          </div>
+        </details>
+        <div class="metric-grid">
+          <div class="metric"><span class="meta">Sesiones</span><strong>24</strong><span>20 completadas</span></div>
+          <div class="metric"><span class="meta">Deuda</span><strong>7</strong><span>clases por revisar</span></div>
+          <div class="metric"><span class="meta">Liberadas</span><strong>3</strong><span>con motivo registrado</span></div>
+          <div class="metric"><span class="meta">Saldo</span><strong>42</strong><span>clases disponibles</span></div>
+        </div>
+        <article class="card stack">
+          <div class="card-row"><h2>Alertas operativas</h2><span class="badge badge-warning">3</span></div>
+          <p>Dos pagos revertidos requieren revisar consumos reasignados.</p>
+          <button class="primary">Revisar alertas</button>
+        </article>
+        <div class="state-list">
+          <div><strong>Carga</strong><br>Métricas con esqueleto estable.</div>
+          <div><strong>Vacío</strong><br>Resumen cero con explicación.</div>
+          <div class="offline"><strong>Sin conexión</strong><br>Última actualización visible.</div>
+          <div><strong>Error</strong><br>Sin valores parciales engañosos.</div>
+        </div>
+      </section>
+    </main>
+    <nav class="bottom" aria-label="Prototipo">
+      <a href="?screen=hoy" data-target="hoy" aria-current="page">Hoy</a>
+      <a href="?screen=sesion" data-target="sesion">Sesión</a>
+      <a href="?screen=admin" data-target="admin">Resumen</a>
+    </nav>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const selected = ["hoy", "sesion", "admin"].includes(params.get("screen")) ? params.get("screen") : "hoy";
+    const titles = { hoy: "Hoy", sesion: "Detalle de sesión", admin: "Resumen administrativo" };
+    document.querySelectorAll(".screen").forEach((item) => item.classList.toggle("active", item.id === selected));
+    document.querySelectorAll(".bottom a").forEach((item) => {
+      if (item.dataset.target === selected) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
+    document.getElementById("screen-title").textContent = titles[selected];
+  </script>
+</body>
+</html>
