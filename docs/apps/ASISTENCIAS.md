@@ -178,6 +178,12 @@ flowchart TD
 - En el panel de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
 - En el panel de `asistencias`, las tablas que usen DataTables deben inicializarse solo cuando tengan filas reales de datos; los estados vacios deben mantener la cantidad real de columnas y no usar una unica fila con `colspan` dentro de la tabla inicializada.
 - El resumen de profesor se consulta desde `personas/<id>/` y debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en vistas de `asistencias`.
+
+## Estado financiero en Disciplina
+
+El detalle de una disciplina muestra por estudiante un estado operacional calculado en un selector masivo, limitado a la disciplina, organización y periodo visibles. Las etiquetas son textuales y se acompañan de icono decorativo y clase de color: `Al día`, `Deuda`, `Sin plan`, `Pendiente` e `Información incompleta` cuando una combinación requiere revisión.
+
+La vista no calcula deuda en el template ni consulta pagos por persona. Los pagos y consumos se agregan en consultas agrupadas; el enlace al perfil solo se renderiza dentro del detalle de disciplina autorizado y conserva los filtros globales. La clasificación respeta el mismo mes y año, pagos revertidos excluidos, consumos y deuda del dominio financiero; un `Payment` directo sin plan sigue siendo un derecho válido si cubre el consumo.
 - En `asistencias/estudiantes/`, la tabla operacional muestra metricas academicas y de cobranza del periodo: clases pagadas, usadas, restantes, total pagado, ultimo pago, asistencias, deuda y estado financiero simple. Estas metricas son operacionales y se calculan en selector, no en template.
 - En `asistencias/estudiantes/`, las acciones rapidas minimas son: perfil, asistencia, estado financiero y registrar pago cuando el usuario tenga permiso financiero. Las URLs preservan periodo y organizacion.
 

@@ -27,6 +27,12 @@ En Asistencias, solo `superuser` de Django conserva acceso total operativo. `is_
 | Administrar personas | si | no | no | no |
 | Administrar sesiones | si | no | no | no |
 
+## Pago masivo y detalle de Disciplina
+
+El pago masivo exige `operar_pagos` en la organización real del lote. La organización activa solo filtra navegación; personas, planes, documentos, lotes y pagos se resuelven mediante querysets autorizados y se vuelven a validar al confirmar. La búsqueda incremental recibe una organización como filtro de navegación, pero el servidor comprueba que el usuario tenga permiso para esa organización y no devuelve personas ajenas.
+
+Un lote ajeno o inexistente no se entrega. La clave de idempotencia se comprueba antes de crear o reutilizar pagos y la autorización se evalúa también al consultar el resultado. El detalle de Disciplina exige autorización administrativa sobre la disciplina y sus enlaces al perfil no amplían ese permiso.
+
 ## Decisiones
 - Las vistas de `finanzas` permiten lectura a `admin`, `finanzas` y `solo_lectura`.
 - Cualquier `POST` financiero requiere rol operativo especifico: pagos, transacciones o documentos.

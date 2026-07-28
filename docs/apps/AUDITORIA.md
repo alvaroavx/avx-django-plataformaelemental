@@ -80,6 +80,7 @@ Finanzas:
 - Crear pago sugerido al confirmar importacion tributaria.
 - Crear, editar y eliminar transacciones.
 - Asociaciones de documento a pago/transaccion cuando ocurren por los formularios auditados.
+- Confirmación de lotes de pagos masivos y cada `Payment` creado, con UUID del lote, usuario, organización, cantidad, monto total, ids técnicos y origen `pago_masivo`.
 
 ## Fuera de alcance v1.0
 

@@ -242,6 +242,22 @@ No debe contarse como ingreso o egreso por si solo.
 - Los pagos a profesores no tienen modelo contable propio; pueden registrarse como `Transaction` de egreso si corresponde.
 - Las alertas de cierre reportan inconsistencias visibles, pero no corrigen datos automaticamente.
 
+## Pago masivo operacional
+
+El registro masivo vive en `finanzas:pagos_masivo` y reutiliza la misma operación de dominio que el pago individual: `Payment.save()` calcula neto, IVA, total y clases; su señal posterior imputa deudas del mismo mes y año. Un `Payment` no crea una `Transaction` automáticamente y el documento tributario sigue siendo opcional.
+
+- La selección se limita a estudiantes con `PersonaRol` activo en la organización autorizada.
+- El servidor valida nuevamente personas, planes, documentos, organización y montos al confirmar; la organización enviada por el navegador no es una prueba de permiso.
+- El preview no persiste pagos ni efectos financieros.
+- La confirmación es `transaction.atomic()`: todas las filas válidas confirman el lote completo; una fila inválida o una excepción deja cero pagos, consumos derivados, auditorías definitivas o lote confirmado.
+- `LotePago` conserva UUID, organización, usuario, clave de idempotencia, cantidad, monto total, metadatos mínimos y fecha de confirmación. `Payment.lote` es nullable para preservar pagos históricos e individuales.
+- La clave de idempotencia es única en PostgreSQL. Un doble envío devuelve el lote ya confirmado y no crea pagos adicionales.
+- La auditoría registra el lote y cada pago con origen `pago_masivo`, sin guardar archivos binarios ni el payload completo del navegador.
+- El flujo individual y el masivo no generan `Transaction`; la conciliación contable de pagos operacionales sigue siendo una decisión pendiente separada.
+- El flujo actual de `Payment` no admite archivo de respaldo binario. No se duplica ni se expone un archivo común; los documentos tributarios se asocian por organización y continúan protegidos por sus vistas autorizadas.
+
+La deuda pendiente de cierre transversal de permisos de Personas y Finanzas, incluido el bypass histórico de `is_staff` en consumidores antiguos, no queda resuelta por este flujo.
+
 ## Decisiones Pendientes
 - Definir si un `Payment` debe crear o sugerir una `Transaction` en un flujo futuro.
 - Definir conciliacion formal entre pagos operacionales, cartola bancaria y transacciones.
