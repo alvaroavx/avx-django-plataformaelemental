@@ -1,6 +1,122 @@
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+
+from auditoria.models import AuditLog
+from auditoria.services import registrar_auditoria
 from personas.models import Persona, PersonaRol, Rol
 
-from ..models import AttendanceConsumption, Payment
+from ..models import AttendanceConsumption, DocumentoTributario, LotePago, Payment, PaymentPlan
+
+
+def crear_pago_operacional(*, pago, usuario=None, lote=None, origen="pago_individual"):
+    """Persiste un Payment y conserva los efectos del flujo individual."""
+    pago.lote = lote
+    pago.save()
+    registrar_auditoria(
+        usuario=usuario,
+        accion=AuditLog.ACCION_CREAR,
+        dominio="finanzas",
+        objeto=pago,
+        organizacion=pago.organizacion,
+        resumen="Pago creado",
+        metadata={
+            "pago_id": pago.pk,
+            "lote_id": str(lote.pk) if lote else None,
+            "origen": origen,
+        },
+    )
+    return pago
+
+
+def _resolver_fila_pago(*, fila, organizacion_id):
+    persona = Persona.objects.filter(
+        pk=fila["persona_id"],
+        roles__organizacion_id=organizacion_id,
+        roles__rol__codigo__iexact="ESTUDIANTE",
+        roles__activo=True,
+    ).first()
+    if not persona:
+        raise ValidationError("La persona seleccionada no es elegible para la organización.")
+    plan = None
+    if fila.get("plan_id"):
+        plan = PaymentPlan.objects.filter(pk=fila["plan_id"], organizacion_id=organizacion_id, activo=True).first()
+        if not plan:
+            raise ValidationError("El plan seleccionado no pertenece a la organización o no está activo.")
+    documento = None
+    if fila.get("documento_tributario_id"):
+        documento = DocumentoTributario.objects.filter(
+            pk=fila["documento_tributario_id"], organizacion_id=organizacion_id
+        ).first()
+        if not documento:
+            raise ValidationError("El documento seleccionado no pertenece a la organización.")
+    return persona, plan, documento
+
+
+@transaction.atomic
+def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas, metadatos=None):
+    """Confirma todas las filas o ninguna; una clave solo puede producir un lote."""
+    try:
+        with transaction.atomic():
+            lote = LotePago.objects.create(
+                organizacion_id=organizacion_id,
+                clave_idempotencia=clave_idempotencia,
+                creado_por=usuario,
+                metadatos=metadatos or {},
+            )
+    except IntegrityError:
+        lote = LotePago.objects.select_for_update().filter(clave_idempotencia=clave_idempotencia).first()
+        if lote:
+            if lote.organizacion_id != organizacion_id:
+                raise ValidationError("La clave de idempotencia ya pertenece a otra organización.")
+            return lote, False
+        raise
+
+    pagos = []
+    try:
+        personas_vistas = set()
+        for fila in filas:
+            if fila["persona_id"] in personas_vistas:
+                raise ValidationError("Una persona no puede repetirse dentro del lote.")
+            personas_vistas.add(fila["persona_id"])
+            persona, plan, documento = _resolver_fila_pago(fila=fila, organizacion_id=organizacion_id)
+            pago = Payment(
+                persona=persona,
+                organizacion_id=organizacion_id,
+                plan=plan,
+                documento_tributario=documento,
+                fecha_pago=fila["fecha_pago"],
+                metodo_pago=fila["metodo_pago"],
+                numero_comprobante=fila.get("numero_comprobante", ""),
+                aplica_iva=fila.get("aplica_iva", True),
+                monto_incluye_iva=fila.get("monto_incluye_iva", False),
+                monto_referencia=fila["monto_referencia"],
+                clases_asignadas=fila.get("clases_asignadas", 0),
+                observaciones=fila.get("observaciones", ""),
+            )
+            pagos.append(crear_pago_operacional(pago=pago, usuario=usuario, lote=lote, origen="pago_masivo"))
+        lote.cantidad_pagos = len(pagos)
+        lote.monto_total = sum((pago.monto_total for pago in pagos), 0)
+        lote.confirmado_en = timezone.now()
+        lote.save(update_fields=["cantidad_pagos", "monto_total", "confirmado_en", "actualizado_en"])
+        registrar_auditoria(
+            usuario=usuario,
+            accion=AuditLog.ACCION_CREAR,
+            dominio="finanzas",
+            objeto=lote,
+            organizacion=lote.organizacion,
+            resumen="Lote de pagos confirmado",
+            metadata={
+                "lote_id": str(lote.pk),
+                "pago_ids": [pago.pk for pago in pagos],
+                "cantidad_pagos": lote.cantidad_pagos,
+                "monto_total": lote.monto_total,
+                "origen": "pago_masivo",
+            },
+        )
+    except Exception:
+        raise
+    return lote, True
 
 
 def crear_persona_estudiante_desde_modal(*, form, organizacion):
@@ -73,6 +189,8 @@ def resumen_consumos_pago(pago):
 
 __all__ = [
     "calcular_saldo_clases_pago",
+    "confirmar_lote_pagos",
+    "crear_pago_operacional",
     "crear_persona_estudiante_desde_modal",
     "enriquecer_pagos_para_listado",
     "resumen_consumos_pago",

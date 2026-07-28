@@ -50,6 +50,7 @@ from .forms import (
 )
 from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
 from .selectors import (
+    estudiantes_financieros_disciplina,
     asistencias_export_queryset,
     estudiantes_operativos_periodo,
     sesiones_visibles_para_usuario,
@@ -825,6 +826,7 @@ def disciplina_detail(request, pk):
         sesiones_en_equipo__disciplina=disciplina,
         **filtros_periodo("sesiones_en_equipo__fecha", request=request),
     ).distinct().order_by("apellidos", "nombres")
+    estudiantes_disciplina = estudiantes_financieros_disciplina(request, disciplina=disciplina)
 
     context.update(
         {
@@ -832,6 +834,7 @@ def disciplina_detail(request, pk):
             "sesiones": sesiones,
             "resumen": resumen,
             "profesores_periodo": profesores_periodo,
+            "estudiantes_disciplina": estudiantes_disciplina,
             "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
         }
     )

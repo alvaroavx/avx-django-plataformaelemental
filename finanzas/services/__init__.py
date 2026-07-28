@@ -9,7 +9,9 @@ from .imputacion import (
 )
 from .pagos import (
     calcular_saldo_clases_pago,
+    confirmar_lote_pagos,
     crear_persona_estudiante_desde_modal,
+    crear_pago_operacional,
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
     texto_copiable_operativo_pago,
@@ -31,8 +33,10 @@ __all__ = [
     "armar_dashboard_financiero",
     "armar_reporte_categorias",
     "calcular_saldo_clases_pago",
+    "confirmar_lote_pagos",
     "consumo_tiene_derecho_valido",
     "crear_persona_estudiante_desde_modal",
+    "crear_pago_operacional",
     "enriquecer_pagos_para_listado",
     "filas_export_pagos",
     "filas_export_transacciones",

@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.db.models import Q
@@ -256,6 +258,75 @@ class PaymentForm(forms.ModelForm):
                     "documento_tributario",
                     "El documento tributario seleccionado no pertenece al periodo filtrado.",
                 )
+        return cleaned
+
+
+class PagoMasivoForm(forms.Form):
+    organizacion = forms.ModelChoiceField(queryset=Organizacion.objects.none(), required=True)
+    fecha_pago = forms.DateField(widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
+    plan = forms.ModelChoiceField(queryset=PaymentPlan.objects.none(), required=False)
+    documento_tributario = forms.ModelChoiceField(queryset=DocumentoTributario.objects.none(), required=False)
+    metodo_pago = forms.ChoiceField(choices=Payment.Metodo.choices)
+    numero_comprobante = forms.CharField(required=False)
+    aplica_iva = forms.BooleanField(required=False, initial=True)
+    monto_incluye_iva = forms.BooleanField(required=False)
+    monto_referencia = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0)
+    clases_asignadas = forms.IntegerField(min_value=0, required=False, initial=0)
+    observaciones = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    personas_seleccionadas = forms.CharField(widget=forms.HiddenInput)
+    filas_json = forms.CharField(widget=forms.HiddenInput, required=False)
+    clave_idempotencia = forms.CharField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, organizaciones=None, personas=None, planes=None, documentos=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["organizacion"].queryset = organizaciones or Organizacion.objects.none()
+        self.fields["plan"].queryset = planes or PaymentPlan.objects.none()
+        self.fields["documento_tributario"].queryset = documentos or DocumentoTributario.objects.none()
+        self.personas_queryset = personas or Persona.objects.none()
+
+    def clean_personas_seleccionadas(self):
+        raw = self.cleaned_data["personas_seleccionadas"] or ""
+        try:
+            ids = [int(value) for value in raw.split(",") if value.strip()]
+        except ValueError as exc:
+            raise forms.ValidationError("La selección de personas no es válida.") from exc
+        if not ids:
+            raise forms.ValidationError("Selecciona al menos una persona.")
+        if len(ids) > 20:
+            raise forms.ValidationError("El lote admite como máximo 20 personas.")
+        if len(ids) != len(set(ids)):
+            raise forms.ValidationError("No puedes seleccionar dos veces a la misma persona.")
+        personas = list(self.personas_queryset.filter(pk__in=ids))
+        if len(personas) != len(ids):
+            raise forms.ValidationError("Una o más personas no son elegibles para la organización.")
+        self.personas_seleccionadas_obj = {persona.pk: persona for persona in personas}
+        return ids
+
+    def clean_filas_json(self):
+        raw = self.cleaned_data.get("filas_json") or "{}"
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise forms.ValidationError("Los ajustes individuales no son válidos.") from exc
+        if not isinstance(value, dict):
+            raise forms.ValidationError("Los ajustes individuales no son válidos.")
+        return value
+
+    def clean(self):
+        cleaned = super().clean()
+        metodo = cleaned.get("metodo_pago")
+        comprobante = (cleaned.get("numero_comprobante") or "").strip()
+        if metodo == Payment.Metodo.TRANSFERENCIA and not comprobante:
+            self.add_error("numero_comprobante", "El número de comprobante es obligatorio para transferencias.")
+        if metodo != Payment.Metodo.TRANSFERENCIA:
+            cleaned["numero_comprobante"] = ""
+        organizacion = cleaned.get("organizacion")
+        plan = cleaned.get("plan")
+        documento = cleaned.get("documento_tributario")
+        if plan and organizacion and plan.organizacion_id != organizacion.pk:
+            self.add_error("plan", "El plan no pertenece a la organización seleccionada.")
+        if documento and organizacion and documento.organizacion_id != organizacion.pk:
+            self.add_error("documento_tributario", "El documento no pertenece a la organización seleccionada.")
         return cleaned
 
 

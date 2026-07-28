@@ -28,6 +28,13 @@
       >
         <i class="bi bi-cash-coin"></i><span class="finanzas-btn-label">Registrar pago</span>
       </button>
+      <a
+        class="btn btn-sm btn-outline-success finanzas-btn"
+        href="{% url 'finanzas:pago_masivo' %}{% if organizacion_id %}?organizacion={{ organizacion_id }}{% endif %}"
+        title="Registrar pagos masivos"
+      >
+        <i class="bi bi-people"></i><span class="finanzas-btn-label">Pago masivo</span>
+      </a>
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}" title="Exportar CSV">
         <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar CSV</span>
       </a>

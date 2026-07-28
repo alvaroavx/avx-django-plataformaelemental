@@ -99,6 +99,24 @@
   </div>
 
   <div class="card">
+    <div class="card-header"><h2 class="h5 mb-0">Estado financiero de estudiantes</h2></div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm align-middle mb-0" id="tabla-estudiantes-disciplina">
+        <thead><tr><th>Persona</th><th>Estado</th><th>Clases usadas</th><th>Clases disponibles</th><th>Deuda</th></tr></thead>
+        <tbody>
+        {% for item in estudiantes_disciplina %}
+          <tr>
+            <td><a href="{% url 'personas:persona_detail' item.persona.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">{{ item.persona.nombre_completo }}</a></td>
+            <td><span class="badge {{ item.estado_financiero_class }}"><i class="bi {{ item.estado_financiero_icon }}" aria-hidden="true"></i> {{ item.estado_financiero }}</span><span class="visually-hidden"> Estado financiero: {{ item.estado_financiero }}</span></td>
+            <td>{{ item.clases_usadas }}</td><td>{{ item.clases_restantes }}</td><td>{{ item.deuda_clases }}</td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">No hay estudiantes registrados en el período.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span>Sesiones de la disciplina</span>
       <small class="text-muted">Cada fila permite ver la sesión en detalle</small>

@@ -1,0 +1,10 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% block title %}Lote confirmado{% endblock %}
+{% block content %}
+<main class="container-fluid py-4" aria-labelledby="titulo-lote-confirmado">
+  <div class="alert alert-success" role="status"><h1 id="titulo-lote-confirmado" class="h4">Lote confirmado</h1><p class="mb-0">Se crearon {{ lote.cantidad_pagos }} pagos en una sola operación.</p></div>
+  <dl class="row"><dt class="col-sm-3">Identificador</dt><dd class="col-sm-9"><code>{{ lote.pk }}</code></dd><dt class="col-sm-3">Organización</dt><dd class="col-sm-9">{{ lote.organizacion.nombre }}</dd><dt class="col-sm-3">Monto total</dt><dd class="col-sm-9">{{ lote.monto_total }}</dd></dl>
+  <h2 class="h5">Pagos creados</h2><ul>{% for pago in lote.pagos.all %}<li><a href="{% url 'finanzas:pago_detail' pago.pk %}">{{ pago.persona.nombre_completo }}</a> — {{ pago.monto_total }}</li>{% endfor %}</ul>
+  <a class="btn btn-primary" href="{% url 'finanzas:pagos_list' %}?organizacion={{ lote.organizacion_id }}">Volver a pagos</a>
+</main>
+{% endblock %}

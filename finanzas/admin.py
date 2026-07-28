@@ -1,7 +1,15 @@
 from django.contrib import admin
 from django.db.models import Count
 
-from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from .models import AttendanceConsumption, Category, DocumentoTributario, LotePago, Payment, PaymentPlan, Transaction
+
+
+@admin.register(LotePago)
+class LotePagoAdmin(admin.ModelAdmin):
+    list_display = ("creado_en", "organizacion", "cantidad_pagos", "monto_total", "confirmado_en", "creado_por")
+    list_filter = ("organizacion", "confirmado_en")
+    readonly_fields = tuple(field.name for field in LotePago._meta.fields)
+    actions = None
 
 
 @admin.register(PaymentPlan)

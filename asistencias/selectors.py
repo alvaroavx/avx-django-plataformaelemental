@@ -1,6 +1,6 @@
 from django.db.models import Case, Count, IntegerField, Max, Q, Sum, Value, When
 
-from personas.models import PersonaRol
+from personas.models import Persona, PersonaRol
 from personas.permissions import normalizar_codigo_rol
 from plataformaelemental.context import aplicar_periodo, filtros_periodo, resolver_periodo
 
@@ -248,6 +248,79 @@ def estudiantes_operativos_periodo(request, *, organizacion=None):
                 "deuda_clases": deuda_clases,
                 "estado_financiero": estado_financiero,
                 "estado_financiero_class": estado_financiero_class,
+            }
+        )
+    return resultado
+
+
+def estudiantes_financieros_disciplina(request, *, disciplina):
+    """Estado financiero por estudiante de una disciplina, sin consultas por fila."""
+    from finanzas.models import AttendanceConsumption, Payment
+
+    periodo = resolver_periodo(request)
+    fecha_asistencia = filtros_periodo("asistencias__sesion__fecha", mes=periodo["mes"], anio=periodo["anio"])
+    base = Persona.objects.filter(
+        asistencias__sesion__disciplina=disciplina,
+        **fecha_asistencia,
+    ).distinct()
+    personas = list(base.order_by("apellidos", "nombres"))
+    persona_ids = [persona.pk for persona in personas]
+    pagos = Payment.objects.filter(
+        persona_id__in=persona_ids,
+        organizacion_id=disciplina.organizacion_id,
+        revertido_en__isnull=True,
+        **filtros_periodo("fecha_pago", mes=periodo["mes"], anio=periodo["anio"]),
+    ).values("persona_id").annotate(
+        clases_pagadas=Sum("clases_asignadas"),
+        tiene_plan=Count("plan", distinct=True),
+        pagos_sin_plan=Count("id", filter=Q(plan__isnull=True), distinct=True),
+    )
+    pagos_por_persona = {item["persona_id"]: item for item in pagos}
+    consumos = AttendanceConsumption.objects.filter(
+        persona_id__in=persona_ids,
+        asistencia__sesion__disciplina=disciplina,
+        **filtros_periodo("clase_fecha", mes=periodo["mes"], anio=periodo["anio"]),
+    ).values("persona_id").annotate(
+        clases_usadas=Count("id", filter=Q(estado=AttendanceConsumption.Estado.CONSUMIDO)),
+        deuda_clases=Count("id", filter=Q(estado=AttendanceConsumption.Estado.DEUDA)),
+        clases_pendientes=Count("id", filter=Q(estado=AttendanceConsumption.Estado.PENDIENTE)),
+        consumos_sin_pago=Count(
+            "id",
+            filter=Q(estado=AttendanceConsumption.Estado.CONSUMIDO, pago__isnull=True),
+        ),
+    )
+    consumos_por_persona = {item["persona_id"]: item for item in consumos}
+
+    resultado = []
+    for persona in personas:
+        pago = pagos_por_persona.get(persona.pk, {})
+        consumo = consumos_por_persona.get(persona.pk, {})
+        clases_pagadas = pago.get("clases_pagadas") or 0
+        clases_usadas = consumo.get("clases_usadas") or 0
+        if consumo.get("clases_pendientes"):
+            codigo, etiqueta, clase, icono = "pendiente", "Pendiente", "text-bg-info", "bi-hourglass-split"
+        elif consumo.get("consumos_sin_pago"):
+            codigo, etiqueta, clase, icono = "informacion_incompleta", "Información incompleta", "text-bg-warning", "bi-question-circle"
+        elif consumo.get("deuda_clases") or clases_usadas > clases_pagadas:
+            codigo, etiqueta, clase, icono = "deuda", "Deuda", "text-bg-danger", "bi-exclamation-triangle"
+        elif not clases_pagadas:
+            codigo, etiqueta, clase, icono = "sin_plan", "Sin plan", "text-bg-secondary", "bi-dash-circle"
+        elif pago.get("pagos_sin_plan") and not pago.get("tiene_plan"):
+            # Un Payment directo sin plan sigue siendo un derecho válido del dominio.
+            codigo, etiqueta, clase, icono = "al_dia", "Al día", "text-bg-success", "bi-check-circle"
+        else:
+            codigo, etiqueta, clase, icono = "al_dia", "Al día", "text-bg-success", "bi-check-circle"
+        resultado.append(
+            {
+                "persona": persona,
+                "estado_financiero_codigo": codigo,
+                "estado_financiero": etiqueta,
+                "estado_financiero_class": clase,
+                "estado_financiero_icon": icono,
+                "clases_pagadas": clases_pagadas,
+                "clases_usadas": clases_usadas,
+                "clases_restantes": clases_pagadas - clases_usadas,
+                "deuda_clases": consumo.get("deuda_clases") or 0,
             }
         )
     return resultado

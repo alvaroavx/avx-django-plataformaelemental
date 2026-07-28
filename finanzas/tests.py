@@ -25,6 +25,7 @@ from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estu
 from finanzas.services.reconciliacion import reconciliar_integridad_dominio
 from finanzas.services.reversas import revertir_pago
 from finanzas.services.pagos import (
+    confirmar_lote_pagos,
     crear_persona_estudiante_desde_modal,
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
@@ -43,6 +44,7 @@ from finanzas.models import (
     Payment,
     PaymentPlan,
     Transaction,
+    LotePago,
 )
 
 
@@ -3578,3 +3580,161 @@ class SprintDosReconciliacionTests(TestCase):
         resultado = reconciliar_integridad_dominio()
 
         self.assertEqual(resultado["resumen"]["estado_asistencia_incompatible"], 1)
+
+
+class PagoMasivoDominioTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.org = Organizacion.objects.create(nombre="Org Lotes", razon_social="Org Lotes SPA", rut="76.000.000-1")
+        self.otra_org = Organizacion.objects.create(nombre="Otra Org Lotes", razon_social="Otra Org Lotes SPA", rut="76.000.000-2")
+        self.rol_admin = Rol.objects.create(nombre="Admin lotes", codigo="ADMIN")
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante lotes", codigo="ESTUDIANTE")
+        self.user = User.objects.create_user("admin_lotes", password=TEST_PASSWORD)
+        self.admin = Persona.objects.create(nombres="Admin", apellidos="Lotes", user=self.user)
+        PersonaRol.objects.create(persona=self.admin, rol=self.rol_admin, organizacion=self.org, activo=True)
+        self.plan = PaymentPlan.objects.create(
+            organizacion=self.org,
+            nombre="Plan lote",
+            num_clases=2,
+            precio=10000,
+            activo=True,
+        )
+        self.personas = []
+        for index in range(20):
+            persona = Persona.objects.create(nombres=f"Alumno{index}", apellidos="Lote")
+            PersonaRol.objects.create(persona=persona, rol=self.rol_estudiante, organizacion=self.org, activo=True)
+            self.personas.append(persona)
+
+    def _filas(self, cantidad):
+        return [
+            {
+                "persona_id": persona.pk,
+                "plan_id": self.plan.pk,
+                "documento_tributario_id": None,
+                "fecha_pago": date(2026, 7, 27),
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "numero_comprobante": "",
+                "aplica_iva": False,
+                "monto_incluye_iva": False,
+                "monto_referencia": Decimal("10000"),
+                "clases_asignadas": 0,
+                "observaciones": "lote de prueba",
+            }
+            for persona in self.personas[:cantidad]
+        ]
+
+    def test_lote_valido_de_10_crea_pagos_y_auditoria_de_lote(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            lote, creado = confirmar_lote_pagos(
+                usuario=self.user,
+                organizacion_id=self.org.pk,
+                clave_idempotencia="lote-10",
+                filas=self._filas(10),
+            )
+        self.assertTrue(creado)
+        self.assertEqual(lote.cantidad_pagos, 10)
+        self.assertEqual(Payment.objects.filter(lote=lote).count(), 10)
+        self.assertEqual(AuditLog.objects.filter(objeto_id=str(lote.pk)).count(), 1)
+
+    def test_lote_valido_de_20_conserva_mismos_montos_del_pago_individual(self):
+        lote, creado = confirmar_lote_pagos(
+            usuario=self.user,
+            organizacion_id=self.org.pk,
+            clave_idempotencia="lote-20",
+            filas=self._filas(20),
+        )
+        self.assertTrue(creado)
+        pagos = list(Payment.objects.filter(lote=lote))
+        self.assertEqual(len(pagos), 20)
+        self.assertTrue(all(pago.monto_total == Decimal("10000.00") for pago in pagos))
+        self.assertTrue(all(pago.clases_asignadas == 2 for pago in pagos))
+
+    def test_fila_invalida_hace_rollback_de_todo_el_lote(self):
+        filas = self._filas(10)
+        filas[-1]["persona_id"] = self.personas[0].pk
+        with self.assertRaises(ValidationError):
+            confirmar_lote_pagos(
+                usuario=self.user,
+                organizacion_id=self.org.pk,
+                clave_idempotencia="lote-invalido",
+                filas=filas,
+            )
+        self.assertEqual(Payment.objects.count(), 0)
+        self.assertEqual(LotePago.objects.count(), 0)
+
+    def test_misma_clave_idempotente_no_duplica_pagos(self):
+        lote, creado = confirmar_lote_pagos(
+            usuario=self.user,
+            organizacion_id=self.org.pk,
+            clave_idempotencia="lote-reintento",
+            filas=self._filas(10),
+        )
+        repetido, creado_repetido = confirmar_lote_pagos(
+            usuario=self.user,
+            organizacion_id=self.org.pk,
+            clave_idempotencia="lote-reintento",
+            filas=self._filas(10),
+        )
+        self.assertTrue(creado)
+        self.assertFalse(creado_repetido)
+        self.assertEqual(repetido.pk, lote.pk)
+        self.assertEqual(Payment.objects.count(), 10)
+
+    def test_persona_de_otra_organizacion_no_puede_formar_parte_del_lote(self):
+        persona_ajena = Persona.objects.create(nombres="Ajena", apellidos="Lote")
+        PersonaRol.objects.create(persona=persona_ajena, rol=self.rol_estudiante, organizacion=self.otra_org, activo=True)
+        filas = self._filas(1)
+        filas[0]["persona_id"] = persona_ajena.pk
+        with self.assertRaisesMessage(ValidationError, "persona seleccionada"):
+            confirmar_lote_pagos(
+                usuario=self.user,
+                organizacion_id=self.org.pk,
+                clave_idempotencia="lote-ajeno",
+                filas=filas,
+            )
+        self.assertEqual(Payment.objects.count(), 0)
+
+    def test_vista_masiva_y_busqueda_estan_limitadas_por_organizacion(self):
+        self.client.force_login(self.user)
+        url = reverse("finanzas:pago_masivo")
+        response = self.client.get(f"{url}?organizacion={self.org.pk}")
+        self.assertEqual(response.status_code, 200)
+        busqueda = self.client.get(
+            reverse("finanzas:pago_masivo_personas"),
+            {"organizacion": self.org.pk, "q": "Alumno"},
+        )
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(len(busqueda.json()["resultados"]), 20)
+        ajena = self.client.get(
+            reverse("finanzas:pago_masivo_personas"),
+            {"organizacion": self.otra_org.pk, "q": "Alumno"},
+        )
+        self.assertEqual(ajena.status_code, 404)
+
+    def test_preview_y_confirmacion_crean_un_solo_lote(self):
+        self.client.force_login(self.user)
+        payload = {
+            "organizacion": self.org.pk,
+            "fecha_pago": "2026-07-27",
+            "plan": self.plan.pk,
+            "documento_tributario": "",
+            "metodo_pago": Payment.Metodo.EFECTIVO,
+            "numero_comprobante": "",
+            "aplica_iva": "",
+            "monto_incluye_iva": "",
+            "monto_referencia": "10000",
+            "clases_asignadas": "0",
+            "observaciones": "",
+            "personas_seleccionadas": ",".join(str(persona.pk) for persona in self.personas[:2]),
+            "filas_json": "{}",
+            "clave_idempotencia": "vista-lote-1",
+            "accion": "preview",
+        }
+        preview = self.client.post(reverse("finanzas:pago_masivo"), payload)
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, "Preview del lote")
+        payload["accion"] = "confirmar"
+        confirmado = self.client.post(reverse("finanzas:pago_masivo"), payload)
+        self.assertEqual(confirmado.status_code, 302)
+        self.assertEqual(Payment.objects.count(), 2)
+        self.assertEqual(LotePago.objects.count(), 1)

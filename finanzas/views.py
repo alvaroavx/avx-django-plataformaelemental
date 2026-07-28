@@ -1,16 +1,20 @@
 ﻿import csv
 import json
 import mimetypes
+import uuid
 from pathlib import Path
 from decimal import Decimal
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from auditoria.models import AuditLog
@@ -19,6 +23,7 @@ from asistencias.forms import PersonaRapidaForm
 from plataformaelemental.context import (
     descripcion_periodo,
     organizacion_desde_request,
+    organizaciones_visibles_para_usuario,
     resolver_periodo,
 )
 from plataformaelemental.exports import periodo_sufijo_archivo, xlsx_response
@@ -58,6 +63,7 @@ from .forms import (
     DocumentoTributarioImportConfirmForm,
     DocumentoTributarioImportUploadForm,
     PaymentForm,
+    PagoMasivoForm,
     PaymentPlanForm,
     ReversaPagoForm,
     TransactionForm,
@@ -74,7 +80,8 @@ from .forms_helpers import (
     url_with_query as _url_with_query,
     url_with_query_without as _url_with_query_without,
 )
-from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from .models import Category, DocumentoTributario, LotePago, Payment, PaymentPlan, Transaction
+from personas.models import Persona
 from .selectors import (
     categorias_queryset,
     consolidado_categorias_queryset,
@@ -92,7 +99,9 @@ from .selectors import (
     transacciones_queryset,
 )
 from .services.pagos import (
+    confirmar_lote_pagos,
     crear_persona_estudiante_desde_modal,
+    crear_pago_operacional,
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
 )
@@ -561,16 +570,7 @@ def pagos_list(request):
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     return _redirect_with_query(request, "finanzas:pagos_list")
         elif form.is_valid():
-            pago = form.save()
-            registrar_auditoria(
-                usuario=request.user,
-                accion=AuditLog.ACCION_CREAR,
-                dominio="finanzas",
-                objeto=pago,
-                organizacion=pago.organizacion,
-                resumen="Pago creado",
-                metadata=_snapshot_pago(pago),
-            )
+            pago = crear_pago_operacional(pago=form.save(commit=False), usuario=request.user)
             messages.success(request, "Pago registrado.")
             return redirect(
                 _url_with_query_without(
@@ -582,6 +582,230 @@ def pagos_list(request):
 
     context = _contexto_pagos_list(request, form=form, persona_form=persona_form, open_nueva_persona=open_nueva_persona)
     return render(request, "finanzas/pagos_list.html", context)
+
+
+def _organizaciones_pago_masivo(user):
+    organizaciones = organizaciones_visibles_para_usuario(user, permitir_staff_global=False)
+    if getattr(user, "is_superuser", False):
+        return organizaciones
+    ids = [
+        organizacion.pk
+        for organizacion in organizaciones
+        if usuario_tiene_permiso(
+            user,
+            ACCION_OPERAR_PAGOS,
+            organizacion=organizacion,
+            permitir_staff_global=False,
+        )
+    ]
+    return organizaciones.filter(pk__in=ids)
+
+
+def _organizacion_pago_masivo(request):
+    raw = request.POST.get("organizacion") or request.GET.get("organizacion")
+    try:
+        organizacion_id = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return _organizaciones_pago_masivo(request.user).filter(pk=organizacion_id).first()
+
+
+def _pago_masivo_form(request, *, organizacion, data=None, initial=None):
+    organizaciones = _organizaciones_pago_masivo(request.user)
+    personas = Persona.objects.filter(
+        roles__organizacion=organizacion,
+        roles__rol__codigo__iexact="ESTUDIANTE",
+        roles__activo=True,
+    ).distinct().order_by("apellidos", "nombres") if organizacion else Persona.objects.none()
+    planes = PaymentPlan.objects.filter(organizacion=organizacion, activo=True).order_by("-es_por_defecto", "nombre") if organizacion else PaymentPlan.objects.none()
+    documentos = DocumentoTributario.objects.filter(organizacion=organizacion).order_by("-fecha_emision", "-id") if organizacion else DocumentoTributario.objects.none()
+    initial = dict(initial or {})
+    if organizacion and data is None:
+        plan_defecto = planes.filter(es_por_defecto=True).first()
+        if plan_defecto:
+            initial.setdefault("plan", plan_defecto.pk)
+        initial.setdefault("aplica_iva", not organizacion.es_exenta_iva)
+        initial.setdefault("fecha_pago", timezone.localdate())
+    return PagoMasivoForm(
+        data=data,
+        initial=initial,
+        organizaciones=organizaciones,
+        personas=personas,
+        planes=planes,
+        documentos=documentos,
+    )
+
+
+def _filas_pago_masivo(request, form):
+    organizacion = form.cleaned_data["organizacion"]
+    comunes = form.cleaned_data
+    overrides = form.cleaned_data.get("filas_json") or {}
+    filas = []
+    errores = {}
+    for persona_id in form.cleaned_data["personas_seleccionadas"]:
+        override = overrides.get(str(persona_id), {})
+        if not isinstance(override, dict):
+            override = {}
+        datos = {
+            "organizacion": organizacion.pk,
+            "persona": persona_id,
+            "plan": override.get("plan", comunes["plan"].pk if comunes.get("plan") else ""),
+            "documento_tributario": override.get(
+                "documento_tributario",
+                comunes["documento_tributario"].pk if comunes.get("documento_tributario") else "",
+            ),
+            "fecha_pago": override.get("fecha_pago", comunes["fecha_pago"].isoformat()),
+            "metodo_pago": override.get("metodo_pago", comunes["metodo_pago"]),
+            "numero_comprobante": override.get("numero_comprobante", comunes.get("numero_comprobante", "")),
+            "aplica_iva": override.get("aplica_iva", comunes.get("aplica_iva", True)),
+            "monto_incluye_iva": override.get("monto_incluye_iva", comunes.get("monto_incluye_iva", False)),
+            "monto_referencia": override.get("monto_referencia", str(comunes["monto_referencia"])),
+            "clases_asignadas": override.get("clases_asignadas", comunes.get("clases_asignadas") or 0),
+            "observaciones": override.get("observaciones", comunes.get("observaciones", "")),
+        }
+        fila_form = PaymentForm(
+            data=datos,
+            periodo_mes=resolver_periodo(request)["mes"],
+            periodo_anio=resolver_periodo(request)["anio"],
+            organizacion=organizacion,
+        )
+        if fila_form.is_valid():
+            cleaned = fila_form.cleaned_data
+            plan = cleaned.get("plan")
+            clases_asignadas = cleaned.get("clases_asignadas") or (plan.num_clases if plan else 0)
+            monto_referencia = cleaned["monto_referencia"]
+            pago_preview = Payment(
+                persona=cleaned["persona"],
+                organizacion=organizacion,
+                plan=plan,
+                aplica_iva=cleaned.get("aplica_iva", True),
+                monto_incluye_iva=cleaned.get("monto_incluye_iva", False),
+                monto_referencia=monto_referencia,
+            )
+            monto_neto, monto_iva, monto_total = pago_preview.calcular_montos()
+            filas.append({
+                "persona_id": cleaned["persona"].pk,
+                "plan_id": cleaned["plan"].pk if cleaned.get("plan") else None,
+                "documento_tributario_id": cleaned["documento_tributario"].pk if cleaned.get("documento_tributario") else None,
+                "fecha_pago": cleaned["fecha_pago"],
+                "metodo_pago": cleaned["metodo_pago"],
+                "numero_comprobante": cleaned.get("numero_comprobante", ""),
+                "aplica_iva": cleaned.get("aplica_iva", True),
+                "monto_incluye_iva": cleaned.get("monto_incluye_iva", False),
+                "monto_referencia": cleaned["monto_referencia"],
+                "observaciones": cleaned.get("observaciones", ""),
+                "persona": cleaned["persona"],
+                "plan": plan,
+                "documento_tributario": cleaned.get("documento_tributario"),
+                "monto_neto": monto_neto,
+                "monto_iva": monto_iva,
+                "monto_total": monto_total,
+                "clases_asignadas": clases_asignadas,
+            })
+        else:
+            persona = getattr(form, "personas_seleccionadas_obj", {}).get(persona_id)
+            filas.append(
+                {
+                    "persona": persona,
+                    "plan": comunes.get("plan"),
+                    "metodo_pago": comunes.get("metodo_pago", ""),
+                    "monto_neto": 0,
+                    "monto_iva": 0,
+                    "monto_total": 0,
+                    "clases_asignadas": comunes.get("clases_asignadas") or 0,
+                    "aplica_iva": comunes.get("aplica_iva", True),
+                }
+            )
+            errores[persona_id] = fila_form.errors.get_json_data()
+    return filas, errores
+
+
+@login_required
+def pago_masivo_personas(request):
+    organizacion = _organizacion_pago_masivo(request)
+    if not organizacion:
+        return JsonResponse({"ok": False, "codigo": "PERMISO_DENEGADO", "mensaje": "Organización no autorizada."}, status=404)
+    query = " ".join((request.GET.get("q") or "").split())
+    personas = Persona.objects.filter(
+        roles__organizacion=organizacion,
+        roles__rol__codigo__iexact="ESTUDIANTE",
+        roles__activo=True,
+    ).distinct()
+    if query:
+        for termino in query.split():
+            personas = personas.filter(Q(nombres__icontains=termino) | Q(apellidos__icontains=termino))
+    resultados = personas.order_by("apellidos", "nombres")[:20]
+    return JsonResponse({"ok": True, "resultados": [{"id": p.pk, "nombre": p.nombre_completo} for p in resultados]})
+
+
+@login_required
+def pago_masivo(request):
+    organizacion = _organizacion_pago_masivo(request)
+    if request.method == "GET" and not organizacion:
+        form = _pago_masivo_form(request, organizacion=None, initial={"clave_idempotencia": uuid.uuid4().hex})
+        return render(request, "finanzas/pago_masivo.html", {"form": form, "organizaciones": _organizaciones_pago_masivo(request.user)})
+    if not organizacion or not usuario_tiene_permiso(
+        request.user, ACCION_OPERAR_PAGOS, organizacion=organizacion, permitir_staff_global=False
+    ):
+        return HttpResponse("No autorizado.", status=404)
+
+    data = request.POST or None
+    if request.method == "GET":
+        data = None
+    form = _pago_masivo_form(
+        request,
+        organizacion=organizacion,
+        data=data,
+        initial={"organizacion": organizacion.pk, "clave_idempotencia": uuid.uuid4().hex},
+    )
+    filas = []
+    errores_filas = {}
+    preview = False
+    resultado = None
+    if request.method == "POST" and form.is_valid():
+        filas, errores_filas = _filas_pago_masivo(request, form)
+        preview = request.POST.get("accion") == "preview"
+        if request.POST.get("accion") == "confirmar" and not errores_filas:
+            lote, creado = confirmar_lote_pagos(
+                usuario=request.user,
+                organizacion_id=organizacion.pk,
+                clave_idempotencia=form.cleaned_data["clave_idempotencia"],
+                filas=filas,
+                metadatos={"personas": form.cleaned_data["personas_seleccionadas"]},
+            )
+            if not creado:
+                messages.info(request, "Esta clave ya fue procesada; se muestra el lote existente.")
+            return redirect("finanzas:pago_masivo_resultado", pk=lote.pk)
+    contexto = {
+        "form": form,
+        "organizaciones": _organizaciones_pago_masivo(request.user),
+        "organizacion": organizacion,
+        "filas": filas,
+        "errores_filas": errores_filas,
+        "preview": preview,
+        "plan_options": form.fields["plan"].queryset,
+        "documento_options": form.fields["documento_tributario"].queryset,
+        "personas_iniciales": [
+            {"id": persona.pk, "nombre": persona.nombre_completo}
+            for persona in getattr(form, "personas_queryset", Persona.objects.none()).filter(
+                pk__in=[value for value in (request.POST.get("personas_seleccionadas", "").split(",")) if value.isdigit()]
+            )
+        ],
+    }
+    return render(request, "finanzas/pago_masivo.html", contexto)
+
+
+@login_required
+def pago_masivo_resultado(request, pk):
+    lote = get_object_or_404(
+        LotePago.objects.prefetch_related("pagos__persona"),
+        pk=pk,
+    )
+    if not usuario_tiene_permiso(
+        request.user, ACCION_OPERAR_PAGOS, organizacion=lote.organizacion, permitir_staff_global=False
+    ):
+        raise Http404
+    return render(request, "finanzas/pago_masivo_resultado.html", {"lote": lote})
 
 
 @pagos_required

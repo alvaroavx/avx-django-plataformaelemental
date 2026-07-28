@@ -13,6 +13,7 @@ from django.core.management.base import CommandError
 from django.db import close_old_connections, connection
 from django.db.models.signals import pre_save
 from django.test import RequestFactory, TestCase, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -27,6 +28,7 @@ from plataformaelemental.context import nav_context, organizacion_desde_request,
 
 from .models import Asistencia, BloqueHorario, ClaseLiberada, Disciplina, SesionClase
 from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
+from .selectors import estudiantes_financieros_disciplina
 
 
 TEST_PASSWORD = "not-a-real-test-password"
@@ -3826,3 +3828,36 @@ class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
             pago.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),
             1,
         )
+
+
+class EstadoFinancieroDisciplinaSelectorTests(TestCase):
+    def setUp(self):
+        self.org = Organizacion.objects.create(nombre="Org Disciplina Finanzas", razon_social="Org Disciplina", rut="77.000.000-1")
+        self.rol_estudiante = Rol.objects.create(nombre="Estudiante estado", codigo="ESTUDIANTE")
+        self.disciplina = Disciplina.objects.create(organizacion=self.org, nombre="Estado Yoga")
+        self.sesion = SesionClase.objects.create(disciplina=self.disciplina, fecha=date(2026, 7, 10))
+        self.al_dia = Persona.objects.create(nombres="Ana", apellidos="Al Día")
+        self.deudora = Persona.objects.create(nombres="Beto", apellidos="Deuda")
+        for persona in (self.al_dia, self.deudora):
+            PersonaRol.objects.create(persona=persona, rol=self.rol_estudiante, organizacion=self.org, activo=True)
+        Payment.objects.create(
+            persona=self.al_dia,
+            organizacion=self.org,
+            fecha_pago=date(2026, 7, 1),
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+            clases_asignadas=1,
+        )
+        Asistencia.objects.create(sesion=self.sesion, persona=self.al_dia)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.deudora)
+
+    def test_estado_financiero_de_disciplina_es_masivo_y_no_n_plus_one(self):
+        request = RequestFactory().get("/", {"periodo_mes": "7", "periodo_anio": "2026"})
+        with CaptureQueriesContext(connection) as queries:
+            resultado = estudiantes_financieros_disciplina(request, disciplina=self.disciplina)
+            list(resultado)
+        estados = {item["persona"].pk: item["estado_financiero"] for item in resultado}
+        self.assertEqual(estados[self.al_dia.pk], "Al día")
+        self.assertEqual(estados[self.deudora.pk], "Deuda")
+        self.assertLessEqual(len(queries), 4)

@@ -1,0 +1,147 @@
+{% extends "finanzas/base_finanzas.html" %}
+{% load finanzas_format %}
+{% block title %}Pago masivo{% endblock %}
+{% block content %}
+<main class="container-fluid py-4" aria-labelledby="titulo-pago-masivo">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h1 id="titulo-pago-masivo" class="h3">Registrar pagos masivos</h1>
+      <p class="text-muted mb-0">Selecciona entre 1 y 20 personas. La confirmación crea todo el lote o nada.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'finanzas:pagos_list' %}">Volver a pagos</a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>{% endfor %}
+  {% endif %}
+  {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+
+  <form method="post" id="pago-masivo-form" novalidate>
+    {% csrf_token %}
+    {{ form.clave_idempotencia }}{{ form.personas_seleccionadas }}{{ form.filas_json }}
+    <div class="card mb-3">
+      <div class="card-header">Datos comunes</div>
+      <div class="card-body row g-3">
+        <div class="col-md-4"><label class="form-label" for="id_organizacion">Organización</label>{{ form.organizacion }}{{ form.organizacion.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_fecha_pago">Fecha de pago</label>{{ form.fecha_pago }}{{ form.fecha_pago.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_plan">Plan inicial</label>{{ form.plan }}{{ form.plan.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_documento_tributario">Documento tributario</label>{{ form.documento_tributario }}{{ form.documento_tributario.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_metodo_pago">Método</label>{{ form.metodo_pago }}{{ form.metodo_pago.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_numero_comprobante">Comprobante</label>{{ form.numero_comprobante }}{{ form.numero_comprobante.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_monto_referencia">Monto por persona</label>{{ form.monto_referencia }}{{ form.monto_referencia.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="id_clases_asignadas">Clases asignadas</label>{{ form.clases_asignadas }}{{ form.clases_asignadas.errors }}</div>
+        <div class="col-md-4 d-flex align-items-center gap-3 pt-4">{{ form.aplica_iva }}<label for="id_aplica_iva">Aplica IVA</label>{{ form.monto_incluye_iva }}<label for="id_monto_incluye_iva">Monto incluye IVA</label></div>
+        <div class="col-12"><label class="form-label" for="id_observaciones">Observaciones</label>{{ form.observaciones }}</div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header">Personas</div>
+      <div class="card-body">
+        <label class="form-label" for="buscar-personas-masivo">Buscar y seleccionar</label>
+        <input class="form-control" id="buscar-personas-masivo" type="search" autocomplete="off" placeholder="Nombre o apellido"{% if not organizacion %} disabled{% endif %}>
+        <div id="resultados-personas-masivo" class="list-group mt-2" aria-live="polite"></div>
+        <div id="personas-seleccionadas-masivo" class="row g-2 mt-2"></div>
+        {{ form.personas_seleccionadas.errors }}
+      </div>
+    </div>
+
+    {% if preview or filas %}
+      <section class="card mb-3" aria-labelledby="titulo-preview">
+        <div class="card-header"><h2 id="titulo-preview" class="h5 mb-0">Preview del lote</h2></div>
+        <div class="card-body">
+          {% if errores_filas %}<div class="alert alert-danger" role="alert">Hay {{ errores_filas|length }} fila(s) por corregir. No se creará ningún pago.</div>{% endif %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead><tr><th>Persona</th><th>Plan</th><th>Método</th><th>Neto</th><th>IVA</th><th>Total</th><th>Clases</th><th>Errores</th></tr></thead>
+              <tbody>
+              {% for fila in filas %}
+                <tr>
+                  <td>{{ fila.persona.nombre_completo }}</td><td>{{ fila.plan|default:"Sin plan" }}</td><td>{{ fila.metodo_pago }}</td><td>{{ fila.monto_neto|clp }}</td><td>{{ fila.monto_iva|clp }}</td><td>{{ fila.monto_total|clp }}</td><td>{{ fila.clases_asignadas }}</td>
+                  <td>{% for persona_id, errores in errores_filas.items %}{% if persona_id == fila.persona.pk %}<span class="text-danger">Revisar datos de esta fila.</span>{% endif %}{% endfor %}</td>
+                </tr>
+              {% empty %}<tr><td colspan="8" class="text-muted">No hay filas válidas para previsualizar.</td></tr>{% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if filas and not errores_filas %}<p class="fw-semibold">Total del lote: {{ filas|length }} pago(s).</p>{% endif %}
+        </div>
+      </section>
+    {% endif %}
+
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-outline-primary" type="submit" name="accion" value="preview">Validar y previsualizar</button>
+      {% if preview and filas and not errores_filas %}<button class="btn btn-success" type="submit" name="accion" value="confirmar" id="confirmar-lote">Confirmar lote</button>{% endif %}
+    </div>
+  </form>
+</main>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const form = document.getElementById('pago-masivo-form');
+  const org = document.getElementById('id_organizacion');
+  const search = document.getElementById('buscar-personas-masivo');
+  const results = document.getElementById('resultados-personas-masivo');
+  const selectedBox = document.getElementById('personas-seleccionadas-masivo');
+  const selectedInput = document.getElementById('id_personas_seleccionadas');
+  const rowsInput = document.getElementById('id_filas_json');
+  const planOptions = [{% for plan in plan_options %}{id: '{{ plan.pk }}', name: '{{ plan.nombre|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+  const commonAmount = document.getElementById('id_monto_referencia');
+  const commonPlan = document.getElementById('id_plan');
+  let selected = new Map();
+  {% for persona in personas_iniciales %}selected.set('{{ persona.id }}', {name: '{{ persona.nombre|escapejs }}', adjusted: {}});{% endfor %}
+  function sync() { selectedInput.value = Array.from(selected.keys()).join(','); }
+  function renderSelected() {
+    selectedBox.innerHTML = '';
+    const overrides = {};
+    selected.forEach((item, id) => {
+      const col = document.createElement('div'); col.className = 'col-12 col-md-6';
+      const options = planOptions.map(function (plan) { return '<option value="' + plan.id + '">' + plan.name + '</option>'; }).join('');
+      col.innerHTML = '<div class="border rounded p-2"><div class="d-flex justify-content-between align-items-center mb-2"><strong>' + item.name + '</strong><button type="button" class="btn btn-sm btn-outline-danger" aria-label="Quitar ' + item.name + '">Quitar</button></div><div class="row g-2"><div class="col-6"><label class="form-label small">Monto de esta fila</label><input class="form-control form-control-sm fila-monto" type="number" min="0" step="0.01" value="' + (item.adjusted.monto_referencia || commonAmount.value || '') + '"></div><div class="col-6"><label class="form-label small">Plan de esta fila</label><select class="form-select form-select-sm fila-plan"><option value="">Sin plan</option>' + options + '</select></div></div></div>';
+      col.querySelector('button').addEventListener('click', function () { selected.delete(id); sync(); renderSelected(); });
+      const amount = col.querySelector('.fila-monto'); const plan = col.querySelector('.fila-plan');
+      plan.value = item.adjusted.plan !== undefined ? item.adjusted.plan : (commonPlan.value || '');
+      amount.addEventListener('input', function () { item.adjusted.monto_referencia = amount.value; syncRows(); });
+      plan.addEventListener('change', function () { item.adjusted.plan = plan.value; syncRows(); });
+      const overridesForRow = {};
+      if (item.adjusted.monto_referencia) overridesForRow.monto_referencia = item.adjusted.monto_referencia;
+      if (item.adjusted.plan !== undefined) overridesForRow.plan = item.adjusted.plan;
+      if (Object.keys(overridesForRow).length) overrides[id] = overridesForRow;
+      selectedBox.appendChild(col);
+    });
+    rowsInput.value = JSON.stringify(overrides);
+  }
+  function syncRows() {
+    const overrides = {};
+    selected.forEach(function (item, id) {
+      if (Object.keys(item.adjusted).length) overrides[id] = item.adjusted;
+    });
+    rowsInput.value = JSON.stringify(overrides);
+  }
+  async function buscar() {
+    results.innerHTML = '<div class="list-group-item text-muted">Buscando...</div>';
+    if (!org.value) { results.innerHTML = '<div class="list-group-item text-muted">Selecciona una organización.</div>'; return; }
+    const url = new URL('{% url "finanzas:pago_masivo_personas" %}', window.location.origin);
+    url.searchParams.set('organizacion', org.value); url.searchParams.set('q', search.value);
+    try {
+      const response = await fetch(url, {headers: {'Accept': 'application/json'}}); const data = await response.json();
+      results.innerHTML = '';
+      if (!data.ok || !data.resultados.length) { results.innerHTML = '<div class="list-group-item text-muted">Sin resultados.</div>'; return; }
+      data.resultados.forEach(function (item) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'list-group-item list-group-item-action'; button.textContent = item.nombre;
+        if (selected.has(String(item.id))) { button.disabled = true; button.textContent += ' (ya seleccionada)'; }
+        button.addEventListener('click', function () { selected.set(String(item.id), {name: item.nombre, adjusted: {}}); sync(); renderSelected(); button.disabled = true; button.textContent += ' (seleccionada)'; });
+        results.appendChild(button);
+      });
+    } catch (error) { results.innerHTML = '<div class="list-group-item text-danger">No se pudo consultar. Intenta nuevamente.</div>'; }
+  }
+  if (search) { search.addEventListener('input', buscar); org.addEventListener('change', function () { selected.clear(); sync(); renderSelected(); buscar(); }); }
+  if (commonAmount) commonAmount.addEventListener('input', renderSelected);
+  if (commonPlan) commonPlan.addEventListener('change', renderSelected);
+  const confirm = document.getElementById('confirmar-lote');
+  if (confirm) form.addEventListener('submit', function (event) { if (event.submitter === confirm) { confirm.disabled = true; confirm.textContent = 'Procesando...'; } });
+  sync(); renderSelected();
+})();
+</script>
+{% endblock %}

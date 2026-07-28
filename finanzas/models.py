@@ -1,6 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
+import uuid
+
 from django.db import models
 from django.utils import timezone
 
@@ -188,6 +190,37 @@ class Category(TimeStampedModel):
         return f"{self.nombre} ({self.get_tipo_display()})"
 
 
+class LotePago(TimeStampedModel):
+    """Identidad auditable de una confirmación de pagos masivos."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organizacion = models.ForeignKey(
+        "personas.Organizacion",
+        on_delete=models.PROTECT,
+        related_name="lotes_pago",
+    )
+    clave_idempotencia = models.CharField(max_length=128, unique=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="lotes_pago_creados",
+    )
+    cantidad_pagos = models.PositiveIntegerField(default=0)
+    monto_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    confirmado_en = models.DateTimeField(null=True, blank=True)
+    origen = models.CharField(max_length=40, default="pago_masivo")
+    metadatos = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Lote de pagos"
+        verbose_name_plural = "Lotes de pagos"
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"Lote {self.pk} ({self.cantidad_pagos} pagos)"
+
+
 class Payment(TimeStampedModel):
     class Metodo(models.TextChoices):
         EFECTIVO = "efectivo", "Efectivo"
@@ -240,6 +273,13 @@ class Payment(TimeStampedModel):
         related_name="pagos_revertidos",
     )
     motivo_reversa = models.TextField(blank=True)
+    lote = models.ForeignKey(
+        "LotePago",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos",
+    )
 
     class Meta:
         verbose_name = "Pago"
