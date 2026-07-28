@@ -26,7 +26,7 @@ def sesiones_visibles_para_usuario(user):
     )
     if not user.is_authenticated:
         return sesiones.none()
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser:
         return sesiones
 
     persona = getattr(user, "persona", None)

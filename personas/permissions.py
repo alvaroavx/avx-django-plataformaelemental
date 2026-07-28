@@ -59,10 +59,10 @@ def normalizar_codigo_rol(codigo):
     return ROL_ALIASES.get(codigo_normalizado.upper(), codigo_normalizado.lower())
 
 
-def usuario_tiene_permiso(user, accion, *, organizacion=None):
+def usuario_tiene_permiso(user, accion, *, organizacion=None, permitir_staff_global=True):
     if not user.is_authenticated:
         return False
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser or (permitir_staff_global and user.is_staff):
         return True
     roles_permitidos = ACCION_ROLES.get(accion, set())
     if not roles_permitidos:
@@ -78,7 +78,7 @@ def usuario_tiene_permiso(user, accion, *, organizacion=None):
     return bool(roles_usuario.intersection(roles_permitidos))
 
 
-def permiso_requerido(accion, *, accion_lectura=None, mensaje=None):
+def permiso_requerido(accion, *, accion_lectura=None, mensaje=None, permitir_staff_global=True):
     def decorator(view_func):
         @login_required
         @wraps(view_func)
@@ -87,9 +87,17 @@ def permiso_requerido(accion, *, accion_lectura=None, mensaje=None):
 
             accion_requerida = accion_lectura if request.method in SAFE_METHODS and accion_lectura else accion
             organizacion = organizacion_desde_request(request)
-            if not (request.user.is_superuser or request.user.is_staff) and organizacion is None:
+            if not (
+                request.user.is_superuser
+                or (permitir_staff_global and request.user.is_staff)
+            ) and organizacion is None:
                 raise PermissionDenied("Debes seleccionar una organización autorizada para operar.")
-            if usuario_tiene_permiso(request.user, accion_requerida, organizacion=organizacion):
+            if usuario_tiene_permiso(
+                request.user,
+                accion_requerida,
+                organizacion=organizacion,
+                permitir_staff_global=permitir_staff_global,
+            ):
                 return view_func(request, *args, **kwargs)
             raise PermissionDenied(mensaje or "No tienes permisos para acceder.")
 

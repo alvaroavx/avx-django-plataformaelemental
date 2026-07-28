@@ -8,11 +8,11 @@ from django.core.exceptions import PermissionDenied
 from personas.models import Organizacion, PersonaRol
 
 
-def organizaciones_visibles_para_usuario(user):
+def organizaciones_visibles_para_usuario(user, *, permitir_staff_global=True):
     """Organizaciones disponibles en el filtro global sin ampliar el alcance del usuario."""
     if not getattr(user, "is_authenticated", False):
         return Organizacion.objects.all().order_by("nombre")
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser or (permitir_staff_global and user.is_staff):
         return Organizacion.objects.all().order_by("nombre")
     persona = getattr(user, "persona", None)
     if not persona:
@@ -115,12 +115,18 @@ def descripcion_periodo(*, request=None, mes=None, anio=None, corta=False):
     return f"{nombre_mes} {anio}" if corta else f"{nombre_mes} de {anio}"
 
 
-def nav_context(request):
+def nav_context(request, *, permitir_staff_global=True):
     persona = getattr(request.user, "persona", None)
     roles = []
     if persona:
         roles = list(persona.roles.filter(activo=True).values_list("rol__codigo", flat=True))
-    return {"persona": persona, "roles_usuario": roles}
+    context = {"persona": persona, "roles_usuario": roles}
+    if not permitir_staff_global:
+        context["organizaciones_global"] = organizaciones_visibles_para_usuario(
+            request.user,
+            permitir_staff_global=False,
+        )
+    return context
 
 
 def organizacion_desde_request(request):

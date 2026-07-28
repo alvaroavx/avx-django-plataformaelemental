@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q, Sum
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -124,7 +124,7 @@ def _url_con_filtros_extra(request, nombre_url, **extra_params):
     return f"{url}?{query}" if query else url
 
 
-@permiso_requerido(ACCION_EXPORTAR_DATOS)
+@permiso_requerido(ACCION_EXPORTAR_DATOS, permitir_staff_global=False)
 def export_asistencias_xlsx(request):
     periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
@@ -216,6 +216,7 @@ def _usuario_es_profesor_asignado(user, sesion):
             user,
             ACCION_VER_SESION,
             organizacion=sesion.disciplina.organizacion,
+            permitir_staff_global=False,
         )
     )
 
@@ -225,6 +226,7 @@ def _usuario_puede_administrar_sesion(user, sesion):
         user,
         ACCION_ADMINISTRAR_SESIONES,
         organizacion=sesion.disciplina.organizacion,
+        permitir_staff_global=False,
     )
 
 
@@ -235,6 +237,7 @@ def _usuario_puede_registrar_asistencia(user, sesion):
         user,
         ACCION_EDITAR_ASISTENCIAS,
         organizacion=sesion.disciplina.organizacion,
+        permitir_staff_global=False,
     )
 
 
@@ -243,6 +246,7 @@ def _usuario_puede_liberar_clase(user, sesion):
         user,
         ACCION_LIBERAR_CLASE,
         organizacion=sesion.disciplina.organizacion,
+        permitir_staff_global=False,
     )
 
 
@@ -275,7 +279,11 @@ def _verificar_acceso_sesion_json(user, pk):
     """
     if not user.is_authenticated:
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
-    if not usuario_tiene_permiso(user, ACCION_VER_SESION):
+    if not usuario_tiene_permiso(
+        user,
+        ACCION_VER_SESION,
+        permitir_staff_global=False,
+    ):
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
     sesion = _sesion_para_endpoint_json(pk)
     if not sesion or not _usuario_puede_registrar_asistencia(user, sesion):
@@ -373,7 +381,7 @@ def sesiones_hoy(request):
             sesion.momento_clase = "info"
             sesion.momento_icono = "bi-calendar-event"
 
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     context.update(
         {
             "hide_periodo": True,
@@ -384,10 +392,10 @@ def sesiones_hoy(request):
     return render(request, "asistencias/sesiones_hoy.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def dashboard(request):
     """Panel principal con métricas operativas según período y organización."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
     sesiones_mes = (
         aplicar_periodo(SesionClase.objects.all(), "fecha", request=request)
@@ -489,10 +497,10 @@ def dashboard(request):
     return render(request, "asistencias/dashboard.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def sesiones_list(request):
     """Vista calendario mensual de sesiones."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
     periodo = resolver_periodo(request)
     year = periodo["referencia_inicio"].year
@@ -596,24 +604,34 @@ def sesiones_list(request):
     return render(request, "asistencias/sesiones_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def sesiones_legacy_redirect(request):
     url = reverse("asistencias:sesiones_list")
     query = request.GET.urlencode()
     return redirect(f"{url}?{query}" if query else url)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def estudiantes_list(request):
     """Listado de estudiantes con estado de asistencia del período seleccionado."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
     org_id = request.GET.get("organizacion")
     contexto = estudiantes_operativos_periodo(request, organizacion=organizacion)
     if request.GET.get("sin_asistencia") == "1":
         contexto = [item for item in contexto if not item["activo_mes"]]
-    puede_operar_pagos = usuario_tiene_permiso(request.user, ACCION_OPERAR_PAGOS, organizacion=organizacion)
-    puede_ver_finanzas = usuario_tiene_permiso(request.user, ACCION_VER_FINANZAS, organizacion=organizacion)
+    puede_operar_pagos = usuario_tiene_permiso(
+        request.user,
+        ACCION_OPERAR_PAGOS,
+        organizacion=organizacion,
+        permitir_staff_global=False,
+    )
+    puede_ver_finanzas = usuario_tiene_permiso(
+        request.user,
+        ACCION_VER_FINANZAS,
+        organizacion=organizacion,
+        permitir_staff_global=False,
+    )
     for item in contexto:
         item["perfil_url"] = _url_con_filtros(request, "personas:persona_detail", pk=item["persona"].pk)
         item["registrar_pago_url"] = _url_con_filtros_extra(
@@ -637,10 +655,10 @@ def estudiantes_list(request):
     return render(request, "asistencias/estudiantes_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def profesores_list(request):
     """Listado de profesores agrupado por organización y período seleccionado."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     profesores = Persona.objects.filter(roles__rol__codigo="PROFESOR").distinct()
     org_id = request.GET.get("organizacion")
     organizacion = organizacion_desde_request(request)
@@ -716,10 +734,10 @@ def profesores_list(request):
     return render(request, "asistencias/profesores_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def disciplinas_list(request):
     """Resumen de disciplinas con métricas operativas del período."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
 
     disciplinas_qs = Disciplina.objects.select_related("organizacion")
@@ -762,10 +780,10 @@ def disciplinas_list(request):
     return render(request, "asistencias/disciplinas_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def disciplina_detail(request, pk):
     """Detalle de disciplina con métricas de sesiones y asistencias por período."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
     disciplinas_visibles = Disciplina.objects.select_related("organizacion")
     if organizacion:
@@ -820,15 +838,22 @@ def disciplina_detail(request, pk):
     return render(request, "asistencias/disciplina_detail.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def disciplina_create(request):
     """Crea una disciplina."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     initial = {}
     if request.GET.get("organizacion"):
         initial["organizacion"] = request.GET.get("organizacion")
 
-    form = DisciplinaForm(request.POST or None, initial=initial, organizaciones=organizaciones_visibles_para_usuario(request.user))
+    form = DisciplinaForm(
+        request.POST or None,
+        initial=initial,
+        organizaciones=organizaciones_visibles_para_usuario(
+            request.user,
+            permitir_staff_global=False,
+        ),
+    )
     if request.method == "POST" and form.is_valid():
         disciplina = form.save()
         messages.success(request, "Disciplina creada correctamente.")
@@ -844,16 +869,23 @@ def disciplina_create(request):
     return render(request, "asistencias/disciplina_form.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def disciplina_edit(request, pk):
     """Edita una disciplina existente."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     organizacion = organizacion_desde_request(request)
     disciplinas_visibles = Disciplina.objects.all()
     if organizacion:
         disciplinas_visibles = disciplinas_visibles.filter(organizacion=organizacion)
     disciplina = get_object_or_404(disciplinas_visibles, pk=pk)
-    form = DisciplinaForm(request.POST or None, instance=disciplina, organizaciones=organizaciones_visibles_para_usuario(request.user))
+    form = DisciplinaForm(
+        request.POST or None,
+        instance=disciplina,
+        organizaciones=organizaciones_visibles_para_usuario(
+            request.user,
+            permitir_staff_global=False,
+        ),
+    )
 
     if request.method == "POST" and form.is_valid():
         disciplina = form.save()
@@ -870,10 +902,10 @@ def disciplina_edit(request, pk):
     )
     return render(request, "asistencias/disciplina_form.html", context)
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def asistencias_list(request):
     """Pantalla operativa para crear sesiones y registrar asistencias en bloque."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     sesion_id = request.GET.get("sesion_id")
     organizacion = organizacion_desde_request(request)
     sesiones_disponibles_qs = SesionClase.objects.select_related(
@@ -933,7 +965,17 @@ def asistencias_list(request):
             sesion_id_post = request.POST.get("sesion_id")
             estado = request.POST.get("estado")
             if sesion_id_post and estado in dict(SesionClase.Estado.choices):
-                sesion = get_object_or_404(SesionClase, pk=sesion_id_post)
+                sesiones_autorizadas = sesiones_visibles_para_usuario(request.user)
+                if organizacion:
+                    sesiones_autorizadas = sesiones_autorizadas.filter(
+                        disciplina__organizacion=organizacion,
+                    )
+                sesion = get_object_or_404(
+                    sesiones_autorizadas,
+                    pk=sesion_id_post,
+                )
+                if not _usuario_puede_administrar_sesion(request.user, sesion):
+                    raise Http404
                 estado_anterior = sesion.estado
                 sesion.estado = estado
                 sesion.save(update_fields=["estado"])
@@ -1099,7 +1141,10 @@ def asistencias_list(request):
             "estudiantes_total_disciplina_periodo": estudiantes_total_disciplina_periodo,
             "disciplinas": disciplinas_vigentes_qs(organizacion=organizacion),
             "profesores": profesores_vigentes_qs(organizacion=organizacion),
-            "organizaciones": organizaciones_visibles_para_usuario(request.user),
+            "organizaciones": organizaciones_visibles_para_usuario(
+                request.user,
+                permitir_staff_global=False,
+            ),
         }
     )
     return render(request, "asistencias/asistencias_list.html", context)
@@ -1108,7 +1153,7 @@ def asistencias_list(request):
 @login_required
 def sesion_detail(request, pk):
     """Detalle de la sesión y estado de sus asistentes."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
         sesiones_visibles_para_usuario(request.user).prefetch_related(
@@ -1565,16 +1610,16 @@ def sesion_asistencia_estado(request, pk, asistencia_pk):
     )
 
 
-@role_required(ROLE_ADMIN)
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
 def sesion_edit(request, pk):
     """Edita una sesión existente."""
-    context = nav_context(request)
+    context = nav_context(request, permitir_staff_global=False)
     sesion = get_object_or_404(
-        SesionClase.objects.select_related("disciplina", "disciplina__organizacion").prefetch_related("profesores"),
+        sesiones_visibles_para_usuario(request.user),
         pk=pk,
     )
     if not _usuario_puede_administrar_sesion(request.user, sesion):
-        raise PermissionDenied("No tienes permisos para editar esta sesión.")
+        raise Http404
     form = SesionBasicaForm(
         request.POST or None,
         organizacion=sesion.disciplina.organizacion,

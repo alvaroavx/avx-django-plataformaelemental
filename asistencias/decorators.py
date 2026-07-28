@@ -6,7 +6,7 @@ from django.core.exceptions import PermissionDenied
 from .utils import usuario_tiene_roles
 
 
-def role_required(*roles):
+def role_required(*roles, permitir_staff_global=True):
     def decorator(view_func):
         @login_required
         @wraps(view_func)
@@ -16,7 +16,9 @@ def role_required(*roles):
             if not roles:
                 return view_func(request, *args, **kwargs)
             organizacion = organizacion_desde_request(request)
-            if not (request.user.is_superuser or request.user.is_staff) and organizacion is None:
+            if permitir_staff_global and request.user.is_staff:
+                return view_func(request, *args, **kwargs)
+            if not request.user.is_superuser and organizacion is None:
                 raise PermissionDenied("Debes seleccionar una organización autorizada para operar.")
             if usuario_tiene_roles(request.user, roles, organizacion=organizacion):
                 return view_func(request, *args, **kwargs)

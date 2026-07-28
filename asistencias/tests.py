@@ -3438,6 +3438,332 @@ class SprintTresJornadaMovilTests(TestCase):
         self.assertContains(response, 'min-height: 44px', html=False)
 
 
+class SprintCincoAislamientoAsistenciasTests(TestCase):
+    def setUp(self):
+        self.hoy = timezone.localdate()
+        self.organizacion_a = Organizacion.objects.create(
+            nombre="Organización A Sprint 5",
+            razon_social="Organización A Sprint 5 SpA",
+            rut="76.510.001-9",
+        )
+        self.organizacion_b = Organizacion.objects.create(
+            nombre="Organización B Sprint 5",
+            razon_social="Organización B Sprint 5 SpA",
+            rut="76.510.002-7",
+        )
+        self.rol_admin = Rol.objects.create(
+            nombre="Administración Sprint 5",
+            codigo="ADMINISTRADOR",
+        )
+        self.rol_profesor = Rol.objects.create(
+            nombre="Profesora Sprint 5",
+            codigo="PROFESOR",
+        )
+        self.rol_estudiante = Rol.objects.create(
+            nombre="Estudiante Sprint 5",
+            codigo="ESTUDIANTE",
+        )
+        self.admin_a = crear_usuario_con_rol(
+            username="admin_a_sprint5",
+            password=TEST_PASSWORD,
+            rol=self.rol_admin,
+            organizacion=self.organizacion_a,
+        )
+        self.staff_sin_rol = get_user_model().objects.create_user(
+            username="staff_sin_rol_sprint5",
+            password=TEST_PASSWORD,
+            is_staff=True,
+            is_superuser=False,
+        )
+        self.staff_admin_a = crear_usuario_con_rol(
+            username="staff_admin_a_sprint5",
+            password=TEST_PASSWORD,
+            rol=self.rol_admin,
+            organizacion=self.organizacion_a,
+        )
+        self.staff_admin_a.is_staff = True
+        self.staff_admin_a.save(update_fields=["is_staff"])
+        self.superusuario = get_user_model().objects.create_superuser(
+            username="superusuario_sprint5",
+            email="superusuario.sprint5@example.test",
+            password=TEST_PASSWORD,
+        )
+        self.profesora_a = crear_usuario_con_rol(
+            username="profesora_a_sprint5",
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=self.organizacion_a,
+        )
+        self.disciplina_a = Disciplina.objects.create(
+            organizacion=self.organizacion_a,
+            nombre="Disciplina A Sprint 5",
+        )
+        self.disciplina_b = Disciplina.objects.create(
+            organizacion=self.organizacion_b,
+            nombre="Disciplina B Sprint 5",
+        )
+        self.sesion_a = SesionClase.objects.create(
+            disciplina=self.disciplina_a,
+            fecha=self.hoy,
+        )
+        self.sesion_b = SesionClase.objects.create(
+            disciplina=self.disciplina_b,
+            fecha=self.hoy,
+        )
+        self.estudiante_a = Persona.objects.create(
+            nombres="Estudiante",
+            apellidos="Organización A",
+        )
+        PersonaRol.objects.create(
+            persona=self.estudiante_a,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion_a,
+            activo=True,
+        )
+        asignar_profesora_a_sesion(user=self.profesora_a, sesion=self.sesion_a)
+
+    def _detalle_url(self, sesion):
+        return reverse("asistencias:sesion_detail", kwargs={"pk": sesion.pk})
+
+    def _query(self, organizacion):
+        return {"organizacion": organizacion.pk}
+
+    def test_staff_sin_rol_no_obtiene_acceso_operativo_global(self):
+        self.client.force_login(self.staff_sin_rol)
+
+        detalle = self.client.get(self._detalle_url(self.sesion_b))
+        busqueda = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": self.sesion_b.pk},
+            ),
+            {"q": "Ana"},
+        )
+        agregar = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_b.pk},
+            ),
+            {"persona_id": 999999},
+        )
+
+        self.assertEqual(detalle.status_code, 404)
+        self.assertEqual(busqueda.status_code, 403)
+        self.assertEqual(agregar.status_code, 403)
+
+    def test_staff_con_rol_admin_solo_opera_su_organizacion(self):
+        self.client.force_login(self.staff_admin_a)
+
+        propia = self.client.get(self._detalle_url(self.sesion_a))
+        ajena = self.client.get(self._detalle_url(self.sesion_b))
+        inexistente = self.client.get(
+            reverse("asistencias:sesion_detail", kwargs={"pk": 999999})
+        )
+        busqueda_ajena = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": self.sesion_b.pk},
+            ),
+            {"q": "Ana"},
+        )
+        busqueda_inexistente = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": 999997},
+            ),
+            {"q": "Ana"},
+        )
+
+        self.assertEqual(propia.status_code, 200)
+        self.assertNotContains(propia, self.organizacion_b.nombre)
+        self.assertEqual(ajena.status_code, 404)
+        self.assertEqual(inexistente.status_code, 404)
+        self.assertEqual(ajena.content, inexistente.content)
+        self.assertEqual(busqueda_ajena.status_code, 404)
+        self.assertEqual(busqueda_ajena.json()["codigo"], "SESION_NO_ENCONTRADA")
+        self.assertEqual(busqueda_ajena.json(), busqueda_inexistente.json())
+
+    def test_superusuario_conserva_acceso_global_explicito(self):
+        self.client.force_login(self.superusuario)
+
+        detalle = self.client.get(self._detalle_url(self.sesion_b))
+        busqueda = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": self.sesion_b.pk},
+            ),
+            {"q": "Ana"},
+        )
+
+        self.assertEqual(detalle.status_code, 200)
+        self.assertEqual(busqueda.status_code, 200)
+
+    def test_edicion_get_y_post_de_sesion_ajena_equivale_a_inexistente(self):
+        self.client.force_login(self.admin_a)
+        query = self._query(self.organizacion_a)
+        url_ajena = reverse(
+            "asistencias:sesion_edit",
+            kwargs={"pk": self.sesion_b.pk},
+        )
+        url_inexistente = reverse(
+            "asistencias:sesion_edit",
+            kwargs={"pk": 999998},
+        )
+        datos = {
+            "disciplina": self.disciplina_a.pk,
+            "fecha": self.hoy.isoformat(),
+        }
+
+        get_ajena = self.client.get(url_ajena, query)
+        get_inexistente = self.client.get(url_inexistente, query)
+        post_ajena = self.client.post(f"{url_ajena}?organizacion={self.organizacion_a.pk}", datos)
+        post_inexistente = self.client.post(
+            f"{url_inexistente}?organizacion={self.organizacion_a.pk}",
+            datos,
+        )
+
+        self.assertEqual(get_ajena.status_code, 404)
+        self.assertEqual(get_inexistente.status_code, 404)
+        self.assertEqual(post_ajena.status_code, 404)
+        self.assertEqual(post_inexistente.status_code, 404)
+        self.assertEqual(get_ajena.content, get_inexistente.content)
+        self.assertEqual(post_ajena.content, post_inexistente.content)
+        self.sesion_b.refresh_from_db()
+        self.assertEqual(self.sesion_b.disciplina, self.disciplina_b)
+
+    def test_post_masivo_manipulado_no_cambia_sesion_ajena(self):
+        self.client.force_login(self.admin_a)
+        respuesta = self.client.post(
+            (
+                f"{reverse('asistencias:asistencias_list')}"
+                f"?organizacion={self.organizacion_a.pk}"
+            ),
+            {
+                "cambiar_estado": "1",
+                "sesion_id": self.sesion_b.pk,
+                "estado": SesionClase.Estado.CANCELADA,
+            },
+        )
+        inexistente = self.client.post(
+            (
+                f"{reverse('asistencias:asistencias_list')}"
+                f"?organizacion={self.organizacion_a.pk}"
+            ),
+            {
+                "cambiar_estado": "1",
+                "sesion_id": 999996,
+                "estado": SesionClase.Estado.CANCELADA,
+            },
+        )
+
+        self.sesion_b.refresh_from_db()
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertEqual(inexistente.status_code, 404)
+        self.assertEqual(respuesta.content, inexistente.content)
+        self.assertEqual(self.sesion_b.estado, SesionClase.Estado.PROGRAMADA)
+
+    def test_post_directo_a_sesion_ajena_no_usa_persona_propia(self):
+        self.client.force_login(self.admin_a)
+        datos = {
+            "agregar_asistentes": "1",
+            "estudiantes": [self.estudiante_a.pk],
+        }
+
+        ajena = self.client.post(self._detalle_url(self.sesion_b), datos)
+        inexistente = self.client.post(
+            reverse("asistencias:sesion_detail", kwargs={"pk": 999995}),
+            datos,
+        )
+
+        self.assertEqual(ajena.status_code, 404)
+        self.assertEqual(inexistente.status_code, 404)
+        self.assertEqual(ajena.content, inexistente.content)
+        self.assertFalse(
+            Asistencia.objects.filter(
+                sesion=self.sesion_b,
+                persona=self.estudiante_a,
+            ).exists()
+        )
+
+    def test_creacion_masiva_rechaza_disciplina_ajena_manipulada(self):
+        self.client.force_login(self.admin_a)
+        existentes = SesionClase.objects.filter(disciplina=self.disciplina_b).count()
+
+        respuesta = self.client.post(
+            reverse("asistencias:sesiones_list"),
+            {
+                "crear_sesiones_masivas": "1",
+                "disciplina": self.disciplina_b.pk,
+                "dias_semana": [str(self.hoy.weekday())],
+            },
+            QUERY_STRING=(
+                f"organizacion={self.organizacion_a.pk}"
+                f"&periodo_mes={self.hoy.month}"
+                f"&periodo_anio={self.hoy.year}"
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(
+            "disciplina",
+            respuesta.context["sesiones_masivas_form"].errors,
+        )
+        self.assertEqual(
+            SesionClase.objects.filter(disciplina=self.disciplina_b).count(),
+            existentes,
+        )
+
+    def test_profesora_asignada_no_adquiere_administracion_de_disciplina(self):
+        self.client.force_login(self.profesora_a)
+
+        respuesta = self.client.get(
+            reverse(
+                "asistencias:disciplina_detail",
+                kwargs={"pk": self.disciplina_a.pk},
+            ),
+            self._query(self.organizacion_a),
+        )
+
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_busqueda_usa_relacion_vigente_de_persona_compartida_con_organizacion(self):
+        compartida = Persona.objects.create(
+            nombres="Compartida",
+            apellidos="Vigente",
+        )
+        PersonaRol.objects.create(
+            persona=compartida,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion_a,
+            activo=True,
+        )
+        PersonaRol.objects.create(
+            persona=compartida,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion_b,
+            activo=True,
+        )
+        solo_b = Persona.objects.create(
+            nombres="Compartida",
+            apellidos="Solo B",
+        )
+        PersonaRol.objects.create(
+            persona=solo_b,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion_b,
+            activo=True,
+        )
+        self.client.force_login(self.profesora_a)
+        url = reverse(
+            "asistencias:sesion_asistentes_buscar",
+            kwargs={"pk": self.sesion_a.pk},
+        )
+
+        visible = self.client.get(url, {"q": "Compartida"}).json()["resultados"]
+
+        self.assertEqual([item["id"] for item in visible], [compartida.pk])
+
+
 class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
     reset_sequences = True
 

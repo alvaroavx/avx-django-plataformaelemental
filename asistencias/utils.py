@@ -26,8 +26,6 @@ def usuario_tiene_roles(user, roles: list[str], *, organizacion=None) -> bool:
         return True
     if user.is_superuser:
         return True
-    if user.is_staff:
-        return True
     roles_normalizados = {normalizar_codigo_rol(rol) for rol in roles}
     persona = getattr(user, "persona", None)
     if not persona:
