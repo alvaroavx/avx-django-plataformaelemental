@@ -38,9 +38,11 @@ Tambien existen roles administrativos historicos o base segun datos/migraciones,
 
 ## Superuser Y Staff
 Regla operativa:
-- `superuser` y `staff` pueden saltar chequeos de rol donde el codigo vigente lo permita.
+- La regla objetivo es que solo `superuser` pueda saltar chequeos operativos de rol y organización.
+- Asistencias aplica esa regla de forma explícita: `is_staff` controla el acceso al Django Admin según permisos Django, pero no concede organizaciones ni acceso operativo de asistencia.
+- Los consumidores históricos de los helpers compartidos fuera de Asistencias conservan temporalmente compatibilidad con el bypass anterior. Su cierre corresponde al Sprint 6.
 - Esto no reemplaza una politica formal de permisos.
-- Si se agrega una accion sensible, se debe decidir explicitamente si basta con staff/superuser o si requiere rol por organizacion.
+- Toda acción sensible requiere rol por organización, salvo la excepción global explícita de `superuser`.
 
 ## Reglas Por Rol
 
@@ -75,7 +77,7 @@ Reglas:
 - No implementar chequeos de permiso dispersos sin test.
 - Si una accion modifica datos criticos, debe tener permiso explicito o al menos quedar cubierta por test de acceso.
 - Las reglas de permisos deben considerar organizacion activa, no solo rol global.
-- Para usuarios que no sean `staff` ni `superuser`, las vistas operativas de Personas, Asistencias y exportaciones requieren una organización explícita del filtro global. `Todas` no amplía el acceso: se deniega en servidor. Una organización ajena también se deniega antes de construir consultas.
+- En Asistencias, todo usuario que no sea `superuser` requiere organización y rol vigentes; `Todas` no amplía el acceso y `is_staff` no altera esta regla. El cierre equivalente de Personas y Finanzas queda fuera del Sprint 5.
 - `personas.gestionar_solicitudes_acceso` es un permiso Django global independiente. No se deriva de `staff` ni de `PersonaRol`; solo superusuarios y usuarios a quienes se asigna deliberadamente el permiso pueden administrar solicitudes.
 
 ## API
@@ -101,7 +103,7 @@ Detalle:
 Antes de agregar permisos mas complejos:
 - definir matriz de acciones sensibles,
 - definir si permiso depende de organizacion,
-- definir si staff/superuser basta,
+- definir el rol organizacional requerido o justificar expresamente la excepción de `superuser`,
 - agregar tests de acceso,
 - documentar en este archivo.
 

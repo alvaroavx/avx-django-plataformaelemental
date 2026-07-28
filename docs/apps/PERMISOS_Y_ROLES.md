@@ -13,7 +13,7 @@ La fuente de roles sigue siendo `PersonaRol`: una persona puede tener permisos d
 - `profesor`: codigos aceptados `PROFESOR`.
 - `solo_lectura`: codigos aceptados `SOLO_LECTURA`, `LECTURA`, `READ_ONLY`.
 
-`superuser` y `staff` de Django conservan acceso total operativo.
+En Asistencias, solo `superuser` de Django conserva acceso total operativo. `is_staff` habilita el acceso al Django Admin según los permisos nativos de Django, pero no concede por sí solo organizaciones ni capacidades operativas de asistencia.
 
 ## Matriz minima
 | Accion | admin | finanzas | profesor | solo_lectura |
@@ -63,7 +63,8 @@ La fuente de roles sigue siendo `PersonaRol`: una persona puede tener permisos d
 La asignación de profesora se comprueba contra `SesionClase.profesores` y el rol `PROFESOR` activo en la organización real de la sesión. El filtro de organización enviado por la interfaz no concede acceso.
 
 Google continúa siendo solo autenticación detrás de sus flags. No crea roles, asignaciones ni permisos, y el acceso real para profesoras continúa sin activarse.
-- `staff` conserva bypass total; si se quiere separar soporte tecnico de operacion, debe revisarse antes de abrir acceso a terceros.
+- `staff` no conserva bypass operativo en Asistencias. Necesita `Persona`, `PersonaRol` activo y organización autorizada como cualquier cuenta ordinaria; el rol de dominio `STAFF_ASISTENCIA` no debe confundirse con `User.is_staff`.
+- Los consumidores históricos de los helpers compartidos fuera de Asistencias conservan temporalmente su compatibilidad anterior. Su cierre multi-organización corresponde al Sprint 6 y no se declara resuelto aquí.
 - La opcion `solo_lectura` puede ver finanzas, pero no debe crear, editar, borrar ni exportar.
 
 ## Matriz de superficies para piloto cerrado
@@ -75,6 +76,7 @@ Google continúa siendo solo autenticación detrás de sus flags. No crea roles,
 | Anónimo | Redirección a login | `403` sin operar | `403`, sin datos | Redirección a login | Redirección a login | Redirección a login | Redirección a login |
 | Autenticado sin rol | Sin sesiones; detalle `404` | `403` | `403` | `403` | `403` | `403` | No |
 | Rol inactivo | Igual que sin rol | `403` | `403` | Según otros roles activos; ninguno por el rol inactivo | Según otros roles activos | Según otros roles activos | No |
+| Staff Django sin rol | Sin sesiones; detalle `404` | `403` | `403` | No | No | No | Django Admin según permisos Django |
 | Profesora asignada | “Hoy” y detalle de sus sesiones | Sí, solo sesión asignada | Sí, personas elegibles de la organización | No | No | No | No |
 | Profesora no asignada | Sesión ajena `404` | `404` | `404` | No | No | No | No |
 | Usuario de otra organización | Recurso ajeno `404` | `404` | `404` | Queryset aislado | Recurso ajeno `404` | Organización ajena no disponible | No |

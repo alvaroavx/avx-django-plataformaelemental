@@ -117,6 +117,9 @@ flowchart TD
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
+- La organización activa sirve para navegación y filtrado, pero no concede autorización. Las operaciones por identificador resuelven primero la sesión o disciplina desde un queryset autorizado y contrastan las relaciones compuestas contra la organización del objeto real.
+- Solo `is_superuser` conserva alcance operativo global. `is_staff` permite entrar al Django Admin cuando Django lo autoriza, pero no reemplaza un `PersonaRol` activo ni amplía las organizaciones visibles en Asistencias.
+- Una sesión ajena, una sesión no asignada a la profesora y una sesión inexistente responden `404` con estructura indistinguible en HTML, POST y endpoints JSON basados en objeto. Un `403` se reserva para negar una capacidad general antes de resolver un objeto.
 - Los detalles y formularios de disciplina se resuelven desde el queryset de la organización autorizada. Un identificador ajeno y uno inexistente responden `404` tanto en GET como en POST; no existen endpoints JSON específicos de disciplina.
 - Los permisos de la jornada se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora o quitar su asignación en `SesionClase.profesores` corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta.
 - La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
@@ -164,7 +167,9 @@ flowchart TD
 - En `asistencias/sesiones/<id>/`, debe existir una opcion para editar la sesion, manteniendo filtros globales y permitiendo actualizar disciplina, fecha y profesores.
 - En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/<id>/`, el modal `Nueva persona` incluye el switch `Agregar a esta sesión`, activo por defecto. Si esta activo, crea la persona, la asigna como estudiante de la organizacion de la sesion y crea la asistencia con `get_or_create`; si esta inactivo, solo crea la persona.
-- En `asistencias/sesiones/<id>/`, el alta rapida sigue restringida al permiso operativo vigente de la vista. Mientras no exista regla segura de profesor sobre "sus sesiones", se mantiene restringida a admin/staff autorizado.
+- En `asistencias/sesiones/<id>/`, el alta rápida de personas sigue restringida a administración autorizada de la organización o al rol operativo `STAFF_ASISTENCIA`; el atributo Django `is_staff` por sí solo no concede esa capacidad.
+- La edición de una sesión y el cambio rápido de su estado cargan la sesión desde el conjunto visible para el usuario y verifican la organización real. Un identificador ajeno o inexistente devuelve `404` y no modifica datos.
+- No existe navegación consecutiva anterior/siguiente entre sesiones. Los enlaces vigentes parten de “Hoy”, calendario, disciplina o listados ya filtrados; por tanto, esa superficie se registra como no aplicable.
 - En `asistencias/calendario/`, una sesion cancelada debe mostrarse como `sesión cancelada` y no como `asistentes: 0`, para no confundir cancelacion con falta de registro.
 - En `asistencias/calendario/`, cada sesion debe mostrar un icono unico de estado: programada, completada o cancelada, visible tanto en calendario como en listado. En calendario, el icono debe quedar fuera del badge de disciplina, al mismo nivel visual, para que el estado se identifique rapidamente.
 - En `asistencias/calendario/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
