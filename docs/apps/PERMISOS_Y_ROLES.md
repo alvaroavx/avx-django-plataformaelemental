@@ -65,3 +65,27 @@ La asignación de profesora se comprueba contra `SesionClase.profesores` y el ro
 Google continúa siendo solo autenticación detrás de sus flags. No crea roles, asignaciones ni permisos, y el acceso real para profesoras continúa sin activarse.
 - `staff` conserva bypass total; si se quiere separar soporte tecnico de operacion, debe revisarse antes de abrir acceso a terceros.
 - La opcion `solo_lectura` puede ver finanzas, pero no debe crear, editar, borrar ni exportar.
+
+## Matriz de superficies para piloto cerrado
+
+`404` significa que un recurso ajeno y uno inexistente son deliberadamente indistinguibles. `403` se usa cuando el actor carece de la capacidad general para esa superficie, sin confirmar la existencia de un objeto concreto.
+
+| Actor | HTML y URL directa de sesión | POST asistencia | JSON y búsqueda | Personas | Archivos/descargas financieras | Exports | Configuración administrativa |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Anónimo | Redirección a login | `403` sin operar | `403`, sin datos | Redirección a login | Redirección a login | Redirección a login | Redirección a login |
+| Autenticado sin rol | Sin sesiones; detalle `404` | `403` | `403` | `403` | `403` | `403` | No |
+| Rol inactivo | Igual que sin rol | `403` | `403` | Según otros roles activos; ninguno por el rol inactivo | Según otros roles activos | Según otros roles activos | No |
+| Profesora asignada | “Hoy” y detalle de sus sesiones | Sí, solo sesión asignada | Sí, personas elegibles de la organización | No | No | No | No |
+| Profesora no asignada | Sesión ajena `404` | `404` | `404` | No | No | No | No |
+| Usuario de otra organización | Recurso ajeno `404` | `404` | `404` | Queryset aislado | Recurso ajeno `404` | Organización ajena no disponible | No |
+| Administración autorizada | Sí en su organización | Sí | Sí | Sí en su organización | Sí mediante ruta autorizada | Sí con permiso explícito | Operación Elemental de su organización |
+| Cuenta revocada | Pierde acceso en la siguiente petición | Sin escritura | Sin resultados | Según roles aún activos; ninguno si se revocaron | Sin acceso por rol revocado | Sin acceso por rol revocado | No |
+| Superusuario de emergencia | Acceso global de recuperación | Sí | Sí | Sí | Sí | Sí | Django Admin |
+
+Superficies no aplicables:
+
+- No existe API de datos de Personas, Asistencias o Finanzas en v1.0.
+- No existe endpoint JSON específico para disciplinas.
+- La jornada móvil no ofrece archivos, descargas ni exports a profesoras.
+
+La sesión Django no constituye autorización persistente. Cada petición vuelve a consultar `User.is_active`, `PersonaRol.activo`, organización y asignación de profesora cuando corresponde.

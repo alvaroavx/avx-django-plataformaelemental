@@ -288,7 +288,24 @@ Fallback de Pillow:
 - Si `pip install -r requirements.txt` falla compilando Pillow, revisar version de Python, arquitectura del servidor y disponibilidad de wheel.
 - Solo si no hay wheel disponible, instalar dependencias del sistema para compilar Pillow segun la distribucion del servidor.
 
-## Media files / logos de organización
+## Gate de versión Python
+
+- `AGENTS.md` y el workflow `test.yml` declaran Python 3.12.
+- El job de pruebas previo al deploy en `deploy.yml` usa Python 3.13.
+- Ese Python 3.13 pertenece al runner de GitHub Actions; no demuestra la versión del servidor.
+- `scripts/deploy.sh` reutiliza el Python del virtualenv productivo existente. `DEPLOY_PYTHON_BIN` solo interviene al crear ese virtualenv.
+- El unit de Gunicorn ejecuta el binario dentro del mismo virtualenv productivo.
+
+Antes de autorizar producción se debe comprobar en Gate 3, sin inferencias:
+
+1. versión de `python` dentro del virtualenv productivo;
+2. versión que instaló las dependencias;
+3. intérprete del proceso Gunicorn;
+4. compatibilidad de esa versión con las validaciones realizadas en Python 3.12 y con el job de Python 3.13.
+
+No se autoriza release mientras el runtime productivo siga sin confirmar o exista una combinación 3.12/3.13 no validada.
+
+## Media files públicos y protegidos
 Configuracion Django vigente:
 
 ```python
@@ -296,21 +313,36 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 ```
 
-En produccion Django no debe servir media files. Nginx debe servir `/media/`.
+En producción Django no sirve archivos directamente desde `MEDIA_ROOT`. Sin embargo, Nginx tampoco debe publicar todo ese directorio: contiene logos públicos y archivos financieros protegidos.
+
+Clasificación:
+
+- público: `media/organizaciones/logos/`;
+- protegido: `media/finanzas/documentos/pdf/`, `media/finanzas/documentos/xml/`, `media/finanzas/transactions/` y `media/finanzas/importaciones_tmp/`.
+
+Los archivos protegidos se descargan o visualizan exclusivamente por rutas Django con autorización. Nginx solo publica los logos.
 
 Bloque sugerido, ajustando la ruta real al `MEDIA_ROOT` de produccion:
 
 ```nginx
+location ^~ /media/organizaciones/logos/ {
+    alias /srv/elementos/plataformaelemental/media/organizaciones/logos/;
+}
+
 location /media/ {
-    alias /srv/elementos/plataformaelemental/media/;
+    return 404;
 }
 ```
 
 Validaciones:
-- La ruta del `alias` debe coincidir con el `MEDIA_ROOT` real.
-- Nginx necesita permisos de lectura sobre esa carpeta.
+- La ruta pública del `alias` debe coincidir con `MEDIA_ROOT/organizaciones/logos/`.
+- Nginx necesita permisos de lectura únicamente sobre la carpeta pública.
 - El usuario que ejecuta Gunicorn necesita permisos de escritura para subir logos desde Django Admin.
+- Solicitar directamente una ruta bajo `/media/finanzas/` debe responder `404`.
+- Las rutas Django de documentos y transacciones deben seguir entregando archivos solo al actor y organización autorizados.
 - Si `/media/` no esta configurado, la plataforma sigue funcionando con fallback de iniciales o `Elemental Apps`, pero los logos subidos no se serviran correctamente.
+
+La configuración efectiva de Nginx debe comprobarse en el servidor durante el Gate 3. No se puede declarar seguro el despliegue únicamente porque las vistas Django estén protegidas.
 
 ## Backup PostgreSQL Previo A Migraciones
 - Solo corre cuando `DJANGO_ENV=prod`.

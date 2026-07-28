@@ -7,6 +7,14 @@ La app `finanzas` concentra cobros academicos, documentos tributarios, movimient
 
 Debe servir para operar varias organizaciones y tambien debe poder escalar a finanzas no academicas sin asumir una sola logica de negocio.
 
+## Archivos públicos y protegidos
+
+- Dentro de `MEDIA_ROOT`, solo `organizaciones/logos/` contiene archivos públicos usados directamente por la interfaz.
+- `finanzas/documentos/pdf/`, `finanzas/documentos/xml/`, `finanzas/transactions/` y `finanzas/importaciones_tmp/` contienen información protegida.
+- Documentos tributarios y respaldos de transacciones se entregan exclusivamente por sus vistas Django autorizadas, con permiso financiero y queryset limitado a la organización activa.
+- Las importaciones temporales se entregan por una vista autorizada y por un token almacenado en la sesión Django que realizó la carga.
+- Producción no debe exponer directamente `/media/finanzas/` ni servir todo `MEDIA_ROOT` mediante un `alias` general de Nginx. El contrato productivo permite públicamente solo `/media/organizaciones/logos/` y responde `404` para el resto de `/media/`.
+
 ## Diagramas
 
 ### Modelo Local

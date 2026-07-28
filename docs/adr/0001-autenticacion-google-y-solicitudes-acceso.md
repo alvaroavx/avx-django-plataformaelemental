@@ -17,6 +17,8 @@ La plataforma tiene una brecha historica de aislamiento multi-organizacion. La a
 - La identidad estable se resuelve primero por `SocialAccount(provider=google, uid=sub)`. El fallback por correo solo sirve para enlazar un `User` activo, unico y con correo Google verificado; cualquier duplicado, inactividad o conflicto falla cerrado.
 - No se insertara `SocialAccount` manualmente ni se guardaran tokens, codes, secretos o respuestas OAuth completas.
 - Una identidad desconocida puede crear una `SolicitudAcceso`, pero esta no crea `User`, `Persona`, `PersonaRol` ni `SocialAccount`.
+- Para una identidad aún no vinculada se consulta la solicitud canónica por `provider + provider_subject`: la pendiente o, si no existe, la más reciente. Mientras esté pendiente o rechazada no se permite el fallback por correo. Reabrir y aprobar explícitamente esa misma solicitud habilita el vínculo con la organización elegida durante la aprobación.
+- Las solicitudes históricas no revocan una `SocialAccount` ya vinculada legítimamente. Esa cuenta queda sujeta a `User.is_active`, roles, organizaciones, asignaciones y permisos evaluados en cada petición.
 - La aprobacion administrativa requiere permiso global explicito `personas.gestionar_solicitudes_acceso`, no se concede por `staff` ni por `PersonaRol`.
 - La aprobacion se implementara como servicio atomico y auditado; el enlace social se completara solamente durante un `SocialLogin` validado posterior, usando API publica soportada por allauth.
 - Todos los flags son opt-in y seguros por defecto: `GOOGLE_AUTH_ENABLED`, `ACCESS_REQUESTS_ENABLED`, `ACCESS_REQUEST_APPROVAL_ENABLED` y `GOOGLE_AUTH_ENFORCED` parten en `false`.

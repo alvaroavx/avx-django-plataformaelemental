@@ -117,6 +117,8 @@ flowchart TD
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
+- Los detalles y formularios de disciplina se resuelven desde el queryset de la organización autorizada. Un identificador ajeno y uno inexistente responden `404` tanto en GET como en POST; no existen endpoints JSON específicos de disciplina.
+- Los permisos de la jornada se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora o quitar su asignación en `SesionClase.profesores` corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta.
 - La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
