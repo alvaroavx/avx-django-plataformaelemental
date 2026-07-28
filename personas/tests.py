@@ -324,6 +324,86 @@ class AutenticacionGoogleFaseUnoTests(TestCase):
         with self.assertRaises(ImmediateHttpResponse):
             self.adaptador.pre_social_login(self._solicitud(), self._social_login())
 
+    @override_settings(GOOGLE_AUTH_ENABLED=True, ACCESS_REQUESTS_ENABLED=False)
+    def test_solicitud_rechazada_no_cae_accidentalmente_al_fallback_por_correo(self):
+        SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="google-sub-1",
+            email=self.usuario.email,
+            estado=SolicitudAcceso.Estado.RECHAZADA,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, ACCESS_REQUESTS_ENABLED=False)
+    def test_solicitud_rechazada_bloquea_usuario_preaprovisionado_con_rol(self):
+        organizacion = Organizacion.objects.create(
+            nombre="Org preaprovisionada",
+            razon_social="Org preaprovisionada SpA",
+            rut="92.111.111-2",
+        )
+        rol = Rol.objects.create(nombre="Profesora preaprovisionada", codigo="PROFESOR_PREAPROVISIONADO")
+        persona = Persona.objects.create(
+            nombres="Profesora",
+            apellidos="Preaprovisionada",
+            email=self.usuario.email,
+            user=self.usuario,
+        )
+        PersonaRol.objects.create(persona=persona, organizacion=organizacion, rol=rol, activo=True)
+        SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="google-sub-1",
+            email=self.usuario.email,
+            estado=SolicitudAcceso.Estado.RECHAZADA,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(self._solicitud(), self._social_login())
+
+        self.assertFalse(SocialAccount.objects.exists())
+        self.assertTrue(PersonaRol.objects.filter(persona=persona, organizacion=organizacion, rol=rol, activo=True).exists())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, ACCESS_REQUESTS_ENABLED=False)
+    def test_rechazo_por_subject_no_se_evade_cambiando_correo_o_mayusculas(self):
+        self.usuario.email = "ACCESO@EXAMPLE.COM"
+        self.usuario.save(update_fields=["email"])
+        SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="google-sub-1",
+            email="correo-historico@example.com",
+            estado=SolicitudAcceso.Estado.RECHAZADA,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adaptador.pre_social_login(
+                self._solicitud(),
+                self._social_login(email="acceso@example.com"),
+            )
+
+        self.assertFalse(SocialAccount.objects.exists())
+
+    @override_settings(GOOGLE_AUTH_ENABLED=True, ACCESS_REQUESTS_ENABLED=False)
+    def test_identidad_ya_vinculada_no_se_bloquea_por_solicitud_historica(self):
+        cuenta = SocialAccount.objects.create(
+            user=self.usuario,
+            provider="google",
+            uid="google-sub-vinculado",
+            extra_data={},
+        )
+        SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject=cuenta.uid,
+            email=self.usuario.email,
+            estado=SolicitudAcceso.Estado.RECHAZADA,
+        )
+        social_login = SocialLogin(user=self.usuario, account=cuenta)
+
+        self.adaptador.pre_social_login(self._solicitud(), social_login)
+
+        self.assertEqual(social_login.user, self.usuario)
+        self.assertEqual(SocialAccount.objects.filter(user=self.usuario, provider="google").count(), 1)
+
     @override_settings(GOOGLE_AUTH_ENABLED=False)
     def test_callback_no_vincula_si_el_flag_google_se_apaga(self):
         with self.assertRaises(ImmediateHttpResponse):

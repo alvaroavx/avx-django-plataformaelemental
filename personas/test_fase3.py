@@ -16,6 +16,7 @@ from django.test import Client, RequestFactory, TestCase, TransactionTestCase, o
 from django.urls import reverse
 from django.contrib.sessions.middleware import SessionMiddleware
 
+from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.models import EmailAddress, SocialAccount, SocialLogin, SocialToken
 
 from auditoria.models import AuditLog
@@ -163,7 +164,34 @@ class MatrizAislamientoOrganizacionalTests(TestCase):
 
     def test_asistencias_y_json_no_filtran_existencia_ajena(self):
         detalle_disciplina = self.client.get(reverse("asistencias:disciplina_detail", args=[self.disciplina_b.pk]), self._query_a())
-        self.assertEqual(detalle_disciplina.status_code, 403)
+        detalle_disciplina_inexistente = self.client.get(
+            reverse("asistencias:disciplina_detail", args=[999999]),
+            self._query_a(),
+        )
+        self.assertEqual(detalle_disciplina.status_code, 404)
+        self.assertEqual(detalle_disciplina_inexistente.status_code, 404)
+        editar_disciplina_ajena = self.client.get(
+            reverse("asistencias:disciplina_edit", args=[self.disciplina_b.pk]),
+            self._query_a(),
+        )
+        editar_disciplina_inexistente = self.client.get(
+            reverse("asistencias:disciplina_edit", args=[999999]),
+            self._query_a(),
+        )
+        self.assertEqual(editar_disciplina_ajena.status_code, 404)
+        self.assertEqual(editar_disciplina_inexistente.status_code, 404)
+        post_disciplina_ajena = self.client.post(
+            f"{reverse('asistencias:disciplina_edit', args=[self.disciplina_b.pk])}?organizacion={self.org_a.pk}",
+            {"nombre": "No debe cambiar"},
+        )
+        post_disciplina_inexistente = self.client.post(
+            f"{reverse('asistencias:disciplina_edit', args=[999999])}?organizacion={self.org_a.pk}",
+            {"nombre": "No debe existir"},
+        )
+        self.assertEqual(post_disciplina_ajena.status_code, 404)
+        self.assertEqual(post_disciplina_inexistente.status_code, 404)
+        self.disciplina_b.refresh_from_db()
+        self.assertEqual(self.disciplina_b.nombre, "Disciplina B")
         detalle_sesion = self.client.get(reverse("asistencias:sesion_detail", args=[self.sesion_b.pk]), self._query_a())
         self.assertEqual(detalle_sesion.status_code, 404)
         json_busqueda = self.client.get(reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion_b.pk]), {"q": "Oculta"})
@@ -311,6 +339,110 @@ class FlujoGooglePosteriorAprobacionTests(TestCase):
         self.assertEqual(cuenta.extra_data, {})
         self.assertFalse(SocialToken.objects.exists())
         self.assertTrue(PersonaRol.objects.filter(persona__user=cuenta.user, organizacion=organizacion, rol=rol, activo=True).exists())
+
+    def test_rechazo_reapertura_y_aprobacion_en_otra_organizacion_habilitan_vinculo(self):
+        User = get_user_model()
+        gestor = User.objects.create_user("gestor_reapertura_google", password=TEST_PASSWORD)
+        gestor.user_permissions.add(Permission.objects.get(codename="gestionar_solicitudes_acceso"))
+        org_origen = Organizacion.objects.create(
+            nombre="Org origen rechazo",
+            razon_social="Org origen rechazo SpA",
+            rut="65.001.011-9",
+        )
+        org_destino = Organizacion.objects.create(
+            nombre="Org destino aprobación",
+            razon_social="Org destino aprobación SpA",
+            rut="65.001.012-7",
+        )
+        rol = Rol.objects.create(nombre="Profesora piloto reapertura", codigo="PROFESOR_REAPERTURA")
+        solicitud = SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="sub-rechazo-reapertura",
+            email="reapertura-google@example.test",
+        )
+        rechazar_solicitud(
+            solicitud_id=solicitud.pk,
+            administrador=gestor,
+            motivo_rechazo="Validación inicial rechazada",
+        )
+        reabrir_solicitud(
+            solicitud_id=solicitud.pk,
+            administrador=gestor,
+            nota_interna="Autorización posterior revisada",
+        )
+        request = self.client.get("/cuenta-interna-de-prueba/").wsgi_request
+        request.session.save()
+        social_login = SocialLogin(
+            user=User(username="temporal-reapertura", email=solicitud.email),
+            account=SocialAccount(provider="google", uid=solicitud.provider_subject, extra_data={}),
+            email_addresses=[EmailAddress(email=solicitud.email, verified=True, primary=True)],
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            AdaptadorSocialGoogleElemental().pre_social_login(request, social_login)
+        self.assertFalse(SocialAccount.objects.exists())
+
+        aprobar_solicitud(
+            solicitud_id=solicitud.pk,
+            administrador=gestor,
+            tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO,
+            organizacion=org_destino,
+            rol=rol,
+            nombres="Profesora",
+            apellidos="Reaprobada",
+        )
+        with patch.object(SocialAccount, "get_provider"):
+            AdaptadorSocialGoogleElemental().pre_social_login(request, social_login)
+
+        solicitud.refresh_from_db()
+        cuenta = SocialAccount.objects.get(provider="google", uid=solicitud.provider_subject)
+        self.assertEqual(solicitud.estado, SolicitudAcceso.Estado.APROBADA)
+        self.assertEqual(solicitud.organizacion_resuelta, org_destino)
+        self.assertFalse(PersonaRol.objects.filter(persona__user=cuenta.user, organizacion=org_origen).exists())
+        self.assertTrue(PersonaRol.objects.filter(persona__user=cuenta.user, organizacion=org_destino, rol=rol, activo=True).exists())
+
+    def test_reintento_de_identidad_aprobada_no_duplica_entidades(self):
+        User = get_user_model()
+        gestor = User.objects.create_user("gestor_reintento_google", password=TEST_PASSWORD)
+        gestor.user_permissions.add(Permission.objects.get(codename="gestionar_solicitudes_acceso"))
+        organizacion = Organizacion.objects.create(
+            nombre="Org reintento Google",
+            razon_social="Org reintento Google SpA",
+            rut="65.001.013-5",
+        )
+        rol = Rol.objects.create(nombre="Profesora reintento", codigo="PROFESOR_REINTENTO")
+        solicitud = SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="sub-reintento-aprobado",
+            email="reintento-aprobado@example.test",
+        )
+        aprobar_solicitud(
+            solicitud_id=solicitud.pk,
+            administrador=gestor,
+            tipo_resolucion=SolicitudAcceso.TipoResolucion.USUARIO_NUEVO,
+            organizacion=organizacion,
+            rol=rol,
+            nombres="Profesora",
+            apellidos="Reintento",
+        )
+        request = self.client.get("/cuenta-interna-de-prueba/").wsgi_request
+        request.session.save()
+        primer_login = SocialLogin(
+            user=User(username="temporal-reintento", email=solicitud.email),
+            account=SocialAccount(provider="google", uid=solicitud.provider_subject, extra_data={}),
+            email_addresses=[EmailAddress(email=solicitud.email, verified=True, primary=True)],
+        )
+        with patch.object(SocialAccount, "get_provider"):
+            AdaptadorSocialGoogleElemental().pre_social_login(request, primer_login)
+        cuenta = SocialAccount.objects.get(provider="google", uid=solicitud.provider_subject)
+        segundo_login = SocialLogin(user=cuenta.user, account=cuenta)
+
+        AdaptadorSocialGoogleElemental().pre_social_login(request, segundo_login)
+
+        self.assertEqual(SocialAccount.objects.filter(provider="google", uid=solicitud.provider_subject).count(), 1)
+        self.assertEqual(User.objects.filter(email=solicitud.email).count(), 1)
+        self.assertEqual(Persona.objects.filter(user=cuenta.user).count(), 1)
+        self.assertEqual(PersonaRol.objects.filter(persona__user=cuenta.user, organizacion=organizacion, rol=rol).count(), 1)
 
 
 @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)

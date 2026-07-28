@@ -58,9 +58,22 @@ def obtener_identidad_pendiente(request):
     return {**identidad, "email": normalizar_email_google(identidad["email"])}
 
 
-def solicitud_pendiente_o_ultima(identidad):
-    base = SolicitudAcceso.objects.filter(provider="google", provider_subject=identidad["provider_subject"])
+def solicitud_canonica_por_identidad(*, provider, provider_subject, bloquear=False):
+    """Retorna la solicitud efectiva sin convertir rechazos históricos en un veto permanente."""
+    base = SolicitudAcceso.objects.filter(
+        provider=provider,
+        provider_subject=provider_subject,
+    ).order_by("-creada_en", "-id")
+    if bloquear:
+        base = base.select_for_update()
     return base.filter(estado=SolicitudAcceso.Estado.PENDIENTE).first() or base.first()
+
+
+def solicitud_pendiente_o_ultima(identidad):
+    return solicitud_canonica_por_identidad(
+        provider=identidad["provider"],
+        provider_subject=identidad["provider_subject"],
+    )
 
 
 def crear_o_recuperar_solicitud(request, identidad):

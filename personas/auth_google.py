@@ -10,7 +10,7 @@ from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria
-from .solicitudes_acceso import guardar_identidad_pendiente
+from .solicitudes_acceso import guardar_identidad_pendiente, solicitud_canonica_por_identidad
 from .models import SolicitudAcceso
 from .identidades_google import COMPATIBLE, SIN_VINCULO, bloquear_identidad_google, bloquear_usuario_google, estado_vinculo_google
 
@@ -49,14 +49,19 @@ class AdaptadorSocialGoogleElemental(DefaultSocialAccountAdapter):
         if not email:
             self._bloquear(request, "Google no entregó un correo verificado para esta cuenta.")
 
-        solicitud_aprobada = SolicitudAcceso.objects.filter(
+        solicitud_canonica = solicitud_canonica_por_identidad(
             provider=self.provider_google,
             provider_subject=sociallogin.account.uid,
-            estado=SolicitudAcceso.Estado.APROBADA,
-            usuario_resuelto__is_active=True,
-        ).select_related("usuario_resuelto").first()
-        if solicitud_aprobada:
-            usuario = get_user_model().objects.select_for_update().get(pk=solicitud_aprobada.usuario_resuelto_id)
+            bloquear=True,
+        )
+        if solicitud_canonica:
+            if solicitud_canonica.estado != SolicitudAcceso.Estado.APROBADA:
+                self._solicitar_revision(request, sociallogin)
+            if not solicitud_canonica.usuario_resuelto_id:
+                self._bloquear(request, "No encontramos un acceso habilitado para esta cuenta.")
+            usuario = get_user_model().objects.select_for_update().get(pk=solicitud_canonica.usuario_resuelto_id)
+            if not usuario.is_active:
+                self._bloquear(request, "No encontramos un acceso habilitado para esta cuenta.")
             bloquear_usuario_google(provider=self.provider_google, usuario_id=usuario.pk)
             if estado_vinculo_google(
                 provider=self.provider_google,

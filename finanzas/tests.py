@@ -2,6 +2,7 @@ import csv
 from io import BytesIO, StringIO
 from datetime import date
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -970,6 +971,85 @@ class FinanzasAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
         self.assertIn("inline;", response["Content-Disposition"])
+
+    def test_archivos_protegidos_no_exponen_ruta_media_y_aislan_organizacion(self):
+        otra_org = Organizacion.objects.create(
+            nombre="Org archivos ajenos",
+            razon_social="Org archivos ajenos SpA",
+            rut="22.222.223-0",
+        )
+        categoria = Category.objects.create(nombre="Respaldo privado", tipo="egreso", activa=True)
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            documento = DocumentoTributario.objects.create(
+                organizacion=otra_org,
+                tipo_documento=DocumentoTributario.TipoDocumento.BOLETA_HONORARIOS,
+                folio="PRIV-1",
+                fecha_emision="2026-02-27",
+                nombre_emisor="Emisor privado",
+                monto_total=10000,
+                archivo_pdf=SimpleUploadedFile(
+                    "documento-privado.pdf",
+                    b"%PDF-1.4\n%%EOF",
+                    content_type="application/pdf",
+                ),
+            )
+            transaccion = Transaction.objects.create(
+                organizacion=otra_org,
+                categoria=categoria,
+                fecha="2026-02-27",
+                tipo=Transaction.Tipo.EGRESO,
+                monto=10000,
+                descripcion="Transacción privada",
+                archivo=SimpleUploadedFile(
+                    "transaccion-privada.pdf",
+                    b"%PDF-1.4\n%%EOF",
+                    content_type="application/pdf",
+                ),
+            )
+            url_documento = reverse(
+                "finanzas:documento_tributario_archivo",
+                kwargs={"pk": documento.pk, "tipo_archivo": "pdf"},
+            )
+            url_transaccion = reverse(
+                "finanzas:transaccion_archivo",
+                kwargs={"pk": transaccion.pk},
+            )
+
+            self.assertEqual(self.client.get(url_documento).status_code, 302)
+            self.client.force_login(self.user_finanzas)
+            for url_ajena, url_inexistente in (
+                (
+                    url_documento,
+                    reverse(
+                        "finanzas:documento_tributario_archivo",
+                        kwargs={"pk": 999991, "tipo_archivo": "pdf"},
+                    ),
+                ),
+                (
+                    url_transaccion,
+                    reverse("finanzas:transaccion_archivo", kwargs={"pk": 999992}),
+                ),
+            ):
+                with self.subTest(url=url_ajena):
+                    respuesta_ajena = self.client.get(url_ajena, {"organizacion": self.org.pk})
+                    respuesta_inexistente = self.client.get(url_inexistente, {"organizacion": self.org.pk})
+                    self.assertEqual(respuesta_ajena.status_code, 404)
+                    self.assertEqual(respuesta_inexistente.status_code, 404)
+
+            self.client.force_login(self.user_admin)
+            PersonaRol.objects.create(
+                persona=self.persona_admin,
+                rol=self.rol_admin,
+                organizacion=otra_org,
+                activo=True,
+            )
+            detalle = self.client.get(
+                reverse("finanzas:documento_tributario_detail", kwargs={"pk": documento.pk}),
+                {"organizacion": otra_org.pk},
+            )
+            self.assertEqual(detalle.status_code, 200)
+            self.assertContains(detalle, url_documento)
+            self.assertNotContains(detalle, documento.archivo_pdf.url)
 
     @patch("finanzas.views.DocumentoTributarioForm.save", side_effect=IntegrityError("conflicto"))
     def test_documento_tributario_edit_muestra_error_legible_si_falla_unicidad(self, _mock_save):

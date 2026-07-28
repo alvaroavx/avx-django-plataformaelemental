@@ -766,9 +766,11 @@ def disciplinas_list(request):
 def disciplina_detail(request, pk):
     """Detalle de disciplina con métricas de sesiones y asistencias por período."""
     context = nav_context(request)
-    disciplina = get_object_or_404(Disciplina.objects.select_related("organizacion"), pk=pk)
-    if not usuario_tiene_permiso(request.user, ACCION_ADMINISTRAR_SESIONES, organizacion=disciplina.organizacion):
-        raise PermissionDenied("No tienes permisos para acceder a esta disciplina.")
+    organizacion = organizacion_desde_request(request)
+    disciplinas_visibles = Disciplina.objects.select_related("organizacion")
+    if organizacion:
+        disciplinas_visibles = disciplinas_visibles.filter(organizacion=organizacion)
+    disciplina = get_object_or_404(disciplinas_visibles, pk=pk)
 
     sesiones = (
         SesionClase.objects.filter(
@@ -846,9 +848,11 @@ def disciplina_create(request):
 def disciplina_edit(request, pk):
     """Edita una disciplina existente."""
     context = nav_context(request)
-    disciplina = get_object_or_404(Disciplina, pk=pk)
-    if not usuario_tiene_permiso(request.user, ACCION_ADMINISTRAR_SESIONES, organizacion=disciplina.organizacion):
-        raise PermissionDenied("No tienes permisos para editar esta disciplina.")
+    organizacion = organizacion_desde_request(request)
+    disciplinas_visibles = Disciplina.objects.all()
+    if organizacion:
+        disciplinas_visibles = disciplinas_visibles.filter(organizacion=organizacion)
+    disciplina = get_object_or_404(disciplinas_visibles, pk=pk)
     form = DisciplinaForm(request.POST or None, instance=disciplina, organizaciones=organizaciones_visibles_para_usuario(request.user))
 
     if request.method == "POST" and form.is_valid():

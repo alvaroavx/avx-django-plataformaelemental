@@ -2995,6 +2995,168 @@ class SprintTresJornadaMovilTests(TestCase):
                 self.client.force_login(usuaria)
                 self.assertEqual(self.client.get(url).status_code, esperado)
 
+    def test_desactivar_user_corta_lectura_y_escritura_con_sesion_abierta(self):
+        self._login_asignada()
+        self.assertEqual(self.client.get(reverse("asistencias:sesiones_hoy")).status_code, 200)
+        self.profesora_asignada.is_active = False
+        self.profesora_asignada.save(update_fields=["is_active"])
+
+        lectura = self.client.get(reverse("asistencias:sesiones_hoy"))
+        escritura = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            ),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(lectura.status_code, 302)
+        self.assertIn(reverse("login"), lectura.url)
+        self.assertEqual(escritura.status_code, 403)
+        self.assertEqual(escritura.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertFalse(
+            Asistencia.objects.filter(
+                sesion=self.sesion_temprano,
+                persona=self.estudiante,
+            ).exists()
+        )
+
+    def test_desactivar_rol_corta_lectura_y_escritura_con_sesion_abierta(self):
+        self._login_asignada()
+        rol = PersonaRol.objects.get(
+            persona__user=self.profesora_asignada,
+            organizacion=self.organizacion,
+            rol=self.rol_profesor,
+        )
+        rol.activo = False
+        rol.save(update_fields=["activo"])
+
+        lectura = self.client.get(
+            reverse(
+                "asistencias:sesion_detail",
+                kwargs={"pk": self.sesion_temprano.pk},
+            )
+        )
+        escritura = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            ),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(lectura.status_code, 404)
+        self.assertEqual(escritura.status_code, 403)
+        self.assertEqual(escritura.json()["codigo"], "PERMISO_DENEGADO")
+        self.assertFalse(
+            Asistencia.objects.filter(
+                sesion=self.sesion_temprano,
+                persona=self.estudiante,
+            ).exists()
+        )
+
+    def test_quitar_asignacion_corta_lectura_y_escritura_con_sesion_abierta(self):
+        self._login_asignada()
+        self.sesion_temprano.profesores.remove(self.profesora_asignada.persona)
+
+        lectura = self.client.get(
+            reverse(
+                "asistencias:sesion_detail",
+                kwargs={"pk": self.sesion_temprano.pk},
+            )
+        )
+        escritura = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            ),
+            {"persona_id": self.estudiante.pk},
+        )
+
+        self.assertEqual(lectura.status_code, 404)
+        self.assertEqual(escritura.status_code, 404)
+        self.assertEqual(escritura.json()["codigo"], "SESION_NO_ENCONTRADA")
+        self.assertFalse(
+            Asistencia.objects.filter(
+                sesion=self.sesion_temprano,
+                persona=self.estudiante,
+            ).exists()
+        )
+
+    def test_matriz_gate2_html_busqueda_json_y_post_por_actor(self):
+        User = get_user_model()
+        sin_rol = User.objects.create_user("jornada_sin_rol", password=TEST_PASSWORD)
+        Persona.objects.create(
+            nombres="Usuario",
+            apellidos="Sin rol",
+            email="jornada.sin.rol@example.com",
+            user=sin_rol,
+        )
+        rol_inactivo = crear_usuario_con_rol(
+            username="profesora_rol_inactivo",
+            password=TEST_PASSWORD,
+            rol=self.rol_profesor,
+            organizacion=self.organizacion,
+            nombres="Profesora",
+            apellidos="Rol inactivo",
+        )
+        PersonaRol.objects.filter(
+            persona__user=rol_inactivo,
+            organizacion=self.organizacion,
+            rol=self.rol_profesor,
+        ).update(activo=False)
+        rol_admin = Rol.objects.create(nombre="Administración jornada", codigo="ADMINISTRADOR")
+        administracion = crear_usuario_con_rol(
+            username="administracion_jornada",
+            password=TEST_PASSWORD,
+            rol=rol_admin,
+            organizacion=self.organizacion,
+            nombres="Administración",
+            apellidos="Jornada",
+        )
+        emergencia = User.objects.create_superuser(
+            "emergencia_jornada",
+            email="emergencia.jornada@example.com",
+            password=TEST_PASSWORD,
+        )
+        detalle_url = reverse(
+            "asistencias:sesion_detail",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        busqueda_url = reverse(
+            "asistencias:sesion_asistentes_buscar",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        agregar_url = reverse(
+            "asistencias:sesion_asistente_agregar",
+            kwargs={"pk": self.sesion_temprano.pk},
+        )
+        casos = (
+            ("anonimo", None, 302, 403, 403),
+            ("sin_rol", sin_rol, 404, 403, 403),
+            ("rol_inactivo", rol_inactivo, 404, 403, 403),
+            ("profesora_asignada", self.profesora_asignada, 200, 200, 400),
+            ("profesora_no_asignada", self.profesora_no_asignada, 404, 404, 404),
+            ("otra_organizacion", self.profesora_otra_organizacion, 404, 404, 404),
+            ("administracion", administracion, 200, 200, 400),
+            ("superusuario_emergencia", emergencia, 200, 200, 400),
+        )
+
+        for actor, usuario, html_status, busqueda_status, post_status in casos:
+            with self.subTest(actor=actor):
+                self.client.logout()
+                if usuario:
+                    self.client.force_login(usuario)
+                query = {"organizacion": self.organizacion.pk} if actor == "administracion" else {}
+                detalle = self.client.get(detalle_url, query)
+                busqueda = self.client.get(busqueda_url, {"q": "Elena"})
+                agregar = self.client.post(agregar_url, {"persona_id": 999999})
+                self.assertEqual(detalle.status_code, html_status)
+                self.assertEqual(busqueda.status_code, busqueda_status)
+                self.assertEqual(agregar.status_code, post_status)
+                if post_status == 400:
+                    self.assertEqual(agregar.json()["codigo"], "PERSONA_INVALIDA")
+
     def test_busqueda_profesora_limita_resultados_a_organizacion_y_sesion(self):
         Asistencia.objects.create(
             sesion=self.sesion_temprano,
