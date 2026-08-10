@@ -2,6 +2,19 @@ from django.conf import settings
 from django.db import models
 
 
+class RelacionOperativaQuerySet(models.QuerySet):
+    def operativas(self):
+        """Solo relaciones explícitas o históricas revisadas que estén activas."""
+        return self.filter(activa=True).filter(
+            models.Q(origen="explicita")
+            | models.Q(
+                origen="historica",
+                revisada_en__isnull=False,
+                revisada_por__isnull=False,
+            )
+        )
+
+
 class Disciplina(models.Model):
     class BadgeColor(models.TextChoices):
         ROJO = "rojo", "Rojo"
@@ -67,6 +80,120 @@ class Disciplina(models.Model):
         ]
 
 
+class AsignacionProfesorDisciplina(models.Model):
+    """Alcance explícito que habilita a una profesora para operar una disciplina."""
+
+    class Origen(models.TextChoices):
+        EXPLICITA = "explicita", "Explícita"
+        HISTORICA = "historica", "Inferida desde historia"
+
+    disciplina = models.ForeignKey(
+        Disciplina,
+        on_delete=models.CASCADE,
+        related_name="asignaciones_profesores",
+    )
+    profesor = models.ForeignKey(
+        "personas.Persona",
+        on_delete=models.CASCADE,
+        related_name="asignaciones_disciplinas",
+    )
+    activa = models.BooleanField(default=True)
+    origen = models.CharField(
+        max_length=20,
+        choices=Origen.choices,
+        default=Origen.EXPLICITA,
+    )
+    asignada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asignaciones_profesor_disciplina_creadas",
+    )
+    asignada_en = models.DateTimeField(auto_now_add=True)
+    revisada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asignaciones_profesor_disciplina_revisadas",
+    )
+    revisada_en = models.DateTimeField(null=True, blank=True)
+
+    objects = RelacionOperativaQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Asignación de profesor a disciplina"
+        verbose_name_plural = "Asignaciones de profesores a disciplinas"
+        db_table = "asistencias_asignacionprofesordisciplina"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["disciplina", "profesor"],
+                name="asistencias_profesor_disciplina_unica",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.profesor} · {self.disciplina}"
+
+
+class AlumnoDisciplina(models.Model):
+    """Matrícula operativa; limita alumnos visibles y cobrables por disciplina."""
+
+    class Origen(models.TextChoices):
+        EXPLICITA = "explicita", "Explícita"
+        HISTORICA = "historica", "Inferida desde historia"
+
+    disciplina = models.ForeignKey(
+        Disciplina,
+        on_delete=models.CASCADE,
+        related_name="alumnos_asignados",
+    )
+    alumno = models.ForeignKey(
+        "personas.Persona",
+        on_delete=models.CASCADE,
+        related_name="disciplinas_asignadas",
+    )
+    activa = models.BooleanField(default=True)
+    origen = models.CharField(
+        max_length=20,
+        choices=Origen.choices,
+        default=Origen.EXPLICITA,
+    )
+    asignada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asignaciones_alumno_disciplina_creadas",
+    )
+    asignada_en = models.DateTimeField(auto_now_add=True)
+    revisada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asignaciones_alumno_disciplina_revisadas",
+    )
+    revisada_en = models.DateTimeField(null=True, blank=True)
+
+    objects = RelacionOperativaQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Alumno de disciplina"
+        verbose_name_plural = "Alumnos de disciplinas"
+        db_table = "asistencias_alumnodisciplina"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["disciplina", "alumno"],
+                name="asistencias_alumno_disciplina_unico",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.alumno} · {self.disciplina}"
+
+
 class BloqueHorario(models.Model):
     class Dia(models.IntegerChoices):
         LUNES = 0, "Lunes"
@@ -106,8 +233,9 @@ class BloqueHorario(models.Model):
 
 class SesionClase(models.Model):
     class Estado(models.TextChoices):
-        PROGRAMADA = "programada", "Programada"
-        COMPLETADA = "completada", "Completada"
+        PROGRAMADA = "programada", "Planificada"
+        ABIERTA = "abierta", "Abierta"
+        COMPLETADA = "completada", "Cerrada"
         CANCELADA = "cancelada", "Cancelada"
 
     disciplina = models.ForeignKey(
@@ -153,6 +281,31 @@ class SesionClase(models.Model):
     @property
     def profesores_resumen(self):
         return ", ".join([str(persona) for persona in self.profesores.all()])
+
+
+class LiberacionSesion(models.Model):
+    """Cancelación auditable de una sesión propia, sin eliminar su historia."""
+
+    sesion = models.OneToOneField(
+        SesionClase,
+        on_delete=models.PROTECT,
+        related_name="liberacion_operativa",
+    )
+    motivo = models.TextField()
+    liberada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="sesiones_liberadas",
+    )
+    liberada_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Liberación de sesión"
+        verbose_name_plural = "Liberaciones de sesiones"
+        db_table = "asistencias_liberacionsesion"
+
+    def __str__(self):
+        return f"Liberación de sesión {self.sesion_id}"
 
 
 class Asistencia(models.Model):

@@ -116,6 +116,7 @@
     const table = document.getElementById("tabla-estudiantes");
     if (!table || !window.jQuery) return;
     if (table.querySelector("tbody td[colspan]")) return;
+    window.ElementalBusqueda.registrarDataTables(jQuery);
     const dt = jQuery(table).DataTable({
       paging: true,
       pageLength: 25,
@@ -148,6 +149,7 @@
     const filtroActividad = document.getElementById("filtro-actividad");
     const limpiar = document.getElementById("limpiar-filtros-estudiantes");
     const inputBuscar = table.closest(".dataTables_wrapper").querySelector(".dataTables_filter input");
+    window.ElementalBusqueda.conectarInputDataTable(dt, inputBuscar);
 
     if (filtroActividad) {
       filtroActividad.value = dt.column(11).search() || "";

@@ -26,7 +26,7 @@ from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.test_factories import asignar_profesora_a_sesion, crear_usuario_con_rol
 from plataformaelemental.context import nav_context, organizacion_desde_request, periodo_context
 
-from .models import Asistencia, BloqueHorario, ClaseLiberada, Disciplina, SesionClase
+from .models import AlumnoDisciplina, Asistencia, BloqueHorario, ClaseLiberada, Disciplina, SesionClase
 from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
 from .selectors import estudiantes_financieros_disciplina
 
@@ -2898,6 +2898,10 @@ class SprintTresJornadaMovilTests(TestCase):
             organizacion=self.otra_organizacion,
             nombre="Pilates Ajeno",
         )
+        AlumnoDisciplina.objects.create(
+            disciplina=self.disciplina,
+            alumno=self.estudiante,
+        )
         self.bloque_temprano = BloqueHorario.objects.create(
             organizacion=self.organizacion,
             nombre="Temprano",
@@ -3175,6 +3179,7 @@ class SprintTresJornadaMovilTests(TestCase):
             organizacion=self.organizacion,
             activo=True,
         )
+        AlumnoDisciplina.objects.create(disciplina=self.disciplina, alumno=elegible)
         self._login_asignada()
         response = self.client.get(
             reverse(
@@ -3421,11 +3426,11 @@ class SprintTresJornadaMovilTests(TestCase):
         self.assertEqual(eliminar.status_code, 403)
         self.assertTrue(Asistencia.objects.filter(pk=asistencia.pk).exists())
 
-    def test_navegacion_profesora_expone_hoy_sin_panel_administrativo(self):
+    def test_navegacion_profesora_expone_operacion_sin_panel_administrativo(self):
         self._login_asignada()
         response = self.client.get(reverse("asistencias:sesiones_hoy"))
 
-        self.assertContains(response, reverse("asistencias:sesiones_hoy"))
+        self.assertContains(response, reverse("profesor:inicio"))
         self.assertNotContains(
             response,
             f'href="{reverse("asistencias:dashboard")}"',
@@ -3744,6 +3749,10 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
             rol=self.rol_estudiante,
             organizacion=self.organizacion_b,
             activo=True,
+        )
+        AlumnoDisciplina.objects.create(
+            disciplina=self.disciplina_a,
+            alumno=compartida,
         )
         solo_b = Persona.objects.create(
             nombres="Compartida",

@@ -2,12 +2,19 @@
 
 Fecha de auditoria: 2026-04-20
 
+> **Documento histórico, no fuente de estado actual.** Conserva evidencia de la
+> migración y extractos de código fechados que ya pueden estar obsoletos. Desde
+> el 2026-08-09 PostgreSQL es el único motor configurado y se retiraron los
+> bloques comentados de fallback SQLite. Para arquitectura, modelos y riesgos
+> vigentes usar `docs/ESTADO_ACTUAL.md` y los documentos dueños. No copiar los
+> snippets de este archivo como configuración actual.
+
 Ruta auditada: `https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main`
 
 Nota de vigencia:
 - La auditoria se preparo para planificar migracion a PostgreSQL.
 - La configuracion activa del proyecto volvio a PostgreSQL en `dev` y `prod` el 2026-05-04.
-- SQLite queda comentado en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py` como fallback local/manual.
+- SQLite ya no aparece como fallback en la configuracion vigente; las menciones posteriores describen el corte historico de abril.
 - La configuracion PostgreSQL activa usa variables `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT`.
 
 ## 1. `requirements.txt` Completo

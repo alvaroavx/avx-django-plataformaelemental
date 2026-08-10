@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-08-09
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -188,6 +188,14 @@ Nota operativa:
    - `bash scripts/deploy.sh`
 
 ## Flujo del workflow
+
+> Excepción Operación Profesor 2026-08-10: no usar este flujo automático para
+> las migraciones `asistencias.0004` y `finanzas.0012`. El workflow no separa
+> mantenimiento, reporte, activación y migraciones. Publicar el release en una
+> rama/tag que no sea `main` y seguir el
+> [runbook manual](MIGRACIONES_OPERACION_PROFESOR.md#runbook-manual-de-producción-para-el-piloto).
+> Un push directo a `main` dispara despliegue automático.
+
 Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh`.
 
 ```mermaid
@@ -236,7 +244,7 @@ flowchart TD
 - El job `test` levanta un service container `postgres:16`.
 - El workflow define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=postgres`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
 - Las credenciales de CI no son credenciales productivas; existen solo dentro del runner.
-- SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
+- SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
 - `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
 
 ## SSH En CI
@@ -392,6 +400,14 @@ bash scripts/deploy.sh
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
 - Si `DEPLOY_SSH_KEY_B64` esta mal cargado, el workflow fallara antes de intentar el SSH remoto.
 - Si `DJANGO_SECRET_KEY` es corto, repetitivo o empieza con `django-insecure-`, Django mostrara `security.W009` en deploy; no siempre bloquea, pero debe corregirse en produccion.
+- Un push a `main` inicia deploy automaticamente despues de la suite; el workflow
+  no declara un `environment` protegido ni una aprobacion manual.
+- Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
+  productivo debe comprobar el valor exacto antes de iniciar procesos.
+- El healthcheck final solo verifica respuesta HTTP del home y no prueba
+  PostgreSQL, Google, escritura de media ni restaurabilidad del backup.
+- El repositorio crea backups previos a migraciones, pero no versiona una prueba
+  periodica de `pg_restore`; un dump no debe llamarse recuperable hasta probarlo.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado

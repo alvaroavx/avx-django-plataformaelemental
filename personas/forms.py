@@ -158,11 +158,29 @@ class ResolverSolicitudAccesoForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
         tipo = cleaned.get("tipo_resolucion")
-        if tipo == SolicitudAcceso.TipoResolucion.USUARIO_EXISTENTE and not cleaned.get("usuario"):
-            self.add_error("usuario", "Busca y selecciona un usuario activo.")
-        if tipo == SolicitudAcceso.TipoResolucion.PERSONA_EXISTENTE and not cleaned.get("persona"):
-            self.add_error("persona", "Busca y selecciona una Persona sin User.")
+        usuario = cleaned.get("usuario")
+        persona = cleaned.get("persona")
+        if tipo == SolicitudAcceso.TipoResolucion.USUARIO_EXISTENTE:
+            if not usuario:
+                self.add_error("usuario", "Busca y selecciona un usuario activo.")
+            if persona:
+                self.add_error(
+                    "persona",
+                    "No selecciones una Persona adicional: el User existente debe tener su propia Persona activa.",
+                )
+        if tipo == SolicitudAcceso.TipoResolucion.PERSONA_EXISTENTE:
+            if not persona:
+                self.add_error("persona", "Busca y selecciona una Persona sin User.")
+            if usuario:
+                self.add_error(
+                    "usuario",
+                    "No selecciones un User adicional: para esta opción se crea el User de acceso y se enlaza a la Persona.",
+                )
         if tipo == SolicitudAcceso.TipoResolucion.USUARIO_NUEVO:
+            if usuario:
+                self.add_error("usuario", "No selecciones un User cuando crearás una identidad nueva.")
+            if persona:
+                self.add_error("persona", "No selecciones una Persona cuando crearás una identidad nueva.")
             if not (cleaned.get("nombres") or "").strip():
                 self.add_error("nombres", "Indica los nombres de la nueva Persona.")
             if not (cleaned.get("apellidos") or "").strip():

@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.
@@ -21,7 +21,10 @@ Apps funcionales visibles:
 - `personas`: identidad, CRM, roles y organizaciones.
 - `finanzas`: cobranza operacional, documentos tributarios, transacciones y reportes.
 - `api`: endpoints minimos de salud, estado, version y usuario autenticado.
-- `monitor`: archivado/desactivado del producto principal; se conserva temporalmente por migraciones y posible data historica.
+
+Componentes activos de soporte:
+- `auditoria`: trazabilidad parcial y best-effort de mutaciones sensibles.
+- `monitor`: instalado en el runtime, pero archivado/desactivado del producto visible; se conserva temporalmente por migraciones y posible data historica.
 
 Componentes de soporte:
 - `plataformaelemental`: configuracion del proyecto.
@@ -29,7 +32,7 @@ Componentes de soporte:
 ## Arquitectura vigente
 - Framework: Django 5.
 - API: Django REST Framework.
-- Base de datos: PostgreSQL por entorno en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`.
+- Base de datos: PostgreSQL, unico motor configurado en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`.
 - UI: Bootstrap 5, DataTables y Tom Select via CDN.
 - Zona horaria: `America/Santiago`.
 - Deploy: GitHub Actions + SSH + `systemd` + `gunicorn`.
@@ -48,10 +51,12 @@ Detalle operativo:
 ## Fronteras de dominio
 - `personas` define identidad: `Persona`, `Organizacion`, `Rol`, `PersonaRol`.
 - `asistencias` define operacion de clases: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`.
+- `asistencias` define además el alcance operativo explícito profesor–disciplina y alumno–disciplina del espacio `/profesor/`.
 - `finanzas` contiene dos subdominios internos:
   - cobranza operacional: planes, pagos, deuda, saldo e imputacion contra asistencias.
   - finanzas/contabilidad: documentos tributarios, transacciones, categorias y reportes.
 - `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
+- `auditoria` registra eventos seleccionados, pero no es una bitacora completa ni bloquea una operacion si falla el log.
 - `monitor` no define core operacional y no forma parte de la navegacion/rutas activas de `Elemental Apps`.
 - La app legacy `database` fue retirada; las migraciones vigentes de `personas`, `asistencias` y `finanzas` crean sus tablas directamente.
 
@@ -76,7 +81,9 @@ Detalle de navegacion y contexto global:
 - [docs/arquitectura/NAVEGACION_Y_CONTEXTO.md](NAVEGACION_Y_CONTEXTO.md)
 
 ## Estado financiero conceptual
-`Payment`, `Transaction` y `DocumentoTributario` son entidades separadas.
+`Payment`, `Transaction` y `DocumentoTributario` son entidades separadas. Los
+pagos confirmados desde los flujos vigentes crean y enlazan una `Transaction`
+uno-a-uno; los pagos históricos anteriores pueden conservar vínculo nulo.
 
 Regla ejecutiva:
 - Un pago operacional responde si una persona pago clases.
@@ -113,6 +120,21 @@ Comando principal esperado:
 ```bash
 python manage.py test
 ```
+
+El inventario actual contiene 407 metodos de test. El workflow de pull requests
+los ejecuta con Python 3.12 y PostgreSQL 16; el workflow previo al deploy usa
+Python 3.13. El resultado de una suite no confirma por si solo el estado del
+servidor ni de los datos productivos.
+
+En el corte 2026-08-09 la suite local completa pasó 404 tests, con 12 omitidos,
+en 517,437 s contra la base PostgreSQL local de desarrollo. La evidencia oficial
+de compatibilidad declarada por el pipeline sigue siendo PostgreSQL 16.
+Los dos tests añadidos el 2026-08-10 para el poblador mensual pasaron de forma
+focalizada. La regresión adicional de solicitudes pasó dentro de su clase de 6
+casos; todavía no se ha repetido la suite completa de 407 casos.
+
+Fotografia verificable y riesgos activos:
+- [docs/ESTADO_ACTUAL.md](../ESTADO_ACTUAL.md)
 
 ## Observaciones tecnicas
 - Sigue siendo importante reducir logica de negocio en views cuando aparezcan cambios funcionales.

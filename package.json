@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "test:mermaid": "python3 scripts/validate_mermaid.py"
+    "test:mermaid": "python3 scripts/validate_mermaid.py",
+    "test:docs-links": "python3 scripts/validate_markdown_links.py",
+    "test:e2e:profesor": "node scripts/e2e/profesor_operacion.js"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.14.0"

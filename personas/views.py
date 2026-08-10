@@ -5,7 +5,7 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models import CharField, Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404
@@ -33,6 +33,7 @@ from plataformaelemental.context import (
 
 from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm, ResolverSolicitudAccesoForm
 from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .search import filtrar_por_fragmentos
 from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
 from .solicitudes_acceso import crear_o_recuperar_solicitud, obtener_identidad_pendiente, solicitud_pendiente_o_ultima
 
@@ -100,25 +101,24 @@ def _candidatos_resolucion(request):
     usuarios = User.objects.none()
     personas = Persona.objects.none()
     if len(termino_usuario) >= 2:
-        usuarios = (
+        usuarios = filtrar_por_fragmentos(
             User.objects.filter(is_active=True)
-            .filter(
-                Q(username__icontains=termino_usuario)
-                | Q(email__icontains=termino_usuario)
-                | Q(first_name__icontains=termino_usuario)
-                | Q(last_name__icontains=termino_usuario)
-            )
             .select_related("persona")
-            .prefetch_related("persona__roles__rol", "persona__roles__organizacion")
-            .order_by("username")[:10]
+            .prefetch_related("persona__roles__rol", "persona__roles__organizacion"),
+            termino_usuario,
+            campos=("username", "email", "first_name", "last_name"),
+            prefijo="usuario_resolucion",
         )
+        usuarios = usuarios.order_by("username")[:10]
     if len(termino_persona) >= 2:
-        personas = (
+        personas = filtrar_por_fragmentos(
             Persona.objects.filter(user__isnull=True, activo=True)
-            .filter(Q(nombres__icontains=termino_persona) | Q(apellidos__icontains=termino_persona) | Q(email__icontains=termino_persona))
-            .prefetch_related("roles__rol", "roles__organizacion")
-            .order_by("apellidos", "nombres")[:10]
+            .prefetch_related("roles__rol", "roles__organizacion"),
+            termino_persona,
+            campos=("nombres", "apellidos", "email"),
+            prefijo="persona_resolucion",
         )
+        personas = personas.order_by("apellidos", "nombres")[:10]
     return termino_usuario, termino_persona, usuarios, personas
 
 
@@ -164,7 +164,12 @@ def solicitudes_acceso_list(request):
     else:
         estado = ""
     if termino:
-        solicitudes = solicitudes.filter(Q(email__icontains=termino) | Q(nombre__icontains=termino) | Q(provider_subject__icontains=termino))
+        solicitudes = filtrar_por_fragmentos(
+            solicitudes,
+            termino,
+            campos=("email", "nombre", "provider_subject"),
+            prefijo="solicitud_acceso",
+        )
     paginator = Paginator(solicitudes, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
     parametros = request.GET.copy()
@@ -570,12 +575,11 @@ def personas_list(request):
     con_deuda = (request.GET.get("con_deuda") or "").strip()
 
     if q:
-        personas_qs = personas_qs.filter(
-            Q(nombres__icontains=q)
-            | Q(apellidos__icontains=q)
-            | Q(email__icontains=q)
-            | Q(telefono__icontains=q)
-            | Q(rut__icontains=q)
+        personas_qs = filtrar_por_fragmentos(
+            personas_qs,
+            q,
+            campos=("nombres", "apellidos", "email", "telefono", "rut"),
+            prefijo="personas_listado",
         )
     if rol:
         personas_qs = personas_qs.filter(roles__rol__codigo=rol)

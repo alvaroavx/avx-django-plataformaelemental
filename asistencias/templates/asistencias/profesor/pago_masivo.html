@@ -1,0 +1,39 @@
+{% extends "asistencias/profesor/base.html" %}
+{% block content %}
+<a class="btn btn-outline-secondary mb-3" href="{% url 'profesor:pagos' %}"><i class="bi bi-arrow-left me-1"></i>Pagos</a>
+<header class="mb-3"><div class="small fw-bold texto-agua text-uppercase">Agua · Lote atómico</div><h1 class="h3">Pago masivo</h1><p class="text-muted">Selecciona entre 10 y 20 alumnos. La confirmación crea todos los pagos y transacciones, o ninguno.</p></header>
+<form class="formulario-operativo" method="post" enctype="multipart/form-data" id="lote-form">{% csrf_token %}
+  <section class="card territorio territorio-agua mb-3"><div class="card-body"><h2 class="h5">Datos comunes</h2>
+    {{ form.non_field_errors }}
+    <label for="{{ form.disciplina.id_for_label }}">Clase</label>{{ form.disciplina }}{{ form.disciplina.errors }}
+    <label for="buscar-alumno">Agregar alumnos</label><input id="buscar-alumno" autocomplete="off" placeholder="Escribe un nombre"><div class="list-group mt-1" id="resultados" aria-live="polite"></div><div class="d-flex flex-wrap gap-2 mt-2" id="seleccionados"></div>{{ form.personas_seleccionadas }}{{ form.personas_seleccionadas.errors }}
+    <div class="row"><div class="col-sm-6"><label for="{{ form.fecha_pago.id_for_label }}">Fecha</label>{{ form.fecha_pago }}{{ form.fecha_pago.errors }}</div><div class="col-sm-6"><label for="{{ form.plan.id_for_label }}">Plan</label>{{ form.plan }}{{ form.plan.errors }}</div></div>
+    <div class="row"><div class="col-sm-6"><label for="{{ form.metodo_pago.id_for_label }}">Método</label>{{ form.metodo_pago }}{{ form.metodo_pago.errors }}</div><div class="col-sm-6"><label for="{{ form.numero_comprobante.id_for_label }}">Comprobante</label>{{ form.numero_comprobante }}{{ form.numero_comprobante.errors }}</div></div>
+    <div class="row"><div class="col-sm-6"><label for="{{ form.monto.id_for_label }}">Monto CLP por alumno</label>{{ form.monto }}{{ form.monto.errors }}</div><div class="col-sm-6"><label for="{{ form.clases_asignadas.id_for_label }}">Clases</label>{{ form.clases_asignadas }}{{ form.clases_asignadas.errors }}</div></div>
+    <label for="{{ form.respaldo.id_for_label }}">Respaldo común</label>{{ form.respaldo }}{{ form.respaldo.errors }}
+    <label for="{{ form.glosa.id_for_label }}">Glosa común</label>{{ form.glosa }}{{ form.glosa.errors }}
+    {{ form.filas_json }}{{ form.clave_idempotencia }}
+  </div></section>
+
+  {% if preview %}<section class="card territorio territorio-fuego mb-3"><div class="card-body"><h2 class="h5">Vista previa del lote</h2><p class="text-muted">Revisa o ajusta cada fila. Si adjuntaste un respaldo, vuelve a seleccionarlo antes de confirmar.</p>
+    {% if errores_filas %}<div class="alert alert-danger">Hay filas inválidas. El lote completo permanece sin confirmar.</div>{% endif %}
+    <div class="table-responsive"><table class="table align-middle"><thead><tr><th>Alumno</th><th>Monto</th><th>Clases</th><th>Glosa</th><th>Validación</th></tr></thead><tbody>
+      {% for fila in filas %}<tr data-row="{{ fila.persona_id }}"><td>{{ fila.persona.nombre_completo }}</td><td><input data-field="monto" type="number" min="1" value="{{ fila.monto_referencia|floatformat:'0' }}"></td><td><input data-field="clases_asignadas" type="number" min="0" value="{{ fila.clases_asignadas }}"></td><td><input data-field="glosa" value="{{ fila.observaciones }}"></td><td><span class="badge text-bg-success">Válida</span></td></tr>{% endfor %}
+      {% for persona_id, error in errores_filas.items %}<tr class="table-danger"><td>Alumno #{{ persona_id }}</td><td colspan="3">{{ error }}</td><td><span class="badge text-bg-danger">Inválida</span></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% if not errores_filas %}<button class="btn btn-fuego w-100" type="submit" name="accion" value="confirmar" data-confirmar><i class="bi bi-lock-fill me-1"></i>Confirmar lote completo</button>{% endif %}
+  </div></section>{% endif %}
+  <button class="btn btn-agua w-100" type="submit" name="accion" value="preview"><i class="bi bi-eye me-1"></i>Validar y ver vista previa</button>
+</form>
+{% endblock %}
+{% block extra_js %}<script>
+(function(){
+  var form=document.getElementById('lote-form'), disciplina=document.getElementById('id_disciplina'), buscar=document.getElementById('buscar-alumno'), resultados=document.getElementById('resultados'), hidden=document.getElementById('id_personas_seleccionadas'), chips=document.getElementById('seleccionados'), filasJson=document.getElementById('id_filas_json');
+  var seleccion=new Map();
+  function render(){hidden.value=Array.from(seleccion.keys()).join(',');chips.innerHTML='';seleccion.forEach(function(nombre,id){var chip=document.createElement('button');chip.type='button';chip.className='btn btn-sm btn-outline-success';chip.innerHTML='<i class="bi bi-x-circle me-1"></i>'+nombre;chip.addEventListener('click',function(){seleccion.delete(id);render();buscar.focus();});chips.appendChild(chip);});}
+  async function consultar(){var q=buscar.value.trim();resultados.innerHTML='';if(q.length<2||!disciplina.value)return;var url='{% url "profesor:pago_masivo_alumnos" %}?disciplina='+encodeURIComponent(disciplina.value)+'&q='+encodeURIComponent(q);var response=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}});if(!response.ok)return;var data=await response.json();data.resultados.forEach(function(item){if(seleccion.has(item.id))return;var button=document.createElement('button');button.type='button';button.className='list-group-item list-group-item-action touch';button.textContent=item.nombre;button.addEventListener('click',function(){seleccion.set(item.id,item.nombre);render();buscar.value='';resultados.innerHTML='';buscar.focus();});resultados.appendChild(button);});}
+  var timer;buscar.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(consultar,180);});buscar.addEventListener('keydown',function(event){if(event.key==='Enter'){var first=resultados.querySelector('button');if(first){event.preventDefault();first.click();}}});disciplina.addEventListener('change',function(){seleccion.clear();render();buscar.focus();});
+  {% for fila in filas %}seleccion.set({{ fila.persona_id }},'{{ fila.persona.nombre_completo|escapejs }}');{% endfor %}render();
+  form.addEventListener('submit',function(event){var overrides={};document.querySelectorAll('[data-row]').forEach(function(row){var id=row.dataset.row;overrides[id]={};row.querySelectorAll('[data-field]').forEach(function(field){overrides[id][field.dataset.field]=field.value;});});filasJson.value=JSON.stringify(overrides);var submitter=event.submitter;if(submitter&&submitter.dataset.confirmar){submitter.disabled=true;submitter.setAttribute('aria-busy','true');}});
+})();
+</script>{% endblock %}

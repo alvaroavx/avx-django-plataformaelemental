@@ -1,6 +1,6 @@
 # API
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito v1.0
 La app `api` queda reducida a una superficie minima operativa para `Elemental Apps`.
@@ -81,6 +81,10 @@ curl https://apps.espacioelementos.cl/api/health/
 curl https://apps.espacioelementos.cl/api/status/
 curl https://apps.espacioelementos.cl/api/version/
 ```
+
+Estos endpoints no prueban conectividad a PostgreSQL ni a Google. `health`,
+`status` y `version` devuelven respuestas estáticas de proceso; por tanto, un
+200 no equivale a salud integral del servicio.
 
 ## Decision arquitectonica
 La API anterior era amplia y exponia personas, asistencias y finanzas sin consumidor real actual desde la UI HTML.

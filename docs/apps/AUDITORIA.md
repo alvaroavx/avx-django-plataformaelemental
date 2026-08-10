@@ -1,8 +1,14 @@
 # Auditoria
 
+Fecha de actualizacion: 2026-08-09
+
 `auditoria` registra trazabilidad operativa minima para acciones sensibles de Plataforma Elemental v1.0.
 
 No es SIEM, no es event sourcing y no reemplaza respaldos ni logs de servidor. Su objetivo es responder: quien hizo que, cuando y sobre que entidad.
+
+La escritura es best-effort mediante `transaction.on_commit()`: si crear el log
+falla, se registra warning técnico pero la operación principal ya confirmada no
+se revierte. Por ello esta tabla no es una bitácora exhaustiva ni una garantía de cumplimiento.
 
 ## Modelo
 

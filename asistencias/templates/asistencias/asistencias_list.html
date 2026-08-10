@@ -353,12 +353,7 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
-    const normalizeText = (value) =>
-      (value || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+    const normalizeText = window.ElementalBusqueda.normalizar;
 
     const input = document.getElementById("estudiantes_search");
     const sesionSelect = document.querySelector(".js-sesion-asistentes-select");
@@ -417,12 +412,7 @@
     }
   })();
   (function () {
-    const normalizeText = (value) =>
-      (value || "")
-        .toString()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+    const normalizeText = window.ElementalBusqueda.normalizar;
     const input = document.getElementById("profesores_search_basica");
     const select = document.getElementById("id_profesores_basica");
     if (!input || !select) return;
@@ -437,6 +427,7 @@
   (function () {
     const table = document.getElementById("tabla-sesiones");
     if (!table || !window.jQuery) return;
+    window.ElementalBusqueda.registrarDataTables(jQuery);
     const dt = jQuery(table).DataTable({
       paging: true,
       pageLength: 20,
@@ -455,6 +446,8 @@
     const filtroProfesor = document.getElementById("filtro-profesor");
     const filtroFecha = document.getElementById("filtro-fecha");
     const limpiarFiltros = document.getElementById("limpiar-filtros");
+    const inputBuscar = table.closest(".dataTables_wrapper").querySelector(".dataTables_filter input");
+    window.ElementalBusqueda.conectarInputDataTable(dt, inputBuscar);
 
     if (filtroDisciplina) {
       filtroDisciplina.value = dt.column(0).search() || "";

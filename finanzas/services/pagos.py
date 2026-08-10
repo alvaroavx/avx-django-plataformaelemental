@@ -6,13 +6,76 @@ from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria
 from personas.models import Persona, PersonaRol, Rol
 
-from ..models import AttendanceConsumption, DocumentoTributario, LotePago, Payment, PaymentPlan
+from ..models import (
+    AttendanceConsumption,
+    Category,
+    DocumentoTributario,
+    LotePago,
+    Payment,
+    PaymentPlan,
+    Transaction,
+)
 
 
-def crear_pago_operacional(*, pago, usuario=None, lote=None, origen="pago_individual"):
-    """Persiste un Payment y conserva los efectos del flujo individual."""
+@transaction.atomic
+def crear_pago_operacional(
+    *,
+    pago,
+    usuario=None,
+    lote=None,
+    origen="pago_individual",
+    clave_idempotencia=None,
+):
+    """Crea un pago y exactamente una transacción contable en la misma unidad atómica."""
+    clave_idempotencia = (clave_idempotencia or pago.clave_idempotencia or "").strip() or None
+    if clave_idempotencia:
+        existente = (
+            Payment.objects.select_for_update()
+            .filter(clave_idempotencia=clave_idempotencia)
+            .first()
+        )
+        if existente:
+            if existente.organizacion_id != pago.organizacion_id:
+                raise ValidationError("La clave de idempotencia pertenece a otra organización.")
+            return existente
+
     pago.lote = lote
+    pago.registrado_por = usuario if getattr(usuario, "is_authenticated", False) else None
+    pago.clave_idempotencia = clave_idempotencia
     pago.save()
+
+    categoria, _ = Category.objects.get_or_create(
+        nombre="Cobranza de clases",
+        defaults={"tipo": Category.Tipo.INGRESO, "activa": True},
+    )
+    if categoria.tipo != Category.Tipo.INGRESO:
+        raise ValidationError("La categoría contable de cobranza no está configurada como ingreso.")
+    transaccion = Transaction.objects.create(
+        organizacion=pago.organizacion,
+        categoria=categoria,
+        fecha=pago.fecha_pago,
+        tipo=Transaction.Tipo.INGRESO,
+        monto=pago.monto_total,
+        descripcion=pago.observaciones.strip()
+        or f"Pago de clases de {pago.persona.nombre_completo}",
+        creado_por=pago.registrado_por,
+    )
+    pago.transaccion = transaccion
+    pago.save(update_fields=["transaccion", "actualizado_en"])
+
+    registrar_auditoria(
+        usuario=usuario,
+        accion=AuditLog.ACCION_CREAR,
+        dominio="finanzas",
+        objeto=transaccion,
+        organizacion=pago.organizacion,
+        resumen="Transacción creada desde pago operacional",
+        metadata={
+            "pago_id": pago.pk,
+            "transaccion_id": transaccion.pk,
+            "origen": origen,
+        },
+    )
     registrar_auditoria(
         usuario=usuario,
         accion=AuditLog.ACCION_CREAR,
@@ -23,8 +86,34 @@ def crear_pago_operacional(*, pago, usuario=None, lote=None, origen="pago_indivi
         metadata={
             "pago_id": pago.pk,
             "lote_id": str(lote.pk) if lote else None,
+            "transaccion_id": transaccion.pk,
+            "disciplina_id": pago.disciplina_id,
+            "clave_idempotencia": clave_idempotencia,
             "origen": origen,
         },
+    )
+    return pago
+
+
+@transaction.atomic
+def sincronizar_transaccion_pago(*, pago, usuario=None):
+    """Mantiene el movimiento enlazado consistente después de una edición autorizada."""
+    pago = Payment.objects.select_for_update().select_related("persona").get(pk=pago.pk)
+    if not pago.transaccion_id:
+        return pago
+    transaccion = Transaction.objects.select_for_update().get(pk=pago.transaccion_id)
+    transaccion.fecha = pago.fecha_pago
+    transaccion.monto = pago.monto_total
+    transaccion.descripcion = pago.observaciones.strip() or f"Pago de clases de {pago.persona.nombre_completo}"
+    transaccion.save(update_fields=["fecha", "monto", "descripcion", "actualizado_en"])
+    registrar_auditoria(
+        usuario=usuario,
+        accion=AuditLog.ACCION_EDITAR,
+        dominio="finanzas",
+        objeto=transaccion,
+        organizacion=pago.organizacion,
+        resumen="Transacción sincronizada desde pago",
+        metadata={"pago_id": pago.pk, "transaccion_id": transaccion.pk},
     )
     return pago
 
@@ -54,7 +143,9 @@ def _resolver_fila_pago(*, fila, organizacion_id):
 
 
 @transaction.atomic
-def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas, metadatos=None):
+def confirmar_lote_pagos(
+    *, usuario, organizacion_id, clave_idempotencia, filas, metadatos=None, respaldo=None
+):
     """Confirma todas las filas o ninguna; una clave solo puede producir un lote."""
     try:
         with transaction.atomic():
@@ -62,6 +153,7 @@ def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas,
                 organizacion_id=organizacion_id,
                 clave_idempotencia=clave_idempotencia,
                 creado_por=usuario,
+                respaldo=respaldo,
                 metadatos=metadatos or {},
             )
     except IntegrityError:
@@ -75,15 +167,27 @@ def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas,
     pagos = []
     try:
         personas_vistas = set()
-        for fila in filas:
+        for indice, fila in enumerate(filas):
             if fila["persona_id"] in personas_vistas:
                 raise ValidationError("Una persona no puede repetirse dentro del lote.")
             personas_vistas.add(fila["persona_id"])
             persona, plan, documento = _resolver_fila_pago(fila=fila, organizacion_id=organizacion_id)
+            disciplina = None
+            if fila.get("disciplina_id"):
+                from asistencias.models import Disciplina
+
+                disciplina = Disciplina.objects.filter(
+                    pk=fila["disciplina_id"],
+                    organizacion_id=organizacion_id,
+                    activa=True,
+                ).first()
+                if not disciplina:
+                    raise ValidationError("La disciplina no pertenece a la organización o no está activa.")
             pago = Payment(
                 persona=persona,
                 organizacion_id=organizacion_id,
                 plan=plan,
+                disciplina=disciplina,
                 documento_tributario=documento,
                 fecha_pago=fila["fecha_pago"],
                 metodo_pago=fila["metodo_pago"],
@@ -94,7 +198,18 @@ def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas,
                 clases_asignadas=fila.get("clases_asignadas", 0),
                 observaciones=fila.get("observaciones", ""),
             )
-            pagos.append(crear_pago_operacional(pago=pago, usuario=usuario, lote=lote, origen="pago_masivo"))
+            clave_item = fila.get("clave_idempotencia") or (
+                f"{clave_idempotencia}:{indice}:{persona.pk}"
+            )
+            pagos.append(
+                crear_pago_operacional(
+                    pago=pago,
+                    usuario=usuario,
+                    lote=lote,
+                    origen="pago_masivo",
+                    clave_idempotencia=clave_item,
+                )
+            )
         lote.cantidad_pagos = len(pagos)
         lote.monto_total = sum((pago.monto_total for pago in pagos), 0)
         lote.confirmado_en = timezone.now()
@@ -111,6 +226,7 @@ def confirmar_lote_pagos(*, usuario, organizacion_id, clave_idempotencia, filas,
                 "pago_ids": [pago.pk for pago in pagos],
                 "cantidad_pagos": lote.cantidad_pagos,
                 "monto_total": lote.monto_total,
+                "transaccion_ids": [pago.transaccion_id for pago in pagos],
                 "origen": "pago_masivo",
             },
         )
@@ -194,5 +310,6 @@ __all__ = [
     "crear_persona_estudiante_desde_modal",
     "enriquecer_pagos_para_listado",
     "resumen_consumos_pago",
+    "sincronizar_transaccion_pago",
     "texto_copiable_operativo_pago",
 ]

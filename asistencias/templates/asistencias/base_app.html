@@ -49,8 +49,20 @@
       </main>
     {% endif %}
     {% block modals %}{% endblock %}
+    {% if profesor_mode %}
+      {% include "asistencias/profesor/_bottom_nav.html" %}
+      <style>
+        body { padding-bottom: 5.5rem; }
+        .profesor-bottom-nav { position:fixed; bottom:0; left:0; right:0; z-index:1030; background:#fff; border-top:1px solid #d8d4ca; }
+        .profesor-bottom-nav nav { max-width:680px; margin:auto; display:grid; grid-template-columns:repeat(4,1fr); }
+        .profesor-bottom-nav a { min-height:64px; color:#46525A; text-decoration:none; display:grid; place-content:center; text-align:center; font-size:.75rem; }
+        .profesor-bottom-nav i { font-size:1.35rem; line-height:1; margin-bottom:.25rem; }
+        .profesor-bottom-nav a[aria-current="page"] { color:#0C6085; font-weight:700; background:#EAF4F7; }
+      </style>
+    {% endif %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     {% include "shared/_periodo_script.html" %}
+    {% include "shared/_busqueda_texto_script.html" %}
     {% block extra_js %}{% endblock %}
   </body>
 </html>

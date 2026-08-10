@@ -14,6 +14,7 @@ from .pagos import (
     crear_pago_operacional,
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
+    sincronizar_transaccion_pago,
     texto_copiable_operativo_pago,
 )
 from .reportes import (
@@ -44,6 +45,7 @@ __all__ = [
     "pago_otorga_derecho",
     "PAGOS_CSV_HEADERS",
     "resumen_consumos_pago",
+    "sincronizar_transaccion_pago",
     "resumen_financiero_estudiante",
     "resumen_financiero_estudiante_periodo",
     "revertir_pago",

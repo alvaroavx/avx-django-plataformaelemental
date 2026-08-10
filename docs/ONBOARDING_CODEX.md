@@ -1,6 +1,6 @@
 # Onboarding Codex
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este documento explica como leer el repo antes de tocarlo.
@@ -14,33 +14,35 @@ Este documento explica como leer el repo antes de tocarlo.
    Gobernanza documental y jerarquia de autoridad.
 3. [docs/proceso/CHECKLIST_CAMBIOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/CHECKLIST_CAMBIOS.md)
    Checklist para cerrar cambios sin dejar documentacion falsa o validaciones pendientes.
-4. [docs/arquitectura/PLATAFORMA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PLATAFORMA.md)
+4. [docs/ESTADO_ACTUAL.md](ESTADO_ACTUAL.md)
+   Fotografia verificable, riesgos y asuntos por resolver del corte vigente.
+5. [docs/arquitectura/PLATAFORMA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PLATAFORMA.md)
    Fotografia ejecutiva de arquitectura.
-5. [docs/arquitectura/ROADMAP_DOMINIOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/ROADMAP_DOMINIOS.md)
+6. [docs/arquitectura/ROADMAP_DOMINIOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/ROADMAP_DOMINIOS.md)
    Roadmap por dominio para ordenar crecimiento futuro.
-6. [docs/arquitectura/DEUDA_TECNICA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/DEUDA_TECNICA.md)
+7. [docs/arquitectura/DEUDA_TECNICA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/DEUDA_TECNICA.md)
    Deuda tecnica activa, impacto y accion recomendada.
-7. [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md)
+8. [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md)
    Inventario de reglas de negocio y referencias de codigo.
-8. [docs/arquitectura/MODELO_DATOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/MODELO_DATOS.md)
+9. [docs/arquitectura/MODELO_DATOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/MODELO_DATOS.md)
    Mapa relacional, integridad, tablas legacy y deuda tecnica de modelo.
-9. [docs/arquitectura/NAVEGACION_Y_CONTEXTO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/NAVEGACION_Y_CONTEXTO.md)
+10. [docs/arquitectura/NAVEGACION_Y_CONTEXTO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/NAVEGACION_Y_CONTEXTO.md)
    Filtros globales, periodo, organizacion activa y navegacion.
-10. [docs/arquitectura/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PERMISOS_Y_ROLES.md)
+11. [docs/arquitectura/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PERMISOS_Y_ROLES.md)
     Roles, permisos y riesgos de acceso.
-11. [docs/arquitectura/OBSERVABILIDAD.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/OBSERVABILIDAD.md)
+12. [docs/arquitectura/OBSERVABILIDAD.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/OBSERVABILIDAD.md)
     Criterios para `monitor`, indicadores y observabilidad interna.
-12. [docs/proceso/TESTING.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/TESTING.md)
+13. [docs/proceso/TESTING.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/TESTING.md)
     Estrategia de pruebas por tipo de cambio.
-13. Documento local de la app que vayas a tocar:
+14. Documento local de la app que vayas a tocar:
     - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md)
     - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md)
     - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md)
     - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md)
     - [docs/apps/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/MONITOR.md)
-14. [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md)
+15. [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md)
     Resumen humano y puesta en marcha.
-15. Documentos operativos si aplica:
+16. Documentos operativos si aplica:
     - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
     - [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
     - [docs/operacion/SEGURIDAD_PRODUCCION.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/SEGURIDAD_PRODUCCION.md)

@@ -1,6 +1,6 @@
 # Roadmap De Dominios
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este documento ordena crecimiento futuro por dominio sin convertir el monolito Django en microservicios.
@@ -110,15 +110,13 @@ No debe contener:
 
 ### Monitor / Observabilidad Interna
 Estado:
-- Inicial.
+- Archivado dentro de este producto. El codigo y las tablas potenciales siguen presentes.
 
 App duena:
 - `monitor`.
 
-Responsabilidad:
-- dashboards internos,
-- indicadores operativos,
-- salud funcional de la plataforma.
+Responsabilidad actual:
+- ninguna superficie activa; `/monitor/` no esta registrada.
 
 No debe duplicar:
 - modelos,
@@ -192,7 +190,7 @@ Criterio de app:
 2. Mantener validado el retiro de `database` legacy en cambios futuros de migraciones.
 3. Completar separacion interna de `finanzas`.
 4. Formalizar permisos/roles antes de exponer mas escrituras.
-5. Hacer crecer `monitor` con indicadores sin duplicar modelos.
+5. Auditar datos productivos de `monitor` y decidir retiro o proyecto separado.
 6. Evaluar nuevas apps solo cuando haya modelos persistentes claros.
 
 ## Anti-Patrones

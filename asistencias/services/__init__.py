@@ -1,9 +1,37 @@
 """Servicios operacionales de asistencias."""
 
 from .dominio import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
+from .profesor import (
+    activar_asignacion_profesor,
+    activar_asignaciones_profesor_en_lote,
+    activar_matricula_alumno,
+    activar_matriculas_alumno_en_lote,
+    asegurar_asignaciones_profesores,
+    asegurar_matricula_operativa,
+    cambiar_estado_sesion_profesor,
+    crear_alumno_profesor,
+    crear_sesion_profesor,
+    disciplinas_asignadas_profesor,
+    liberar_sesion_profesor,
+    rol_profesor_activo,
+    sesion_en_alcance_profesor,
+)
 
 __all__ = [
+    "activar_asignacion_profesor",
+    "activar_asignaciones_profesor_en_lote",
+    "activar_matricula_alumno",
+    "activar_matriculas_alumno_en_lote",
+    "asegurar_asignaciones_profesores",
+    "asegurar_matricula_operativa",
+    "cambiar_estado_sesion_profesor",
     "cambiar_estado_asistencia",
     "liberar_clase",
     "revertir_clase_liberada",
+    "crear_alumno_profesor",
+    "crear_sesion_profesor",
+    "disciplinas_asignadas_profesor",
+    "liberar_sesion_profesor",
+    "rol_profesor_activo",
+    "sesion_en_alcance_profesor",
 ]

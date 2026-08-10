@@ -28,7 +28,13 @@ def crear_usuario_con_rol(
 
 
 def asignar_profesora_a_sesion(*, user, sesion):
+    from asistencias.models import AsignacionProfesorDisciplina
+
     sesion.profesores.add(user.persona)
+    AsignacionProfesorDisciplina.objects.get_or_create(
+        disciplina=sesion.disciplina,
+        profesor=user.persona,
+    )
     return user
 
 

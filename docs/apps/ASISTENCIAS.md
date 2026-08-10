@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-10
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -9,6 +9,54 @@ Debe privilegiar:
 - velocidad de registro
 - claridad operativa
 - visibilidad academica y financiera inmediata
+
+## Datos mensuales de prueba
+
+El comando `poblar_mes_pruebas` genera un escenario operativo sintético e
+idempotente sobre organizaciones, profesores y alumnos existentes. Está
+bloqueado cuando `DEBUG=False` y sin `--aplicar` solo entrega un preview.
+
+Requiere IDs explícitos para no guardar nombres, correos ni identificadores
+personales en el código:
+
+```bash
+python manage.py poblar_mes_pruebas \
+  --anio 2026 --mes 8 \
+  --organizacion-elementos-id 1 --organizacion-latin-id 2 \
+  --profesor-lyra-id 10 --profesor-latin-id 3 --profesor-circo-id 2
+```
+
+Agregar `--aplicar` confirma la escritura. Las sesiones y asistencias quedan
+marcadas con `[DATOS_PRUEBA_MES_OPERATIVO]`; no se crean personas. El comando
+mantiene las señales de dominio activas, por lo que cada asistencia genera su
+`AttendanceConsumption`. Si no existen pagos de ese período, esos consumos
+quedan correctamente como deuda sintética.
+
+El escenario base produce:
+
+- Lyra los lunes: una sesión cerrada, una abierta parcial y tres planificadas;
+- LatinRengo los sábados: una cerrada, una atrasada sin información y tres
+  planificadas;
+- Tela Aérea los viernes: una abierta parcial y tres planificadas.
+
+Evidencia del primer uso:
+[docs/evidencia/poblado-agosto-20260810/RESULTADOS.md](../evidencia/poblado-agosto-20260810/RESULTADOS.md).
+
+## Transición de relaciones históricas
+
+El comando `reportar_relaciones_historicas` distingue historia y vigencia sin
+modificar datos. Las sesiones no canceladas desde una fecha de corte identifican
+asignaciones de profesor que deben conservarse o activarse explícitamente; una
+sesión pasada no concede acceso. Las asistencias recientes solo generan una cola
+de revisión de matrículas y nunca las activan automáticamente.
+
+El detalle nominal se habilita explícitamente con
+`--incluir-detalle-operativo`, contiene datos personales y no se versiona. En
+Django Admin, asignaciones y matrículas disponen de una activación masiva tras
+revisión: bloquea las filas, valida permiso por organización, revierte todo el
+lote ante un error y audita cada activación. El borrado masivo está retirado de
+estos dos administradores; desactivar una relación conserva la trazabilidad y
+también se audita.
 
 ## Diagramas
 
@@ -121,7 +169,7 @@ flowchart TD
 - Solo `is_superuser` conserva alcance operativo global. `is_staff` permite entrar al Django Admin cuando Django lo autoriza, pero no reemplaza un `PersonaRol` activo ni amplía las organizaciones visibles en Asistencias.
 - Una sesión ajena, una sesión no asignada a la profesora y una sesión inexistente responden `404` con estructura indistinguible en HTML, POST y endpoints JSON basados en objeto. Un `403` se reserva para negar una capacidad general antes de resolver un objeto.
 - Los detalles y formularios de disciplina se resuelven desde el queryset de la organización autorizada. Un identificador ajeno y uno inexistente responden `404` tanto en GET como en POST; no existen endpoints JSON específicos de disciplina.
-- Los permisos de la jornada se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora o quitar su asignación en `SesionClase.profesores` corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta.
+- Los permisos de la jornada se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora, quitar su asignación en `SesionClase.profesores` o desactivar su `AsignacionProfesorDisciplina` operativa corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta.
 - La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
 - Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
 - Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
@@ -164,12 +212,20 @@ flowchart TD
 - En `asistencias/sesiones/<id>/`, el listado de asistentes debe incluir estado de pago y permitir quitar asistentes individualmente desde la sesion, con confirmacion previa.
 - En `asistencias/sesiones/<id>/`, el bloque `Agregar asistentes` debe respetar la misma regla que `asistencias/asistencias/`: estudiantes de la organizacion de la sesion, inactivos visibles con marca y reactivacion al agregarlos.
 - En `asistencias/sesiones/<id>/`, el backend movil para agregar asistentes expone endpoints JSON internos bajo la sesion: `asistentes/buscar/` y `asistentes/agregar/`. Ambos validan permisos contra `sesion.disciplina.organizacion`, no confian en la organizacion activa ni en datos enviados por POST. La busqueda devuelve solo `id`, `nombre` e `inactivo`, excluye asistentes ya agregados y limita resultados. El alta valida rol `ESTUDIANTE` en la organizacion real, usa `get_or_create` dentro de transaccion, reactiva al estudiante si corresponde, sincroniza `AttendanceConsumption` mediante el servicio de `finanzas` y audita la accion.
+- Las búsquedas de asistentes, alumnos para pago masivo y filtros locales de
+  alumnos/profesores aceptan varios fragmentos y no exigen tildes. El backend
+  reutiliza `personas.search.filtrar_por_fragmentos` después de acotar el
+  queryset a la organización, matrícula y asignación autorizadas; el navegador
+  reutiliza `shared/_busqueda_texto_script.html` para filtros que no consultan al
+  servidor.
 - En `asistencias/sesiones/<id>/`, debe existir una opcion para editar la sesion, manteniendo filtros globales y permitiendo actualizar disciplina, fecha y profesores.
 - En `asistencias/sesiones/<id>/`, debe existir un modal de `Nueva persona` junto a `Eliminar sesion`; la persona creada queda automaticamente como `ESTUDIANTE` de la organizacion duena de esa sesion, no de la organizacion del filtro superior.
 - En `asistencias/sesiones/<id>/`, el modal `Nueva persona` incluye el switch `Agregar a esta sesión`, activo por defecto. Si esta activo, crea la persona, la asigna como estudiante de la organizacion de la sesion y crea la asistencia con `get_or_create`; si esta inactivo, solo crea la persona.
 - En `asistencias/sesiones/<id>/`, el alta rápida de personas sigue restringida a administración autorizada de la organización o al rol operativo `STAFF_ASISTENCIA`; el atributo Django `is_staff` por sí solo no concede esa capacidad.
 - La edición de una sesión y el cambio rápido de su estado cargan la sesión desde el conjunto visible para el usuario y verifican la organización real. Un identificador ajeno o inexistente devuelve `404` y no modifica datos.
-- No existe navegación consecutiva anterior/siguiente entre sesiones. Los enlaces vigentes parten de “Hoy”, calendario, disciplina o listados ya filtrados; por tanto, esa superficie se registra como no aplicable.
+- El detalle de una sesión vista por profesor ofrece anterior/siguiente dentro
+  del queryset autorizado. Administración conserva su navegación por calendario
+  y listados filtrados.
 - En `asistencias/calendario/`, una sesion cancelada debe mostrarse como `sesión cancelada` y no como `asistentes: 0`, para no confundir cancelacion con falta de registro.
 - En `asistencias/calendario/`, cada sesion debe mostrar un icono unico de estado: programada, completada o cancelada, visible tanto en calendario como en listado. En calendario, el icono debe quedar fuera del badge de disciplina, al mismo nivel visual, para que el estado se identifique rapidamente.
 - En `asistencias/calendario/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
@@ -277,6 +333,8 @@ reciben la misma respuesta que una sesión inexistente.
 - Excluye personas ya registradas en la sesión.
 
 La búsqueda filtra personas con rol ESTUDIANTE en la organización de la sesión. Puede incluir roles inactivos, marcados con inactivo=true, para permitir su reactivación mediante el flujo existente.
+El parámetro `q` se divide por espacios: todos los fragmentos deben aparecer en
+alguno de los campos nombre, apellido, correo o RUT, sin sensibilidad a tildes.
 
 - Limita a 10 resultados.
 - Devuelve solo `id`, `nombre` e `inactivo`; no expone email ni RUT.
@@ -394,7 +452,7 @@ idempotente del dominio; ausencias y justificaciones no recuperan cupo.
 | 404 | `SESION_NO_ENCONTRADA` | sesión inexistente o no autorizada |
 | 404 | `ASISTENCIA_NO_ENCONTRADA` | asistencia inexistente o ajena a la sesión |
 
-## Jornada móvil de profesoras — Sprint 3
+## Jornada móvil de profesoras — base histórica Sprint 3
 
 - `GET /asistencias/hoy/` lista solamente las sesiones del día accesibles para
   el usuario. Para profesoras exige rol activo en la organización y asignación
@@ -412,10 +470,37 @@ idempotente del dominio; ausencias y justificaciones no recuperan cupo.
 - La profesora no recibe enlaces a fichas de personas, datos financieros,
   controles de liberación, pagos ni eliminación de asistentes. Una clase
   liberada se muestra únicamente como estado informativo.
-- La navegación de profesora incorpora solo el acceso `Hoy`; no abre el panel
-  administrativo de Asistencias.
+- La navegación anterior incorporaba solo `Hoy`. La superficie vigente es
+  `/profesor/`, con Inicio, Mis clases, Alumnos y Pagos; el detalle de sesión
+  continúa reutilizando los endpoints endurecidos de esta sección.
 - Google sigue detrás de los flags existentes. Autenticarse no crea rol,
   organización ni asignación y no concede por sí solo acceso a la jornada.
+
+## Operación Profesor vigente
+
+- `AsignacionProfesorDisciplina` autoriza la clase; `SesionClase.profesores`
+  autoriza la sesión concreta y `AlumnoDisciplina` acota roster, búsqueda y pago.
+- Una relación operativa debe estar activa y ser explícita, o ser histórica con
+  actor y fecha de revisión administrativa. `activa=True` por sí solo no basta
+  para una relación inferida.
+- El primer asistente registrado por profesor cambia una sesión planificada a
+  `abierta`; cerrar requiere acción explícita y auditada.
+- Una profesora crea sesiones futuras propias, puede abrirlas, cerrarlas y
+  liberarlas con motivo obligatorio mediante `LiberacionSesion`.
+- Crear un alumno exige teléfono o correo válido y crea matrícula únicamente en
+  una disciplina asignada a la profesora.
+- La búsqueda incremental de sesión dejó de listar a todos los estudiantes de
+  la organización para profesoras y staff de asistencia: exige matrícula
+  operativa en la disciplina. Solo administración de personas puede convertir
+  explícitamente una persona de la organización en matrícula vigente.
+- La migración `asistencias.0004` deriva asignaciones históricas desde sesiones
+  y asistencias sin borrar datos, pero las crea con `origen=historica` y
+  `activa=False`. La señal de asistencia conserva esa trazabilidad y nunca
+  reactiva una matrícula.
+- `reportar_relaciones_historicas --formato=json --fallar-si-inseguro` entrega
+  conteos sin datos personales y bloquea el gate si existe historia activa sin
+  revisión completa.
+- Contrato completo: [OPERACION_PROFESOR.md](OPERACION_PROFESOR.md).
 
 ## API
 La API de datos de `asistencias` queda desactivada en v1.0.

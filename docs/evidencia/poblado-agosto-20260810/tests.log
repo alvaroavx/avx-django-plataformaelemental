@@ -1,0 +1,13 @@
+Primera ejecución: el fixture detectó que Organizacion.rut es único; no alcanzó
+a ejecutar el poblador ni escribió sobre la base de desarrollo. Se asignaron RUT
+sintéticos distintos y se repitieron los casos.
+
+Using existing test database for alias 'default' ('test_plataforma_elemental_dev')...
+test_preview_no_escribe_y_aplicar_es_idempotente ... ok
+test_rechaza_entorno_sin_debug ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.048s
+
+OK
+Preserving test database for alias 'default' ('test_plataforma_elemental_dev')...

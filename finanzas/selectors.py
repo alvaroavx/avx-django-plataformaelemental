@@ -3,6 +3,7 @@ from django.db.models.functions import Coalesce
 
 from asistencias.models import Asistencia
 from plataformaelemental.context import aplicar_periodo, filtros_periodo
+from personas.search import filtrar_por_fragmentos
 
 from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
@@ -66,7 +67,12 @@ def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
     q = request.GET.get("q")
     metodo = request.GET.get("metodo")
     if q:
-        queryset = queryset.filter(Q(persona__nombres__icontains=q) | Q(persona__apellidos__icontains=q))
+        queryset = filtrar_por_fragmentos(
+            queryset,
+            q,
+            campos=("persona__nombres", "persona__apellidos", "persona__email", "persona__rut"),
+            prefijo="persona_pago",
+        )
     if metodo:
         queryset = queryset.filter(metodo_pago=metodo)
     return queryset

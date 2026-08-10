@@ -80,6 +80,15 @@
     {% endif %}
   </div>
 
+  {% if es_jornada_profesora %}
+  <nav class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" aria-label="Sesiones consecutivas autorizadas">
+    {% if sesion_anterior %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}"><i class="bi bi-arrow-left me-1"></i>Anterior</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin anterior</span>{% endif %}
+    {% if sesion_siguiente %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}">Siguiente<i class="bi bi-arrow-right ms-1"></i></a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin siguiente</span>{% endif %}
+  </nav>
+  {% if sesion.estado != "cancelada" %}<form class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" method="post" action="{% url 'profesor:sesion_estado' sesion.pk %}">{% csrf_token %}<button class="btn btn-outline-warning jornada-touch" name="estado" value="abierta" type="submit"><i class="bi bi-play-circle me-1"></i>Abrir sesión</button><button class="btn btn-outline-success jornada-touch" name="estado" value="completada" type="submit"><i class="bi bi-check-circle me-1"></i>Cerrar sesión</button></form>{% endif %}
+  {% if sesion.estado != "cancelada" %}<form class="card card-body mb-3" method="post" action="{% url 'profesor:sesion_liberar' sesion.pk %}">{% csrf_token %}<label class="form-label fw-semibold" for="motivo-liberar-sesion">Liberar esta sesión</label><div class="d-flex flex-column flex-sm-row gap-2"><input class="form-control jornada-touch" id="motivo-liberar-sesion" name="motivo" required minlength="3" placeholder="Glosa o motivo obligatorio"><button class="btn btn-outline-danger jornada-touch" type="submit">Liberar</button></div></form>{% endif %}
+  {% endif %}
+
   <div class="card mb-3">
     <div class="card-body">
       <div class="row g-3 align-items-center">
@@ -113,9 +122,11 @@
         </div>
         <div class="col-md-4 text-md-end">
           {% if sesion.estado == "programada" %}
-            <span class="badge text-bg-info">Programada</span>
+            <span class="badge text-bg-info">Planificada</span>
+          {% elif sesion.estado == "abierta" %}
+            <span class="badge text-bg-warning"><i class="bi bi-play-circle me-1"></i>Abierta</span>
           {% elif sesion.estado == "completada" %}
-            <span class="badge text-bg-success">Completada</span>
+            <span class="badge text-bg-success">Cerrada</span>
           {% else %}
             <span class="badge text-bg-secondary">Cancelada</span>
           {% endif %}

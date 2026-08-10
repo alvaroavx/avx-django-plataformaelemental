@@ -1,0 +1,2260 @@
+{
+  "antes": {
+    "columnas_nuevas_presentes": [
+      "finanzas_lotepago.clave_idempotencia",
+      "finanzas_lotepago.creado_por_id"
+    ],
+    "migraciones_asistencias": [
+      "0001_move_models_from_database",
+      "0002_disciplina_badge_color",
+      "0003_claseliberada",
+      "0004_alter_sesionclase_estado_liberacionsesion_and_more"
+    ],
+    "migraciones_finanzas": [
+      "0001_initial",
+      "0003_repair_missing_tables",
+      "0004_payment_numero_comprobante",
+      "0005_documentos_tributarios",
+      "0006_documentotributario_unique_emisor",
+      "0007_paymentplan_es_por_defecto",
+      "0008_move_relations_to_domain_apps",
+      "0009_documentotributario_contraparte",
+      "0010_payment_motivo_reversa_payment_revertido_en_and_more",
+      "0011_lotepago_payment_lote"
+    ],
+    "pagos_con_transaccion": null,
+    "tablas": {
+      "finanzas_lotepago": {
+        "filas": 0,
+        "indices_bytes": 40960,
+        "tabla_bytes": 8192,
+        "total_bytes": 49152
+      },
+      "finanzas_payment": {
+        "filas": 300000,
+        "indices_bytes": 24436736,
+        "tabla_bytes": 79355904,
+        "total_bytes": 103792640
+      },
+      "finanzas_transaction": {
+        "filas": 100000,
+        "indices_bytes": 5636096,
+        "tabla_bytes": 22183936,
+        "total_bytes": 27820032
+      }
+    },
+    "transacciones": 100000,
+    "version_postgresql": "PostgreSQL 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit"
+  },
+  "artefacto": "ensayar_finanzas_0012",
+  "base_no_productiva_confirmada": true,
+  "despues": {
+    "columnas_nuevas_presentes": [
+      "finanzas_lotepago.clave_idempotencia",
+      "finanzas_lotepago.creado_por_id",
+      "finanzas_lotepago.respaldo",
+      "finanzas_payment.clave_idempotencia",
+      "finanzas_payment.disciplina_id",
+      "finanzas_payment.registrado_por_id",
+      "finanzas_payment.respaldo",
+      "finanzas_payment.transaccion_id",
+      "finanzas_transaction.creado_por_id"
+    ],
+    "lotes_historicos_con_respaldo_nuevo": 0,
+    "migraciones_asistencias": [
+      "0001_move_models_from_database",
+      "0002_disciplina_badge_color",
+      "0003_claseliberada",
+      "0004_alter_sesionclase_estado_liberacionsesion_and_more"
+    ],
+    "migraciones_finanzas": [
+      "0001_initial",
+      "0003_repair_missing_tables",
+      "0004_payment_numero_comprobante",
+      "0005_documentos_tributarios",
+      "0006_documentotributario_unique_emisor",
+      "0007_paymentplan_es_por_defecto",
+      "0008_move_relations_to_domain_apps",
+      "0009_documentotributario_contraparte",
+      "0010_payment_motivo_reversa_payment_revertido_en_and_more",
+      "0011_lotepago_payment_lote",
+      "0012_payment_clave_idempotencia_payment_disciplina_and_more"
+    ],
+    "pagos_con_transaccion": 0,
+    "pagos_historicos_con_datos_nuevos": 0,
+    "tablas": {
+      "finanzas_lotepago": {
+        "filas": 0,
+        "indices_bytes": 40960,
+        "tabla_bytes": 8192,
+        "total_bytes": 49152
+      },
+      "finanzas_payment": {
+        "filas": 300000,
+        "indices_bytes": 44302336,
+        "tabla_bytes": 79364096,
+        "total_bytes": 123666432
+      },
+      "finanzas_transaction": {
+        "filas": 100000,
+        "indices_bytes": 6348800,
+        "tabla_bytes": 22183936,
+        "total_bytes": 28532736
+      }
+    },
+    "transacciones": 100000,
+    "transacciones_historicas_con_actor_nuevo": 0,
+    "version_postgresql": "PostgreSQL 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit"
+  },
+  "errores_invariantes": [],
+  "espacio_disponible_bytes_declarado": 15483297792,
+  "medicion": {
+    "actividad": [
+      {
+        "estado": "idle",
+        "sql": "SELECT \"django_migrations\".\"id\", \"django_migrations\".\"app\", \"django_migrations\".\"name\", \"django_migrations\".\"applied\" FROM \"django_migrations\"",
+        "t_s": 0.8381,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle",
+        "sql": "SELECT c.relname, CASE WHEN c.relispartition THEN 'p' WHEN c.relkind IN ('m', 'v') THEN 'v' ELSE 't' END, obj_description(c.oid, 'pg_class') FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v') AND n.nspname NOT IN ('pg_catalog', 'pg_toast') AND pg_catalog.pg_table_is_visible(c.oid)",
+        "t_s": 0.8897,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 0.9412,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 0.9412,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 0.9938,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 0.9938,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 1.0465,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "t_s": 1.1,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"disciplina_id\" bigint NULL CONSTRAINT \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" REFERENCES \"academia_disciplina\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" IMMEDIATE",
+        "t_s": 1.1557,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"disciplina_id\" bigint NULL CONSTRAINT \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" REFERENCES \"academia_disciplina\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" IMMEDIATE",
+        "t_s": 1.2118,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"registrado_por_id\" integer NULL CONSTRAINT \"finanzas_payment_registrado_por_id_14e1aeb7_fk_auth_user_id\" REFERENCES \"auth_user\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_registrado_por_id_14e1aeb7_fk_auth_user_id\" IMMEDIATE",
+        "t_s": 1.2664,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"respaldo\" varchar(100) NULL",
+        "t_s": 1.3214,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "idle in transaction",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"respaldo\" varchar(100) NULL",
+        "t_s": 1.3775,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.4339,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.434,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.4902,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.4903,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.5469,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.547,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "t_s": 1.5996,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_clave_idempotencia_eb77c6c8_like\" ON \"finanzas_payment\" (\"clave_idempotencia\" varchar_pattern_ops)",
+        "t_s": 1.6511,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_clave_idempotencia_eb77c6c8_like\" ON \"finanzas_payment\" (\"clave_idempotencia\" varchar_pattern_ops)",
+        "t_s": 1.7027,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_clave_idempotencia_eb77c6c8_like\" ON \"finanzas_payment\" (\"clave_idempotencia\" varchar_pattern_ops)",
+        "t_s": 1.7028,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_disciplina_id_d3d40743\" ON \"finanzas_payment\" (\"disciplina_id\")",
+        "t_s": 1.7543,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_disciplina_id_d3d40743\" ON \"finanzas_payment\" (\"disciplina_id\")",
+        "t_s": 1.7543,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_disciplina_id_d3d40743\" ON \"finanzas_payment\" (\"disciplina_id\")",
+        "t_s": 1.8058,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_registrado_por_id_14e1aeb7\" ON \"finanzas_payment\" (\"registrado_por_id\")",
+        "t_s": 1.8577,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_registrado_por_id_14e1aeb7\" ON \"finanzas_payment\" (\"registrado_por_id\")",
+        "t_s": 1.8577,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "active",
+        "sql": "CREATE INDEX \"finanzas_payment_registrado_por_id_14e1aeb7\" ON \"finanzas_payment\" (\"registrado_por_id\")",
+        "t_s": 1.9099,
+        "wait_event": null,
+        "wait_event_type": null
+      },
+      {
+        "estado": "idle",
+        "sql": "SELECT \"django_migrations\".\"id\", \"django_migrations\".\"app\", \"django_migrations\".\"name\", \"django_migrations\".\"applied\" FROM \"django_migrations\"",
+        "t_s": 1.9618,
+        "wait_event": "ClientRead",
+        "wait_event_type": "Client"
+      }
+    ],
+    "duracion_total_s": 2.3352,
+    "escrituras_representativas": [
+      {
+        "duracion_ms": 2.495,
+        "error": null,
+        "inicio_s": 0.002991
+      },
+      {
+        "duracion_ms": 1.325,
+        "error": null,
+        "inicio_s": 0.055589
+      },
+      {
+        "duracion_ms": 1.343,
+        "error": null,
+        "inicio_s": 0.107074
+      },
+      {
+        "duracion_ms": 1.314,
+        "error": null,
+        "inicio_s": 0.158524
+      },
+      {
+        "duracion_ms": 1.36,
+        "error": null,
+        "inicio_s": 0.209954
+      },
+      {
+        "duracion_ms": 0.732,
+        "error": null,
+        "inicio_s": 0.261407
+      },
+      {
+        "duracion_ms": 0.529,
+        "error": null,
+        "inicio_s": 0.312218
+      },
+      {
+        "duracion_ms": 0.824,
+        "error": null,
+        "inicio_s": 0.362867
+      },
+      {
+        "duracion_ms": 0.813,
+        "error": null,
+        "inicio_s": 0.41379
+      },
+      {
+        "duracion_ms": 0.778,
+        "error": null,
+        "inicio_s": 0.464698
+      },
+      {
+        "duracion_ms": 0.739,
+        "error": null,
+        "inicio_s": 0.515567
+      },
+      {
+        "duracion_ms": 0.597,
+        "error": null,
+        "inicio_s": 0.566407
+      },
+      {
+        "duracion_ms": 0.763,
+        "error": null,
+        "inicio_s": 0.617096
+      },
+      {
+        "duracion_ms": 0.689,
+        "error": null,
+        "inicio_s": 0.667983
+      },
+      {
+        "duracion_ms": 0.829,
+        "error": null,
+        "inicio_s": 0.718787
+      },
+      {
+        "duracion_ms": 1.033,
+        "error": null,
+        "inicio_s": 0.769697
+      },
+      {
+        "duracion_ms": 0.736,
+        "error": null,
+        "inicio_s": 0.820843
+      },
+      {
+        "duracion_ms": 0.679,
+        "error": null,
+        "inicio_s": 0.871668
+      },
+      {
+        "duracion_ms": 0.73,
+        "error": null,
+        "inicio_s": 0.922433
+      },
+      {
+        "duracion_ms": 967.264,
+        "error": null,
+        "inicio_s": 0.97329
+      },
+      {
+        "duracion_ms": 0.964,
+        "error": null,
+        "inicio_s": 1.990641
+      },
+      {
+        "duracion_ms": 2.124,
+        "error": null,
+        "inicio_s": 2.041737
+      },
+      {
+        "duracion_ms": 2.117,
+        "error": null,
+        "inicio_s": 2.094067
+      },
+      {
+        "duracion_ms": 2.16,
+        "error": null,
+        "inicio_s": 2.146341
+      },
+      {
+        "duracion_ms": 1.959,
+        "error": null,
+        "inicio_s": 2.198655
+      },
+      {
+        "duracion_ms": 0.865,
+        "error": null,
+        "inicio_s": 2.250763
+      },
+      {
+        "duracion_ms": 0.79,
+        "error": null,
+        "inicio_s": 2.30178
+      }
+    ],
+    "exit_code": 0,
+    "locks": [
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          }
+        ],
+        "t_s": 0.0043
+      },
+      {
+        "locks": [],
+        "t_s": 0.0585
+      },
+      {
+        "locks": [],
+        "t_s": 0.1125
+      },
+      {
+        "locks": [],
+        "t_s": 0.1655
+      },
+      {
+        "locks": [],
+        "t_s": 0.2186
+      },
+      {
+        "locks": [],
+        "t_s": 0.2701
+      },
+      {
+        "locks": [],
+        "t_s": 0.3216
+      },
+      {
+        "locks": [],
+        "t_s": 0.3732
+      },
+      {
+        "locks": [],
+        "t_s": 0.4248
+      },
+      {
+        "locks": [],
+        "t_s": 0.4769
+      },
+      {
+        "locks": [],
+        "t_s": 0.5288
+      },
+      {
+        "locks": [],
+        "t_s": 0.5804
+      },
+      {
+        "locks": [],
+        "t_s": 0.6324
+      },
+      {
+        "locks": [],
+        "t_s": 0.6839
+      },
+      {
+        "locks": [],
+        "t_s": 0.7359
+      },
+      {
+        "locks": [],
+        "t_s": 0.7873
+      },
+      {
+        "locks": [],
+        "t_s": 0.8389
+      },
+      {
+        "locks": [],
+        "t_s": 0.8904
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          }
+        ],
+        "t_s": 0.9422
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 0.9952
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.0478
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.1028
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.1593
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.2142
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.2692
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.3243
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.3814
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.4374
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.4949
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.5487
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.6003
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.6519
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.7035
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.755
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.8067
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.8588
+      },
+      {
+        "locks": [
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "virtualxid"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessShareLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ShareRowExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "AccessExclusiveLock",
+            "tipo": "relation"
+          },
+          {
+            "concedido": true,
+            "modo": "ExclusiveLock",
+            "tipo": "transactionid"
+          },
+          {
+            "concedido": false,
+            "modo": "RowExclusiveLock",
+            "tipo": "relation"
+          }
+        ],
+        "t_s": 1.9108
+      },
+      {
+        "locks": [],
+        "t_s": 1.9627
+      },
+      {
+        "locks": [],
+        "t_s": 2.0158
+      },
+      {
+        "locks": [],
+        "t_s": 2.0699
+      },
+      {
+        "locks": [],
+        "t_s": 2.1244
+      },
+      {
+        "locks": [],
+        "t_s": 2.1798
+      },
+      {
+        "locks": [],
+        "t_s": 2.2332
+      },
+      {
+        "locks": [],
+        "t_s": 2.2847
+      }
+    ],
+    "operaciones_relevantes": [
+      {
+        "duracion_maxima_estimada_ms": 258.8,
+        "duracion_minima_observada_ms": 158.8,
+        "muestras": 6,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 0.9412,
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"clave_idempotencia\" varchar(160) NULL UNIQUE",
+        "ultima_muestra_s": 1.1
+      },
+      {
+        "duracion_maxima_estimada_ms": 156.1,
+        "duracion_minima_observada_ms": 56.1,
+        "muestras": 2,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.1557,
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"disciplina_id\" bigint NULL CONSTRAINT \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" REFERENCES \"academia_disciplina\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_disciplina_id_d3d40743_fk_academia_\" IMMEDIATE",
+        "ultima_muestra_s": 1.2118
+      },
+      {
+        "duracion_maxima_estimada_ms": 100.0,
+        "duracion_minima_observada_ms": 0.0,
+        "muestras": 1,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.2664,
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"registrado_por_id\" integer NULL CONSTRAINT \"finanzas_payment_registrado_por_id_14e1aeb7_fk_auth_user_id\" REFERENCES \"auth_user\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_registrado_por_id_14e1aeb7_fk_auth_user_id\" IMMEDIATE",
+        "ultima_muestra_s": 1.2664
+      },
+      {
+        "duracion_maxima_estimada_ms": 156.1,
+        "duracion_minima_observada_ms": 56.1,
+        "muestras": 2,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.3214,
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"respaldo\" varchar(100) NULL",
+        "ultima_muestra_s": 1.3775
+      },
+      {
+        "duracion_maxima_estimada_ms": 265.7,
+        "duracion_minima_observada_ms": 165.7,
+        "muestras": 7,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.4339,
+        "sql": "ALTER TABLE \"finanzas_payment\" ADD COLUMN \"transaccion_id\" bigint NULL UNIQUE CONSTRAINT \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" REFERENCES \"finanzas_transaction\"(\"id\") DEFERRABLE INITIALLY DEFERRED; SET CONSTRAINTS \"finanzas_payment_transaccion_id_7a5b8c20_fk_finanzas_\" IMMEDIATE",
+        "ultima_muestra_s": 1.5996
+      },
+      {
+        "duracion_maxima_estimada_ms": 151.7,
+        "duracion_minima_observada_ms": 51.7,
+        "muestras": 3,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.6511,
+        "sql": "CREATE INDEX \"finanzas_payment_clave_idempotencia_eb77c6c8_like\" ON \"finanzas_payment\" (\"clave_idempotencia\" varchar_pattern_ops)",
+        "ultima_muestra_s": 1.7028
+      },
+      {
+        "duracion_maxima_estimada_ms": 151.5,
+        "duracion_minima_observada_ms": 51.5,
+        "muestras": 3,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.7543,
+        "sql": "CREATE INDEX \"finanzas_payment_disciplina_id_d3d40743\" ON \"finanzas_payment\" (\"disciplina_id\")",
+        "ultima_muestra_s": 1.8058
+      },
+      {
+        "duracion_maxima_estimada_ms": 152.2,
+        "duracion_minima_observada_ms": 52.2,
+        "muestras": 3,
+        "muestras_esperando_lock": 0,
+        "primera_muestra_s": 1.8577,
+        "sql": "CREATE INDEX \"finanzas_payment_registrado_por_id_14e1aeb7\" ON \"finanzas_payment\" (\"registrado_por_id\")",
+        "ultima_muestra_s": 1.9099
+      }
+    ],
+    "salida_manage_py": "Operations to perform:\n  Target specific migration: 0012_payment_clave_idempotencia_payment_disciplina_and_more, from finanzas\nRunning pre-migrate handlers for application admin\nRunning pre-migrate handlers for application auth\nRunning pre-migrate handlers for application contenttypes\nRunning pre-migrate handlers for application sites\nRunning pre-migrate handlers for application sessions\nRunning pre-migrate handlers for application authtoken\nRunning pre-migrate handlers for application allauth\nRunning pre-migrate handlers for application account\nRunning pre-migrate handlers for application socialaccount\nRunning pre-migrate handlers for application auditoria\nRunning pre-migrate handlers for application api\nRunning pre-migrate handlers for application asistencias\nRunning pre-migrate handlers for application personas\nRunning pre-migrate handlers for application finanzas\nRunning pre-migrate handlers for application monitor\nRunning migrations:\n  Applying finanzas.0012_payment_clave_idempotencia_payment_disciplina_and_more... OK (1.057s)\nRunning post-migrate handlers for application admin\nRunning post-migrate handlers for application auth\nRunning post-migrate handlers for application contenttypes\nRunning post-migrate handlers for application sites\nRunning post-migrate handlers for application sessions\nRunning post-migrate handlers for application authtoken\nRunning post-migrate handlers for application allauth\nRunning post-migrate handlers for application account\nRunning post-migrate handlers for application socialaccount\nRunning post-migrate handlers for application auditoria\nRunning post-migrate handlers for application api\nRunning post-migrate handlers for application asistencias\nRunning post-migrate handlers for application personas\nRunning post-migrate handlers for application finanzas\nRunning post-migrate handlers for application monitor\n",
+    "timeout_alcanzado": false
+  },
+  "migracion": "finanzas.0012_payment_clave_idempotencia_payment_disciplina_and_more",
+  "nombre_base_omitido_por_seguridad": true
+}

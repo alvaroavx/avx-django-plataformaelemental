@@ -32,7 +32,7 @@
 
     <div class="col-12 col-xl-8">
       {% if solicitud.estado == "PENDIENTE" %}
-        <form method="get" class="card card-body shadow-sm mb-4" aria-label="Buscar candidato para resolver">
+        <form method="get" action="{% url 'personas:solicitud_acceso_detail' solicitud.pk %}" class="card card-body shadow-sm mb-4" aria-label="Buscar candidato para resolver">
           <h2 class="h5">Buscar candidato</h2>
           <p class="small text-secondary">Busca antes de seleccionar. Se muestran como máximo diez resultados por búsqueda.</p>
           <div class="row g-3 align-items-end">
@@ -47,6 +47,7 @@
         <form method="post" action="{% url 'personas:solicitud_acceso_aprobar' solicitud.pk %}" class="card shadow-sm" data-procesar-form>
           {% csrf_token %}<div class="card-body">
             <h2 class="h5">Resolución</h2>
+            <p class="small text-secondary">Selecciona una sola estrategia: un User que ya tenga Persona, una Persona sin User para crearle su acceso, o una identidad completamente nueva.</p>
             {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
             <div class="row g-3">
               <div class="col-12 col-md-6"><label class="form-label" for="{{ form.tipo_resolucion.id_for_label }}">{{ form.tipo_resolucion.label }}</label>{{ form.tipo_resolucion }}{% if form.tipo_resolucion.errors %}<div class="invalid-feedback d-block">{{ form.tipo_resolucion.errors|join:', ' }}</div>{% endif %}</div>

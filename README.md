@@ -45,13 +45,21 @@ Reglas funcionales vigentes:
 - health/status/version
 - check minimo de usuario autenticado
 
+### `auditoria`
+- trazabilidad parcial de mutaciones sensibles
+- revisión de solo lectura desde Django Admin
+
+### `monitor`
+- instalado por compatibilidad histórica
+- archivado, sin rutas ni navegación activas
+
 ## Arquitectura
 
 ### Stack
 - Django 5
 - Django REST Framework
 - PostgreSQL activo en `dev` y `prod`
-- SQLite queda comentado como fallback local/manual en configuración
+- PostgreSQL es el único motor configurado; SQLite no es un fallback soportado
 - Bootstrap 5
 - DataTables
 - Tom Select
@@ -112,6 +120,9 @@ python -m pip install -r requirements.txt
 
 ### Aplicar migraciones
 ```bash
+set -a
+source .env.dev
+set +a
 python manage.py migrate
 ```
 
@@ -224,9 +235,8 @@ Eso genera:
 
 Instalacion:
 1. Copia la publica al servidor, al `authorized_keys` del usuario definido en `DEPLOY_USER`.
-2. Copia la privada completa al secret `DEPLOY_SSH_KEY` en GitHub Actions.
-3. Crea tambien el secret `DEPLOY_SSH_KEY_B64` con la misma clave codificada en Base64.
-4. Prueba localmente antes del workflow:
+2. Crea el secret `DEPLOY_SSH_KEY_B64` con la clave privada codificada en Base64.
+3. Prueba localmente antes del workflow:
 
 ```bash
 ssh -i ~/.ssh/plataforma_elemental_deploy -o IdentitiesOnly=yes -p 22 USUARIO@HOST
@@ -256,8 +266,11 @@ python manage.py test api.tests
 ```
 
 Última validación conocida:
-- `python manage.py test asistencias.tests personas.tests finanzas.tests api.tests`
-- resultado: `99 tests OK`
+- inventario actual: 396 métodos `test_*`
+- estado y evidencia: [docs/ESTADO_ACTUAL.md](docs/ESTADO_ACTUAL.md)
+
+La validación de cierre debe usar `python manage.py test`; una lista manual de
+apps puede omitir pruebas transversales, auditoría o módulos nuevos.
 
 ## Documentación
 

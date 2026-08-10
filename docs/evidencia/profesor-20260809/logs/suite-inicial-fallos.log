@@ -1,0 +1,18 @@
+Ejecución inicial de regresión antes de las correcciones finales.
+
+Found 404 test(s).
+Ran 404 tests in 527.101s
+FAILED (failures=2, errors=1, skipped=12)
+
+Regresiones detectadas:
+
+1. finanzas.tests.FinanzasAccessTests.test_pago_edit_post_valido_redirige_sin_editar_pago
+   PostgreSQL rechazó SELECT FOR UPDATE sobre el lado anulable de un OUTER JOIN.
+2. asistencias.tests.SprintCincoAislamientoAsistenciasTests.test_busqueda_usa_relacion_vigente_de_persona_compartida_con_organizacion
+   El fixture no incluía la nueva matrícula explícita AlumnoDisciplina.
+3. plataformaelemental.tests.ElementalAppsUXTests.test_dashboard_general_profesor_no_ve_finanzas
+   El contrato esperado seguía siendo HTTP 200 y el nuevo tablero redirige a /profesor/.
+
+Esta evidencia describe el hallazgo intermedio, no el estado final. Las tres
+regresiones se corrigieron y la ejecución conservada en suite-completa-ok.log
+terminó con 404 tests aprobados y 12 omitidos.
