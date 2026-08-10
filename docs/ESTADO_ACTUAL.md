@@ -1,8 +1,10 @@
 # Estado actual de Plataforma Elemental
 
 Fecha de corte: 2026-08-10
-Código base auditado: `origin/main` en `d4a4e48`; este corte incorpora el commit
-local no publicado `94b5299` y el endurecimiento de migraciones posterior.
+Código base auditado: `origin/main` en `d4a4e48`; la funcionalidad está cerrada
+en `c47ce8225b3221b28a00baf9a4d2909e154c3b30` y el empaquetado operativo vive
+en el segundo commit identificado por el tag
+`release/operacion-profesor-20260810.1`. Nada fue publicado ni desplegado.
 
 ## Cómo leer este documento
 
@@ -201,9 +203,13 @@ explícitamente PostgreSQL ni dependencias externas.
 
 ### Operación y despliegue
 
-- Un push a `main` dispara deploy automático tras tests, sin environment protegido
-  o aprobación manual visible en el workflow.
-- El servidor ejecuta `git reset --hard origin/main`; cualquier cambio manual local se pierde.
+- El patch de transición separa CI y producción: un push a `main` ejecuta pruebas
+  sin desplegar; producción requiere `workflow_dispatch`, confirmación literal y
+  el environment protegido `production`.
+- El checkout productivo se rechaza si está sucio y cambia en modo detached al
+  SHA exacto probado; ya no se fuerza a `origin/main`.
+- La protección efectiva exige configurar revisores obligatorios en el
+  environment de GitHub; el YAML no puede crear esa regla administrativa.
 - El job de PR usa Python 3.12 y el previo al deploy Python 3.13; producción no está fijada por el repo.
 - Un `DJANGO_ENV` desconocido cae silenciosamente en `dev`.
 - `DJANGO_SECRET_KEY` tiene fallback inseguro en settings base; `check --deploy`

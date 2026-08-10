@@ -146,6 +146,28 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
   parametrizados y eliminarlos tras aprobar la evidencia conforme al runbook;
   no copiar dumps como fixtures.
 
+### Release manual de Operación Profesor
+
+- `scripts/release_operacion_profesor.sh`: coordinador por etapas para el tag
+  inmutable `release/operacion-profesor-20260810.1`. Verifica que el tag apunte
+  exactamente a `HEAD`, que el padre sea el commit funcional y que el worktree
+  esté limpio; instala dependencias sin migrar, guarda cada
+  `showmigrations --plan`, aplica
+  solo `asistencias.0004`, genera el reporte, y aplica `finanzas.0012` únicamente
+  después de gates de reporte y activación administrativa.
+- El script no crea backups, no activa relaciones, no inicia servicios y no
+  ejecuta `migrate` completo. Esas decisiones permanecen visibles en
+  `docs/operacion/MIGRACIONES_OPERACION_PROFESOR.md`.
+- Vive y se ejecuta dentro del checkout versionado del tag; no admite una ruta de
+  aplicación externa ni depende de archivos copiados manualmente. Los reportes
+  nominales deben ir a `RELEASE_OPS_DIR` protegido, nunca al repositorio.
+- No generalizar este script a releases futuros cambiando silenciosamente el
+  hash: crear una variante o convertirlo en herramienta genérica solo después de
+  definir un manifiesto versionado de etapas y gates equivalentes.
+- `docs/evidencia/release-manual-operacion-profesor-20260810/RESULTADOS.md`:
+  evidencia sanitizada de sintaxis Bash/YAML, gates estructurales, documentación,
+  lint y check local. No contiene secretos, datos de producción ni dumps.
+
 ### Poblador mensual operativo
 
 - `asistencias/management/commands/poblar_mes_pruebas.py`: genera un mes

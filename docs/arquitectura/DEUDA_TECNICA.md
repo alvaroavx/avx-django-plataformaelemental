@@ -85,12 +85,15 @@ productivos antes de construir la aplicación.
 
 ### CI y deploy acoplados
 
-Estado: activa controlada.
+Estado: parcialmente resuelta.
 
-Push a `main` despliega tras tests sin environment protegido visible. El clon
-remoto se fuerza a `origin/main` y el healthcheck es solo HTTP superficial.
+El patch de transición deja los pushes a `main` solo con pruebas y exige
+`workflow_dispatch`, confirmación literal y environment `production` para
+desplegar un tag/hash explícito. El clon remoto rechaza cambios locales y usa el
+SHA probado en modo detached. Sigue pendiente configurar revisores obligatorios
+en GitHub y reemplazar el healthcheck HTTP superficial por uno más profundo.
 
-Acción: decidir aprobación/ambiente y healthcheck profundo según riesgo operativo.
+Acción: verificar la política real del environment y diseñar healthcheck profundo.
 
 ### Observabilidad y auditoría incompletas
 

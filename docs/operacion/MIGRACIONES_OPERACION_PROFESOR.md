@@ -29,9 +29,17 @@ se debe marcar la migración como aplicada de nuevo ni añadir columnas a mano.
 ## Runbook manual de producción para el piloto
 
 Este procedimiento reemplaza `scripts/deploy.sh` para esta versión. No hacer
-push directo a `main`: el workflow vigente despliega automáticamente. Publicar
-el commit en una rama o tag no asociado a `main`, y desplegar el hash exacto
-durante la ventana.
+push a `main` ni invocar el workflow de deploy durante la ventana. El único
+artefacto desplegable es el tag anotado e inmutable
+`release/operacion-profesor-20260810.1`; su SHA es el commit al que resuelve
+`refs/tags/release/operacion-profesor-20260810.1^{commit}` y se entrega junto con
+este runbook. El commit funcional
+`c47ce8225b3221b28a00baf9a4d2909e154c3b30` es solamente el padre del release,
+no el hash que se debe desplegar.
+
+El script manual vive dentro de ese checkout y verifica que el tag apunte
+exactamente a `HEAD`, que el worktree esté limpio y que su padre sea el commit
+funcional anterior. No depende de copias externas ni de cambios sin versionar.
 
 ### 0. Variables de la sesión operativa
 
@@ -45,7 +53,7 @@ export APP_DIR=/ruta/absoluta/del/checkout-productivo
 export VENV_DIR=/ruta/absoluta/del/venv-productivo
 export DEPLOY_ENV_FILE=/ruta/absoluta/del/environment-file-productivo
 export SERVICE_UNIT=plataforma-elemental.service
-export RELEASE_COMMIT=<HASH_EXACTO_DE_ESTA_ENTREGA>
+export RELEASE_TAG=release/operacion-profesor-20260810.1
 export BACKUP_DIR=/montaje-externo-seguro/elemental
 export OPS_DIR=/ruta-protegida/actas/operacion-profesor
 
@@ -61,6 +69,7 @@ set -a
 source "$DEPLOY_ENV_FILE"
 set +a
 export PGPASSWORD="$POSTGRES_PASSWORD"
+export PGOPTIONS="-c lock_timeout=5s -c statement_timeout=15min"
 ```
 
 `BACKUP_DIR` debe estar fuera de `APP_DIR`, idealmente en almacenamiento montado
@@ -77,11 +86,17 @@ export PROD_PREV_COMMIT="$(git rev-parse HEAD)"
 git show --no-patch --format='%H %cI %s' "$PROD_PREV_COMMIT" \
   | tee "$OPS_DIR/produccion-antes.txt"
 
-git fetch --prune origin
-git cat-file -e "${RELEASE_COMMIT}^{commit}"
+git fetch --prune --tags origin
+test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = "tag"
+export RELEASE_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+test "$RELEASE_COMMIT" != "$PROD_PREV_COMMIT"
+test "$(git rev-parse "${RELEASE_COMMIT}^")" = \
+  "c47ce8225b3221b28a00baf9a4d2909e154c3b30"
 git show --no-patch --format='%H %cI %s' "$RELEASE_COMMIT" \
   | tee "$OPS_DIR/release-objetivo.txt"
-test "$PROD_PREV_COMMIT" != "$RELEASE_COMMIT"
+git for-each-ref "refs/tags/$RELEASE_TAG" \
+  --format='%(refname) %(objecttype) %(objectname) %(*objectname)' \
+  | tee "$OPS_DIR/release-tag.txt"
 
 sudo systemctl show "$SERVICE_UNIT" --property=ActiveState,MainPID,FragmentPath \
   | tee "$OPS_DIR/systemd-antes.txt"
@@ -91,8 +106,9 @@ readlink -f "/proc/$main_pid/cwd" | tee "$OPS_DIR/proceso-cwd-antes.txt"
 test "$(readlink -f "/proc/$main_pid/cwd")" = "$(readlink -f "$APP_DIR")"
 ```
 
-`PROD_PREV_COMMIT`, no `origin/main`, es el hash productivo real y será el
-objetivo del rollback de aplicación. Un checkout sucio obliga a abortar.
+`PROD_PREV_COMMIT`, no `origin/main`, es el hash productivo real que debe quedar
+registrado antes del cambio. Un checkout sucio, un tag liviano, un padre distinto
+o una discrepancia entre el SHA entregado y `RELEASE_COMMIT` obliga a abortar.
 
 ### 2. Preflight PostgreSQL de solo lectura
 
@@ -169,8 +185,8 @@ reportadas y espacio externo mayor al tamaño actual de la base.
 
 Abortar sin tocar esquema si ocurre cualquiera:
 
-- no se pudo registrar `PROD_PREV_COMMIT`, el checkout está sucio o el release
-  descargado no coincide con `RELEASE_COMMIT`;
+- no se pudo registrar `PROD_PREV_COMMIT`, el checkout está sucio o el tag no es
+  anotado/no coincide con el SHA final entregado;
 - PostgreSQL servidor no es 16.x, salvo aprobación explícita de infraestructura;
 - `asistencias.0003` o `finanzas.0011` no están aplicadas, o `0004` / `0012` ya
   figuran aplicadas;
@@ -236,73 +252,62 @@ como restauración probada.
 
 ```bash
 cd "$APP_DIR"
-git reset --hard "$RELEASE_COMMIT"
+git checkout --detach "$RELEASE_COMMIT"
 test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
 test -z "$(git status --porcelain)"
 
-source "$VENV_DIR/bin/activate"
-python -m pip install --requirement requirements.txt
-python manage.py check --deploy
-python manage.py migrate --plan | tee "$OPS_DIR/migrate-plan.txt"
+export DEPLOY_VENV_DIR="$VENV_DIR"
+export RELEASE_OPS_DIR="$OPS_DIR"
+export DEPLOY_SERVICE="$SERVICE_UNIT"
+
+bash scripts/release_operacion_profesor.sh verify-release
+bash scripts/release_operacion_profesor.sh install
+bash scripts/release_operacion_profesor.sh plan-before
 ```
 
 Esta entrega no cambia `requirements.txt`. Si `git diff "$PROD_PREV_COMMIT"
 "$RELEASE_COMMIT" -- requirements.txt` muestra cambios, abortar y preparar un
 virtualenv versionado antes de continuar.
 
-### 7. Migraciones, medición y reporte real
+`plan-before` ejecuta `showmigrations --plan`, falla si hay pendientes distintos
+de `asistencias.0004` y `finanzas.0012`, y guarda la evidencia. Instalar
+dependencias no ejecuta migraciones.
+
+### 7. `asistencias.0004`, medición y reporte real
 
 Aplicar cada migración por separado, con espera de lock acotada:
 
 ```bash
-PGOPTIONS='-c lock_timeout=5s -c statement_timeout=15min' \
-  /usr/bin/time -p python manage.py migrate asistencias 0004 --noinput \
-  2>&1 | tee "$OPS_DIR/migrate-asistencias-0004.txt"
-
-python manage.py reportar_relaciones_historicas \
-  --fecha-corte "$(date +%F)" --dias-vigencia-alumno 90 \
-  --formato=json --fallar-si-inseguro \
-  > "$OPS_DIR/relaciones-sanitizado.json"
-python manage.py reportar_relaciones_historicas \
-  --fecha-corte "$(date +%F)" --dias-vigencia-alumno 90 \
-  --formato=json --fallar-si-inseguro --incluir-detalle-operativo \
-  > "$OPS_DIR/relaciones-protegido.json"
-
-PGOPTIONS='-c lock_timeout=5s -c statement_timeout=15min' \
-  /usr/bin/time -p python manage.py migrate finanzas 0012 --noinput \
-  2>&1 | tee "$OPS_DIR/migrate-finanzas-0012.txt"
-
-python manage.py migrate --check
-python manage.py showmigrations asistencias finanzas \
-  | tee "$OPS_DIR/migraciones-despues.txt"
-python manage.py collectstatic --noinput
-python manage.py check --deploy
+bash scripts/release_operacion_profesor.sh migrate-asistencias
+bash scripts/release_operacion_profesor.sh report
 ```
 
-Un timeout, lock no obtenido, error de reporte, índice/constraint inválido o
-migración adicional pendiente mantiene el servicio detenido.
+El script vuelve a ejecutar `showmigrations --plan` antes y después de `0004`.
+Después de esta etapa debe quedar pendiente únicamente `finanzas.0012`; de lo
+contrario aborta y mantiene el servicio detenido. Un timeout, lock no obtenido,
+error de reporte o migración adicional pendiente tiene el mismo efecto.
 
 ### 8. Activación administrativa durante mantenimiento
 
-Revisar `relaciones-protegido.json` contra programación/contratos actuales. Una
+Revisar el último `relaciones-*-protegido.json` contra programación/contratos actuales. Una
 sesión futura identifica un profesor a revisar; una asistencia reciente no basta
 para declarar vigente a un alumno.
 
 Previsualizar y luego confirmar por IDs revisados:
 
 ```bash
-python manage.py activar_relaciones_operativas \
+"$VENV_DIR/bin/python" manage.py activar_relaciones_operativas \
   --tipo profesor --ids <ID_1> <ID_2> \
   --actor-username <USUARIO_ADMIN>
-python manage.py activar_relaciones_operativas \
+"$VENV_DIR/bin/python" manage.py activar_relaciones_operativas \
   --tipo profesor --ids <ID_1> <ID_2> \
   --actor-username <USUARIO_ADMIN> \
   --confirmar ACTIVAR_RELACIONES_REVISADAS
 
-python manage.py activar_relaciones_operativas \
+"$VENV_DIR/bin/python" manage.py activar_relaciones_operativas \
   --tipo alumno --ids <ID_1> <ID_2> \
   --actor-username <USUARIO_ADMIN>
-python manage.py activar_relaciones_operativas \
+"$VENV_DIR/bin/python" manage.py activar_relaciones_operativas \
   --tipo alumno --ids <ID_1> <ID_2> \
   --actor-username <USUARIO_ADMIN> \
   --confirmar ACTIVAR_RELACIONES_REVISADAS
@@ -313,13 +318,37 @@ relación. También existe la acción equivalente en Django Admin. Repetir el
 reporte y no abrir mientras quede una asignación futura confirmada pendiente de
 activación o decisión explícita.
 
-### 9. Verificación post-despliegue y arranque
+Guardar una segunda versión del reporte después de las activaciones:
 
 ```bash
-python manage.py reportar_relaciones_historicas \
-  --fecha-corte "$(date +%F)" --formato=json --fallar-si-inseguro \
-  > "$OPS_DIR/relaciones-final.json"
+export RELEASE_ACTIVATION_ACTOR=<USUARIO_ADMIN>
+export RELEASE_CONFIRM_ACTIVACIONES=RELACIONES_VIGENTES_REVISADAS
+bash scripts/release_operacion_profesor.sh confirm-activations
+unset RELEASE_CONFIRM_ACTIVACIONES
+```
 
+`confirm-activations` vuelve a generar el reporte y deja un gate asociado al SHA
+del release y al actor. `migrate-finanzas` rechaza avanzar si faltan el reporte o
+esta confirmación. La auditoría de datos permanece en los servicios de activación;
+el archivo de gate es evidencia operativa, no reemplaza esa auditoría.
+
+### 9. `finanzas.0012`, verificación post-despliegue y arranque
+
+Solo después de firmar la revisión administrativa:
+
+```bash
+export RELEASE_CONFIRM_FINANZAS=APLICAR_FINANZAS_0012
+bash scripts/release_operacion_profesor.sh migrate-finanzas
+unset RELEASE_CONFIRM_FINANZAS
+bash scripts/release_operacion_profesor.sh finalize
+```
+
+`migrate-finanzas` guarda un `showmigrations --plan` inmediatamente antes y
+después, exige que `0012` sea el único pendiente y no declara éxito si queda
+alguna migración. `finalize` tampoco ejecuta `migrate`; solo comprueba, recopila
+estáticos y ejecuta el gate de Django.
+
+```bash
 PGPASSWORD="$POSTGRES_PASSWORD" psql \
   --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" \
   --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
@@ -375,38 +404,47 @@ Retirar mantenimiento solo si el smoke y los queries son correctos.
 
 ### 11. Rollback de aplicación
 
-El rollback normal vuelve código y estáticos al hash registrado; **no revierte
-migraciones ni backfills automáticamente**. Las tablas nuevas y columnas
-nullable son compatibles con el código anterior y conservan datos.
+**`d4a4e482c67a115562918bcc2f3f71e6cdb2b0c9` (`d4a4e48`) no se declara
+compatible con una base que ya recibió estas
+migraciones y operaciones.** Aunque PostgreSQL tolere físicamente tablas y
+columnas extra nullable, ese código desconoce el estado de sesión `abierta`, las
+relaciones operativas auditadas y los vínculos financieros nuevos. Arrancarlo
+después de `0004`, activaciones o escrituras de esta versión puede ocultar o
+interpretar incorrectamente datos.
+
+Antes de ejecutar `asistencias.0004`, si solo falló checkout/dependencias, se
+puede volver de forma manual al hash real registrado:
 
 ```bash
 sudo systemctl stop "$SERVICE_UNIT"
 cd "$APP_DIR"
-git reset --hard "$PROD_PREV_COMMIT"
+git checkout --detach "$PROD_PREV_COMMIT"
 test "$(git rev-parse HEAD)" = "$PROD_PREV_COMMIT"
 source "$VENV_DIR/bin/activate"
 python -m pip install --requirement requirements.txt
 python manage.py collectstatic --noinput
 python manage.py check --deploy
 sudo systemctl start "$SERVICE_UNIT"
-sudo systemctl is-active --quiet "$SERVICE_UNIT"
 ```
 
-No ejecutar `migrate asistencias 0003`, no revertir `finanzas.0012` y no usar
-`scripts/deploy.sh` como rollback: la reversa de `0004` elimina tablas y puede
-destruir asignaciones, matrículas y liberaciones creadas desde el despliegue.
+Desde que `0004` se aplica, no iniciar `d4a4e48`: mantener mantenimiento y
+resolver con una corrección forward compatible. No ejecutar `migrate` hacia una
+migración anterior, no usar `scripts/deploy.sh` como rollback y no restaurar
+PostgreSQL automáticamente.
 
-Solo si el servicio nunca se reabrió y no hubo escrituras posteriores, una falla
-de datos puede resolverse restaurando el dump en una base nueva, verificándola y
-cambiando el puntero de la aplicación. Con tráfico posterior, conservar ambos
-estados y preparar una corrección forward o recuperación selectiva revisada.
+La restauración del dump es excepcional: únicamente con aprobación de la persona
+dueña de los datos, restaurar en una base nueva aislada, verificar conteos e
+invariantes y cambiar el puntero de la aplicación de forma controlada. Restaurar
+el dump descarta toda escritura posterior al instante del `pg_dump`; si el sitio
+se reabrió, esa pérdida potencial debe medirse y aceptarse expresamente o se debe
+preferir recuperación selectiva/corrección forward.
 
 ### 12. Checklist breve
 
 Antes:
 
 - [ ] Ventana, responsables y comando de mantenimiento confirmados.
-- [ ] `RELEASE_COMMIT` y `PROD_PREV_COMMIT` registrados y distintos.
+- [ ] Tag anotado, `RELEASE_COMMIT` exacto y `PROD_PREV_COMMIT` real registrados.
 - [ ] Preflight sin locks/transacciones largas y con espacio suficiente.
 - [ ] Destino externo de backup montado; criterios de aborto aceptados.
 - [ ] Cuenta Google solo PROFESOR y relaciones vigentes identificadas.
@@ -415,7 +453,7 @@ Durante:
 
 - [ ] Mantenimiento activo y escrituras detenidas.
 - [ ] `pg_dump`, catálogo, checksum y, si es posible, restore aprobados.
-- [ ] Código exacto, dependencias y plan de migraciones revisados.
+- [ ] Código exacto, dependencias y cada `showmigrations --plan` revisados.
 - [ ] `0004`, reporte real, activaciones revisadas y `0012` completados.
 - [ ] Tiempos, errores y decisiones guardados en `OPS_DIR` protegido.
 
@@ -425,7 +463,8 @@ Después:
 - [ ] Servicio activo, logs limpios y healthcheck interno correcto.
 - [ ] Smoke solo PROFESOR e aislamiento por URL directa aprobados.
 - [ ] Mantenimiento retirado, monitoreo reforzado y backup bajo retención.
-- [ ] Si se abortó: código en `PROD_PREV_COMMIT`, sin reversa automática de datos.
+- [ ] Si se abortó tras `0004`: mantenimiento activo y corrección forward; no se
+      arrancó `d4a4e48` ni se revirtieron datos automáticamente.
 
 ## Semántica de relaciones históricas
 
