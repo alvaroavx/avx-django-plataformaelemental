@@ -1,0 +1,12 @@
+{
+  "sesiones_total": 14,
+  "sesiones": {
+    "Lyra": {"completada": 1, "abierta": 1, "programada": 3},
+    "LatinRengo": {"completada": 1, "programada": 4},
+    "Tela Aérea": {"abierta": 1, "programada": 3}
+  },
+  "asistencias_total": 25,
+  "asistencias": {"presente": 19, "ausente": 2, "justificada": 4},
+  "consumos_financieros": {"deuda": 25},
+  "matriculas_tela_aerea": 12
+}

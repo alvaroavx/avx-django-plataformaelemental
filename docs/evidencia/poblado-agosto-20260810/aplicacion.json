@@ -1,0 +1,14 @@
+{
+  "modo": "aplicar",
+  "periodo": "2026-08",
+  "sesiones_previstas": 14,
+  "asistencias_previstas": 25,
+  "sesiones_creadas": 14,
+  "sesiones_actualizadas": 0,
+  "sesiones_omitidas_por_conflicto": 0,
+  "asistencias_creadas": 25,
+  "asistencias_actualizadas": 0,
+  "matriculas_creadas": 12,
+  "bloques_creados": 1,
+  "sesion_ids": [158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171]
+}

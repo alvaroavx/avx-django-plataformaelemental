@@ -1,12 +1,20 @@
 # Deploy
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-08-10
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
-- GitHub Actions ejecuta tests
-- si el push entra a `main`, despliega por SSH al servidor
-- el servidor actualiza codigo, instala dependencias, migra, recopila estaticos y reinicia `systemd`
+- todo push a `main` ejecuta lint y tests, pero no despliega;
+- producción solo se ejecuta por `workflow_dispatch`, con tag/hash explícito,
+  confirmación literal y aprobación del environment `production`;
+- el servidor verifica un checkout limpio y cambia al hash probado en modo
+  detached, sin `git reset --hard origin/main`;
+- el deploy genérico instala dependencias, respalda en almacenamiento externo,
+  migra, recopila estáticos y reinicia `systemd`.
+
+La liberación Operación Profesor es una excepción deliberada: no usa el deploy
+genérico porque requiere detenerse entre dos migraciones. Su procedimiento exacto
+está en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 ## Estrategia elegida
 - No se usa Docker, Compose ni self-hosted runner.
@@ -20,6 +28,7 @@ Este documento describe el CI/CD minimo del proyecto:
 ## Archivos creados
 - `.github/workflows/deploy.yml`
 - `scripts/deploy.sh`
+- `scripts/release_operacion_profesor.sh`
 - `deploy/systemd/plataforma-elemental.service.example`
 
 ## Secrets de GitHub Actions
@@ -42,6 +51,9 @@ Este documento describe el CI/CD minimo del proyecto:
   - ruta absoluta del archivo de entorno productivo del servidor, por ejemplo `/srv/elementos/.env.prod`
   - `scripts/deploy.sh` falla si esta variable viene vacia o si el archivo no existe
   - es una ruta, no el contenido del archivo; GitHub Actions la pasa por SSH y el servidor carga el archivo local
+- `DEPLOY_BACKUP_DIR`
+  - directorio absoluto, existente, escribible y externo al checkout;
+  - debe residir en almacenamiento seguro con retención operativa definida.
 
 ## Archivo de entorno productivo
 
@@ -183,60 +195,71 @@ Nota operativa:
    - copiarlo a `/etc/systemd/system/plataforma-elemental.service`
    - `sudo systemctl daemon-reload`
    - `sudo systemctl enable plataforma-elemental`
-7. Ejecutar una primera vez:
-   - `cd /srv/plataformaelemental`
-   - `bash scripts/deploy.sh`
+7. Configurar el environment protegido `production`, con revisores obligatorios,
+   y ejecutar el primer release mediante `workflow_dispatch`.
 
 ## Flujo del workflow
+
+> Excepción Operación Profesor 2026-08-10: no usar este flujo para el tag
+> `release/operacion-profesor-20260810.1`. Ese release requiere el
+> [runbook manual](MIGRACIONES_OPERACION_PROFESOR.md#runbook-manual-de-producción-para-el-piloto).
+> El cambio de workflow forma parte del segundo commit, separado del cambio
+> funcional, y gobierna releases futuros. El checkout actual contiene
+> `MANUAL_RELEASE_ONLY=1`, por lo
+> que el propio workflow rechaza desplegarlo con el camino de migración completa.
+
 Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh`.
 
 ```mermaid
 flowchart TD
-    A["Push a main"] --> B["GitHub Actions"]
-    B --> C["Instalar dependencias Python"]
+    A["Push a main o dispatch"] --> B["GitHub Actions"]
+    B --> C["Checkout del SHA o ref explícito"]
     C --> D["Instalar dependencias dev"]
     D --> E["ruff check ."]
     E --> F["Tests Django"]
-    F --> G["Validar secrets"]
-    G --> H["Preparar llave SSH y known_hosts"]
-    H --> I["SSH al servidor"]
-    I --> J["git fetch"]
-    J --> K["git reset --hard origin/main"]
-    K --> L["scripts/deploy.sh"]
-    L --> M["Cargar DEPLOY_ENV_FILE"]
-    M --> N["Crear o usar virtualenv"]
+    F --> G{"workflow_dispatch y confirmación literal"}
+    G -- "No: push main" --> X["Fin: pruebas, sin deploy"]
+    G -- "Sí" --> Y["Aprobación environment production"]
+    Y --> H["Validar secrets"]
+    H --> I["Preparar llave SSH y known_hosts"]
+    I --> J["SSH al servidor"]
+    J --> K["Verificar worktree y registrar hash previo"]
+    K --> L["Checkout detached del SHA probado"]
+    L --> M["scripts/deploy.sh"]
+    M --> N["Validar hash, entorno y backup externo"]
     N --> O["Instalar requirements"]
-    O --> P{"DJANGO_ENV=prod?"}
-    P -- "Si" --> Q["Backup PostgreSQL con pg_dump"]
-    P -- "No" --> R["Omitir backup prod"]
-    Q --> S["migrate --noinput"]
-    R --> S
-    S --> T["clearsessions"]
-    T --> U["collectstatic"]
-    U --> V["check --deploy"]
-    V --> W["Restart systemd"]
+    O --> P["Backup PostgreSQL con pg_dump"]
+    P --> Q["migrate --noinput"]
+    Q --> R["clearsessions y collectstatic"]
+    R --> S["check --deploy y restart systemd"]
 ```
 
-1. `actions/checkout`
-2. instalar dependencias Python
-3. instalar dependencias de desarrollo para lint
-4. correr `ruff check .`
-5. correr `python manage.py test`
-6. validar secrets obligatorios
-7. escribir la llave privada en `~/.ssh/deploy_key`
-8. validar que la llave sea una privada SSH correcta y sin passphrase interactiva
-9. poblar `known_hosts` con `ssh-keyscan`
-10. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`
-11. `git fetch`
-12. `git reset --hard origin/main`
-13. ejecutar `bash scripts/deploy.sh`
+1. `actions/checkout` del SHA del push o del tag/hash del dispatch;
+2. en dispatch, comprobar que el propio release contiene el protocolo endurecido
+   de `scripts/deploy.sh`, y rechazar cualquier checkout marcado
+   `MANUAL_RELEASE_ONLY=1`; esto impide usar el flujo genérico con releases
+   anteriores o con esta migración escalonada;
+3. instalar dependencias Python;
+4. instalar dependencias de desarrollo para lint;
+5. correr `ruff check .`;
+6. correr `python manage.py test`;
+7. en push a `main`, terminar sin deploy;
+8. en dispatch, exigir `DESPLEGAR_PRODUCCION` y aprobación del environment;
+9. validar secrets obligatorios;
+10. escribir la llave privada en `~/.ssh/deploy_key`;
+11. validar que sea una privada SSH correcta y poblar `known_hosts`;
+12. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`;
+13. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
+14. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
+15. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
+    explícita de migración completa.
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
 - El job `test` levanta un service container `postgres:16`.
 - El workflow define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=postgres`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
 - Las credenciales de CI no son credenciales productivas; existen solo dentro del runner.
-- SQLite queda comentado solo como fallback local/manual, no como base activa del pipeline.
+- SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
 - `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
 
 ## SSH En CI
@@ -248,12 +271,18 @@ flowchart TD
 
 ## Que hace `scripts/deploy.sh`
 - exige `DEPLOY_ENV_FILE`
+- exige `DEPLOY_EXPECTED_COMMIT`, `DEPLOY_PREVIOUS_COMMIT`, un worktree limpio y
+  que `HEAD` coincida exactamente con el SHA probado;
+- exige `DEPLOY_BACKUP_DIR` fuera del checkout;
+- exige `DEPLOY_ALLOW_FULL_MIGRATE=FULL_MIGRATE_APPROVED`; por eso no sirve para
+  la liberación escalonada de Operación Profesor;
 - carga variables desde `DEPLOY_ENV_FILE`
 - valida `DJANGO_ENV=prod`
 - valida que PostgreSQL apunte a la base productiva esperada antes de migrar
 - crea virtualenv si no existe
 - instala dependencias
-- si `DJANGO_ENV=prod`, ejecuta backup PostgreSQL previo a migraciones usando `pg_dump`
+- ejecuta backup PostgreSQL previo a migraciones usando `pg_dump` en el destino
+  externo configurado;
 - ejecuta `python manage.py migrate --noinput`
 - ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
@@ -267,7 +296,8 @@ Checklist operativo para validar el deploy que incluye `Organizacion.logo`:
 
 1. Confirmar que `Pillow` esta en `requirements.txt`.
 2. Confirmar que el workflow remoto ejecuta `pip install -r requirements.txt` mediante `scripts/deploy.sh`.
-3. Ejecutar deploy normal por push a `main` o `workflow_dispatch`.
+3. Ejecutar deploy por `workflow_dispatch`, indicando tag/hash y obteniendo la
+   aprobación del environment `production`.
 4. Verificar que la migracion `personas.0005_organizacion_logo` se aplica durante `python manage.py migrate --noinput`.
 5. Confirmar que `python manage.py check --deploy` corre en el script.
 6. Confirmar que `python manage.py collectstatic --noinput` corre en el script.
@@ -345,53 +375,47 @@ Validaciones:
 La configuración efectiva de Nginx debe comprobarse en el servidor durante el Gate 3. No se puede declarar seguro el despliegue únicamente porque las vistas Django estén protegidas.
 
 ## Backup PostgreSQL Previo A Migraciones
-- Solo corre cuando `DJANGO_ENV=prod`.
+- El script genérico exige `DJANGO_ENV=prod`.
 - Usa `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT` cargadas desde `DEPLOY_ENV_FILE` o desde el entorno del proceso.
-- Guarda los archivos en `$APP_DIR/backups/postgres`.
+- Guarda los archivos en `DEPLOY_BACKUP_DIR`, que debe ser absoluto, escribible y
+  estar fuera del checkout.
 - El nombre del archivo incluye base de datos, timestamp y commit corto, por ejemplo `plataforma_elemental_20260508_153000_abc1234.dump`.
 - El formato es `custom` de `pg_dump`, pensado para restaurar con `pg_restore`.
 - Si `pg_dump` falla, el deploy aborta antes de ejecutar migraciones.
 - El script no imprime la password; la entrega a `pg_dump` mediante `PGPASSWORD`.
 
-## Rollback simple
-Este flujo muestra el rollback manual simple documentado. Asume acceso SSH al servidor y un commit conocido.
+## Rollback
 
-```mermaid
-flowchart TD
-    A["Entrar al servidor"] --> B["cd DEPLOY_PATH"]
-    B --> C["git fetch --prune origin"]
-    C --> D["git reset --hard commit_sha"]
-    D --> E["bash scripts/deploy.sh"]
-    E --> F["Backup si DJANGO_ENV=prod"]
-    F --> G["Migraciones y collectstatic"]
-    G --> H["Restart systemd"]
-```
+No existe un rollback genérico seguro después de migraciones de datos. Antes de
+cada release se registra el `HEAD` productivo real, no `origin/main`. El runbook
+de cada release debe declarar si ese código anterior entiende el esquema y los
+estados que puede escribir la versión nueva.
 
-En el servidor:
-
-```bash
-cd /srv/plataformaelemental
-git fetch --prune origin
-git reset --hard <commit_sha>
-bash scripts/deploy.sh
-```
-
-Si quieres volver al ultimo `main`:
-
-```bash
-cd /srv/plataformaelemental
-git reset --hard origin/main
-bash scripts/deploy.sh
-```
+Nunca se ejecutan automáticamente migraciones hacia atrás ni una restauración de
+PostgreSQL. Si el código anterior no es compatible, se mantiene mantenimiento y
+se prepara una corrección forward. Restaurar un dump es un procedimiento
+excepcional y puede perder todas las escrituras posteriores al momento del dump.
+Para Operación Profesor, `d4a4e48` **no** se declara compatible después de
+aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específico.
 
 ## Riesgos detectados en el proyecto
 - `package.json` y `node_modules/` existen en el repo, pero no forman parte del stack real de deploy.
 - `gunicorn` no estaba declarado como dependencia de produccion; se agrego a `requirements.txt`.
 - No hay hasta ahora configuracion de `systemd`, `nginx` o proceso WSGI versionada; por eso se agrega el unit file ejemplo.
-- El deploy usa `git reset --hard origin/main`; eso es correcto para un clon de despliegue, pero cualquier cambio manual hecho en el servidor se perdera.
+- El workflow aborta ante cambios locales y usa checkout detached del SHA exacto;
+  un worktree productivo sucio debe resolverse manualmente antes de desplegar.
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
 - Si `DEPLOY_SSH_KEY_B64` esta mal cargado, el workflow fallara antes de intentar el SSH remoto.
 - Si `DJANGO_SECRET_KEY` es corto, repetitivo o empieza con `django-insecure-`, Django mostrara `security.W009` en deploy; no siempre bloquea, pero debe corregirse en produccion.
+- La aprobación efectiva depende de configurar revisores obligatorios en el
+  environment GitHub `production`; declararlo en YAML por sí solo no crea esa
+  política en el repositorio.
+- Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
+  productivo debe comprobar el valor exacto antes de iniciar procesos.
+- El healthcheck final solo verifica respuesta HTTP del home y no prueba
+  PostgreSQL, Google, escritura de media ni restaurabilidad del backup.
+- El repositorio crea backups previos a migraciones, pero no versiona una prueba
+  periodica de `pg_restore`; un dump no debe llamarse recuperable hasta probarlo.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado

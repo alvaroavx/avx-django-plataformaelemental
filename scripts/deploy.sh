@@ -7,6 +7,10 @@ VENV_DIR="${DEPLOY_VENV_DIR:-$APP_DIR/.venv}"
 PYTHON_BIN="${DEPLOY_PYTHON_BIN:-python3}"
 SERVICE_NAME_RAW="${DEPLOY_SERVICE:-plataforma-elemental}"
 ENV_FILE="${DEPLOY_ENV_FILE:-}"
+EXPECTED_COMMIT="${DEPLOY_EXPECTED_COMMIT:-}"
+PREVIOUS_COMMIT="${DEPLOY_PREVIOUS_COMMIT:-}"
+ALLOW_FULL_MIGRATE="${DEPLOY_ALLOW_FULL_MIGRATE:-}"
+BACKUP_DIR="${DEPLOY_BACKUP_DIR:-}"
 
 if [[ "$SERVICE_NAME_RAW" == *.service ]]; then
   SERVICE_NAME="${SERVICE_NAME_RAW%.service}"
@@ -32,6 +36,38 @@ if [[ ! -f "$ENV_FILE" ]]; then
   echo "No existe el archivo de entorno: $ENV_FILE" >&2
   exit 1
 fi
+
+if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "DEPLOY_EXPECTED_COMMIT debe ser un hash Git completo." >&2
+  exit 1
+fi
+if [[ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]]; then
+  echo "El checkout no coincide con DEPLOY_EXPECTED_COMMIT." >&2
+  exit 1
+fi
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "El checkout de despliegue contiene cambios locales." >&2
+  exit 1
+fi
+if [[ "$ALLOW_FULL_MIGRATE" != "FULL_MIGRATE_APPROVED" ]]; then
+  echo "El deploy automático exige aprobación literal de migrate completo." >&2
+  echo "Para migraciones por etapas use el runbook específico de la liberación." >&2
+  exit 1
+fi
+if [[ ! "$PREVIOUS_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "DEPLOY_PREVIOUS_COMMIT debe registrar el hash productivo anterior." >&2
+  exit 1
+fi
+if [[ "$BACKUP_DIR" != /* ]] || [[ ! -d "$BACKUP_DIR" ]] || [[ ! -w "$BACKUP_DIR" ]]; then
+  echo "DEPLOY_BACKUP_DIR debe ser un directorio absoluto, existente y escribible." >&2
+  exit 1
+fi
+case "$(realpath "$BACKUP_DIR")/" in
+  "$(realpath "$APP_DIR")/"*)
+    echo "DEPLOY_BACKUP_DIR debe quedar fuera del checkout de aplicación." >&2
+    exit 1
+    ;;
+esac
 
 set -a
 # shellcheck disable=SC1090
@@ -75,12 +111,11 @@ backup_postgresql_prod() {
   : "${POSTGRES_PORT:?Falta POSTGRES_PORT para backup PostgreSQL}"
 
   local backup_dir timestamp commit_short backup_file
-  backup_dir="$APP_DIR/backups/postgres"
+  backup_dir="$BACKUP_DIR"
   timestamp="$(date +%Y%m%d_%H%M%S)"
   commit_short="$(git rev-parse --short HEAD)"
   backup_file="${backup_dir}/${POSTGRES_DB}_${timestamp}_${commit_short}.dump"
 
-  mkdir -p "$backup_dir"
   echo "Creando backup PostgreSQL previo a migraciones: ${backup_file}"
 
   PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \

@@ -104,10 +104,10 @@ def build_navigation(request):
         items.append(
             _item(
                 request,
-                label="Hoy",
-                icon="bi-sun",
-                url_name="asistencias:sesiones_hoy",
-                active_prefixes=["/asistencias/hoy/", "/asistencias/sesiones/"],
+                label="Operación profesor",
+                icon="bi-person-workspace",
+                url_name="profesor:inicio",
+                active_prefixes=["/profesor/", "/asistencias/hoy/", "/asistencias/sesiones/"],
             )
         )
 

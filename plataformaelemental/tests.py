@@ -132,15 +132,11 @@ class ElementalAppsUXTests(TestCase):
         self.assertNotContains(response, "Personas")
         self.assertNotContains(response, "Asistencias")
 
-    def test_dashboard_general_profesor_no_ve_finanzas(self):
+    def test_dashboard_general_profesor_redirige_a_operacion_acotada(self):
         self.client.force_login(self.user_profesor)
         response = self.client.get(reverse("elemental_apps"))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Finanzas")
-        self.assertContains(response, "Hoy")
-        self.assertContains(response, reverse("asistencias:sesiones_hoy"))
-        self.assertNotContains(response, "no tiene accesos operativos visibles")
+        self.assertRedirects(response, reverse("profesor:inicio"))
 
     def test_dashboard_general_staff_ve_admin(self):
         self.client.force_login(self.user_staff)

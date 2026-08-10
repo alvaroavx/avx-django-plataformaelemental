@@ -4,7 +4,7 @@ from personas.models import Persona, PersonaRol
 from personas.permissions import normalizar_codigo_rol
 from plataformaelemental.context import aplicar_periodo, filtros_periodo, resolver_periodo
 
-from .models import Asistencia, SesionClase
+from .models import AsignacionProfesorDisciplina, Asistencia, SesionClase
 
 
 def sesiones_visibles_para_usuario(user):
@@ -46,8 +46,12 @@ def sesiones_visibles_para_usuario(user):
             organizaciones_profesora.add(organizacion_id)
 
     filtro = Q(disciplina__organizacion_id__in=organizaciones_administradas)
-    filtro |= Q(
+    disciplinas_operativas = AsignacionProfesorDisciplina.objects.operativas().filter(
+        profesor=persona,
         disciplina__organizacion_id__in=organizaciones_profesora,
+    ).values("disciplina_id")
+    filtro |= Q(
+        disciplina_id__in=disciplinas_operativas,
         profesores=persona,
     )
     return sesiones.filter(filtro).distinct()

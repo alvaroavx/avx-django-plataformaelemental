@@ -1,6 +1,6 @@
 # Checklist De Cambios
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este checklist reduce documentacion falsa y cambios incompletos.
@@ -77,11 +77,14 @@ python manage.py makemigrations --check --dry-run
 python manage.py check
 ```
 
-- Para cambios en apps principales:
+- Para cambios transversales o antes de deploy:
 
 ```bash
-python manage.py test asistencias.tests personas.tests finanzas.tests api.tests
+python manage.py test
 ```
+
+La lista manual de apps omite `auditoria`, `plataformaelemental`, pruebas de
+fase y cualquier app futura; no usarla como equivalente a suite completa.
 
 - Para cambios solo documentales no se requieren tests, pero se debe revisar enlaces y rutas.
 

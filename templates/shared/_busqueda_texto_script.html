@@ -1,0 +1,35 @@
+<script>
+  (function (global) {
+    if (global.ElementalBusqueda) return;
+
+    const normalizar = function (value) {
+      return (value || "")
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    };
+
+    const registrarDataTables = function (jQueryRef) {
+      if (!jQueryRef || !jQueryRef.fn || !jQueryRef.fn.dataTable) return;
+      const tipos = jQueryRef.fn.dataTable.ext.type.search;
+      tipos.string = normalizar;
+      tipos.html = function (value) {
+        return normalizar((value || "").toString().replace(/<[^>]*>/g, " "));
+      };
+    };
+
+    const conectarInputDataTable = function (dataTable, input) {
+      if (!dataTable || !input) return;
+      input.addEventListener("input", function () {
+        dataTable.search(normalizar(input.value)).draw();
+      });
+    };
+
+    global.ElementalBusqueda = {
+      normalizar: normalizar,
+      registrarDataTables: registrarDataTables,
+      conectarInputDataTable: conectarInputDataTable,
+    };
+  })(window);
+</script>

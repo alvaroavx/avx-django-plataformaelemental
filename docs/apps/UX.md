@@ -127,7 +127,7 @@ El layout principal muestra footer discreto:
 `Implementado por AVX`
 
 ## Limitaciones Conocidas
-- No se implementa auditoria transversal.
+- Existe auditoria transversal parcial para mutaciones seleccionadas; no cubre lecturas, exports ni todos los automatismos.
 - No se implementa backoffice/configuracion.
 - No se implementa rediseño profundo del Django Admin.
 - `monitor` queda archivado: no aparece en navegacion y `/monitor/` no esta registrado como ruta activa.

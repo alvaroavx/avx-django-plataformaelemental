@@ -82,6 +82,7 @@ from .forms_helpers import (
 )
 from .models import Category, DocumentoTributario, LotePago, Payment, PaymentPlan, Transaction
 from personas.models import Persona
+from personas.search import filtrar_por_fragmentos
 from .selectors import (
     categorias_queryset,
     consolidado_categorias_queryset,
@@ -104,6 +105,7 @@ from .services.pagos import (
     crear_pago_operacional,
     enriquecer_pagos_para_listado,
     resumen_consumos_pago,
+    sincronizar_transaccion_pago,
 )
 from .services.reversas import revertir_pago
 from .services.reportes import (
@@ -732,8 +734,12 @@ def pago_masivo_personas(request):
         roles__activo=True,
     ).distinct()
     if query:
-        for termino in query.split():
-            personas = personas.filter(Q(nombres__icontains=termino) | Q(apellidos__icontains=termino))
+        personas = filtrar_por_fragmentos(
+            personas,
+            query,
+            campos=("nombres", "apellidos", "email", "rut"),
+            prefijo="persona_pago_masivo",
+        )
     resultados = personas.order_by("apellidos", "nombres")[:20]
     return JsonResponse({"ok": True, "resultados": [{"id": p.pk, "nombre": p.nombre_completo} for p in resultados]})
 
@@ -830,6 +836,7 @@ def pago_edit(request, pk):
     )
     if request.method == "POST" and form.is_valid():
         pago = form.save()
+        sincronizar_transaccion_pago(pago=pago, usuario=request.user)
         registrar_cambio(
             usuario=request.user,
             dominio="finanzas",

@@ -179,6 +179,41 @@ class FinanzasAccessTests(TestCase):
             response = self.client.get(reverse(url_name), {"organizacion": self.org.pk})
             self.assertEqual(response.status_code, 200)
 
+    def test_listado_pagos_busca_persona_por_fragmentos_sin_tildes(self):
+        persona = Persona.objects.create(
+            nombres="Bárbara Inés",
+            apellidos="Muñoz Cáceres",
+            email="barbara.munoz@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona,
+            rol=self.rol_estudiante,
+            organizacion=self.org,
+            activo=True,
+        )
+        Payment.objects.create(
+            persona=persona,
+            organizacion=self.org,
+            fecha_pago="2026-08-10",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=10000,
+        )
+        self.client.force_login(self.user_finanzas)
+
+        response = self.client.get(
+            reverse("finanzas:pagos_list"),
+            {
+                "organizacion": self.org.pk,
+                "periodo_mes": 8,
+                "periodo_anio": 2026,
+                "q": "barbara munoz",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bárbara Inés Muñoz Cáceres")
+
     def test_profesor_no_accede_a_finanzas_completa(self):
         self.client.force_login(self.user_profesor)
         response = self.client.get(reverse("finanzas:dashboard"), {"organizacion": self.org.pk})
@@ -3705,6 +3740,26 @@ class PagoMasivoDominioTests(TestCase):
         )
         self.assertEqual(busqueda.status_code, 200)
         self.assertEqual(len(busqueda.json()["resultados"]), 20)
+        persona_con_tildes = Persona.objects.create(
+            nombres="Matías Andrés",
+            apellidos="Pérez Muñoz",
+            email="matias.perez@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona_con_tildes,
+            rol=self.rol_estudiante,
+            organizacion=self.org,
+            activo=True,
+        )
+        busqueda_nombre_completo = self.client.get(
+            reverse("finanzas:pago_masivo_personas"),
+            {"organizacion": self.org.pk, "q": "matias perez"},
+        )
+        self.assertEqual(busqueda_nombre_completo.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in busqueda_nombre_completo.json()["resultados"]],
+            [persona_con_tildes.pk],
+        )
         ajena = self.client.get(
             reverse("finanzas:pago_masivo_personas"),
             {"organizacion": self.otra_org.pk, "q": "Alumno"},

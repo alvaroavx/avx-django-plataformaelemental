@@ -12,15 +12,6 @@ ALLOWED_HOSTS = ["*", "apps.espacioelementos.cl"]
 # Use the console backend so emails are printed to stdout during development.
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-# Fallback SQLite local:
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db.sqlite3",
-#     }
-# }
-
-# PostgreSQL local:
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

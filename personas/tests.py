@@ -1048,6 +1048,33 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertNotContains(response, "Luis Rojas")
         self.assertEqual(response.context["q"], "ana.personas@example.com")
 
+    def test_personas_list_busca_nombre_completo_sin_exigir_tildes(self):
+        persona = Persona.objects.create(
+            nombres="Álvaro José",
+            apellidos="Várgas Peña",
+            email="alvaro.vargas.personas@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=persona,
+            rol=self.rol_profesor,
+            organizacion=self.org,
+            activo=True,
+        )
+
+        response = self.client.get(
+            reverse("personas:personas_list"),
+            {
+                "periodo_mes": 3,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "q": "alvaro vargas",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Álvaro José Várgas Peña")
+        self.assertNotContains(response, "Ana Diaz")
+
     def test_personas_list_paginate_en_servidor_y_preserva_filtros(self):
         for index in range(30):
             persona = Persona.objects.create(
@@ -1275,6 +1302,56 @@ class ResolucionSolicitudAccesoTests(TestCase):
         self.client.force_login(self.sin_permiso)
         with self.settings(ACCESS_REQUESTS_ENABLED=True):
             self.assertEqual(self.client.get(listado).status_code, 403)
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)
+    def test_busqueda_desde_error_vuelve_al_detalle_y_no_combina_user_con_persona(self):
+        User = get_user_model()
+        usuario = User.objects.create_user("candidato.existente", email="candidato@example.com")
+        Persona.objects.create(
+            nombres="Candidato",
+            apellidos="Existente",
+            email="candidato@example.com",
+            user=usuario,
+        )
+        persona_sin_user = Persona.objects.create(
+            nombres="Álvaro",
+            apellidos="Vargas sin acceso",
+            email="alvaro.sin.acceso@example.com",
+        )
+        detalle = reverse("personas:solicitud_acceso_detail", args=[self.solicitud.pk])
+        aprobar = reverse("personas:solicitud_acceso_aprobar", args=[self.solicitud.pk])
+        self.client.force_login(self.admin)
+
+        busqueda = self.client.get(
+            detalle,
+            {"usuario_q": "candidato", "persona_q": "alvaro vargas"},
+        )
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertContains(busqueda, f'action="{detalle}"', html=False)
+        self.assertContains(busqueda, persona_sin_user.nombre_completo)
+
+        invalido = self.client.post(
+            aprobar,
+            {
+                "tipo_resolucion": SolicitudAcceso.TipoResolucion.PERSONA_EXISTENTE,
+                "usuario": usuario.pk,
+                "persona": persona_sin_user.pk,
+                "organizacion": self.org.pk,
+                "rol": self.rol.pk,
+                "nota_interna": "",
+            },
+        )
+        self.assertEqual(invalido.status_code, 400)
+        self.assertContains(invalido, "No selecciones un User adicional", status_code=400)
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, SolicitudAcceso.Estado.PENDIENTE)
+
+        nueva_busqueda = self.client.get(
+            detalle,
+            {"usuario_q": "", "persona_q": "alvaro vargas"},
+        )
+        self.assertEqual(nueva_busqueda.status_code, 200)
+        self.assertContains(nueva_busqueda, persona_sin_user.nombre_completo)
 
     @override_settings(ACCESS_REQUESTS_ENABLED=True, ACCESS_REQUEST_APPROVAL_ENABLED=True)
     def test_conflictos_google_y_excepcion_correo_fallan_cerrado(self):

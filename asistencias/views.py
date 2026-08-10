@@ -18,7 +18,9 @@ from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from finanzas.models import AttendanceConsumption, Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.search import filtrar_por_fragmentos
 from personas.permissions import (
+    ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
     ACCION_EDITAR_ASISTENCIAS,
     ACCION_EXPORTAR_DATOS,
@@ -48,7 +50,14 @@ from .forms import (
     SesionBasicaForm,
     SesionesMasivasForm,
 )
-from .models import Asistencia, ClaseLiberada, Disciplina, SesionClase
+from .models import (
+    AlumnoDisciplina,
+    AsignacionProfesorDisciplina,
+    Asistencia,
+    ClaseLiberada,
+    Disciplina,
+    SesionClase,
+)
 from .selectors import (
     estudiantes_financieros_disciplina,
     asistencias_export_queryset,
@@ -56,7 +65,13 @@ from .selectors import (
     sesiones_visibles_para_usuario,
 )
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
-from .services import cambiar_estado_asistencia, liberar_clase, revertir_clase_liberada
+from .services import (
+    asegurar_asignaciones_profesores,
+    asegurar_matricula_operativa,
+    cambiar_estado_asistencia,
+    liberar_clase,
+    revertir_clase_liberada,
+)
 from .utils import ROLE_ADMIN, usuario_tiene_roles
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
@@ -180,6 +195,22 @@ def _estudiantes_para_asistencia_qs(organizacion):
     return queryset.distinct().order_by("apellidos", "nombres")
 
 
+def _estudiantes_sesion_para_usuario(user, sesion):
+    queryset = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+    puede_administrar_personas = usuario_tiene_permiso(
+        user,
+        ACCION_ADMINISTRAR_PERSONAS,
+        organizacion=sesion.disciplina.organizacion,
+        permitir_staff_global=False,
+    )
+    if not puede_administrar_personas:
+        alumnos_operativos = AlumnoDisciplina.objects.operativas().filter(
+            disciplina=sesion.disciplina,
+        ).values("alumno_id")
+        queryset = queryset.filter(pk__in=alumnos_operativos)
+    return queryset.distinct()
+
+
 def _estudiantes_con_estado_operativo(estudiantes_qs, organizacion):
     estudiantes = list(estudiantes_qs)
     estudiantes_ids = [estudiante.pk for estudiante in estudiantes]
@@ -213,6 +244,10 @@ def _usuario_es_profesor_asignado(user, sesion):
         return False
     return (
         sesion.profesores.filter(pk=persona.pk).exists()
+        and AsignacionProfesorDisciplina.objects.operativas().filter(
+            profesor=persona,
+            disciplina=sesion.disciplina,
+        ).exists()
         and usuario_tiene_permiso(
             user,
             ACCION_VER_SESION,
@@ -365,6 +400,10 @@ def sesiones_hoy(request):
             sesion.momento_label = "Finalizada"
             sesion.momento_clase = "success"
             sesion.momento_icono = "bi-check-circle"
+        elif sesion.estado == SesionClase.Estado.ABIERTA:
+            sesion.momento_label = "Abierta"
+            sesion.momento_clase = "warning"
+            sesion.momento_icono = "bi-play-circle"
         elif sesion.bloque and hora_actual < sesion.bloque.hora_inicio:
             sesion.momento_label = "Próxima"
             sesion.momento_clase = "primary"
@@ -547,6 +586,11 @@ def sesiones_list(request):
                 )
                 if profesores:
                     sesion.profesores.set(profesores)
+                    asegurar_asignaciones_profesores(
+                        disciplina=sesion.disciplina,
+                        profesores=profesores,
+                        user=request.user,
+                    )
                 creadas += 1
             messages.success(
                 request,
@@ -952,6 +996,11 @@ def asistencias_list(request):
                 )
                 if profesores:
                     sesion.profesores.set(profesores)
+                    asegurar_asignaciones_profesores(
+                        disciplina=sesion.disciplina,
+                        profesores=profesores,
+                        user=request.user,
+                    )
                 registrar_auditoria(
                     usuario=request.user,
                     accion=AuditLog.ACCION_CREAR,
@@ -1030,6 +1079,11 @@ def asistencias_list(request):
                 creados = 0
                 asistencia_ids_creadas = []
                 for persona in estudiantes_seleccionados:
+                    asegurar_matricula_operativa(
+                        user=request.user,
+                        disciplina=sesion.disciplina,
+                        alumno=persona,
+                    )
                     _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
                     asistencia, created = Asistencia.objects.get_or_create(
                         sesion=sesion,
@@ -1167,7 +1221,7 @@ def sesion_detail(request, pk):
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
-    estudiantes_qs = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
+    estudiantes_qs = _estudiantes_sesion_para_usuario(request.user, sesion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
     open_nueva_persona = False
@@ -1189,7 +1243,12 @@ def sesion_detail(request, pk):
             messages.success(request, f"Sesión eliminada: {sesion_resumen}.")
             return redirect(_url_con_filtros(request, "asistencias:sesiones_list"))
         elif "crear_persona_estudiante" in request.POST:
-            if not puede_administrar:
+            if not usuario_tiene_permiso(
+                request.user,
+                ACCION_ADMINISTRAR_PERSONAS,
+                organizacion=sesion.disciplina.organizacion,
+                permitir_staff_global=False,
+            ):
                 raise PermissionDenied("No tienes permisos para crear personas desde esta sesión.")
             persona_form = PersonaRapidaForm(request.POST)
             open_nueva_persona = True
@@ -1199,6 +1258,11 @@ def sesion_detail(request, pk):
                     sesion.disciplina.organizacion,
                 )
                 if persona:
+                    asegurar_matricula_operativa(
+                        user=request.user,
+                        disciplina=sesion.disciplina,
+                        alumno=persona,
+                    )
                     registrar_auditoria(
                         usuario=request.user,
                         accion=AuditLog.ACCION_CREAR,
@@ -1355,6 +1419,17 @@ def sesion_detail(request, pk):
             creados = 0
             asistencia_ids_creadas = []
             for persona in estudiantes_seleccionados:
+                if usuario_tiene_permiso(
+                    request.user,
+                    ACCION_ADMINISTRAR_PERSONAS,
+                    organizacion=sesion.disciplina.organizacion,
+                    permitir_staff_global=False,
+                ):
+                    asegurar_matricula_operativa(
+                        user=request.user,
+                        disciplina=sesion.disciplina,
+                        alumno=persona,
+                    )
                 _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
                 asistencia, created = Asistencia.objects.get_or_create(
                     sesion=sesion,
@@ -1366,7 +1441,11 @@ def sesion_detail(request, pk):
                     asistencia_ids_creadas.append(asistencia.pk)
             estado_anterior = sesion.estado
             if estudiantes_seleccionados and sesion.estado == SesionClase.Estado.PROGRAMADA:
-                sesion.estado = SesionClase.Estado.COMPLETADA
+                sesion.estado = (
+                    SesionClase.Estado.COMPLETADA
+                    if puede_administrar
+                    else SesionClase.Estado.ABIERTA
+                )
                 sesion.save(update_fields=["estado"])
             registrar_auditoria(
                 usuario=request.user,
@@ -1412,6 +1491,16 @@ def sesion_detail(request, pk):
             asistencia.estado_financiero_label = "Sin consumo"
             asistencia.estado_financiero_clase = "light"
     asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
+    sesion_anterior = None
+    sesion_siguiente = None
+    if puede_registrar and not puede_administrar:
+        alcance = sesiones_visibles_para_usuario(request.user)
+        sesion_anterior = alcance.filter(
+            Q(fecha__lt=sesion.fecha) | Q(fecha=sesion.fecha, pk__lt=sesion.pk)
+        ).order_by("-fecha", "-pk").first()
+        sesion_siguiente = alcance.filter(
+            Q(fecha__gt=sesion.fecha) | Q(fecha=sesion.fecha, pk__gt=sesion.pk)
+        ).order_by("fecha", "pk").first()
     context.update(
         {
             "sesion": sesion,
@@ -1426,6 +1515,9 @@ def sesion_detail(request, pk):
             "puede_liberar_clase": puede_liberar,
             "puede_quitar_asistente": puede_administrar,
             "es_jornada_profesora": puede_registrar and not puede_administrar,
+            "profesor_mode": puede_registrar and not puede_administrar,
+            "sesion_anterior": sesion_anterior,
+            "sesion_siguiente": sesion_siguiente,
             "back_url": request.META.get("HTTP_REFERER")
             or (
                 reverse("asistencias:sesiones_hoy")
@@ -1448,15 +1540,12 @@ def sesion_asistentes_buscar(request, pk):
         return JsonResponse({"ok": True, "resultados": []})
 
     asistentes_ids = Asistencia.objects.filter(sesion=sesion).values_list("persona_id", flat=True)
-    estudiantes_qs = (
-        _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion)
-        .exclude(pk__in=asistentes_ids)
-        .filter(
-            Q(nombres__icontains=termino)
-            | Q(apellidos__icontains=termino)
-            | Q(rut__icontains=termino)
-            | Q(email__icontains=termino)
-        )
+    estudiantes_qs = filtrar_por_fragmentos(
+        _estudiantes_sesion_para_usuario(request.user, sesion)
+        .exclude(pk__in=asistentes_ids),
+        termino,
+        campos=("nombres", "apellidos", "rut", "email"),
+        prefijo="asistente_sesion",
     )
 
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs[:10], sesion.disciplina.organizacion)
@@ -1496,7 +1585,7 @@ def sesion_asistente_agregar(request, pk):
     if Asistencia.objects.filter(sesion=sesion, persona_id=persona_id).exists():
         return _json_error("ASISTENCIA_DUPLICADA", "La persona ya está agregada.", status=409)
 
-    persona = _estudiantes_para_asistencia_qs(sesion.disciplina.organizacion).filter(pk=persona_id).first()
+    persona = _estudiantes_sesion_para_usuario(request.user, sesion).filter(pk=persona_id).first()
     if not persona:
         return _json_error("PERSONA_INVALIDA", "La persona no es estudiante válido de esta organización.", status=400)
 
@@ -1504,6 +1593,17 @@ def sesion_asistente_agregar(request, pk):
         sesion = SesionClase.objects.select_for_update().select_related("disciplina", "disciplina__organizacion").get(
             pk=sesion.pk
         )
+        if usuario_tiene_permiso(
+            request.user,
+            ACCION_ADMINISTRAR_PERSONAS,
+            organizacion=sesion.disciplina.organizacion,
+            permitir_staff_global=False,
+        ):
+            asegurar_matricula_operativa(
+                user=request.user,
+                disciplina=sesion.disciplina,
+                alumno=persona,
+            )
         asistencia, created = Asistencia.objects.get_or_create(
             sesion=sesion,
             persona=persona,
@@ -1515,7 +1615,11 @@ def sesion_asistente_agregar(request, pk):
         _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
         estado_anterior = sesion.estado
         if sesion.estado == SesionClase.Estado.PROGRAMADA:
-            sesion.estado = SesionClase.Estado.COMPLETADA
+            sesion.estado = (
+                SesionClase.Estado.COMPLETADA
+                if _usuario_puede_administrar_sesion(request.user, sesion)
+                else SesionClase.Estado.ABIERTA
+            )
             sesion.save(update_fields=["estado"])
 
         registrar_auditoria(
@@ -1639,6 +1743,11 @@ def sesion_edit(request, pk):
         sesion.fecha = form.cleaned_data["fecha"] or sesion.fecha
         sesion.save(update_fields=["disciplina", "fecha"])
         sesion.profesores.set(form.cleaned_data["profesores"])
+        asegurar_asignaciones_profesores(
+            disciplina=sesion.disciplina,
+            profesores=form.cleaned_data["profesores"],
+            user=request.user,
+        )
         despues = _snapshot_sesion(sesion)
         cambios = {
             "disciplina_id": {"antes": antes["disciplina_id"], "despues": despues["disciplina_id"]},

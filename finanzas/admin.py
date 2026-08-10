@@ -28,6 +28,9 @@ class PaymentAdmin(admin.ModelAdmin):
         "monto_total",
         "metodo_pago",
         "clases_asignadas",
+        "disciplina",
+        "transaccion",
+        "registrado_por",
         "revertido_en",
         "documento_tributario",
         "creado_en",
@@ -44,13 +47,16 @@ class PaymentAdmin(admin.ModelAdmin):
         "monto_neto",
         "monto_iva",
         "monto_total",
+        "transaccion",
+        "registrado_por",
+        "clave_idempotencia",
         "revertido_en",
         "revertido_por",
         "motivo_reversa",
         "creado_en",
         "actualizado_en",
     )
-    list_select_related = ("persona", "organizacion", "documento_tributario", "plan")
+    list_select_related = ("persona", "organizacion", "documento_tributario", "plan", "disciplina", "transaccion")
     actions = None
 
 

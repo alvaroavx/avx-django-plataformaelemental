@@ -1,6 +1,6 @@
 # Finanzas
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 La app `finanzas` concentra cobros academicos, documentos tributarios, movimientos de caja y reportes basicos.
@@ -98,11 +98,12 @@ flowchart TD
     C --> D["Calcular neto, IVA y total"]
     D --> E["Asignar clases del plan o formulario"]
     E --> F["Guardar Payment"]
-    F --> G["Imputar deudas del mismo mes y anio"]
+    F --> T["Crear y enlazar Transaction"]
+    T --> G["Imputar deudas del mismo mes y anio"]
     G --> H["Actualizar saldo de clases"]
     H --> I["Payment operacional"]
     I -. "puede asociarse" .-> J["DocumentoTributario"]
-    I -. "no es lo mismo que" .-> K["Transaction"]
+    I --> K["Transaction enlazada uno a uno"]
 ```
 
 ### Flujo De Carga Tributaria Asistida
@@ -180,7 +181,10 @@ Alimenta:
 - saldo neto del periodo
 - reportes por categoria
 
-Regla: el libro de caja usa `Transaction` como unica fuente.
+Regla: el libro de caja usa `Transaction` como unica fuente. Desde Operación
+Profesor, y desde el servicio común usado por altas de pago, un pago nuevo crea
+exactamente una transacción enlazada en la misma transacción de base de datos.
+Los pagos históricos no se convierten retroactivamente en movimientos contables.
 
 ### DocumentoTributario
 `DocumentoTributario` es respaldo fiscal/documental.
@@ -199,15 +203,20 @@ No debe contarse como ingreso o egreso por si solo.
 - Los enlaces preservan `periodo_mes`, `periodo_anio` y `organizacion`.
 - Los botones solo se muestran a usuarios con permisos mutables del subdominio correspondiente: admin y finanzas.
 - Solo lectura puede ver el panel financiero si tiene permiso de lectura, pero no ve accesos mutables.
-- Profesor no accede a finanzas completa ni ve acciones financieras.
-- Estos accesos no mezclan responsabilidades: crear un `Payment` no crea una `Transaction`, crear una `Transaction` no crea un `Payment`, y un `DocumentoTributario` no se trata como movimiento financiero.
+- Profesor no accede a finanzas completa. Opera únicamente pagos de alumnos
+  matriculados en disciplinas propias desde `/profesor/pagos/`.
+- Estos accesos no colapsan responsabilidades: el servicio de alta de `Payment`
+  crea una `Transaction` enlazada, pero ambas siguen siendo entidades distintas;
+  crear una `Transaction` manual no crea un `Payment` y un
+  `DocumentoTributario` no se trata como movimiento financiero.
 
 ## Libro De Caja
 - Fuente unica: `Transaction`.
 - Orden de exportacion: `fecha` ascendente + `id` ascendente.
 - El CSV bloquea periodos con mes o año en `Todos`; se debe seleccionar un mes y año especificos.
 - La columna `Msg` se construye desde datos de la transaccion: fecha, tipo, categoria, descripcion y documentos asociados.
-- `Payment` no se exporta en libro de caja salvo que exista una relacion explicita futura con `Transaction`.
+- `Payment` no se exporta directamente: su transacción enlazada sí forma parte
+  del libro de caja. Pagos históricos sin vínculo no aparecen automáticamente.
 
 ### Contrato libro de caja y Msg
 - El libro de caja v1.0 usa solo `Transaction` como fuente contable/exportable.
@@ -226,7 +235,8 @@ No debe contarse como ingreso o egreso por si solo.
 - `transacciones_YYYY_MM.xlsx`: fuente `Transaction`; export contable alineado con libro de caja, sin incluir pagos operacionales directamente.
 - Todas las exportaciones respetan periodo y organizacion activa.
 - Las exportaciones financieras usan el permiso `exportar_datos`; rol `admin` y rol `finanzas` pueden exportar, profesor y solo lectura no.
-- No existe aun una relacion formal `Payment -> Transaction`; por eso los pagos de alumnos no aparecen en transacciones salvo que exista una `Transaction` real creada aparte.
+- Existe relación formal `Payment.transaccion` uno-a-uno para pagos nuevos. Los
+  pagos históricos anteriores al cambio pueden permanecer sin vínculo.
 - La estimacion de pagos a profesores no equivale a egreso contable cerrado ni reemplaza una `Transaction`; si se paga efectivamente, debe registrarse como movimiento contable separado.
 - Las metricas financieras visibles en la tabla operacional de estudiantes vienen de `Payment` y `AttendanceConsumption`; son cobranza operacional y no deben sumarse al bloque contable.
 
@@ -237,29 +247,56 @@ No debe contarse como ingreso o egreso por si solo.
 - Los documentos tributarios se muestran como respaldo disponible/asociado, no como movimiento financiero.
 
 ## Limitaciones Actuales
-- No existe relacion directa `Payment -> Transaction`.
-- Los pagos de alumnos no generan transacciones automaticamente.
+- Los pagos históricos pueden no tener `Payment.transaccion`.
+- La reversa de pago aún no genera un contramovimiento contable automático.
 - Los pagos a profesores no tienen modelo contable propio; pueden registrarse como `Transaction` de egreso si corresponde.
 - Las alertas de cierre reportan inconsistencias visibles, pero no corrigen datos automaticamente.
 
+## Migración `finanzas.0012`
+
+- Agrega siete campos anulables y no contiene backfill: pagos y transacciones
+  históricos permanecen sin vínculo, actor, disciplina, respaldo o clave
+  inventados.
+- El SQL usa `ALTER TABLE`, unicidades, claves foráneas e índices no concurrentes
+  dentro de una migración atómica. Puede esperar o bloquear escrituras hasta el
+  `COMMIT`.
+- El ensayo sintético PostgreSQL 18.4 con 300.000 pagos y 100.000 transacciones
+  tardó 2,335 s y produjo una espera máxima de escritura de 967,264 ms sin error.
+  Este resultado no representa producción.
+- No existe QA/staging. La duración real se medirá bajo mantenimiento productivo
+  con `lock_timeout=5s`; una espera o duración fuera de la ventana aborta antes
+  de abrir tráfico. No se rediseña a índices concurrentes sin esa evidencia; si
+  el resultado real es inaceptable, se prepara una corrección forward en fases.
+- Runbook y evidencia: [MIGRACIONES_OPERACION_PROFESOR.md](../operacion/MIGRACIONES_OPERACION_PROFESOR.md).
+
 ## Pago masivo operacional
 
-El registro masivo vive en `finanzas:pagos_masivo` y reutiliza la misma operación de dominio que el pago individual: `Payment.save()` calcula neto, IVA, total y clases; su señal posterior imputa deudas del mismo mes y año. Un `Payment` no crea una `Transaction` automáticamente y el documento tributario sigue siendo opcional.
+El registro masivo administrativo vive en `finanzas:pago_masivo` y el acotado a
+profesor en `profesor:pago_masivo`. Ambos reutilizan la operación de dominio del
+pago individual: calculan montos, crean `Payment` + `Transaction` uno-a-uno y la
+señal posterior imputa deudas del mismo mes y año. El documento tributario sigue
+siendo opcional y queda fuera del espacio profesor.
 
 - La selección se limita a estudiantes con `PersonaRol` activo en la organización autorizada.
 - El servidor valida nuevamente personas, planes, documentos, organización y montos al confirmar; la organización enviada por el navegador no es una prueba de permiso.
 - El preview no persiste pagos ni efectos financieros.
 - La confirmación es `transaction.atomic()`: todas las filas válidas confirman el lote completo; una fila inválida o una excepción deja cero pagos, consumos derivados, auditorías definitivas o lote confirmado.
-- `LotePago` conserva UUID, organización, usuario, clave de idempotencia, cantidad, monto total, metadatos mínimos y fecha de confirmación. `Payment.lote` es nullable para preservar pagos históricos e individuales.
+- `LotePago` conserva UUID, organización, usuario, clave de idempotencia,
+  respaldo común, cantidad, monto total, metadatos mínimos y fecha de confirmación.
+  `Payment.lote` es nullable para preservar pagos históricos e individuales.
 - La clave de idempotencia es única en PostgreSQL. Un doble envío devuelve el lote ya confirmado y no crea pagos adicionales.
-- La auditoría registra el lote y cada pago con origen `pago_masivo`, sin guardar archivos binarios ni el payload completo del navegador.
-- El flujo individual y el masivo no generan `Transaction`; la conciliación contable de pagos operacionales sigue siendo una decisión pendiente separada.
-- El flujo actual de `Payment` no admite archivo de respaldo binario. No se duplica ni se expone un archivo común; los documentos tributarios se asocian por organización y continúan protegidos por sus vistas autorizadas.
+- La auditoría registra lote, pago y transacción con actor y origen, sin guardar
+  el payload completo del navegador.
+- El lote y cada ítem tienen claves idempotentes; una doble confirmación devuelve
+  el lote existente y no crea movimientos adicionales.
+- `LotePago.respaldo` guarda el respaldo común y `Payment.respaldo` admite respaldo
+  individual. Los documentos tributarios continúan protegidos por sus vistas.
 
 La deuda pendiente de cierre transversal de permisos de Personas y Finanzas, incluido el bypass histórico de `is_staff` en consumidores antiguos, no queda resuelta por este flujo.
 
 ## Decisiones Pendientes
-- Definir si un `Payment` debe crear o sugerir una `Transaction` en un flujo futuro.
+- Definir conciliación segura de pagos históricos sin transacción.
+- Definir contramovimiento o anulación contable al revertir un pago enlazado.
 - Definir conciliacion formal entre pagos operacionales, cartola bancaria y transacciones.
 - Definir reglas de categorias contables obligatorias para libro de caja.
 
@@ -413,6 +450,10 @@ Reglas:
 - `documentos tributarios` debe permitir asociar contraparte tanto en alta manual como en carga asistida y edicion posterior; el detalle y listado deben mostrar esa asociacion cuando exista.
 - `reporte categorias` muestra tabla y grafico de torta sobre el mismo consolidado filtrado.
 - Listado de `pagos` con badge fiscal `Afecta/Exenta`, columnas separadas de neto, IVA y bruto, y accion rapida para copiar descripcion operativa del pago.
+- El buscador del listado de pagos y los selectores de personas de pago masivo
+  aceptan nombre completo por fragmentos, correo o RUT sin exigir tildes. La
+  normalización se aplica después del alcance de organización y permisos; nunca
+  amplía el universo autorizado.
 - Los montos de neto, IVA y bruto en `pagos` son clickeables y copian el valor sin formato al portapapeles.
 - La descripcion operativa del pago usa como disciplina principal aquella donde la persona registra mas asistencias `presente`.
 - En transacciones, el tipo `ingreso/egreso` se deriva automaticamente desde la categoria y no se expone como selector manual.
@@ -451,7 +492,7 @@ Queda pendiente, no urgente:
 - extraer helpers puros de documentos tributarios
 - extraer flujo de importacion tributaria por etapas
 - evaluar constraints de integridad
-- separar CI de deploy productivo cuando produccion migre a PostgreSQL
+- separar CI de deploy productivo si el riesgo operativo requiere aprobacion o ambientes independientes; produccion ya usa PostgreSQL segun la configuracion y el contexto declarado
 
 ## API
 La API de datos de `finanzas` queda desactivada en v1.0.

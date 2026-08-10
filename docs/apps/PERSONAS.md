@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-10
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -31,6 +31,20 @@ Debe concentrar:
 - Para una identidad no vinculada, la solicitud canónica es la pendiente para `provider + provider_subject` o, si no existe, la más reciente. Una solicitud canónica `RECHAZADA` o `PENDIENTE` bloquea el fallback por correo antes de crear `SocialAccount`. Crear `User`, `Persona` o `PersonaRol` no supera un rechazo: la vía soportada es reabrir esa misma solicitud y aprobarla explícitamente.
 - La aprobación posterior de la solicitud canónica prevalece sobre su rechazo anterior y puede seleccionar cualquier organización válida. El rechazo no se interpreta por correo ni como veto histórico permanente. Una `SocialAccount` que ya fue vinculada legítimamente no vuelve a evaluarse contra solicitudes históricas; su acceso se controla mediante `User`, roles activos, organización y permisos vigentes.
 - La resolución aprobada conserva explícitamente el `User`, la organización y el rol seleccionados. La pantalla busca Users y Personas de forma acotada; no expone directorios completos en controles HTML.
+- El buscador de candidatos siempre envía GET al detalle de la solicitud; nunca
+  a la ruta `/aprobar/`, que permanece limitada a POST. La búsqueda divide el
+  término en fragmentos y normaliza tildes para encontrar nombres completos como
+  `alvaro vargas` aunque la Persona guarde `Álvaro Vargas`.
+- La regla anterior es transversal a las cajas de búsqueda de personas. Vive en
+  `personas/search.py`: aplica AND entre fragmentos, OR entre campos y normaliza
+  tildes/mayúsculas mediante PostgreSQL `TRANSLATE`. Siempre recibe un queryset
+  ya acotado; no concede acceso ni sustituye filtros de organización, rol, clase
+  o membresía.
+- Las estrategias de resolución son mutuamente excluyentes: `USUARIO_EXISTENTE`
+  exige un User que ya tenga Persona activa; `PERSONA_EXISTENTE` crea el User de
+  acceso y lo enlaza a la Persona sin User; `USUARIO_NUEVO` crea ambos. Seleccionar
+  simultáneamente User y Persona se rechaza de forma visible y no resuelve la
+  solicitud.
 - Las decisiones sobre una identidad Google se serializan con bloqueos transaccionales de PostgreSQL por `provider + provider_subject` y por `provider + User`. Lo usan tanto la resolución administrativa como el siguiente `SocialLogin` validado por django-allauth, porque una `SocialAccount` aún inexistente no se protege solo con `select_for_update`. El servicio de Personas no crea ni actualiza `SocialAccount`.
 
 ## Decisiones funcionales vigentes
@@ -43,6 +57,8 @@ Debe concentrar:
 - El comando `python manage.py auditar_datos_v1` revisa datos existentes sin modificar la base: personas sin identidad, duplicados de RUT/email/telefono, telefonos inconsistentes y posibles duplicados por nombre.
 - En `personas/listado`, el filtro por `rol` debe considerar asignaciones activas e inactivas; el filtro `estado` controla el estado de la `Persona`, no la vigencia del rol. La tabla debe mostrar si cada rol esta activo o inactivo.
 - En `personas/listado`, la tabla usa paginacion Django en servidor de 25 filas por pagina. DataTables no debe cargar todas las personas en HTML inicial.
+- En `personas/listado`, el texto puede buscar nombre completo, correo, teléfono
+  o RUT por varios fragmentos sin exigir que el usuario escriba tildes.
 - El listado conserva filtros `periodo_mes`, `periodo_anio`, `organizacion`, busqueda y filtros propios al cambiar de pagina.
 - Las metricas por persona del listado se calculan para el periodo/organizacion activos y se evalúan solo sobre la pagina visible.
 - El queryset base se filtra y pagina antes de calcular metricas correlacionadas. Solo el filtro explicito de deuda puede calcular esa metrica antes de paginar porque la necesita para definir el universo.

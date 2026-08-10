@@ -1,5 +1,10 @@
 # Reporte técnico de Plataforma Elemental
 
+> Documento histórico del levantamiento del 2026-07-26. Describe una rama y un
+> commit que ya no son el estado actual. La fotografía vigente se mantiene en
+> `docs/ESTADO_ACTUAL.md`; no usar este archivo para decidir sobre el código de
+> `main` sin volver a verificarlo.
+
 Fecha de levantamiento: 2026-07-26
 Base revisada: `HEAD` `8d52a7d`, rama `fase3-cierre-operativo`, alineada con `origin/fase3-cierre-operativo`.
 Base de comparación: `origin/main` en `744243c`.

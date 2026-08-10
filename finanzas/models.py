@@ -210,6 +210,7 @@ class LotePago(TimeStampedModel):
     monto_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     confirmado_en = models.DateTimeField(null=True, blank=True)
     origen = models.CharField(max_length=40, default="pago_masivo")
+    respaldo = models.FileField(upload_to="finanzas/lotes/", null=True, blank=True)
     metadatos = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -246,6 +247,13 @@ class Payment(TimeStampedModel):
         null=True,
         blank=True,
     )
+    disciplina = models.ForeignKey(
+        "asistencias.Disciplina",
+        on_delete=models.PROTECT,
+        related_name="pagos_operacionales",
+        null=True,
+        blank=True,
+    )
     documento_tributario = models.ForeignKey(
         DocumentoTributario,
         on_delete=models.SET_NULL,
@@ -264,6 +272,22 @@ class Payment(TimeStampedModel):
     monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     clases_asignadas = models.PositiveIntegerField(default=0)
     observaciones = models.TextField(blank=True)
+    respaldo = models.FileField(upload_to="finanzas/pagos/", null=True, blank=True)
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_operacionales_registrados",
+    )
+    clave_idempotencia = models.CharField(max_length=160, null=True, blank=True, unique=True)
+    transaccion = models.OneToOneField(
+        "Transaction",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pago_operacional",
+    )
     revertido_en = models.DateTimeField(null=True, blank=True)
     revertido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -404,6 +428,13 @@ class Transaction(TimeStampedModel):
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     descripcion = models.TextField(blank=True)
     archivo = models.FileField(upload_to="finanzas/transactions/", null=True, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transacciones_financieras_creadas",
+    )
     documentos_tributarios = models.ManyToManyField(
         DocumentoTributario,
         related_name="transacciones_asociadas",

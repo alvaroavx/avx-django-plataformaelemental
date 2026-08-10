@@ -1,6 +1,6 @@
 # Permisos Y Roles
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este documento define la matriz minima de permisos v1.0 para vistas HTML internas.
@@ -70,7 +70,9 @@ La asignación de profesora se comprueba contra `SesionClase.profesores` y el ro
 
 Google continúa siendo solo autenticación detrás de sus flags. No crea roles, asignaciones ni permisos, y el acceso real para profesoras continúa sin activarse.
 - `staff` no conserva bypass operativo en Asistencias. Necesita `Persona`, `PersonaRol` activo y organización autorizada como cualquier cuenta ordinaria; el rol de dominio `STAFF_ASISTENCIA` no debe confundirse con `User.is_staff`.
-- Los consumidores históricos de los helpers compartidos fuera de Asistencias conservan temporalmente su compatibilidad anterior. Su cierre multi-organización corresponde al Sprint 6 y no se declara resuelto aquí.
+- Personas y Finanzas conservan el bypass histórico de `is_staff` en helpers que
+  usan `permitir_staff_global=True`. No existe evidencia para declararlo cerrado
+  globalmente; Asistencias sí lo desactiva en sus superficies endurecidas.
 - La opcion `solo_lectura` puede ver finanzas, pero no debe crear, editar, borrar ni exportar.
 
 ## Matriz de superficies para piloto cerrado

@@ -1,6 +1,6 @@
 # INDICE
 
-Fecha de actualizacion: 2026-07-20
+Fecha de actualizacion: 2026-08-10
 
 Este archivo es el mapa de la documentacion viva del repo.
 
@@ -11,6 +11,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md): resumen humano y puesta en marcha.
 
 ## Docs
+- [docs/ESTADO_ACTUAL.md](ESTADO_ACTUAL.md): fotografia verificable del producto, validaciones, riesgos y asuntos por resolver.
 - [docs/ONBOARDING_CODEX.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/ONBOARDING_CODEX.md): ruta de lectura y trabajo para Codex.
 - [docs/SECURITY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/SECURITY.md): higiene de secretos y reglas de seguridad del repositorio.
 
@@ -29,6 +30,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.
+- [docs/apps/OPERACION_PROFESOR.md](apps/OPERACION_PROFESOR.md): panel, autorización, pagos y evidencia del espacio profesor.
 - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md): decisiones de `personas`.
 - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md): decisiones de `finanzas`.
 - [docs/apps/UX.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/UX.md): navegacion, login y UX responsive de `Elemental Apps`.
@@ -43,11 +45,18 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/proceso/DECISIONES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/DECISIONES.md): gobernanza documental y jerarquia de autoridad.
 - [docs/proceso/CHECKLIST_CAMBIOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/CHECKLIST_CAMBIOS.md): checklist de cierre de cambios.
 - [docs/proceso/TESTING.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/TESTING.md): estrategia de pruebas.
+- [docs/proceso/ARTEFACTOS.md](proceso/ARTEFACTOS.md): política, inventario y reglas de reutilización de herramientas y evidencias de trabajo.
 
 ## Operacion
 - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md): CI/CD, deploy y rollback.
-- [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md): auditoria de migracion SQLite/PostgreSQL.
+- [docs/operacion/MIGRACIONES_OPERACION_PROFESOR.md](operacion/MIGRACIONES_OPERACION_PROFESOR.md): semántica histórica, ensayo PostgreSQL, backup/restore, runbook y gate productivo.
+- [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md): evidencia historica de la migracion; no describe el modelo ni la configuracion actuales.
 - [docs/operacion/SEGURIDAD_PRODUCCION.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/SEGURIDAD_PRODUCCION.md): seguridad productiva.
+
+## Evidencia vigente
+
+- [Migraciones Operación Profesor 2026-08-10](evidencia/migraciones-operacion-profesor-20260810/RESULTADOS.md): SQL, medición sintética de locks, reporte histórico y restauración probada.
+- [Ensayo QA y transición de permisos](evidencia/migraciones-operacion-profesor-20260810/ENSAYO_QA_Y_TRANSICION.md): estado representativo, procedimiento de activación, pruebas omitidas, higiene y veredicto no-go.
 
 ## Archivo
 - [docs/archivo/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/archivo/MONITOR.md): inventario y decision de archivo de `monitor`.

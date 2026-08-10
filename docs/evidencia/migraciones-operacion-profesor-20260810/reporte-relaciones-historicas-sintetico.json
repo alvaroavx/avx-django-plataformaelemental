@@ -1,0 +1,29 @@
+{
+  "asignaciones_profesor_disciplina": {
+    "activas_operativas": 0,
+    "ambiguas_disciplinas_con_varios_profesores_historicos": 0,
+    "ambiguas_sin_rol_profesor_activo": 0,
+    "creadas_desde_historia": 0,
+    "explicitas_inactivas": 0,
+    "historicas_activas_revisadas": 0,
+    "historicas_activas_sin_revision": 0,
+    "historicas_inactivas": 0,
+    "requieren_revision_manual": 0,
+    "sin_inferencia": 0,
+    "total_relaciones": 0
+  },
+  "contiene_datos_sensibles": false,
+  "matriculas_alumno_disciplina": {
+    "activas_operativas": 0,
+    "ambiguas_alumnos_en_varias_disciplinas_historicas": 0,
+    "ambiguas_sin_rol_estudiante_activo": 0,
+    "creadas_desde_historia": 0,
+    "explicitas_inactivas": 0,
+    "historicas_activas_revisadas": 0,
+    "historicas_activas_sin_revision": 0,
+    "historicas_inactivas": 0,
+    "requieren_revision_manual": 0,
+    "sin_inferencia": 0,
+    "total_relaciones": 0
+  }
+}

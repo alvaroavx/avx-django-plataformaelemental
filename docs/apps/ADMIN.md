@@ -1,5 +1,7 @@
 # Django Admin
 
+Fecha de actualizacion: 2026-08-09
+
 El Django Admin de Plataforma Elemental es una herramienta interna de soporte, revision y diagnostico.
 
 No reemplaza la operacion diaria de `Elemental Apps`. Los flujos normales de personas, asistencias, pagos, documentos, transacciones y reportes deben seguir ocurriendo en las vistas propias de la plataforma.
@@ -24,7 +26,12 @@ Tambien existen admins auxiliares para modelos de catalogo o compatibilidad, per
 
 - No usar admin para cerrar meses, recalcular saldos ni imputar pagos.
 - No crear acciones masivas destructivas.
-- `delete_selected` esta deshabilitado en modelos criticos.
+- `actions = None` deshabilita acciones masivas en Organización, Persona,
+  PersonaRol, SesionClase, Asistencia, ClaseLiberada, LotePago, Payment,
+  DocumentoTributario, Transaction y AuditLog.
+- No está deshabilitado de forma uniforme: Rol, Disciplina, BloqueHorario,
+  PaymentPlan, AttendanceConsumption, Category y ApiAccessKey conservan las
+  acciones estándar del Admin según permisos Django. Esto es un riesgo operativo.
 - Evitar calculos caros en `list_display`.
 - Usar `select_related`, `prefetch_related` o `annotate` cuando una columna derive de relaciones.
 - No listar documentos M2M completos en columnas.
@@ -61,7 +68,10 @@ No debe operarse como parte del producto principal.
 
 ## Limites conocidos
 
-- El admin no aplica toda la experiencia de permisos finos de la UI principal.
+- El admin no aplica la matriz organizacional de la UI principal.
 - El admin es para staff/superuser.
+- Los permisos nativos del Admin no equivalen a la matriz organizacional de
+  `PersonaRol`; una cuenta staff debe revisarse separadamente.
 - La asignacion masiva de roles existente en `PersonaRol` es sensible y debe usarse con criterio.
 - No hay acciones de recuperacion, recalculo o conciliacion desde admin.
+- `AuditLog` puede ser visto por cualquier `is_staff`; no filtra por organización.

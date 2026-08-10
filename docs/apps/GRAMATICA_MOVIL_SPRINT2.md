@@ -23,7 +23,7 @@ La validación con Beisics y dos profesoras está pendiente. Este documento no r
 - Estados `P`, `A` y `J` usan nombre accesible y no dependen solo de color.
 - Objetivos táctiles mínimos de 44 × 44 px.
 - El orden de teclado sigue título, búsqueda, resultados, estados y guardado.
-- El éxito se anuncia mediante texto y una futura región `aria-live`.
+- En la implementación activa, el éxito se anuncia mediante texto y región `aria-live`.
 
 ### Resumen administrativo
 

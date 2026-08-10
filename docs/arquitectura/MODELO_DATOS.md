@@ -1,6 +1,6 @@
 # Modelo De Datos
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-09
 
 ## Proposito
 Este documento resume el mapa relacional vigente de Plataforma Elemental.
@@ -37,10 +37,28 @@ erDiagram
         int organizacion_id FK
         boolean activo
     }
+    SOLICITUD_ACCESO {
+        uuid id PK
+        string provider
+        string provider_subject
+        string estado
+        int organizacion_resuelta_id FK
+        int rol_resuelto_id FK
+    }
     DISCIPLINA {
         int id PK
         int organizacion_id FK
         string nombre
+        boolean activa
+    }
+    ASIGNACION_PROFESOR_DISCIPLINA {
+        int disciplina_id FK
+        int profesor_id FK
+        boolean activa
+    }
+    ALUMNO_DISCIPLINA {
+        int disciplina_id FK
+        int alumno_id FK
         boolean activa
     }
     BLOQUE_HORARIO {
@@ -61,6 +79,11 @@ erDiagram
         int persona_id FK
         string estado
     }
+    LIBERACION_SESION {
+        int sesion_id FK,UK
+        int liberada_por_id FK
+        string motivo
+    }
     PAYMENT_PLAN {
         int id PK
         int organizacion_id FK
@@ -73,7 +96,16 @@ erDiagram
         int organizacion_id FK
         int plan_id FK
         int documento_tributario_id FK
+        int disciplina_id FK
+        int transaccion_id FK,UK
         date fecha_pago
+    }
+    LOTE_PAGO {
+        uuid id PK
+        int organizacion_id FK
+        string clave_idempotencia UK
+        int creado_por_id FK
+        datetime confirmado_en
     }
     ATTENDANCE_CONSUMPTION {
         int id PK
@@ -118,10 +150,20 @@ erDiagram
         string hash_clave UK
         boolean activa
     }
+    AUDIT_LOG {
+        int id PK
+        int usuario_id FK
+        int organizacion_id FK
+        string dominio
+        string accion
+        json metadata
+    }
 
     ORGANIZACION ||--o{ PERSONA_ROL : asigna
     PERSONA ||--o{ PERSONA_ROL : tiene
     ROL ||--o{ PERSONA_ROL : clasifica
+    ORGANIZACION ||--o{ SOLICITUD_ACCESO : resuelve_en
+    ROL ||--o{ SOLICITUD_ACCESO : resuelve_como
 
     ORGANIZACION ||--o{ DISCIPLINA : contiene
     ORGANIZACION ||--o{ BLOQUE_HORARIO : contiene
@@ -129,13 +171,21 @@ erDiagram
     DISCIPLINA ||--o{ SESION_CLASE : programa
     BLOQUE_HORARIO ||--o{ SESION_CLASE : sugiere_horario
     PERSONA }o--o{ SESION_CLASE : profesores
+    PERSONA ||--o{ ASIGNACION_PROFESOR_DISCIPLINA : profesora
+    DISCIPLINA ||--o{ ASIGNACION_PROFESOR_DISCIPLINA : autoriza
+    PERSONA ||--o{ ALUMNO_DISCIPLINA : alumno
+    DISCIPLINA ||--o{ ALUMNO_DISCIPLINA : matricula
     SESION_CLASE ||--o{ ASISTENCIA : registra
+    SESION_CLASE ||--o| LIBERACION_SESION : cancela_auditada
     PERSONA ||--o{ ASISTENCIA : asiste
 
     ORGANIZACION ||--o{ PAYMENT_PLAN : ofrece
     ORGANIZACION ||--o{ PAYMENT : recibe
     PERSONA ||--o{ PAYMENT : paga
     PAYMENT_PLAN ||--o{ PAYMENT : define_clases_precio
+    LOTE_PAGO ||--o{ PAYMENT : agrupa
+    DISCIPLINA ||--o{ PAYMENT : imputa
+    ORGANIZACION ||--o{ LOTE_PAGO : confirma
     PAYMENT ||--o{ ATTENDANCE_CONSUMPTION : consume
     ASISTENCIA ||--|| ATTENDANCE_CONSUMPTION : genera
     ASISTENCIA ||--o| CLASE_LIBERADA : exceptua
@@ -149,7 +199,9 @@ erDiagram
 
     ORGANIZACION ||--o{ TRANSACTION : registra
     CATEGORY ||--o{ TRANSACTION : clasifica
+    TRANSACTION ||--o| PAYMENT : movimiento_de
     TRANSACTION }o--o{ DOCUMENTO_TRIBUTARIO : respalda
+    ORGANIZACION ||--o{ AUDIT_LOG : contextualiza
 ```
 
 ## Entidades Principales
@@ -159,22 +211,33 @@ erDiagram
 - `Persona`: identidad individual. Tiene email unico opcional, RUT opcional validado y relacion opcional con `User`.
 - `Rol`: catalogo de roles como estudiante o profesor.
 - `PersonaRol`: une persona, rol y organizacion. Guarda configuracion operativa por rol, como `valor_clase` y `retencion_sii`.
+- `SolicitudAcceso`: conserva la decisión administrativa sobre una identidad Google y la organización/rol resueltos.
 
 ### Asistencias
 - `Disciplina`: actividad dictada dentro de una organizacion.
 - `BloqueHorario`: horario recurrente opcionalmente asociado a disciplina.
 - `SesionClase`: clase concreta en una fecha, con disciplina, bloque opcional, profesores y estado.
+- `AsignacionProfesorDisciplina`: autorización explícita para operar una clase.
+- `AlumnoDisciplina`: matrícula operativa que limita roster, asistencia y pago.
+- `LiberacionSesion`: cancelación de sesión con motivo, fecha y actor.
 - `Asistencia`: registro de persona en una sesion, con estado presente, ausente o justificada.
 - `ClaseLiberada`: excepcion historica y reversible que evita cobro sin eliminar la asistencia.
 
 ### Finanzas
 - `PaymentPlan`: plan comercial por organizacion, con clases y precio.
-- `Payment`: pago operacional de clases asociado a persona, organizacion, plan y opcionalmente documento tributario.
+- `Payment`: pago operacional asociado a persona, organización, disciplina, plan,
+  transacción uno-a-uno y opcionalmente documento tributario.
+- `LotePago`: identidad auditable e idempotente de una confirmación masiva; pagos históricos/individuales pueden no tener lote.
 - `Payment` conserva motivo, autor y fecha cuando se revierte; una reversa no elimina el registro.
 - `AttendanceConsumption`: imputacion financiera de una asistencia contra un pago o deuda.
 - `DocumentoTributario`: snapshot fiscal con folio, emisor, receptor, montos, archivos, metadata y contraparte opcional.
 - `Category`: categoria contable para transacciones.
 - `Transaction`: movimiento financiero de ingreso o egreso, asociado a categoria, organizacion y documentos tributarios opcionales.
+
+### Soporte transversal
+- `AuditLog`: evento parcial de auditoría con usuario y organización opcionales.
+- `ApiAccessKey`: credencial hash conservada para la API mínima.
+- Los modelos de `monitor` siguen instalados, pero archivados y fuera del producto visible.
 
 ## Tablas Legacy
 
@@ -236,8 +299,13 @@ Regla:
 - `DocumentoTributario` es unico por `organizacion + tipo_documento + folio + rut_emisor`.
 
 ### Cascadas
-- Si se elimina una `Organizacion`, se eliminan sus roles asignados, disciplinas, bloques, planes, pagos, documentos y transacciones asociados por `CASCADE`.
-- Si se elimina una `Persona`, se eliminan sus roles, asistencias y consumos por `CASCADE`.
+- El intento de eliminar una `Organizacion` puede borrar roles, disciplinas,
+  bloques, planes, pagos, documentos y transacciones, pero puede ser bloqueado
+  por `ClaseLiberada.organizacion` o `LotePago.organizacion` con `PROTECT`.
+- Si se elimina una `Persona`, se eliminan sus roles, asistencias y consumos por
+  `CASCADE`, salvo que un `Payment.persona` la proteja.
+- Si se elimina el `User` vinculado, `Persona.user` usa `CASCADE` y por tanto
+  intenta eliminar también la Persona. Es un riesgo productivo explícito.
 - Si se elimina una `SesionClase`, se eliminan sus asistencias por `CASCADE`.
 - Si se elimina una `Asistencia`, se elimina su `AttendanceConsumption` por `CASCADE`.
 
@@ -245,6 +313,7 @@ Regla:
 - `PersonaRol.rol` usa `PROTECT`, por lo que no se puede eliminar un rol usado.
 - `Payment.persona` usa `PROTECT`, por lo que no se puede eliminar una persona con pagos.
 - `Transaction.categoria` usa `PROTECT`, por lo que no se puede eliminar una categoria con transacciones.
+- `ClaseLiberada.organizacion` y `LotePago.organizacion` usan `PROTECT`.
 
 ### SET_NULL
 - `BloqueHorario.disciplina` queda en `NULL` si se elimina la disciplina.
@@ -252,6 +321,7 @@ Regla:
 - `Payment.plan` queda en `NULL` si se elimina el plan.
 - `Payment.documento_tributario` queda en `NULL` si se elimina el documento.
 - `AttendanceConsumption.pago` queda en `NULL` si se elimina el pago.
+- `Payment.lote` queda en `NULL` si se elimina el lote, aunque la organización del lote está protegida.
 - `DocumentoTributario.documento_relacionado` queda en `NULL` si se elimina el documento padre.
 - `DocumentoTributario.persona_relacionada` queda en `NULL` si se elimina la persona relacionada.
 - `DocumentoTributario.organizacion_relacionada` queda en `NULL` si se elimina la organizacion relacionada.

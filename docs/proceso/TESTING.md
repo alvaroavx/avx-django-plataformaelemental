@@ -1,11 +1,23 @@
 # Testing
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-08-10
 
 ## Proposito
 Este documento define la estrategia de pruebas vigente.
 
 La meta no es tener tests por cantidad. La meta es proteger reglas criticas del negocio y evitar regresiones en flujos operativos.
+
+## Base de desarrollo autorizada
+
+La base configurada en este checkout es de desarrollo y está separada de
+producción. Puede usarse directamente para pruebas funcionales, cargas masivas,
+previews, importaciones y validaciones de datos de desarrollo; no se requiere
+levantar una instancia PostgreSQL paralela solo para aislar estas operaciones.
+
+Esta autorización no convierte resultados locales en evidencia productiva ni
+permite apuntar comandos a producción. Antes de una operación destructiva debe
+comprobarse que la configuración activa siga siendo `dev` y que el destino sea
+la base de desarrollo esperada.
 
 ## Comando Principal
 El set principal esperado es:
@@ -40,6 +52,25 @@ Para diagramas Mermaid en documentacion:
 ```bash
 npm run test:mermaid
 ```
+
+Para enlaces locales de documentación:
+
+```bash
+npm run test:docs-links
+```
+
+Para reutilizar el recorrido móvil parametrizado de Operación Profesor:
+
+```bash
+export ELEMENTAL_E2E_USERNAME='usuario-sintetico'
+export ELEMENTAL_E2E_PASSWORD='clave-no-versionada'
+npm run test:e2e:profesor
+```
+
+La convención, variables y evidencia se mantienen en
+[docs/proceso/ARTEFACTOS.md](ARTEFACTOS.md). El runner es de solo lectura salvo
+que se habilite explícitamente `ELEMENTAL_E2E_MUTACIONES=1` sobre desarrollo o
+QA con datos sintéticos.
 
 ## Estrategia Por Tipo De Cambio
 
@@ -129,6 +160,33 @@ El workflow ejecuta:
 - `python manage.py test`
 
 La base de datos de CI usa PostgreSQL mediante service container.
+
+Inventario al 2026-08-10: 410 métodos `test_*`. Este número orienta el tamaño,
+pero el resultado válido es el del runner; 15 métodos pertenecen a `monitor` y
+sus clases de vistas están explícitamente omitidas porque la app está archivada.
+
+Validación local de este corte: `python manage.py test` pasó 404 tests, con 12
+omitidos, en 517,437 segundos contra PostgreSQL local de desarrollo. Este
+resultado valida el código local, pero no reemplaza CI PostgreSQL 16 ni confirma
+la base o runtime productivos. El log sanitizado se conserva en
+`docs/evidencia/profesor-20260809/logs/suite-completa-ok.log`.
+
+Después de ese corte se agregaron dos casos para `poblar_mes_pruebas`; ambos
+pasaron contra PostgreSQL local en 1,048 segundos. Verifican preview sin escritura,
+14 sesiones, 25 asistencias/consumos, idempotencia y bloqueo con `DEBUG=False`.
+
+También se agregó una regresión para el buscador y la selección mutuamente
+excluyente al aprobar solicitudes. La clase completa de resolución pasó 6 casos
+contra PostgreSQL local en 6,099 segundos.
+
+El corte de búsqueda transversal agregó tres casos y amplió uno existente para
+personas, asistentes, alumnos de pago masivo y pagos. Pasaron 100 pruebas
+focalizadas más los 6 casos de resolución contra PostgreSQL 18.4 local; la suite
+completa de 410 métodos queda pendiente de una futura ejecución integral.
+
+El workflow `test.yml` usa Python 3.12; el job de test previo a deploy usa
+Python 3.13. Esta diferencia es riesgo operativo hasta alinear o demostrar ambas
+versiones junto al runtime productivo.
 
 Detalle operativo:
 - [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)

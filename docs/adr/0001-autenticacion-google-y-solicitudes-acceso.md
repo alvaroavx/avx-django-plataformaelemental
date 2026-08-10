@@ -2,6 +2,10 @@
 
 Fecha: 2026-07-20
 
+Estado al 2026-08-09: implementado en código detrás de flags apagados por
+defecto. La conectividad real con Google y los flags productivos no fueron
+confirmados desde este repositorio.
+
 ## Contexto
 
 Plataforma Elemental usa `django.contrib.auth.User` y relacion opcional `Persona.user`.
@@ -11,7 +15,7 @@ La plataforma tiene una brecha historica de aislamiento multi-organizacion. La a
 
 ## Decision
 
-- Se usara `django-allauth` con Google; no se implementara OAuth manualmente.
+- Se usa `django-allauth` con Google; no se implementa OAuth manualmente.
 - Se preservan `User`, sus IDs, `Persona.user`, `PersonaRol`, sesiones Django, `login_required` y la auditoria atribuida a `User`.
 - Google autentica identidad; nunca asigna organizaciones, roles ni permisos por correo, dominio o existencia de cuenta.
 - La identidad estable se resuelve primero por `SocialAccount(provider=google, uid=sub)`. El fallback por correo solo sirve para enlazar un `User` activo, unico y con correo Google verificado; cualquier duplicado, inactividad o conflicto falla cerrado.
@@ -20,7 +24,13 @@ La plataforma tiene una brecha historica de aislamiento multi-organizacion. La a
 - Para una identidad aún no vinculada se consulta la solicitud canónica por `provider + provider_subject`: la pendiente o, si no existe, la más reciente. Mientras esté pendiente o rechazada no se permite el fallback por correo. Reabrir y aprobar explícitamente esa misma solicitud habilita el vínculo con la organización elegida durante la aprobación.
 - Las solicitudes históricas no revocan una `SocialAccount` ya vinculada legítimamente. Esa cuenta queda sujeta a `User.is_active`, roles, organizaciones, asignaciones y permisos evaluados en cada petición.
 - La aprobacion administrativa requiere permiso global explicito `personas.gestionar_solicitudes_acceso`, no se concede por `staff` ni por `PersonaRol`.
-- La aprobacion se implementara como servicio atomico y auditado; el enlace social se completara solamente durante un `SocialLogin` validado posterior, usando API publica soportada por allauth.
+- La búsqueda de candidatos usa el detalle read-only de la solicitud. Aprobar,
+  rechazar y reabrir continúan siendo operaciones exclusivamente POST; un
+  formulario de búsqueda nunca debe usar esas rutas como destino GET.
+- User existente, Persona existente sin User y creación completa son estrategias
+  excluyentes. La interfaz debe rechazar combinaciones ambiguas antes de invocar
+  el servicio atómico.
+- La aprobacion se implementa como servicio atomico y auditado; el enlace social se completa solamente durante un `SocialLogin` validado posterior, usando API publica soportada por allauth.
 - Todos los flags son opt-in y seguros por defecto: `GOOGLE_AUTH_ENABLED`, `ACCESS_REQUESTS_ENABLED`, `ACCESS_REQUEST_APPROVAL_ENABLED` y `GOOGLE_AUTH_ENFORCED` parten en `false`.
 - `ACCESS_REQUEST_APPROVAL_ENABLED` y `GOOGLE_AUTH_ENFORCED` son security gates: no se habilitaran hasta corregir y probar el aislamiento multi-organizacion en listados, detalles, mutaciones, filtros, exports, JSON y navegacion directa.
 
@@ -44,4 +54,8 @@ La plataforma tiene una brecha historica de aislamiento multi-organizacion. La a
 
 ## Rollout y rollback
 
-El despliegue futuro se hara con flags apagados. La activacion sera gradual y reversible apagando flags; no se revertiran migraciones ni se eliminaran solicitudes/asociaciones durante un incidente. La autenticacion local de emergencia se conserva para superusuarios.
+El código y los workflows parten con flags apagados. Una activacion productiva
+debe ser gradual y reversible apagando flags; no se revierten migraciones ni se
+eliminan solicitudes/asociaciones durante un incidente. La autenticacion local
+de emergencia se conserva para superusuarios. El estado real de esos flags en
+el servidor es no confirmado.

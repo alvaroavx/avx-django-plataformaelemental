@@ -5,14 +5,25 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Tag o hash exacto que se probará y desplegará"
+        required: true
+        type: string
+      confirmacion:
+        description: "Escribir DESPLEGAR_PRODUCCION para habilitar el job protegido"
+        required: true
+        type: string
 
 concurrency:
-  group: deploy-main
-  cancel-in-progress: true
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    outputs:
+      release_commit: ${{ steps.release.outputs.release_commit }}
     env:
       DJANGO_ENV: dev
       POSTGRES_DB: plataforma_elemental_dev
@@ -43,6 +54,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.sha }}
+
+      - name: Verify release deploy protocol
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          grep -Fq 'DEPLOY_ALLOW_FULL_MIGRATE' scripts/deploy.sh
+          grep -Fq 'DEPLOY_EXPECTED_COMMIT' scripts/deploy.sh
+          if grep -Fq 'MANUAL_RELEASE_ONLY=1' scripts/release_operacion_profesor.sh 2>/dev/null; then
+            echo "Este release exige su runbook manual por etapas." >&2
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -62,9 +86,20 @@ jobs:
       - name: Run test suite
         run: python manage.py test
 
+      - name: Resolve tested release commit
+        id: release
+        run: |
+          set -euo pipefail
+          release_commit="$(git rev-parse HEAD)"
+          [[ "$release_commit" =~ ^[0-9a-f]{40}$ ]]
+          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
+
   deploy:
     runs-on: ubuntu-latest
     needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirmacion == 'DESPLEGAR_PRODUCCION' }}
+    environment:
+      name: production
 
     steps:
       - name: Validate deploy secrets
@@ -78,13 +113,14 @@ jobs:
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
           DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
           DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
+          DEPLOY_BACKUP_DIR: ${{ secrets.DEPLOY_BACKUP_DIR }}
         run: |
           set -euo pipefail
 
           missing=0
 
           # Validamos antes de abrir SSH para fallar con un mensaje claro cuando falte un secret esencial.
-          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY_B64 DEPLOY_PATH DEPLOY_SERVICE DEPLOY_ENV_FILE; do
+          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY_B64 DEPLOY_PATH DEPLOY_SERVICE DEPLOY_ENV_FILE DEPLOY_BACKUP_DIR; do
             if [[ -z "${!required_var:-}" ]]; then
               echo "Falta el secret requerido ${required_var}. El deploy no puede continuar sin ese valor." >&2
               missing=1
@@ -130,8 +166,12 @@ jobs:
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
           DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
           DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
+          DEPLOY_BACKUP_DIR: ${{ secrets.DEPLOY_BACKUP_DIR }}
+          RELEASE_COMMIT: ${{ needs.test.outputs.release_commit }}
         run: |
           set -euo pipefail
+
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
 
           # -i ~/.ssh/deploy_key evita depender del nombre por defecto de OpenSSH
           # y asegura que el workflow use exactamente la clave exclusiva de deploy.
@@ -145,13 +185,22 @@ jobs:
             "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
           set -euo pipefail
           cd "${DEPLOY_PATH}"
-          git fetch --prune origin
-          git checkout main
-          git reset --hard origin/main
+          test -z "\$(git status --porcelain)"
+          previous_commit="\$(git rev-parse HEAD)"
+          git fetch --prune --tags origin
+          git cat-file -e "${RELEASE_COMMIT}^{commit}"
+          resolved_commit="\$(git rev-parse "${RELEASE_COMMIT}^{commit}")"
+          test "\$resolved_commit" = "${RELEASE_COMMIT}"
+          git checkout --detach "${RELEASE_COMMIT}"
+          test "\$(git rev-parse HEAD)" = "${RELEASE_COMMIT}"
           export DEPLOY_SERVICE="${DEPLOY_SERVICE}"
           export DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE}"
           export DEPLOY_VENV_DIR="${DEPLOY_VENV_DIR}"
           export DEPLOY_PYTHON_BIN="${DEPLOY_PYTHON_BIN}"
+          export DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR}"
+          export DEPLOY_EXPECTED_COMMIT="${RELEASE_COMMIT}"
+          export DEPLOY_PREVIOUS_COMMIT="\$previous_commit"
+          export DEPLOY_ALLOW_FULL_MIGRATE="FULL_MIGRATE_APPROVED"
           bash scripts/deploy.sh
           EOF
 

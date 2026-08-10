@@ -4,12 +4,29 @@
 
 ## Documentacion viva
 - Antes de hacer cambios transversales, revisar `docs/INDICE.md` y `docs/arquitectura/PLATAFORMA.md`.
+- Antes de crear scripts, fixtures, cargas, recorridos de navegador o utilidades
+  temporales, revisar `docs/proceso/ARTEFACTOS.md` y el inventario existente. Si
+  un artefacto puede generalizarse, extenderlo en vez de crear otro desde cero.
 - Antes de trabajar una app puntual, revisar su archivo local:
   - `docs/apps/ASISTENCIAS.md`
   - `docs/apps/PERSONAS.md`
   - `docs/apps/FINANZAS.md`
   - `docs/apps/API.md`
 - Cada decision concreta debe actualizar su `.md` correspondiente en el mismo cambio de codigo.
+
+## Artefactos de trabajo
+- Los scripts, fixtures, trazas, capturas y resultados que se creen y usen para
+  completar una tarea deben conservarse, sanitizarse y documentarse según
+  `docs/proceso/ARTEFACTOS.md`.
+- No borrar un artefacto útil porque terminó la tarea. Si queda obsoleto, marcarlo
+  como reemplazado y enlazar su sucesor.
+- Nunca persistir secretos, datos personales reales, dumps, perfiles de navegador
+  ni dependencias descargadas. Conservar en su lugar la herramienta parametrizada,
+  una evidencia sanitizada o la receta reproducible.
+- Antes de delegar a un subagente, el agente principal debe revisar el inventario
+  y entregarle las rutas reutilizables pertinentes. El subagente debe preferir
+  extender esos artefactos y reportar cualquier artefacto nuevo para incorporarlo
+  al inventario.
 
 ## Estructura del proyecto
 api/ contiene las apis hacia el exterior de esta plataforma

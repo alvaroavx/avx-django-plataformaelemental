@@ -1,132 +1,127 @@
-# Deuda Tecnica Activa
+# Deuda técnica activa
 
-Fecha de actualizacion: 2026-05-11
+Fecha de actualización: 2026-08-09
 
-## Proposito
-Este documento mantiene visible la deuda tecnica activa del proyecto.
+Este documento lista deuda verificable del código actual. La fotografía completa,
+incluidos riesgos operativos y de datos, está en [ESTADO_ACTUAL](../ESTADO_ACTUAL.md).
 
-No es backlog de features. Es inventario de riesgos tecnicos conocidos que afectan mantenibilidad, migraciones, datos, seguridad operativa o velocidad de cambio.
+## Alta
 
-## Criterio De Uso
-- Registrar deuda cuando se decide no resolverla en el cambio actual.
-- Mantener descripcion concreta, impacto y accion recomendada.
-- Eliminar o actualizar una deuda cuando se resuelve.
-- No usar este documento para justificar deuda nueva sin test ni plan.
+### Permisos no uniformes entre apps
 
-## Deuda Alta
+Estado: activa.
 
-### Retiro De `database` Legacy
-Estado:
-- Resuelta en Sprint 14B.
+Asistencias no concede bypass operativo a `is_staff`, pero los helpers compartidos
+y consumidores de Personas/Finanzas todavía lo permiten por defecto. El alcance
+por organización tampoco está centralizado para toda superficie futura.
 
-Impacto:
-- La app legacy fue retirada de `INSTALLED_APPS`.
-- Las migraciones vigentes de `personas`, `asistencias` y `finanzas` ya no dependen de nodos `database`.
-- La carpeta `database/` fue eliminada del codigo versionado.
+Acción segura: inventariar actores y superficies, escribir la matriz definitiva,
+crear una cuenta administrativa de reemplazo y probarla antes de retirar privilegios.
+Incluir Django Admin: varias acciones masivas estándar siguen disponibles y la
+lectura de `AuditLog` no está aislada por organización.
 
-Accion recomendada:
-- Mantener tests de instalacion limpia y `migrate --plan` antes de tocar migraciones futuras.
-- No reintroducir imports o modelos bajo `database`.
+### Operaciones destructivas y cascadas productivas
 
-Documentos relacionados:
-- [docs/arquitectura/MODELO_DATOS.md](MODELO_DATOS.md)
-- [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](../operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
+Estado: activa.
 
-### Inventario De Reglas Con Referencias Obsoletas
-Estado:
-- Mitigada.
+`Persona.user` usa `CASCADE`; organizaciones, personas y sesiones también tienen
+cascadas amplias, combinadas con algunas protecciones financieras. La UI evita
+varios borrados, pero shell, Admin, migraciones o código futuro pueden activar el
+grafo real.
 
-Impacto:
-- [docs/arquitectura/INVENTARIO_REGLAS_NEGOCIO.md](INVENTARIO_REGLAS_NEGOCIO.md) fue reducido a marcador pendiente de regeneracion para no mantener enlaces obsoletos.
-- Falta reconstruir el inventario desde codigo vigente.
+Acción segura: documentar bajas soportadas, preferir desactivación/reversa, añadir
+preview y probar sobre copia antes de cambiar `on_delete` o datos.
 
-Accion recomendada:
-- Regenerar el inventario desde codigo vigente.
-- Mantener referencias a services/selectors actuales.
+### Runtime productivo no reproducido desde el repo
 
-### Produccion PostgreSQL Pendiente De Estabilizacion
-Estado:
-- Mitigada.
+Estado: no confirmado.
 
-Impacto:
-- Desarrollo y produccion operan con PostgreSQL.
-- Los cambios de migracion profundos siguen requiriendo respaldo y validacion en copia de datos antes de deploy.
+El usuario informa que el sitio está en producción y el repositorio contiene
+deploy automatizado, pero este levantamiento no verificó el servidor, commit,
+Python/PostgreSQL, flags, Nginx, media ni restauración de backups.
 
-Accion recomendada:
-- Confirmar restauracion de backup con `pg_restore` en entorno controlado.
-- Mantener backups previos a migraciones productivas.
+Acción segura: auditoría read-only del servidor y simulacro de `pg_restore`.
 
-## Deuda Media
+### Posibles datos reales versionados
 
-### Logica De Negocio Todavia En Views
-Estado:
-- Activa.
+Estado: activa.
 
-Impacto:
-- Aumenta acoplamiento HTTP/dominio.
-- Hace mas dificil testear reglas sin renderizar vistas.
-- En `finanzas` ya hubo una primera extraccion, pero quedan flujos complejos, especialmente documentos tributarios/importacion.
+`data/` contiene cargas de alumnos y `public/` PDFs tributarios no referenciados
+por runtime/tests. Sus nombres parecen reales; no deben asumirse fixtures.
 
-Accion recomendada:
-- Continuar extraccion incremental hacia selectors y services.
-- Siguiente candidato natural: helpers puros y flujo de documentos tributarios en `finanzas/services/documentos.py`.
-- No mover todo de golpe.
+Acción segura: confirmar dueño/retención, retirar del HEAD si corresponde y decidir
+si la exposición justifica limpiar historial. No copiar contenido a documentación.
 
-### Frontera Interna De `finanzas`
-Estado:
-- Activa.
+## Media
 
-Impacto:
-- `finanzas` contiene cobranza operacional y finanzas/contabilidad.
-- Si crece sin separacion interna, pagos, documentos, parsing e imputacion pueden volver a mezclarse en views.
+### Dos subdominios dentro de Finanzas
 
-Accion recomendada:
-- Mantener subdominios documentados en [docs/apps/FINANZAS.md](../apps/FINANZAS.md).
-- Usar `finanzas/services/imputacion.py`, `pagos.py`, `reportes.py` y futuros `documentos.py`.
-- Evitar app nueva hasta que el monolito modular lo justifique claramente.
+Estado: activa controlada.
 
-### Constraints De Integridad Pendientes
-Estado:
-- Activa.
+Cobranza y contabilidad comparten app. Hay services/selectors y paquete de
+documentos, pero las views aún coordinan casos de uso grandes.
 
-Impacto:
-- Algunas reglas viven en formularios/services y no en base de datos.
-- Ejemplo: un `DocumentoTributario` no deberia asociar simultaneamente `persona_relacionada` y `organizacion_relacionada`, pero la regla debe mantenerse desde capa de aplicacion.
+Acción: extraer incrementalmente sin crear otra app hasta que existan ciclo de
+vida, modelos y permisos realmente independientes.
 
-Accion recomendada:
-- Evaluar constraints con PostgreSQL cuando las reglas esten estables.
-- Agregar tests antes de promover reglas a constraints.
+### Reglas solo en aplicación
 
-### CI Y Deploy En Un Flujo Unico
-Estado:
-- Activa controlada.
+Estado: activa.
 
-Impacto:
-- El workflow prueba y despliega desde el mismo archivo.
-- Para la escala actual es aceptable, pero mezcla responsabilidades cuando produccion tenga datos mas criticos.
+Compatibilidad de organización, contraparte exclusiva y plan por defecto dependen
+en parte de forms/services. Escrituras futuras podrían omitirlos.
 
-Accion recomendada:
-- Mantenerlo simple mientras el riesgo sea bajo.
-- Separar CI de deploy productivo cuando PostgreSQL en produccion sea la fuente critica y haya mas ramas/ambientes.
+Acción: estabilizar reglas y datos antes de añadir constraints compatibles.
 
-## Deuda Baja
+### Desalineación de Python y selección de entorno
 
-### Documentacion Operativa Larga
-Estado:
-- Activa controlada.
+Estado: activa.
 
-Impacto:
-- Algunos documentos operativos son extensos porque capturan auditorias completas.
-- Pueden ser utiles como evidencia, pero no siempre como guia rapida.
+PR usa Python 3.12, deploy prueba 3.13 y runtime no está fijado. Un valor desconocido
+de `DJANGO_ENV` cae a `dev`; el secret key base tiene fallback inseguro.
 
-Accion recomendada:
-- Mantener auditorias completas en `docs/operacion/`.
-- Mantener `PLATAFORMA.md` como resumen ejecutivo.
-- Crear documentos especializados cuando una regla transversal crezca demasiado.
+Acción: alinear versión, fallar cerrado en entorno desconocido y exigir secretos
+productivos antes de construir la aplicación.
 
-## Regla De Cierre
-Una deuda puede eliminarse de este documento solo si:
-- el codigo fue corregido,
-- los tests relevantes pasan,
-- la documentacion duenia quedo actualizada,
-- y el cambio no dejo una deuda equivalente con otro nombre.
+### CI y deploy acoplados
+
+Estado: parcialmente resuelta.
+
+El patch de transición deja los pushes a `main` solo con pruebas y exige
+`workflow_dispatch`, confirmación literal y environment `production` para
+desplegar un tag/hash explícito. El clon remoto rechaza cambios locales y usa el
+SHA probado en modo detached. Sigue pendiente configurar revisores obligatorios
+en GitHub y reemplazar el healthcheck HTTP superficial por uno más profundo.
+
+Acción: verificar la política real del environment y diseñar healthcheck profundo.
+
+### Observabilidad y auditoría incompletas
+
+Estado: activa.
+
+No hay logs estructurados, alertas ni healthcheck de DB. `AuditLog` es parcial y
+best-effort. `monitor` está instalado, archivado y con tests HTML omitidos.
+
+Acción: definir mínimo de producción; auditar tablas de monitor antes de retirarlo.
+
+## Baja
+
+- Views extensas y separación desigual por capas.
+- Sin coverage formal ni convención única de factories.
+- Auditoría histórica SQLite muy larga; se conserva como evidencia, no como guía.
+- API conserva ApiAccessKey/Token DRF sin consumidor de datos.
+- Dependencias visuales CDN no están vendorizadas ni monitorizadas.
+
+## Resuelta
+
+- App legacy `database` retirada del runtime y grafo vigente.
+- SQLite retirado de settings y del checkout local en este corte.
+- Inventario de reglas regenerado desde el código actual.
+- Transiciones ordinarias de asistencia recalculan idempotentemente su consumo.
+- Pago ya no se elimina desde UI: existe reversa histórica controlada.
+- Accesos directos financieros por objeto se acotan mediante querysets de organización.
+
+## Regla de cierre
+
+Una deuda solo se marca resuelta cuando código, tests y documento dueño coinciden.
+Una mitigación de UI no equivale a una garantía de base de datos o producción.

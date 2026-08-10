@@ -1,0 +1,20 @@
+Primera ejecución focalizada:
+
+- 5 casos existentes: OK.
+- Regresión nueva: FAIL porque `alvaro vargas` no encontraba `Álvaro Vargas sin acceso`.
+- Causa: frase completa aplicada a cada campo y comparación sensible a tildes.
+
+Ejecución final:
+
+test_aprobacion_crea_identidad_y_rol_explicitos_sin_socialaccount ... ok
+test_busqueda_desde_error_vuelve_al_detalle_y_no_combina_user_con_persona ... ok
+test_conflictos_google_y_excepcion_correo_fallan_cerrado ... ok
+test_endpoints_exigen_flags_permiso_y_post ... ok
+test_flags_y_permiso_bloquean_servicio ... ok
+test_rollback_total_si_falla_personarol ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 6.099s
+
+OK
+Preserving test database for alias 'default' ('test_plataforma_elemental_dev')...
