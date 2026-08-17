@@ -1,20 +1,25 @@
 # Deploy
 
-Fecha de actualizacion: 2026-08-10
+Fecha de actualizacion: 2026-08-12
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
-- todo push a `main` ejecuta lint y tests, pero no despliega;
-- producción solo se ejecuta por `workflow_dispatch`, con tag/hash explícito,
-  confirmación literal y aprobación del environment `production`;
+- todo push a `main` ejecuta primero el gate completo sobre PostgreSQL aislado;
+- el job `deploy` depende explícitamente de `test`, exige `success()` y no inicia
+  si falla un check, Ruff o una prueba;
+- después del gate, el job usa el environment `production`; la aprobación humana
+  solo existe si GitHub tiene revisores obligatorios configurados allí;
+  `workflow_dispatch` conserva además tag/hash explícito y confirmación literal;
 - el servidor verifica un checkout limpio y cambia al hash probado en modo
   detached, sin `git reset --hard origin/main`;
 - el deploy genérico instala dependencias, respalda en almacenamiento externo,
   migra, recopila estáticos y reinicia `systemd`.
 
-La liberación Operación Profesor es una excepción deliberada: no usa el deploy
-genérico porque requiere detenerse entre dos migraciones. Su procedimiento exacto
-está en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
+La liberación Operación Profesor mantiene una excepción deliberada para sus dos
+migraciones escalonadas. `scripts/deploy.sh` comprueba que `asistencias.0004` y
+`finanzas.0012` ya estén aplicadas y aborta antes de backup, migraciones,
+estáticos o reinicio si siguen pendientes. Su procedimiento exacto está en
+[MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 ## Estrategia elegida
 - No se usa Docker, Compose ni self-hosted runner.
@@ -29,6 +34,9 @@ está en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 - `.github/workflows/deploy.yml`
 - `scripts/deploy.sh`
 - `scripts/release_operacion_profesor.sh`
+- `scripts/validar_gate_ci.py`
+- `scripts/smoke_produccion.sh`
+- `asistencias/management/commands/verificar_smoke_profesor.py`
 - `deploy/systemd/plataforma-elemental.service.example`
 
 ## Secrets de GitHub Actions
@@ -60,6 +68,21 @@ está en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 `DEPLOY_ENV_FILE` identifica un archivo existente solo en el servidor. `scripts/deploy.sh` lo carga para migraciones y validaciones, y el unit de systemd debe referenciar el mismo archivo mediante `EnvironmentFile` para Gunicorn.
 
 El archivo debe incluir las credenciales sensibles (`DJANGO_SECRET_KEY`, PostgreSQL y `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`) y las configuraciones no sensibles de Django, hosts, cookies y HSTS. No se copia a GitHub Actions, no se imprime y no se versiona.
+
+El smoke post-deploy lee además, solo desde ese archivo local del servidor:
+
+```dotenv
+DEPLOY_SMOKE_BASE_URL=https://apps.espacioelementos.cl
+DEPLOY_SMOKE_HOST=apps.espacioelementos.cl
+DEPLOY_SMOKE_PROFESOR_USERNAME=usuario_smoke_existente
+DEPLOY_SMOKE_PROFESOR_ORG_ID=1
+DEPLOY_SMOKE_FOREIGN_ORG_ID=2
+```
+
+La cuenta debe estar activa, tener `PersonaRol(PROFESOR, activo=True)` únicamente
+en la organización autorizada del smoke y no tenerlo en la organización ajena.
+No se guarda su contraseña en GitHub: el comando usa una sesión firmada temporal
+en memoria y no persiste una sesión Django.
 
 Para el despliegue oscuro inicial, mantener explícitamente:
 
@@ -203,22 +226,22 @@ Nota operativa:
 > Excepción Operación Profesor 2026-08-10: no usar este flujo para el tag
 > `release/operacion-profesor-20260810.1`. Ese release requiere el
 > [runbook manual](MIGRACIONES_OPERACION_PROFESOR.md#runbook-manual-de-producción-para-el-piloto).
-> El cambio de workflow forma parte del segundo commit, separado del cambio
-> funcional, y gobierna releases futuros. El checkout actual contiene
-> `MANUAL_RELEASE_ONLY=1`, por lo
-> que el propio workflow rechaza desplegarlo con el camino de migración completa.
+> El dispatch directo de ese tag sigue siendo rechazado por
+> `MANUAL_RELEASE_ONLY=1`. Un deploy posterior desde `main` también aborta en el
+> servidor si detecta pendiente cualquiera de sus dos migraciones; primero debe
+> completarse el runbook escalonado.
 
 Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh`.
 
 ```mermaid
 flowchart TD
-    A["Push a main o dispatch"] --> B["GitHub Actions"]
+    A["Push a main o dispatch"] --> B["Job test"]
     B --> C["Checkout del SHA o ref explícito"]
     C --> D["Instalar dependencias dev"]
     D --> E["ruff check ."]
     E --> F["Tests Django"]
-    F --> G{"workflow_dispatch y confirmación literal"}
-    G -- "No: push main" --> X["Fin: pruebas, sin deploy"]
+    F --> G{"Tests exitosos"}
+    G -- "No" --> X["Deploy omitido; sin SSH ni cambios productivos"]
     G -- "Sí" --> Y["Aprobación environment production"]
     Y --> H["Validar secrets"]
     H --> I["Preparar llave SSH y known_hosts"]
@@ -226,12 +249,13 @@ flowchart TD
     J --> K["Verificar worktree y registrar hash previo"]
     K --> L["Checkout detached del SHA probado"]
     L --> M["scripts/deploy.sh"]
-    M --> N["Validar hash, entorno y backup externo"]
-    N --> O["Instalar requirements"]
-    O --> P["Backup PostgreSQL con pg_dump"]
+    M --> N["Validar hash e instalar requirements"]
+    N --> O["Validar entorno y migraciones escalonadas"]
+    O --> P["Backup PostgreSQL externo con pg_dump"]
     P --> Q["migrate --noinput"]
     Q --> R["clearsessions y collectstatic"]
     R --> S["check --deploy y restart systemd"]
+    S --> T["Smoke HTTP y aislamiento Profesor"]
 ```
 
 1. `actions/checkout` del SHA del push o del tag/hash del dispatch;
@@ -239,26 +263,38 @@ flowchart TD
    de `scripts/deploy.sh`, y rechazar cualquier checkout marcado
    `MANUAL_RELEASE_ONLY=1`; esto impide usar el flujo genérico con releases
    anteriores o con esta migración escalonada;
-3. instalar dependencias Python;
-4. instalar dependencias de desarrollo para lint;
-5. correr `ruff check .`;
-6. correr `python manage.py test`;
-7. en push a `main`, terminar sin deploy;
-8. en dispatch, exigir `DESPLEGAR_PRODUCCION` y aprobación del environment;
-9. validar secrets obligatorios;
-10. escribir la llave privada en `~/.ssh/deploy_key`;
-11. validar que sea una privada SSH correcta y poblar `known_hosts`;
-12. abrir SSH al servidor usando `-i ~/.ssh/deploy_key`;
-13. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
-14. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
-15. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
+3. instalar dependencias Python y de desarrollo;
+4. validar estructuralmente el gate con `scripts/validar_gate_ci.py`;
+5. correr `python manage.py check`;
+6. correr `ruff check .`;
+7. correr `python manage.py test asistencias finanzas personas`;
+8. ejecutar explícitamente
+   `python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests`;
+9. omitir completamente `deploy` si cualquier paso anterior falla;
+10. antes de habilitar el flujo, comprobar que el environment `production`
+    existe y tiene revisores obligatorios; en dispatch exigir además
+    `DESPLEGAR_PRODUCCION`;
+11. validar secrets obligatorios;
+12. escribir y validar la llave privada, y poblar `known_hosts`;
+13. abrir SSH solo después del éxito del job `test` y la aprobación productiva;
+14. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
+15. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
+16. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
     explícita de migración completa.
+17. ejecutar `scripts/smoke_produccion.sh` como paso separado. Un fallo deja el
+    workflow rojo y evidencia en el log, pero no revierte código ni base de datos.
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
 - El job `test` levanta un service container `postgres:16`.
-- El workflow define `POSTGRES_DB=plataforma_elemental_dev`, `POSTGRES_USER=elementos`, `POSTGRES_PASSWORD=postgres`, `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
+- El workflow define `POSTGRES_DB=plataforma_elemental_ci`,
+  `POSTGRES_USER=elemental_ci`, `POSTGRES_PASSWORD=elemental_ci_only`,
+  `POSTGRES_HOST=127.0.0.1` y `POSTGRES_PORT=5432` solo para CI.
 - Las credenciales de CI no son credenciales productivas; existen solo dentro del runner.
+- Django crea `test_plataforma_elemental_ci` para cada ejecución y la elimina al
+  terminar porque el workflow no usa `--keepdb`. GitHub Actions destruye además
+  el contenedor PostgreSQL junto con el runner efímero.
+- El job no carga `.env.prod`, `DEPLOY_ENV_FILE` ni secrets de PostgreSQL.
 - SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
 - `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
 
@@ -279,6 +315,8 @@ flowchart TD
 - carga variables desde `DEPLOY_ENV_FILE`
 - valida `DJANGO_ENV=prod`
 - valida que PostgreSQL apunte a la base productiva esperada antes de migrar
+- exige que las migraciones escalonadas `asistencias.0004` y `finanzas.0012` ya
+  estén aplicadas; si no, deriva al runbook manual antes de cualquier escritura;
 - crea virtualenv si no existe
 - instala dependencias
 - ejecuta backup PostgreSQL previo a migraciones usando `pg_dump` en el destino
@@ -320,9 +358,9 @@ Fallback de Pillow:
 
 ## Gate de versión Python
 
-- `AGENTS.md` y el workflow `test.yml` declaran Python 3.12.
-- El job de pruebas previo al deploy en `deploy.yml` usa Python 3.13.
-- Ese Python 3.13 pertenece al runner de GitHub Actions; no demuestra la versión del servidor.
+- `AGENTS.md`, `test.yml` y el job previo al deploy en `deploy.yml` usan Python
+  3.12.
+- La versión del runner no demuestra la versión efectiva del servidor.
 - `scripts/deploy.sh` reutiliza el Python del virtualenv productivo existente. `DEPLOY_PYTHON_BIN` solo interviene al crear ese virtualenv.
 - El unit de Gunicorn ejecuta el binario dentro del mismo virtualenv productivo.
 
@@ -331,9 +369,10 @@ Antes de autorizar producción se debe comprobar en Gate 3, sin inferencias:
 1. versión de `python` dentro del virtualenv productivo;
 2. versión que instaló las dependencias;
 3. intérprete del proceso Gunicorn;
-4. compatibilidad de esa versión con las validaciones realizadas en Python 3.12 y con el job de Python 3.13.
+4. compatibilidad de esa versión con las validaciones realizadas en Python 3.12.
 
-No se autoriza release mientras el runtime productivo siga sin confirmar o exista una combinación 3.12/3.13 no validada.
+No se autoriza release mientras el runtime productivo siga sin confirmar o sea
+incompatible con Python 3.12.
 
 ## Media files públicos y protegidos
 Configuracion Django vigente:
@@ -412,8 +451,11 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
   política en el repositorio.
 - Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
   productivo debe comprobar el valor exacto antes de iniciar procesos.
-- El healthcheck final solo verifica respuesta HTTP del home y no prueba
-  PostgreSQL, Google, escritura de media ni restaurabilidad del backup.
+- El smoke final verifica `/` → login, `/accounts/login/` → `200` y el contrato
+  Profesor `200/404` con organizaciones autorizada/ajena. No prueba OAuth Google,
+  escritura de media ni restaurabilidad del backup.
+- Un smoke fallido marca el workflow como fallido después del deploy. No existe
+  rollback automático de migraciones ni restauración automática del dump.
 - El repositorio crea backups previos a migraciones, pero no versiona una prueba
   periodica de `pg_restore`; un dump no debe llamarse recuperable hasta probarlo.
 

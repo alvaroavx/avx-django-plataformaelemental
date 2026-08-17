@@ -125,7 +125,36 @@ npm run test:e2e:profesor
 Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 `ELEMENTAL_E2E_RUN_ID`, `ELEMENTAL_E2E_CHROME`,
 `ELEMENTAL_E2E_BUSQUEDA_ALUMNO`, `ELEMENTAL_E2E_MONTO`,
-`ELEMENTAL_E2E_MUTACIONES` y `ELEMENTAL_E2E_INSPECCIONAR_FORMULARIO`.
+`ELEMENTAL_E2E_MUTACIONES`, `ELEMENTAL_E2E_INSPECCIONAR_FORMULARIO`,
+`ELEMENTAL_E2E_SESSION_COOKIE`, `ELEMENTAL_E2E_SESSION_COOKIE_NAME`,
+`ELEMENTAL_E2E_PAGO_MASIVO`, `ELEMENTAL_E2E_CAPTURAS` y
+`ELEMENTAL_E2E_SOLO_PAGO_PERSONA_ID`, `ELEMENTAL_E2E_PERIODO_MES`,
+`ELEMENTAL_E2E_PERIODO_ANIO`, `ELEMENTAL_E2E_PERIODO_TODOS`,
+`ELEMENTAL_E2E_THEME`, `ELEMENTAL_E2E_USER_DATA_DIR`,
+`ELEMENTAL_E2E_BROWSER_URL` y `ELEMENTAL_E2E_SANITIZAR_CAPTURAS`.
+
+### Refresh visual Profesor 2026-08-16
+
+- `docs/evidencia/profesor-refresh-20260816/`: contrato final, matriz de
+  contraste, verificaciones de solo lectura y capturas 390×844 cuando el login
+  manual local está disponible.
+- Reutiliza `scripts/e2e/profesor_operacion.js`; no se creó un segundo runner ni
+  un fixture alternativo. Por instrucción del entorno, no crea bases temporales:
+  navega la base de desarrollo configurada y deja las mutaciones deshabilitadas.
+- No conserva contraseñas, cookies, perfiles de Chrome ni datos personales en
+  el resultado. El perfil local de navegador se elimina al cerrar la revisión.
+
+### Ronda Profesor sobre desarrollo 2026-08-16
+
+- `docs/evidencia/profesor-flujo-20260816/`: resultados sanitizados de dos
+  profesores, dos organizaciones y viewport móvil sobre la base de desarrollo
+  configurada; no se creó otra base.
+- Conserva los recorridos de sesiones, alumnos, asistencias, pagos y autorización,
+  además de una matriz de capacidades no disponibles para Profesor puro.
+- No conserva capturas, cookies ni el perfil temporal de Chrome. El flujo Google
+  manual no completó callback y se registra como no verificado.
+- Reutilizar esta evidencia como línea base funcional, no como prueba OAuth ni
+  como autorización para ejecutar mutaciones en producción.
 
 ### Evidencia Operación Profesor 2026-08-09
 
@@ -192,6 +221,25 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 - `docs/evidencia/release-manual-operacion-profesor-20260810/RESULTADOS.md`:
   evidencia sanitizada de sintaxis Bash/YAML, gates estructurales, documentación,
   lint y check local. No contiene secretos, datos de producción ni dumps.
+
+### Gate CI y smoke de producción
+
+- `scripts/validar_gate_ci.py`: valida la estructura de
+  `.github/workflows/deploy.yml`: trigger de `main`, PostgreSQL efímero, comandos
+  completos, `needs: test`, ausencia de `always()`, `success()` explícito y smoke
+  posterior al deploy. Se ejecuta dentro de los workflows de test y deploy.
+- `scripts/smoke_produccion.sh`: smoke de solo lectura posterior al reinicio.
+  Comprueba los códigos HTTP públicos y delega la autorización Profesor al
+  comando Django. Lee parámetros desde el `DEPLOY_ENV_FILE` local del servidor;
+  no recibe contraseñas ni IDs productivos desde el repositorio.
+- `asistencias/management/commands/verificar_smoke_profesor.py`: usa una cuenta
+  existente y dos organizaciones parametrizadas para verificar `200` autorizado
+  y `404` ajeno. Sustituye temporalmente el backend de sesión por cookies
+  firmadas para no dejar una fila de sesión en producción.
+- Uso posible: mantener estos tres artefactos como gate común para futuros
+  releases. El smoke no sustituye el E2E Google ni una prueba de restauración.
+- Evidencia sanitizada de esta revisión:
+  `docs/evidencia/gate-ci-deploy-20260811/RESULTADOS.md`.
 
 ### Poblador mensual operativo
 

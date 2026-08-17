@@ -26,9 +26,10 @@ jobs:
       release_commit: ${{ steps.release.outputs.release_commit }}
     env:
       DJANGO_ENV: dev
-      POSTGRES_DB: plataforma_elemental_dev
-      POSTGRES_USER: elementos
-      POSTGRES_PASSWORD: postgres
+      DJANGO_SECRET_KEY: ci-only-not-a-production-secret
+      POSTGRES_DB: plataforma_elemental_ci
+      POSTGRES_USER: elemental_ci
+      POSTGRES_PASSWORD: elemental_ci_only
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: 5432
       GOOGLE_AUTH_ENABLED: "false"
@@ -40,13 +41,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: plataforma_elemental_dev
-          POSTGRES_USER: elementos
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plataforma_elemental_ci
+          POSTGRES_USER: elemental_ci
+          POSTGRES_PASSWORD: elemental_ci_only
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U elementos -d plataforma_elemental_dev"
+          --health-cmd "pg_isready -U elemental_ci -d plataforma_elemental_ci"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -71,7 +72,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install dependencies
@@ -80,11 +81,20 @@ jobs:
       - name: Install development dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Validate CI deploy gate
+        run: python scripts/validar_gate_ci.py
+
+      - name: Run Django checks
+        run: python manage.py check
+
       - name: Run lint
         run: ruff check .
 
-      - name: Run test suite
-        run: python manage.py test
+      - name: Run complete domain test suite
+        run: python manage.py test asistencias finanzas personas
+
+      - name: Run Profesor multi-organization tests explicitly
+        run: python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests
 
       - name: Resolve tested release commit
         id: release
@@ -97,7 +107,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: test
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirmacion == 'DESPLEGAR_PRODUCCION' }}
+    if: ${{ success() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirmacion == 'DESPLEGAR_PRODUCCION')) }}
     environment:
       name: production
 
@@ -204,7 +214,27 @@ jobs:
           bash scripts/deploy.sh
           EOF
 
-      - name: Healthcheck production
+      - name: Smoke test production
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
+          DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
         run: |
           set -euo pipefail
-          curl -fsSI --retry 5 --retry-delay 2 --retry-all-errors https://apps.espacioelementos.cl/ >/dev/null
+
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -p "${DEPLOY_PORT:-22}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          export DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE}"
+          export DEPLOY_VENV_DIR="${DEPLOY_VENV_DIR}"
+          bash scripts/smoke_produccion.sh
+          EOF

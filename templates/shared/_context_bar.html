@@ -21,7 +21,20 @@
           </div>
         </div>
       </div>
-      {% if not hide_periodo %}
+      {% if profesor_mode %}
+        <form method="get" action="{% url 'profesor:inicio' %}" class="row g-2 align-items-end flex-grow-1 justify-content-xl-end" aria-label="Cambiar organización de trabajo">
+          {% if periodo_mes %}<input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">{% endif %}
+          {% if periodo_anio %}<input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">{% endif %}
+          <div class="col-12 col-md-5 col-xl-4">
+            <label class="form-label small mb-1" for="organizacion-profesor-global">Organización de trabajo</label>
+            <select id="organizacion-profesor-global" name="organizacion" class="form-select form-select-sm" onchange="this.form.submit()" required>
+              {% for org in organizaciones_profesor %}
+                <option value="{{ org.id }}" {% if organizacion_id == org.id|stringformat:"s" %}selected{% endif %}>{{ org.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+      {% elif not hide_periodo %}
         <form method="get" class="row g-2 align-items-end flex-grow-1 justify-content-xl-end" id="periodo-global-form">
           <div id="periodo-hidden-filtros"></div>
           <div class="col-6 col-md-2 col-xl-2">

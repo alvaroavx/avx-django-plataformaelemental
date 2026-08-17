@@ -9,9 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DJANGO_ENV: dev
-      POSTGRES_DB: plataforma_elemental_dev
-      POSTGRES_USER: elementos
-      POSTGRES_PASSWORD: postgres
+      DJANGO_SECRET_KEY: ci-only-not-a-production-secret
+      POSTGRES_DB: plataforma_elemental_ci
+      POSTGRES_USER: elemental_ci
+      POSTGRES_PASSWORD: elemental_ci_only
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: 5432
       GOOGLE_AUTH_ENABLED: "false"
@@ -23,13 +24,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: plataforma_elemental_dev
-          POSTGRES_USER: elementos
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plataforma_elemental_ci
+          POSTGRES_USER: elemental_ci
+          POSTGRES_PASSWORD: elemental_ci_only
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U elementos -d plataforma_elemental_dev"
+          --health-cmd "pg_isready -U elemental_ci -d plataforma_elemental_ci"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -47,8 +48,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Validate CI deploy gate
+        run: python scripts/validar_gate_ci.py
+
+      - name: Run Django checks
+        run: python manage.py check
+
       - name: Run lint
         run: ruff check .
 
-      - name: Run Django suite on PostgreSQL 16
-        run: python manage.py test
+      - name: Run complete domain test suite on PostgreSQL 16
+        run: python manage.py test asistencias finanzas personas
+
+      - name: Run Profesor multi-organization tests explicitly
+        run: python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests

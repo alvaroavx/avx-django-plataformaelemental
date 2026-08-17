@@ -196,7 +196,13 @@ No existe QA/staging. El piloto se ejecutará manualmente en producción bajo
 mantenimiento: la prueba sintética no reemplaza la medición real, por lo que el
 runbook exige backup, `lock_timeout`, criterios de aborto y registro de tiempos.
 
-Evidencia local: [docs/evidencia/profesor-20260809/RESULTADOS.md](../evidencia/profesor-20260809/RESULTADOS.md).
+Evidencia local inicial:
+[docs/evidencia/profesor-20260809/RESULTADOS.md](../evidencia/profesor-20260809/RESULTADOS.md).
+Ronda anterior sobre la base de desarrollo actual, conservada como evidencia
+histórica previa a este refresh:
+[docs/evidencia/profesor-flujo-20260816/RESULTADOS.md](../evidencia/profesor-flujo-20260816/RESULTADOS.md).
+Refresh visual, aislamiento multi-organización y login Google local:
+[docs/evidencia/profesor-refresh-20260816/RESULTADOS.md](../evidencia/profesor-refresh-20260816/RESULTADOS.md).
 
 El recorrido local de navegador comprobó además alta de alumno, persistencia de
 asistencia justificada tras recarga, pago individual con transacción visible y

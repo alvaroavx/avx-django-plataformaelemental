@@ -107,7 +107,7 @@ class RelacionesHistoricasPermisosTests(TestCase):
         )
 
     def test_asignacion_historica_inactiva_o_sin_revision_no_otorga_acceso(self):
-        detalle = reverse("asistencias:sesion_detail", args=[self.sesion.pk])
+        detalle = self._url_profesor("asistencias:sesion_detail", self.sesion.pk)
         self.assertEqual(self.client.get(detalle).status_code, 404)
         self.assertFalse(AsignacionProfesorDisciplina.objects.operativas().filter(pk=self.asignacion.pk).exists())
 

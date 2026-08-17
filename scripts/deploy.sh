@@ -129,6 +129,19 @@ backup_postgresql_prod() {
     "$POSTGRES_DB"
 }
 
+assert_manual_release_migrations_complete() {
+  local plan
+  plan="$(python manage.py showmigrations asistencias finanzas --list)"
+  if ! grep -Eq '^[[:space:]]*\[X\][[:space:]]+0004_alter_sesionclase_estado_liberacionsesion_and_more$' <<<"$plan"; then
+    echo "asistencias.0004 sigue pendiente; use el runbook manual de Operación Profesor." >&2
+    exit 1
+  fi
+  if ! grep -Eq '^[[:space:]]*\[X\][[:space:]]+0012_payment_clave_idempotencia_payment_disciplina_and_more$' <<<"$plan"; then
+    echo "finanzas.0012 sigue pendiente; use el runbook manual de Operación Profesor." >&2
+    exit 1
+  fi
+}
+
 if [[ ! -d "$VENV_DIR" ]] || [[ ! -x "$VENV_DIR/bin/python" ]]; then
   rm -rf "$VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -141,6 +154,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
 validate_prod_environment
+assert_manual_release_migrations_complete
 backup_postgresql_prod
 python manage.py migrate --noinput
 python manage.py clearsessions

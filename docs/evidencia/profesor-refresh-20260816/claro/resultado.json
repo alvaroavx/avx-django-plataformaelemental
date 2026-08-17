@@ -1,0 +1,131 @@
+{
+  "runId": "20260817040932",
+  "baseUrl": "http://127.0.0.1:8000",
+  "organizacionId": "[id-autorizado]",
+  "periodo": "8/2026",
+  "tema": "light",
+  "viewport": "390x844",
+  "mutacionesHabilitadas": false,
+  "capturasConservadas": true,
+  "capturasSanitizadas": true,
+  "perfilChromeReutilizado": false,
+  "navegadorAbiertoReutilizado": true,
+  "paginas": {
+    "01-inicio-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "02-sesiones-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/sesiones/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "detalleSesion": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/asistencias/sesiones/[id]/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Detalle sesión"
+    },
+    "03-alumnos-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/alumnos/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "04-pagos-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/pagos/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "05-formulario-sesion-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/sesiones/crear/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "06-formulario-alumno-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/alumnos/crear/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    },
+    "07-formulario-pago-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8000/profesor/pagos/crear/?organizacion=%5Bid-autorizado%5D&periodo_mes=8&periodo_anio=2026",
+      "title": "Profesor · Plataforma Elemental"
+    }
+  },
+  "controles": {
+    "contextoTrabajo": {
+      "organizacionesDisponibles": 3,
+      "permiteTodasOrganizaciones": true,
+      "permiteTodosPeriodos": true,
+      "temasDisponibles": 2,
+      "organizaciones": [
+        "Espacio Elementos",
+        "Latin Rengo"
+      ]
+    },
+    "navegacionInferior": [
+      {
+        "texto": "Inicio",
+        "alto": 64,
+        "ancho": 94
+      },
+      {
+        "texto": "Mis clases",
+        "alto": 64,
+        "ancho": 94
+      },
+      {
+        "texto": "Alumnos",
+        "alto": 64,
+        "ancho": 94
+      },
+      {
+        "texto": "Pagos",
+        "alto": 64,
+        "ancho": 94
+      }
+    ],
+    "accionesRapidas": [
+      {
+        "texto": "Crear sesión",
+        "alto": 47
+      },
+      {
+        "texto": "Asistencia",
+        "alto": 47
+      },
+      {
+        "texto": "Agregar alumno",
+        "alto": 71
+      },
+      {
+        "texto": "Registrar pago",
+        "alto": 71
+      }
+    ],
+    "selectorMasivo": {
+      "ejecutado": false,
+      "seleccionados": 0,
+      "foco": "buscar-alumno"
+    }
+  },
+  "autorizacion": {
+    "finanzasGlobales": {
+      "status": 403,
+      "urlFinal": "http://127.0.0.1:8000/finanzas/"
+    },
+    "organizaciones": {
+      "status": 403,
+      "urlFinal": "http://127.0.0.1:8000/personas/organizaciones/"
+    },
+    "adminGlobal": {
+      "status": 200,
+      "urlFinal": "http://127.0.0.1:8000/admin/login/?next=/admin/"
+    }
+  },
+  "mutaciones": {},
+  "erroresConsola": [
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+  ]
+}

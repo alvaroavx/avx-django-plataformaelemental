@@ -1,6 +1,6 @@
 # Migraciones de Operación Profesor
 
-Fecha de actualización: 2026-08-10
+Fecha de actualización: 2026-08-16
 
 ## Estado y decisión
 
@@ -21,10 +21,18 @@ compartido las recibió manualmente desde ese commit local, se debe detener el
 deploy y crear una migración correctiva posterior: no se debe editar el historial
 que ese ambiente ya considere aplicado.
 
-Una base de desarrollo que hubiera aplicado la versión local anterior de `0004`
-queda con un historial de migraciones incompatible con el archivo corregido. Se
-debe reconstruir desde una copia/fixture de desarrollo o restaurar un backup; no
-se debe marcar la migración como aplicada de nuevo ni añadir columnas a mano.
+Una base que hubiera aplicado la versión local precommit de `0004` queda con un
+historial incompatible con el archivo corregido: figuran creadas las relaciones,
+pero faltan `origen`, `revisada_en` y `revisada_por`. La migración posterior
+`asistencias.0005_reparar_schema_0004_aplicada_precommit` repara ese caso sin
+editar ni falsear `django_migrations`. Es idempotente respecto de una instalación
+nueva: si `0004` correcta ya creó los campos, no reclasifica datos.
+
+Cuando encuentra el esquema precommit, `0005` solo conserva como explícitas las
+relaciones que tienen `asignada_por`; las que no tienen actor quedan
+`historica`, inactivas y sin permiso operativo. No infiere vigencia desde
+sesiones o asistencias. La activación posterior sigue requiriendo
+`activar_relaciones_operativas` y queda auditada.
 
 ## Runbook manual de producción para el piloto
 

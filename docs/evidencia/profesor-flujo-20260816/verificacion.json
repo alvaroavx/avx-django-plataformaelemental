@@ -1,0 +1,48 @@
+{
+  "fecha": "2026-08-16",
+  "entorno": "desarrollo_configurado",
+  "postgresql": "18.4",
+  "base_adicional_creada": false,
+  "oauth_google_completado": false,
+  "organizaciones": {
+    "elementos": {
+      "alumnos_operativos": 13,
+      "alumnos_con_pago_agosto": 1,
+      "alumnos_sin_pago_agosto": 12
+    },
+    "latin_rengo": {
+      "alumnos_operativos": 15,
+      "alumnos_con_pago_agosto": 2,
+      "alumnos_sin_pago_agosto": 13
+    }
+  },
+  "invariantes_pagos_e2e": {
+    "pagos": 3,
+    "con_transaccion": 3,
+    "transacciones_distintas": 3,
+    "mismo_monto": 3,
+    "misma_organizacion": 3
+  },
+  "relaciones_finales": {
+    "asignaciones_docentes_total": 8,
+    "asignaciones_docentes_operativas": 3,
+    "asignaciones_docentes_historicas_inactivas": 5,
+    "matriculas_total": 107,
+    "matriculas_operativas": 49,
+    "matriculas_historicas_inactivas": 58
+  },
+  "autorizacion_profesor_puro": {
+    "crear_persona_desde_sesion": 403,
+    "quitar_asistente": 403,
+    "liberar_clase_individual": 403,
+    "editar_pago": 403,
+    "revertir_pago": 403,
+    "sesion_otra_organizacion": 404,
+    "pago_otra_organizacion": 404
+  },
+  "estado_final": {
+    "sesiones_inspeccionadas_abiertas": 2,
+    "sesiones_e2e_canceladas": 3,
+    "rol_administrativo_temporal_restaurado": true
+  }
+}

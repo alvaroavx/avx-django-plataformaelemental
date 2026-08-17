@@ -1,0 +1,20 @@
+{
+  "runId": "20260816-profesora-latin-asistente",
+  "baseUrl": "http://127.0.0.1:8010",
+  "organizacionId": "2",
+  "viewport": "390x844",
+  "mutacionesHabilitadas": false,
+  "capturasConservadas": false,
+  "paginas": {},
+  "controles": {},
+  "autorizacion": {},
+  "mutaciones": {
+    "pagoDirigido": {
+      "url": "http://127.0.0.1:8010/profesor/pagos/104/?organizacion=2",
+      "transaccionVisible": true
+    }
+  },
+  "erroresConsola": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

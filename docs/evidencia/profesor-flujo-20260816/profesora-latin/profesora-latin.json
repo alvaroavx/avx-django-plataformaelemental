@@ -1,0 +1,121 @@
+{
+  "runId": "20260816-profesora-latin",
+  "baseUrl": "http://127.0.0.1:8010",
+  "organizacionId": "2",
+  "viewport": "390x844",
+  "mutacionesHabilitadas": true,
+  "capturasConservadas": false,
+  "paginas": {
+    "01-inicio-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8010/profesor/?organizacion=2",
+      "title": "Tablero Elemental Operativo"
+    },
+    "02-sesiones-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8010/profesor/sesiones/?organizacion=2",
+      "title": "Tablero Elemental Operativo"
+    },
+    "03-alumnos-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8010/profesor/alumnos/?organizacion=2",
+      "title": "Tablero Elemental Operativo"
+    },
+    "04-pagos-mobile": {
+      "status": 200,
+      "url": "http://127.0.0.1:8010/profesor/pagos/?organizacion=2",
+      "title": "Tablero Elemental Operativo"
+    }
+  },
+  "controles": {
+    "navegacionInferior": [
+      {
+        "texto": "Inicio",
+        "alto": 64,
+        "ancho": 98
+      },
+      {
+        "texto": "Mis clases",
+        "alto": 64,
+        "ancho": 98
+      },
+      {
+        "texto": "Alumnos",
+        "alto": 64,
+        "ancho": 98
+      },
+      {
+        "texto": "Pagos",
+        "alto": 64,
+        "ancho": 98
+      }
+    ],
+    "accionesRapidas": [
+      {
+        "texto": "Crear sesión",
+        "alto": 62
+      },
+      {
+        "texto": "Pasar asistencia",
+        "alto": 62
+      },
+      {
+        "texto": "Agregar alumno",
+        "alto": 62
+      },
+      {
+        "texto": "Registrar pago",
+        "alto": 62
+      }
+    ],
+    "selectorMasivo": {
+      "ejecutado": false,
+      "seleccionados": 0,
+      "foco": "buscar-alumno"
+    },
+    "sesionProfesor": {
+      "puedeCrearPersonaDesdeSesion": false,
+      "puedeQuitarAsistente": false,
+      "puedeLiberarClaseAlumno": false
+    }
+  },
+  "autorizacion": {
+    "finanzasGlobales": {
+      "status": 403,
+      "urlFinal": "http://127.0.0.1:8010/finanzas/"
+    },
+    "organizaciones": {
+      "status": 403,
+      "urlFinal": "http://127.0.0.1:8010/personas/organizaciones/"
+    },
+    "adminGlobal": {
+      "status": 200,
+      "urlFinal": "http://127.0.0.1:8010/admin/login/?next=/admin/"
+    }
+  },
+  "mutaciones": {
+    "asistencia": {
+      "antes": 1,
+      "despues": 2
+    },
+    "alumno": {
+      "url": "http://127.0.0.1:8010/profesor/alumnos/?organizacion=2",
+      "runId": "20260816-profesora-latin"
+    },
+    "pago": {
+      "url": "http://127.0.0.1:8010/profesor/pagos/103/?organizacion=2",
+      "transaccionVisible": true,
+      "puedeEditar": false,
+      "puedeEliminarORevertir": false
+    },
+    "sesion": {
+      "urlCreada": "http://127.0.0.1:8010/asistencias/sesiones/173/?organizacion=2",
+      "liberada": true
+    }
+  },
+  "erroresConsola": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+  ]
+}

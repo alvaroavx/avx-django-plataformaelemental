@@ -73,6 +73,44 @@ La convención, variables y evidencia se mantienen en
 que se habilite explícitamente `ELEMENTAL_E2E_MUTACIONES=1` sobre desarrollo o
 QA con datos sintéticos.
 
+## Ronda funcional Profesor 2026-08-16
+
+Se ejecutó el runner reutilizable sobre la base de desarrollo configurada, sin
+crear una base de test adicional, con dos usuarios Profesor y dos organizaciones.
+Pasaron navegación móvil, aislamiento, alta de asistentes, cambio persistente de
+asistencia, alta/matrícula de alumno, pago individual con transacción, creación y
+liberación de sesión completa y cambio de estado de sesión.
+
+Esa ronda, anterior al refresh visual, encontró capacidades ausentes para
+Profesor puro. El refresh habilita quitar asistentes y liberar/revertir una
+clase individual mediante servicios auditados. Crear una persona sigue siendo
+responsabilidad de Alumnos y ahora la sesión enlaza ese flujo con retorno. La
+corrección de pagos permanece restringida porque el modelo no relaciona un
+contramovimiento contable con la transacción original. La evidencia histórica y
+los conteos de aquella ronda se conservan en
+[profesor-flujo-20260816](../evidencia/profesor-flujo-20260816/RESULTADOS.md).
+
+No se ejecutó `manage.py test` en esta ronda porque Django crea o reutiliza una
+base de pruebas separada y la instrucción era trabajar exclusivamente sobre la
+base de desarrollo actual. Los checks estáticos y de configuración sí forman
+parte del cierre. Este recorrido funcional no reemplaza la suite automatizada.
+
+Durante el desarrollo del refresh, antes de la instrucción final de no crear
+bases, se ejecutaron 18 pruebas focalizadas de Operación Profesor y
+multi-organización con resultado verde. También se ejecutaron 50 pruebas de los
+dominios y jornada: 49 pasaron y una detectó un fixture de transferencia sin
+comprobante; el caso corregido se reejecutó y pasó. Después de la restricción no
+se recreó la base de test, por lo que la suite integral de Asistencias, Finanzas
+y Personas queda pendiente y no se declara validación completa.
+
+El 2026-08-17 se completó el login Google real local con una cuenta Profesor y
+se ejecutó el recorrido sanitizado a 390×844 en claro, oscuro, contexto agregado
+y una segunda organización autorizada sin asignación docente. El recorrido fue
+de solo lectura: no creó bases ni modificó datos funcionales. La segunda
+organización respondió `200` en listados vacíos, ocultó acciones y respondió
+`403` en formularios mutantes directos. La evidencia está en
+[profesor-refresh-20260816](../evidencia/profesor-refresh-20260816/RESULTADOS.md).
+
 ## Estrategia Por Tipo De Cambio
 
 ### Modelos y migraciones
