@@ -29,6 +29,15 @@ def main():
     triggers = workflow.get("on", {})
     ramas_push = triggers.get("push", {}).get("branches", [])
     exigir("main" in ramas_push, "el workflow no se ejecuta en push a main.")
+    confirmacion = (
+        triggers.get("workflow_dispatch", {})
+        .get("inputs", {})
+        .get("confirmacion", {})
+    )
+    exigir(
+        confirmacion.get("required") == "true",
+        "workflow_dispatch debe exigir la confirmación manual.",
+    )
 
     jobs = workflow.get("jobs", {})
     test = jobs.get("test")
@@ -83,8 +92,16 @@ def main():
     exigir("always()" not in condicion_deploy, "deploy no puede usar if: always().")
     exigir("success()" in condicion_deploy, "deploy debe exigir success() explícitamente.")
     exigir(
-        "github.event_name == 'push'" in condicion_deploy,
-        "deploy debe habilitarse después del gate en push a main.",
+        "github.event_name == 'push'" not in condicion_deploy,
+        "un push a main no puede habilitar deploy.",
+    )
+    exigir(
+        "github.event_name == 'workflow_dispatch'" in condicion_deploy,
+        "deploy debe requerir workflow_dispatch.",
+    )
+    exigir(
+        "inputs.confirmacion == 'DESPLEGAR_PRODUCCION'" in condicion_deploy,
+        "deploy debe requerir la confirmación DESPLEGAR_PRODUCCION.",
     )
     exigir(
         deploy.get("environment", {}).get("name") == "production",
@@ -105,7 +122,8 @@ def main():
     )
 
     print(
-        "Gate CI válido: push main -> test PostgreSQL completo -> deploy condicionado -> smoke post-deploy"
+        "Gate CI válido: push main -> test PostgreSQL completo -> deploy omitido; "
+        "workflow_dispatch confirmado -> deploy -> smoke post-deploy"
     )
 
 
