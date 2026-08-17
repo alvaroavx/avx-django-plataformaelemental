@@ -1,2 +1,20 @@
 {% extends "asistencias/profesor/base.html" %}
-{% block content %}<div class="d-flex justify-content-between align-items-start gap-2 mb-3"><div><div class="small fw-bold texto-tierra text-uppercase">Tierra · Personas</div><h1 class="h3">Alumnos</h1><p class="text-muted">Solo alumnos asociados a tus clases.</p></div><a class="btn btn-tierra" href="{% url 'profesor:alumno_crear' %}"><i class="bi bi-person-plus me-1"></i>Agregar</a></div><div class="d-grid gap-2">{% for alumno in alumnos %}<article class="card territorio territorio-tierra"><div class="card-body"><h2 class="h6">{{ alumno.nombre_completo }}</h2><div class="small">{% if alumno.email %}<i class="bi bi-envelope me-1"></i>{{ alumno.email }}{% endif %}{% if alumno.telefono %}<br><i class="bi bi-telephone me-1"></i>{{ alumno.telefono }}{% endif %}</div><div class="mt-2">{% for asignacion in alumno.disciplinas_asignadas.all %}{% if asignacion.activa and asignacion.disciplina_id in disciplina_ids %}<span class="badge text-bg-light border">{{ asignacion.disciplina.nombre }}</span>{% endif %}{% endfor %}</div></div></article>{% empty %}<div class="card"><div class="card-body text-muted">Todavía no tienes alumnos asignados.</div></div>{% endfor %}</div>{% endblock %}
+{% block content %}
+<header class="page-heading d-flex justify-content-between align-items-start gap-3">
+  <div><span class="eyebrow">Personas de tus clases</span><h1>Alumnos</h1></div>
+  {% if puede_operar_profesor %}<a class="btn btn-student" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i><span class="visually-hidden">Agregar alumno</span><span class="d-none d-sm-inline ms-1">Agregar</span></a>{% endif %}
+</header>
+{% if not contexto_mutable %}<div class="context-notice mb-3" role="status"><i class="bi bi-eye" aria-hidden="true"></i><div><strong>Vista de lectura</strong><div>{{ mensaje_contexto_accion }}</div></div></div>{% endif %}
+<div class="operational-list">
+  {% for alumno in alumnos %}
+    <article class="operational-row">
+      <span class="avatar-profesor avatar-student" aria-hidden="true">{{ alumno.nombres|first }}{{ alumno.apellidos|first }}</span>
+      <div class="operational-row-main">
+        <div class="operational-row-title">{{ alumno.nombre_completo }}</div>
+        <div class="operational-row-meta">{% if alumno.email %}{{ alumno.email }}{% elif alumno.telefono %}{{ alumno.telefono }}{% else %}Sin contacto visible{% endif %}</div>
+        {% for matricula in alumno.matriculas_profesor %}<div class="status-text status-student"><i class="bi bi-person-check" aria-hidden="true"></i>{{ matricula.disciplina.nombre }}{% if organizacion_todas %} · {{ matricula.disciplina.organizacion.nombre }}{% endif %}</div>{% endfor %}
+      </div>
+    </article>
+  {% empty %}<div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><strong>Sin alumnos activos</strong><span>Aún no hay alumnos activos para tus clases.</span></div>{% endfor %}
+</div>
+{% endblock %}

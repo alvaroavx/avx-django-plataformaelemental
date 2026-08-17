@@ -1,0 +1,7 @@
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="pagination-profesor" aria-label="Páginas del historial">
+  {% if page_obj.has_previous %}<a class="btn btn-outline-profesor" href="?{{ profesor_query }}&pagina={{ page_obj.previous_page_number }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Anterior</a>{% else %}<span></span>{% endif %}
+  <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a class="btn btn-outline-profesor" href="?{{ profesor_query }}&pagina={{ page_obj.next_page_number }}">Siguiente <i class="bi bi-arrow-right" aria-hidden="true"></i></a>{% else %}<span></span>{% endif %}
+</nav>
+{% endif %}

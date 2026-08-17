@@ -4,20 +4,22 @@ from django.utils import timezone
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria
-from personas.models import Persona, PersonaRol, Rol
+from finanzas.models import AttendanceConsumption
+from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
-    normalizar_codigo_rol,
     usuario_tiene_permiso,
 )
 
 from ..models import (
     AlumnoDisciplina,
     AsignacionProfesorDisciplina,
+    Asistencia,
     LiberacionSesion,
     SesionClase,
 )
+from .dominio import liberar_clase, revertir_clase_liberada
 
 
 def _exigir_permiso_administrativo(*, user, accion, organizacion):
@@ -230,23 +232,45 @@ def asegurar_asignaciones_profesores(*, disciplina, profesores, user=None):
             )
 
 
-def rol_profesor_activo(user, *, organizacion_id=None):
+def organizaciones_profesor(user):
+    """Organizaciones donde la persona tiene un rol PROFESOR activo."""
+    persona = getattr(user, "persona", None)
+    if not user.is_authenticated or not user.is_active or not persona or not persona.activo:
+        return Organizacion.objects.none()
+    return (
+        Organizacion.objects.filter(
+            persona_roles__persona=persona,
+            persona_roles__activo=True,
+            persona_roles__rol__codigo__iexact="PROFESOR",
+        )
+        .distinct()
+        .order_by("nombre", "pk")
+    )
+
+
+def rol_profesor_activo(user, *, organizacion_id):
+    """Resuelve un rol exacto; nunca elige una organización implícitamente."""
     persona = getattr(user, "persona", None)
     if not user.is_authenticated or not user.is_active or not persona or not persona.activo:
         return None
-    roles = PersonaRol.objects.select_related("organizacion", "rol").filter(
-        persona=persona,
-        activo=True,
-    )
-    if organizacion_id:
-        roles = roles.filter(organizacion_id=organizacion_id)
-    for rol in roles.order_by("organizacion__nombre", "pk"):
-        if normalizar_codigo_rol(rol.rol.codigo) == "profesor":
-            return rol
-    return None
+    if organizacion_id in (None, ""):
+        return None
+    try:
+        return (
+            PersonaRol.objects.select_related("organizacion", "rol")
+            .filter(
+                persona=persona,
+                activo=True,
+                organizacion_id=organizacion_id,
+                rol__codigo__iexact="PROFESOR",
+            )
+            .first()
+        )
+    except (TypeError, ValueError, ValidationError):
+        return None
 
 
-def disciplinas_asignadas_profesor(user, *, organizacion_id=None):
+def disciplinas_asignadas_profesor(user, *, organizacion_id):
     rol = rol_profesor_activo(user, organizacion_id=organizacion_id)
     if not rol:
         return AsignacionProfesorDisciplina.objects.none(), None
@@ -261,8 +285,11 @@ def disciplinas_asignadas_profesor(user, *, organizacion_id=None):
     return asignaciones, rol
 
 
-def sesion_en_alcance_profesor(user, *, sesion_id):
-    asignaciones, rol = disciplinas_asignadas_profesor(user)
+def sesion_en_alcance_profesor(user, *, organizacion_id, sesion_id):
+    asignaciones, rol = disciplinas_asignadas_profesor(
+        user,
+        organizacion_id=organizacion_id,
+    )
     if not rol:
         return None
     disciplina_ids = asignaciones.values_list("disciplina_id", flat=True)
@@ -271,6 +298,7 @@ def sesion_en_alcance_profesor(user, *, sesion_id):
         .prefetch_related("profesores")
         .filter(
             pk=sesion_id,
+            disciplina__organizacion_id=organizacion_id,
             disciplina_id__in=disciplina_ids,
             profesores=rol.persona,
         )
@@ -279,9 +307,11 @@ def sesion_en_alcance_profesor(user, *, sesion_id):
 
 
 @transaction.atomic
-def crear_sesion_profesor(*, user, disciplina, fecha):
+def crear_sesion_profesor(*, user, organizacion_id, disciplina, fecha):
     if fecha < timezone.localdate():
         raise ValidationError("La sesión debe programarse para hoy o una fecha futura.")
+    if disciplina.organizacion_id != organizacion_id:
+        raise PermissionDenied("No tienes asignación activa para esta clase.")
     asignacion = (
         AsignacionProfesorDisciplina.objects.operativas().select_for_update()
         .select_related("disciplina__organizacion", "profesor")
@@ -310,7 +340,7 @@ def crear_sesion_profesor(*, user, disciplina, fecha):
 
 
 @transaction.atomic
-def liberar_sesion_profesor(*, user, sesion, motivo):
+def liberar_sesion_profesor(*, user, organizacion_id, sesion, motivo):
     motivo = (motivo or "").strip()
     if not motivo:
         raise ValidationError("La glosa o motivo de liberación es obligatorio.")
@@ -319,7 +349,11 @@ def liberar_sesion_profesor(*, user, sesion, motivo):
         .select_related("disciplina__organizacion")
         .get(pk=sesion.pk)
     )
-    if not sesion_en_alcance_profesor(user, sesion_id=sesion.pk):
+    if not sesion_en_alcance_profesor(
+        user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion.pk,
+    ):
         raise PermissionDenied("No tienes asignación activa para esta sesión.")
     if sesion.estado == SesionClase.Estado.CANCELADA:
         raise ValidationError("La sesión ya está cancelada.")
@@ -351,11 +385,15 @@ def liberar_sesion_profesor(*, user, sesion, motivo):
 
 
 @transaction.atomic
-def cambiar_estado_sesion_profesor(*, user, sesion, estado):
+def cambiar_estado_sesion_profesor(*, user, organizacion_id, sesion, estado):
     if estado not in {SesionClase.Estado.ABIERTA, SesionClase.Estado.COMPLETADA}:
         raise ValidationError("El profesor solo puede abrir o cerrar una sesión propia.")
     sesion = SesionClase.objects.select_for_update().select_related("disciplina__organizacion").get(pk=sesion.pk)
-    if not sesion_en_alcance_profesor(user, sesion_id=sesion.pk):
+    if not sesion_en_alcance_profesor(
+        user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion.pk,
+    ):
         raise PermissionDenied("No tienes asignación activa para esta sesión.")
     if sesion.estado == SesionClase.Estado.CANCELADA:
         raise ValidationError("Una sesión cancelada no puede reabrirse desde el espacio profesor.")
@@ -377,7 +415,18 @@ def cambiar_estado_sesion_profesor(*, user, sesion, estado):
 
 
 @transaction.atomic
-def crear_alumno_profesor(*, user, disciplina, nombres, apellidos="", email="", telefono=""):
+def crear_alumno_profesor(
+    *,
+    user,
+    organizacion_id,
+    disciplina,
+    nombres,
+    apellidos="",
+    email="",
+    telefono="",
+):
+    if disciplina.organizacion_id != organizacion_id:
+        raise PermissionDenied("No tienes asignación activa para esta clase.")
     asignacion = AsignacionProfesorDisciplina.objects.operativas().select_for_update().filter(
         disciplina=disciplina,
         profesor=getattr(user, "persona", None),
@@ -418,3 +467,97 @@ def crear_alumno_profesor(*, user, disciplina, nombres, apellidos="", email="", 
         metadata={"persona_id": persona.pk, "disciplina_id": disciplina.pk},
     )
     return persona
+
+
+def _exigir_sesion_profesor(*, user, organizacion_id, sesion_id):
+    sesion = sesion_en_alcance_profesor(
+        user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion_id,
+    )
+    if not sesion:
+        raise PermissionDenied("No tienes asignación activa para esta sesión.")
+    return sesion
+
+
+@transaction.atomic
+def quitar_asistente_profesor(*, user, organizacion_id, sesion, asistencia):
+    sesion = _exigir_sesion_profesor(
+        user=user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion.pk,
+    )
+    asistencia = (
+        Asistencia.objects.select_for_update()
+        .select_related("persona", "sesion__disciplina__organizacion")
+        .filter(
+            pk=asistencia.pk,
+            sesion=sesion,
+            persona__activo=True,
+            persona__roles__organizacion_id=organizacion_id,
+            persona__roles__rol__codigo__iexact="ESTUDIANTE",
+            persona__roles__activo=True,
+        )
+        .first()
+    )
+    if not asistencia:
+        raise PermissionDenied("La asistencia no pertenece a esta sesión.")
+    consumo = AttendanceConsumption.objects.select_for_update().filter(
+        asistencia=asistencia
+    ).first()
+    metadata = {
+        "asistencia_id": asistencia.pk,
+        "sesion_id": sesion.pk,
+        "persona_id": asistencia.persona_id,
+        "estado_asistencia": asistencia.estado,
+        "consumo_id": consumo.pk if consumo else None,
+        "pago_id": consumo.pago_id if consumo else None,
+    }
+    registrar_auditoria(
+        usuario=user,
+        accion=AuditLog.ACCION_ELIMINAR,
+        dominio="asistencias",
+        objeto=asistencia,
+        organizacion=sesion.disciplina.organizacion,
+        resumen="Asistente quitado de sesión por profesor",
+        metadata=metadata,
+    )
+    asistencia.delete()
+
+
+@transaction.atomic
+def liberar_clase_profesor(*, user, organizacion_id, sesion, asistencia, motivo):
+    sesion = _exigir_sesion_profesor(
+        user=user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion.pk,
+    )
+    asistencia = Asistencia.objects.select_for_update().filter(
+        pk=asistencia.pk,
+        sesion=sesion,
+        persona__roles__organizacion_id=organizacion_id,
+        persona__roles__rol__codigo__iexact="ESTUDIANTE",
+        persona__roles__activo=True,
+    ).first()
+    if not asistencia:
+        raise PermissionDenied("La asistencia no pertenece a esta organización y sesión.")
+    return liberar_clase(asistencia=asistencia, motivo=motivo, usuario=user)
+
+
+@transaction.atomic
+def revertir_clase_liberada_profesor(*, user, organizacion_id, sesion, asistencia):
+    sesion = _exigir_sesion_profesor(
+        user=user,
+        organizacion_id=organizacion_id,
+        sesion_id=sesion.pk,
+    )
+    asistencia = Asistencia.objects.select_for_update().filter(
+        pk=asistencia.pk,
+        sesion=sesion,
+        persona__roles__organizacion_id=organizacion_id,
+        persona__roles__rol__codigo__iexact="ESTUDIANTE",
+        persona__roles__activo=True,
+    ).first()
+    if not asistencia:
+        raise PermissionDenied("La asistencia no pertenece a esta organización y sesión.")
+    return revertir_clase_liberada(asistencia=asistencia, usuario=user)

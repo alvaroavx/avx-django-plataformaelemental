@@ -1,3 +1,14 @@
 {% extends "asistencias/profesor/base.html" %}
-{% block content %}<a class="btn btn-outline-secondary mb-3" href="javascript:history.back()"><i class="bi bi-arrow-left me-1"></i>Volver</a><section class="card territorio territorio-fuego"><div class="card-body"><h1 class="h3">{{ titulo }}</h1><form class="formulario-operativo" method="post" enctype="multipart/form-data" data-prevent-double-submit>{% csrf_token %}{{ form.as_div }}<button class="btn btn-fuego w-100 mt-3" type="submit"><i class="bi bi-check2-circle me-1"></i>Guardar</button><div class="small text-muted mt-2" role="status" data-submit-status></div></form></div></section>{% endblock %}
+{% block content %}
+<a class="btn btn-outline-profesor mb-3" href="{% url 'profesor:inicio' %}?{{ profesor_query }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Volver</a>
+<header class="page-heading"><span class="eyebrow">Tarea</span><h1>{{ titulo }}</h1></header>
+<section class="task-surface">
+  <form class="formulario-operativo" method="post" enctype="multipart/form-data" data-prevent-double-submit>
+    {% csrf_token %}
+    {{ form.as_div }}
+    <button class="btn btn-primary-profesor w-100 mt-2" type="submit"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Guardar</button>
+    <div class="small text-muted mt-2" role="status" aria-live="polite" data-submit-status></div>
+  </form>
+</section>
+{% endblock %}
 {% block extra_js %}<script>document.querySelectorAll('[data-prevent-double-submit]').forEach(function(form){form.addEventListener('submit',function(){var button=form.querySelector('button[type=submit]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');form.querySelector('[data-submit-status]').textContent='Guardando…';});});</script>{% endblock %}

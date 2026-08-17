@@ -2807,20 +2807,29 @@ class SprintDosDominioAsistenciasTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
-    def test_profesora_no_puede_liberar_clase(self):
+    def test_profesora_asignada_puede_liberar_clase_con_trazabilidad(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
         self.client.force_login(self.profesor_asignado)
-        response = self.client.post(
-            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
-            + f"?organizacion={self.organizacion.pk}",
-            {
-                "liberar_clase": "1",
-                "asistencia_id": asistencia.pk,
-                "motivo_liberacion": "No autorizado",
-            },
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+                + f"?organizacion={self.organizacion.pk}",
+                {
+                    "liberar_clase": "1",
+                    "asistencia_id": asistencia.pk,
+                    "motivo_liberacion": "Liberación operativa autorizada",
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        liberacion = ClaseLiberada.objects.get(asistencia=asistencia)
+        self.assertTrue(liberacion.activa)
+        self.assertEqual(liberacion.liberada_por, self.profesor_asignado)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                objeto_id=str(liberacion.pk),
+                resumen="Clase liberada",
+            ).exists()
         )
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(ClaseLiberada.objects.filter(asistencia=asistencia).exists())
 
 
 class SprintTresJornadaMovilTests(TestCase):
@@ -2952,13 +2961,20 @@ class SprintTresJornadaMovilTests(TestCase):
     def _login_asignada(self):
         self.client.force_login(self.profesora_asignada)
 
+    def _con_org(self, url, organizacion=None):
+        organizacion = organizacion or self.organizacion
+        return f"{url}?organizacion={organizacion.pk}"
+
+    def _parametros_org(self, **extra):
+        return {"organizacion": self.organizacion.pk, **extra}
+
     def test_integracion_jornada_usa_postgresql(self):
         self.assertEqual(connection.vendor, "postgresql")
         self.assertEqual(connection.settings_dict["ENGINE"], "django.db.backends.postgresql")
 
     def test_hoy_muestra_solo_sesiones_asignadas_en_orden_cronologico(self):
         self._login_asignada()
-        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+        response = self.client.get(self._con_org(reverse("asistencias:sesiones_hoy")))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -2981,7 +2997,7 @@ class SprintTresJornadaMovilTests(TestCase):
 
     def test_hoy_muestra_estado_vacio_comprensible(self):
         self.client.force_login(self.profesora_no_asignada)
-        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+        response = self.client.get(self._con_org(reverse("asistencias:sesiones_hoy")))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No tienes clases asignadas hoy")
@@ -2999,19 +3015,26 @@ class SprintTresJornadaMovilTests(TestCase):
         ):
             with self.subTest(usuaria=usuaria.username):
                 self.client.force_login(usuaria)
-                self.assertEqual(self.client.get(url).status_code, esperado)
+                self.assertEqual(self.client.get(self._con_org(url)).status_code, esperado)
 
     def test_desactivar_user_corta_lectura_y_escritura_con_sesion_abierta(self):
         self._login_asignada()
-        self.assertEqual(self.client.get(reverse("asistencias:sesiones_hoy")).status_code, 200)
+        self.assertEqual(
+            self.client.get(
+                self._con_org(reverse("asistencias:sesiones_hoy"))
+            ).status_code,
+            200,
+        )
         self.profesora_asignada.is_active = False
         self.profesora_asignada.save(update_fields=["is_active"])
 
-        lectura = self.client.get(reverse("asistencias:sesiones_hoy"))
+        lectura = self.client.get(self._con_org(reverse("asistencias:sesiones_hoy")))
         escritura = self.client.post(
-            reverse(
-                "asistencias:sesion_asistente_agregar",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistente_agregar",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             ),
             {"persona_id": self.estudiante.pk},
         )
@@ -3038,15 +3061,19 @@ class SprintTresJornadaMovilTests(TestCase):
         rol.save(update_fields=["activo"])
 
         lectura = self.client.get(
-            reverse(
-                "asistencias:sesion_detail",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_detail",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             )
         )
         escritura = self.client.post(
-            reverse(
-                "asistencias:sesion_asistente_agregar",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistente_agregar",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             ),
             {"persona_id": self.estudiante.pk},
         )
@@ -3066,15 +3093,19 @@ class SprintTresJornadaMovilTests(TestCase):
         self.sesion_temprano.profesores.remove(self.profesora_asignada.persona)
 
         lectura = self.client.get(
-            reverse(
-                "asistencias:sesion_detail",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_detail",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             )
         )
         escritura = self.client.post(
-            reverse(
-                "asistencias:sesion_asistente_agregar",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistente_agregar",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             ),
             {"persona_id": self.estudiante.pk},
         )
@@ -3153,10 +3184,13 @@ class SprintTresJornadaMovilTests(TestCase):
                 self.client.logout()
                 if usuario:
                     self.client.force_login(usuario)
-                query = {"organizacion": self.organizacion.pk} if actor == "administracion" else {}
+                query = self._parametros_org()
                 detalle = self.client.get(detalle_url, query)
-                busqueda = self.client.get(busqueda_url, {"q": "Elena"})
-                agregar = self.client.post(agregar_url, {"persona_id": 999999})
+                busqueda = self.client.get(busqueda_url, self._parametros_org(q="Elena"))
+                agregar = self.client.post(
+                    self._con_org(agregar_url),
+                    {"persona_id": 999999},
+                )
                 self.assertEqual(detalle.status_code, html_status)
                 self.assertEqual(busqueda.status_code, busqueda_status)
                 self.assertEqual(agregar.status_code, post_status)
@@ -3186,7 +3220,7 @@ class SprintTresJornadaMovilTests(TestCase):
                 "asistencias:sesion_asistentes_buscar",
                 kwargs={"pk": self.sesion_temprano.pk},
             ),
-            {"q": "Elena"},
+            self._parametros_org(q="Elena"),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -3203,14 +3237,14 @@ class SprintTresJornadaMovilTests(TestCase):
                     "asistencias:sesion_asistentes_buscar",
                     kwargs={"pk": self.sesion_no_asignada.pk},
                 ),
-                {"q": "Elena"},
+                self._parametros_org(q="Elena"),
             ),
             self.client.get(
                 reverse(
                     "asistencias:sesion_asistentes_buscar",
                     kwargs={"pk": 999991},
                 ),
-                {"q": "Elena"},
+                self._parametros_org(q="Elena"),
             ),
         )
         for response in responses:
@@ -3229,9 +3263,11 @@ class SprintTresJornadaMovilTests(TestCase):
         )
         self._login_asignada()
         response = self.client.post(
-            reverse(
-                "asistencias:sesion_asistente_agregar",
-                kwargs={"pk": self.sesion_temprano.pk},
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistente_agregar",
+                    kwargs={"pk": self.sesion_temprano.pk},
+                )
             ),
             {"persona_id": self.estudiante.pk},
         )
@@ -3249,9 +3285,11 @@ class SprintTresJornadaMovilTests(TestCase):
 
     def test_agregado_profesora_rechaza_persona_ajena_y_reintento(self):
         self._login_asignada()
-        url = reverse(
-            "asistencias:sesion_asistente_agregar",
-            kwargs={"pk": self.sesion_temprano.pk},
+        url = self._con_org(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_temprano.pk},
+            )
         )
         ajena = self.client.post(
             url,
@@ -3288,12 +3326,14 @@ class SprintTresJornadaMovilTests(TestCase):
             persona=self.estudiante,
         )
         self._login_asignada()
-        url = reverse(
-            "asistencias:sesion_asistencia_estado",
-            kwargs={
-                "pk": self.sesion_temprano.pk,
-                "asistencia_pk": asistencia.pk,
-            },
+        url = self._con_org(
+            reverse(
+                "asistencias:sesion_asistencia_estado",
+                kwargs={
+                    "pk": self.sesion_temprano.pk,
+                    "asistencia_pk": asistencia.pk,
+                },
+            )
         )
 
         ausencia = self.client.post(url, {"estado": Asistencia.Estado.AUSENTE})
@@ -3326,19 +3366,23 @@ class SprintTresJornadaMovilTests(TestCase):
             persona=self.estudiante_otra_org,
         )
         self._login_asignada()
-        url_ajena = reverse(
-            "asistencias:sesion_asistencia_estado",
-            kwargs={
-                "pk": self.sesion_temprano.pk,
-                "asistencia_pk": asistencia_ajena.pk,
-            },
+        url_ajena = self._con_org(
+            reverse(
+                "asistencias:sesion_asistencia_estado",
+                kwargs={
+                    "pk": self.sesion_temprano.pk,
+                    "asistencia_pk": asistencia_ajena.pk,
+                },
+            )
         )
-        url_valida = reverse(
-            "asistencias:sesion_asistencia_estado",
-            kwargs={
-                "pk": self.sesion_temprano.pk,
-                "asistencia_pk": 999992,
-            },
+        url_valida = self._con_org(
+            reverse(
+                "asistencias:sesion_asistencia_estado",
+                kwargs={
+                    "pk": self.sesion_temprano.pk,
+                    "asistencia_pk": 999992,
+                },
+            )
         )
 
         ajena = self.client.post(
@@ -3350,15 +3394,17 @@ class SprintTresJornadaMovilTests(TestCase):
             {"estado": Asistencia.Estado.AUSENTE},
         )
         invalido = self.client.post(
-            reverse(
-                "asistencias:sesion_asistencia_estado",
-                kwargs={
-                    "pk": self.sesion_temprano.pk,
-                    "asistencia_pk": Asistencia.objects.create(
-                        sesion=self.sesion_temprano,
-                        persona=self.estudiante,
-                    ).pk,
-                },
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistencia_estado",
+                    kwargs={
+                        "pk": self.sesion_temprano.pk,
+                        "asistencia_pk": Asistencia.objects.create(
+                            sesion=self.sesion_temprano,
+                            persona=self.estudiante,
+                        ).pk,
+                    },
+                )
             ),
             {"estado": "desconocido"},
         )
@@ -3372,22 +3418,24 @@ class SprintTresJornadaMovilTests(TestCase):
 
         self.client.force_login(self.profesora_no_asignada)
         no_asignada = self.client.post(
-            reverse(
-                "asistencias:sesion_asistencia_estado",
-                kwargs={
-                    "pk": self.sesion_temprano.pk,
-                    "asistencia_pk": Asistencia.objects.get(
-                        sesion=self.sesion_temprano,
-                        persona=self.estudiante,
-                    ).pk,
-                },
+            self._con_org(
+                reverse(
+                    "asistencias:sesion_asistencia_estado",
+                    kwargs={
+                        "pk": self.sesion_temprano.pk,
+                        "asistencia_pk": Asistencia.objects.get(
+                            sesion=self.sesion_temprano,
+                            persona=self.estudiante,
+                        ).pk,
+                    },
+                )
             ),
             {"estado": Asistencia.Estado.AUSENTE},
         )
         self.assertEqual(no_asignada.status_code, 404)
         self.assertEqual(no_asignada.json()["codigo"], "SESION_NO_ENCONTRADA")
 
-    def test_profesora_no_puede_quitar_liberar_ni_ver_detalles_financieros(self):
+    def test_profesora_puede_quitar_y_liberar_sin_ver_detalles_financieros(self):
         asistencia = Asistencia.objects.create(
             sesion=self.sesion_temprano,
             persona=self.estudiante,
@@ -3398,15 +3446,17 @@ class SprintTresJornadaMovilTests(TestCase):
             usuario=self.profesora_asignada,
         )
         self._login_asignada()
-        url = reverse(
-            "asistencias:sesion_detail",
-            kwargs={"pk": self.sesion_temprano.pk},
+        url = self._con_org(
+            reverse(
+                "asistencias:sesion_detail",
+                kwargs={"pk": self.sesion_temprano.pk},
+            )
         )
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["puede_quitar_asistente"])
-        self.assertFalse(response.context["puede_liberar_clase"])
+        self.assertTrue(response.context["puede_quitar_asistente"])
+        self.assertTrue(response.context["puede_liberar_clase"])
         self.assertFalse(response.context["puede_administrar_sesion"])
         self.assertNotContains(response, "Estado de pago")
         self.assertNotContains(response, reverse("personas:persona_detail", args=[self.estudiante.pk]))
@@ -3416,19 +3466,27 @@ class SprintTresJornadaMovilTests(TestCase):
         self.assertContains(response, 'aria-live="polite"', html=False)
         self.assertContains(response, 'aria-pressed="true"', html=False)
 
-        eliminar = self.client.post(
-            url,
-            {
-                "eliminar_asistente": "1",
-                "asistencia_id": asistencia.pk,
-            },
+        asistencia_id = asistencia.pk
+        with self.captureOnCommitCallbacks(execute=True):
+            eliminar = self.client.post(
+                url,
+                {
+                    "eliminar_asistente": "1",
+                    "asistencia_id": asistencia_id,
+                },
+            )
+        self.assertEqual(eliminar.status_code, 302)
+        self.assertFalse(Asistencia.objects.filter(pk=asistencia_id).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(
+                metadata__asistencia_id=asistencia_id,
+                resumen="Asistente quitado de sesión por profesor",
+            ).exists()
         )
-        self.assertEqual(eliminar.status_code, 403)
-        self.assertTrue(Asistencia.objects.filter(pk=asistencia.pk).exists())
 
     def test_navegacion_profesora_expone_operacion_sin_panel_administrativo(self):
         self._login_asignada()
-        response = self.client.get(reverse("asistencias:sesiones_hoy"))
+        response = self.client.get(self._con_org(reverse("asistencias:sesiones_hoy")))
 
         self.assertContains(response, reverse("profesor:inicio"))
         self.assertNotContains(
@@ -3441,8 +3499,8 @@ class SprintTresJornadaMovilTests(TestCase):
             f'href="{reverse("finanzas:dashboard")}"',
             html=False,
         )
-        self.assertContains(response, 'aria-label="Abrir menú"', html=False)
-        self.assertContains(response, 'min-height: 44px', html=False)
+        self.assertContains(response, 'aria-label="Abrir contexto de trabajo"', html=False)
+        self.assertContains(response, "/static/asistencias/css/profesor.css")
 
 
 class SprintCincoAislamientoAsistenciasTests(TestCase):
@@ -3770,7 +3828,10 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
             kwargs={"pk": self.sesion_a.pk},
         )
 
-        visible = self.client.get(url, {"q": "Compartida"}).json()["resultados"]
+        visible = self.client.get(
+            url,
+            {"q": "Compartida", "organizacion": self.organizacion_a.pk},
+        ).json()["resultados"]
 
         self.assertEqual([item["id"] for item in visible], [compartida.pk])
 

@@ -1,4 +1,4 @@
-{% extends "asistencias/base_app.html" %}
+{% extends base_template|default:"asistencias/base_app.html" %}
 {% block title %}Hoy · Clases{% endblock %}
 
 {% block extra_head %}
@@ -43,6 +43,45 @@
 {% endblock %}
 
 {% block content %}
+{% if profesor_mode %}
+<section aria-labelledby="jornada-hoy-title">
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Agenda</span>
+      <h1 id="jornada-hoy-title">Hoy</h1>
+      <p>{{ fecha_hoy|date:"l d \d\e F \d\e Y"|capfirst }}</p>
+    </div>
+  </header>
+
+  <div id="jornada-hoy-status" class="inline-status" role="status" aria-live="polite" hidden></div>
+  <div class="operational-list" id="sesiones-hoy-list">
+    {% for sesion in sesiones %}
+      <article class="operational-row" data-sesion-id="{{ sesion.pk }}">
+        <span class="avatar-profesor avatar-session" aria-hidden="true"><i class="bi {{ sesion.momento_icono }}"></i></span>
+        <div class="operational-row-main">
+          <h2 class="operational-row-title">{{ sesion.disciplina.nombre }}</h2>
+          <div class="operational-row-meta">
+            {% if organizacion_todas %}{{ sesion.disciplina.organizacion.nombre }} · {% endif %}
+            {% if sesion.bloque %}{{ sesion.bloque.hora_inicio|time:"H:i" }}–{{ sesion.bloque.hora_fin|time:"H:i" }}{% else %}Horario no informado{% endif %}
+            · {{ sesion.total_asistentes }} asistente{{ sesion.total_asistentes|pluralize }}
+          </div>
+          <span class="status-text"><i class="bi {{ sesion.momento_icono }}" aria-hidden="true"></i>{{ sesion.momento_label }}</span>
+        </div>
+        {% if contexto_mutable %}
+          <a class="row-link" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ profesor_query }}" data-abrir-sesion><span class="visually-hidden">Abrir {{ sesion.disciplina.nombre }}</span></a>
+        {% endif %}
+      </article>
+    {% empty %}
+      <div class="empty-state">
+        <i class="bi bi-calendar2-check" aria-hidden="true"></i>
+        <strong>No tienes clases asignadas hoy</strong>
+        <span>Cuando exista una sesión asignada aparecerá aquí.</span>
+      </div>
+    {% endfor %}
+  </div>
+  {% if not contexto_mutable %}<div class="context-readonly-note"><i class="bi bi-lock" aria-hidden="true"></i>{{ mensaje_contexto_accion }}</div>{% endif %}
+</section>
+{% else %}
 <section class="jornada-hoy mt-3" aria-labelledby="jornada-hoy-title">
   <header class="mb-3">
     <div class="text-uppercase small fw-semibold text-success">Jornada de clases</div>
@@ -98,7 +137,7 @@
 
           <a
             class="btn btn-success jornada-action"
-            href="{% url 'asistencias:sesion_detail' sesion.pk %}"
+            href="{% url 'asistencias:sesion_detail' sesion.pk %}{% if profesor_query %}?{{ profesor_query }}{% endif %}"
             data-abrir-sesion
           >
             Abrir sesión
@@ -117,6 +156,7 @@
     {% endfor %}
   </div>
 </section>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

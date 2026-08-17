@@ -1,22 +1,67 @@
 {% extends "asistencias/profesor/base.html" %}
 {% block content %}
-<header class="mb-3"><div class="small fw-bold texto-fuego text-uppercase">Tablero Elemental Operativo</div><h1 class="h3 mb-1">Inicio</h1><p class="text-muted mb-0">Tu operación de clases, en un solo lugar.</p></header>
+<header class="page-heading">
+  <span class="eyebrow">Resumen</span>
+  <h1>Inicio</h1>
+</header>
 
-<section class="card territorio territorio-fuego mb-3" aria-labelledby="principal-title"><div class="card-body">
-  {% if proxima_sesion %}<div class="small fw-bold texto-fuego text-uppercase">{% if proxima_sesion.fecha == fecha_hoy %}Sesión en curso o próxima{% else %}Próxima sesión{% endif %}</div><h2 class="h4" id="principal-title">{{ proxima_sesion.disciplina.nombre }}</h2><p><i class="bi bi-calendar-event me-1"></i>{{ proxima_sesion.fecha|date:"d/m/Y" }}{% if proxima_sesion.bloque %} · {{ proxima_sesion.bloque.hora_inicio|time:"H:i" }}{% endif %}</p><a class="btn btn-fuego touch" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}"><i class="bi bi-play-circle me-1"></i>Abrir sesión</a>
-  {% else %}<div class="small fw-bold texto-fuego text-uppercase">Agenda</div><h2 class="h4" id="principal-title">No tienes sesiones próximas</h2><p class="text-muted">Puedes planificar una sesión para una clase asignada.</p><a class="btn btn-fuego" href="{% url 'profesor:sesion_crear' %}"><i class="bi bi-plus-circle me-1"></i>Crear sesión</a>{% endif %}
-</div></section>
+{% if not contexto_mutable %}
+  <div class="context-notice mb-3" role="status">
+    <i class="bi bi-eye" aria-hidden="true"></i>
+    <div><strong>Vista de lectura</strong><div>{{ mensaje_contexto_accion }}</div></div>
+  </div>
+{% endif %}
 
-<section aria-labelledby="acciones-title" class="mb-4"><h2 class="h5" id="acciones-title">Acciones rápidas</h2><div class="acciones-rapidas">
-  <a class="btn btn-aire" href="{% url 'profesor:sesion_crear' %}"><i class="bi bi-calendar-plus"></i>Crear sesión</a>
-  {% if proxima_sesion %}<a class="btn btn-tierra" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}"><i class="bi bi-person-check"></i>Pasar asistencia</a>{% else %}<a class="btn btn-tierra disabled" aria-disabled="true"><i class="bi bi-person-check"></i>Pasar asistencia</a>{% endif %}
-  <a class="btn btn-tierra" href="{% url 'profesor:alumno_crear' %}"><i class="bi bi-person-plus"></i>Agregar alumno</a>
-  <a class="btn btn-agua" href="{% url 'profesor:pago_crear' %}"><i class="bi bi-cash-coin"></i>Registrar pago</a>
-</div></section>
+<section class="primary-session mb-4" aria-labelledby="sesion-principal-titulo">
+  {% if proxima_sesion %}
+    <span class="eyebrow">{% if proxima_sesion.fecha == fecha_hoy %}Sesión de hoy{% elif periodo_todos %}Sesión destacada{% else %}Próxima sesión del período{% endif %}</span>
+    <h2 class="h4 mt-1 mb-2" id="sesion-principal-titulo">{{ proxima_sesion.disciplina.nombre }}</h2>
+    {% if organizacion_todas %}<div class="operational-row-meta mb-1"><i class="bi bi-building" aria-hidden="true"></i> {{ proxima_sesion.disciplina.organizacion.nombre }}</div>{% endif %}
+    <p class="mb-3"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i>{{ proxima_sesion.fecha|date:"d/m/Y" }}{% if proxima_sesion.bloque %} · {{ proxima_sesion.bloque.hora_inicio|time:"H:i" }}{% endif %}</p>
+    {% if puede_operar_profesor %}<a class="btn btn-critical" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}?{{ profesor_query }}"><i class="bi bi-play-circle me-1" aria-hidden="true"></i>Abrir sesión</a>{% endif %}
+  {% else %}
+    <span class="eyebrow">Agenda</span>
+    <h2 class="h4 mt-1" id="sesion-principal-titulo">Sin sesiones para este período</h2>
+    <p class="text-muted mb-0">Cambia el contexto para consultar otra fecha.</p>
+  {% endif %}
+</section>
 
-<div class="row g-3">
-  <section class="col-12"><div class="card territorio territorio-aire"><div class="card-body"><div class="d-flex justify-content-between"><h2 class="h5 texto-aire"><i class="bi bi-wind me-1"></i>Aire · Sesiones</h2><a href="{% url 'profesor:sesiones' %}">Ver todas</a></div>{% for sesion in sesiones_hoy %}<a class="d-flex justify-content-between py-2 border-top text-decoration-none text-dark" href="{% url 'asistencias:sesion_detail' sesion.pk %}"><span>{{ sesion.disciplina.nombre }}</span><span>{{ sesion.bloque.hora_inicio|time:"H:i"|default:"Sin hora" }}</span></a>{% empty %}<p class="text-muted mb-0">No tienes sesiones hoy.</p>{% endfor %}</div></div></section>
-  <section class="col-md-6"><div class="card territorio territorio-tierra h-100"><div class="card-body"><div class="d-flex justify-content-between"><h2 class="h5 texto-tierra"><i class="bi bi-tree me-1"></i>Tierra · Alumnos</h2><a href="{% url 'profesor:alumnos' %}">Ver todos</a></div>{% for alumno in alumnos_resumen %}<div class="py-2 border-top">{{ alumno.nombre_completo }}</div>{% empty %}<p class="text-muted mb-0">Sin alumnos asignados.</p>{% endfor %}</div></div></section>
-  <section class="col-md-6"><div class="card territorio territorio-agua h-100"><div class="card-body"><div class="d-flex justify-content-between"><h2 class="h5 texto-agua"><i class="bi bi-droplet me-1"></i>Agua · Pagos</h2><a href="{% url 'profesor:pagos' %}">Ver todos</a></div>{% for pago in pagos_resumen %}<a class="d-flex justify-content-between py-2 border-top text-decoration-none text-dark" href="{% url 'profesor:pago_detalle' pago.pk %}"><span>{{ pago.persona.nombre_completo }}</span><strong>${{ pago.monto_total|floatformat:"0g" }}</strong></a>{% empty %}<p class="text-muted mb-0">Sin pagos registrados.</p>{% endfor %}</div></div></section>
-</div>
+{% if puede_operar_profesor %}
+<section aria-labelledby="acciones-title" class="mb-4">
+  <div class="section-heading"><h2 id="acciones-title">Acciones rápidas</h2></div>
+  <div class="quick-actions">
+    <a class="btn btn-primary-profesor" href="{% url 'profesor:sesion_crear' %}?{{ profesor_query }}"><i class="bi bi-calendar-plus" aria-hidden="true"></i>Crear sesión</a>
+    {% if proxima_sesion %}<a class="btn btn-outline-profesor" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}?{{ profesor_query }}"><i class="bi bi-person-check" aria-hidden="true"></i>Asistencia</a>{% endif %}
+    <a class="btn btn-student" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i>Agregar alumno</a>
+    <a class="btn btn-payment" href="{% url 'profesor:pago_crear' %}?{{ profesor_query }}"><i class="bi bi-cash-coin" aria-hidden="true"></i>Registrar pago</a>
+  </div>
+</section>
+{% endif %}
+
+<section aria-labelledby="sesiones-resumen">
+  <div class="section-heading"><h2 id="sesiones-resumen">Sesiones</h2><a href="{% url 'profesor:sesiones' %}?{{ profesor_query }}">Ver historial</a></div>
+  <div class="operational-list">
+    {% for sesion in sesiones_hoy %}
+      <div class="operational-row">
+        <span class="avatar-profesor avatar-session" aria-hidden="true"><i class="bi bi-calendar2-check"></i></span>
+        <div class="operational-row-main"><div class="operational-row-title">{{ sesion.disciplina.nombre }}</div><div class="operational-row-meta">{% if organizacion_todas %}{{ sesion.disciplina.organizacion.nombre }} · {% endif %}{{ sesion.bloque.hora_inicio|time:"H:i"|default:"Horario pendiente" }}</div></div>
+        {% if puede_operar_profesor %}<a class="row-link" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ profesor_query }}"><span class="visually-hidden">Abrir {{ sesion.disciplina.nombre }}</span></a>{% endif %}
+      </div>
+    {% empty %}<div class="empty-state"><i class="bi bi-calendar-x" aria-hidden="true"></i><span>Sin sesiones para hoy en este contexto.</span></div>{% endfor %}
+  </div>
+</section>
+
+<section aria-labelledby="alumnos-resumen">
+  <div class="section-heading"><h2 id="alumnos-resumen">Alumnos</h2><a href="{% url 'profesor:alumnos' %}?{{ profesor_query }}">Ver todos</a></div>
+  <div class="operational-list">
+    {% for alumno in alumnos_resumen %}<div class="operational-row"><span class="avatar-profesor avatar-student" aria-hidden="true">{{ alumno.nombres|first }}{{ alumno.apellidos|first }}</span><div class="operational-row-main"><div class="operational-row-title">{{ alumno.nombre_completo }}</div><div class="operational-row-meta">Estudiante activo</div></div></div>{% empty %}<div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><span>Sin alumnos activos en tus clases.</span></div>{% endfor %}
+  </div>
+</section>
+
+<section aria-labelledby="pagos-resumen">
+  <div class="section-heading"><h2 id="pagos-resumen">Pagos</h2><a href="{% url 'profesor:pagos' %}?{{ profesor_query }}">Ver todos</a></div>
+  <div class="operational-list">
+    {% for pago in pagos_resumen %}<div class="operational-row"><span class="avatar-profesor avatar-payment" aria-hidden="true"><i class="bi bi-cash"></i></span><div class="operational-row-main"><div class="operational-row-title">{{ pago.persona.nombre_completo }}</div><div class="operational-row-meta">{% if organizacion_todas %}{{ pago.organizacion.nombre }} · {% endif %}{{ pago.fecha_pago|date:"d/m/Y" }}</div></div><div class="operational-row-amount">${{ pago.monto_total|floatformat:"0g" }}</div>{% if puede_operar_profesor %}<a class="row-link" href="{% url 'profesor:pago_detalle' pago.pk %}?{{ profesor_query }}"><span class="visually-hidden">Ver pago</span></a>{% endif %}</div>{% empty %}<div class="empty-state"><i class="bi bi-receipt" aria-hidden="true"></i><span>Sin pagos para este período.</span></div>{% endfor %}
+  </div>
+</section>
 {% endblock %}

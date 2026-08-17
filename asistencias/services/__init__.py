@@ -13,6 +13,10 @@ from .profesor import (
     crear_sesion_profesor,
     disciplinas_asignadas_profesor,
     liberar_sesion_profesor,
+    liberar_clase_profesor,
+    organizaciones_profesor,
+    quitar_asistente_profesor,
+    revertir_clase_liberada_profesor,
     rol_profesor_activo,
     sesion_en_alcance_profesor,
 )
@@ -32,6 +36,10 @@ __all__ = [
     "crear_sesion_profesor",
     "disciplinas_asignadas_profesor",
     "liberar_sesion_profesor",
+    "liberar_clase_profesor",
+    "organizaciones_profesor",
+    "quitar_asistente_profesor",
+    "revertir_clase_liberada_profesor",
     "rol_profesor_activo",
     "sesion_en_alcance_profesor",
 ]

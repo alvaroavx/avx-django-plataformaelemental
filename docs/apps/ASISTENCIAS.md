@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-08-10
+Fecha de actualizacion: 2026-08-16
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -165,14 +165,28 @@ flowchart TD
 
 ## Reglas vigentes
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
+- En modo Profesor, `organizacion` es obligatorio para toda pantalla operativa.
+  Puede ser un ID autorizado o `todos`; este último agrega solo organizaciones
+  con `PersonaRol(PROFESOR, activo=True)` y bloquea toda mutación. `/profesor/`
+  sin parámetro solo muestra el selector y no consulta sesiones, alumnos, planes
+  ni pagos. No existe inferencia por orden ni bypass por `is_staff`.
 - La organización activa sirve para navegación y filtrado, pero no concede autorización. Las operaciones por identificador resuelven primero la sesión o disciplina desde un queryset autorizado y contrastan las relaciones compuestas contra la organización del objeto real.
+- Una organización con rol Profesor activo y sin asignación docente operativa se
+  mantiene visible, pero muestra estado vacío, no presenta acciones mutantes y
+  rechaza con `403` las URLs directas de creación o pago. No usa otra
+  organización como fallback.
 - Solo `is_superuser` conserva alcance operativo global. `is_staff` permite entrar al Django Admin cuando Django lo autoriza, pero no reemplaza un `PersonaRol` activo ni amplía las organizaciones visibles en Asistencias.
 - Una sesión ajena, una sesión no asignada a la profesora y una sesión inexistente responden `404` con estructura indistinguible en HTML, POST y endpoints JSON basados en objeto. Un `403` se reserva para negar una capacidad general antes de resolver un objeto.
 - Los detalles y formularios de disciplina se resuelven desde el queryset de la organización autorizada. Un identificador ajeno y uno inexistente responden `404` tanto en GET como en POST; no existen endpoints JSON específicos de disciplina.
 - Los permisos de la jornada se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora, quitar su asignación en `SesionClase.profesores` o desactivar su `AsignacionProfesorDisciplina` operativa corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta.
 - La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
-- Si no hay filtros explicitos en la URL, el periodo global debe partir en el mes y año actuales, y la organizacion debe partir en `Todas`.
-- Los filtros globales deben autoaplicarse al cambiar `mes`, `anio` u `organizacion`, sin boton manual de confirmacion.
+- Fuera del modo Profesor, si no hay filtros explícitos en la URL, el período
+  global parte en el mes y año actuales y la organización parte en `Todas`.
+  Profesor diferencia `organizacion=todos` de una organización concreta y exige
+  aplicar el cambio desde su hoja de contexto.
+- Los filtros administrativos globales autoaplican al cambiar. La hoja de
+  contexto Profesor es la excepción intencional: permite revisar organización,
+  período y tema, y solo navega al pulsar `Aplicar cambios`.
 - `periodo_mes` y `periodo_anio` deben aceptar la opcion `Todos`, permitiendo filtrar por todos los meses, todos los años, o combinaciones parciales como `todos los meses de un año` y `un mes en todos los años`.
 - La administracion de organizaciones no vive aqui; vive en `personas`.
 - Los enlaces hacia perfiles de persona deben dirigir a `personas/<id>/` y respetar siempre el periodo y la organizacion activos.
@@ -182,6 +196,17 @@ flowchart TD
 - La navegacion principal vive en el sidebar global de `Elemental Apps`; `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
 
 ## Decisiones funcionales vigentes
+- En Profesor, mes/año se transportan juntos o se usa `periodo=todos`; mezclar
+  ambos contratos devuelve `404`. El historial total se ordena por fecha e ID
+  descendentes y se pagina de 25 en 25.
+- El buscador de asistentes Profesor parte de `AlumnoDisciplina` operativa y de
+  un rol `ESTUDIANTE` activo en la organización de la disciplina. No exige una
+  asistencia histórica. El POST vuelve a comprobar sesión, organización,
+  matrícula y asignación docente.
+- Un profesor asignado puede quitar asistentes y liberar/revertir la clase
+  individual. Ambas operaciones son atómicas; la primera audita los IDs antes
+  de borrar la asistencia y la segunda conserva `ClaseLiberada` y recalcula el
+  consumo financiero mediante el servicio de dominio existente.
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.
 - La vista de profesores debe mostrar cards resumen del periodo con alumnos unicos, sesiones realizadas, asistencias del mes y profesores activos, respetando la organizacion seleccionada.
 - La tabla de profesores debe mostrar la organizacion como badge junto al nombre, no como columna independiente, y debe incluir pago bruto, retencion SII en monto y pago neto calculados desde `PersonaRol.valor_clase` y `PersonaRol.retencion_sii` de esa organizacion.

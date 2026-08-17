@@ -1,0 +1,66 @@
+<div class="offcanvas offcanvas-bottom contexto-sheet" tabindex="-1" id="contextoProfesor" aria-labelledby="contextoProfesorTitulo">
+  <div class="offcanvas-header">
+    <div>
+      <h2 class="offcanvas-title h5 mb-1" id="contextoProfesorTitulo">Contexto de trabajo</h2>
+      <p class="small text-muted mb-0">Organización, período y apariencia.</p>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body">
+    {% if sin_organizaciones %}
+      <div class="empty-state" role="status">
+        <i class="bi bi-building-x" aria-hidden="true"></i>
+        <strong>Sin organización disponible</strong>
+        <span>No tienes un rol Profesor activo en una organización.</span>
+      </div>
+    {% else %}
+      <form method="get" action="{% url 'profesor:inicio' %}" data-contexto-form>
+        <div class="mb-3">
+          <label class="form-label" for="contexto-organizacion">Organización</label>
+          <select class="form-select" id="contexto-organizacion" name="organizacion" required>
+            {% if not organizacion_id %}<option value="" selected disabled>Selecciona una organización</option>{% endif %}
+            <option value="todos" {% if organizacion_todas %}selected{% endif %}>Todas mis organizaciones</option>
+            {% for organizacion in organizaciones_profesor %}
+              <option value="{{ organizacion.pk }}" {% if organizacion_id == organizacion.pk|stringformat:"s" %}selected{% endif %}>{{ organizacion.nombre }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">El modo “Todas” es únicamente de lectura.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="contexto-periodo-modo">Período</label>
+          <select class="form-select" id="contexto-periodo-modo" data-periodo-modo>
+            <option value="mes" {% if not periodo_todos %}selected{% endif %}>Mes y año</option>
+            <option value="todos" {% if periodo_todos %}selected{% endif %}>Todos los períodos</option>
+          </select>
+        </div>
+        <input type="hidden" name="periodo" value="todos" data-periodo-todos {% if not periodo_todos %}disabled{% endif %}>
+        <div class="row g-2 mb-4" data-periodo-campos>
+          <div class="col-7">
+            <label class="form-label" for="contexto-mes">Mes</label>
+            <select class="form-select" id="contexto-mes" name="periodo_mes" {% if periodo_todos %}disabled{% endif %}>
+              {% for valor, nombre in meses_profesor %}<option value="{{ valor }}" {% if periodo_mes == valor or not periodo_mes and periodo_mes_sugerido == valor %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-5">
+            <label class="form-label" for="contexto-anio">Año</label>
+            <input class="form-control" id="contexto-anio" name="periodo_anio" type="number" min="2000" max="2199" value="{{ periodo_anio|default:periodo_anio_sugerido }}" {% if periodo_todos %}disabled{% endif %} required>
+          </div>
+        </div>
+
+        <fieldset class="mb-4">
+          <legend class="form-label mb-2">Tema</legend>
+          <div class="theme-options" role="radiogroup" aria-label="Tema de color">
+            <label><input type="radio" name="tema-visual" value="light" data-theme-option><span><i class="bi bi-sun" aria-hidden="true"></i> Claro</span></label>
+            <label><input type="radio" name="tema-visual" value="dark" data-theme-option><span><i class="bi bi-moon-stars" aria-hidden="true"></i> Oscuro</span></label>
+          </div>
+        </fieldset>
+
+        <button class="btn btn-primary-profesor w-100" type="submit" data-contexto-submit>
+          Aplicar cambios
+        </button>
+        <div class="small text-muted mt-2" role="status" aria-live="polite" data-contexto-status></div>
+      </form>
+    {% endif %}
+  </div>
+</div>

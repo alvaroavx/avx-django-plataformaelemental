@@ -58,6 +58,7 @@ from .models import (
     Disciplina,
     SesionClase,
 )
+from .profesor_contexto import resolver_contexto_profesor
 from .selectors import (
     estudiantes_financieros_disciplina,
     asistencias_export_queryset,
@@ -69,8 +70,14 @@ from .services import (
     asegurar_asignaciones_profesores,
     asegurar_matricula_operativa,
     cambiar_estado_asistencia,
+    disciplinas_asignadas_profesor,
     liberar_clase,
+    liberar_clase_profesor,
+    organizaciones_profesor,
+    quitar_asistente_profesor,
+    rol_profesor_activo,
     revertir_clase_liberada,
+    revertir_clase_liberada_profesor,
 )
 from .utils import ROLE_ADMIN, usuario_tiene_roles
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
@@ -140,6 +147,22 @@ def _url_con_filtros_extra(request, nombre_url, **extra_params):
     return f"{url}?{query}" if query else url
 
 
+def _query_profesor(request, *, organizacion_id):
+    params = request.GET.copy()
+    for key in list(params):
+        if key not in {"periodo", "periodo_mes", "periodo_anio", "organizacion"}:
+            params.pop(key, None)
+    params["organizacion"] = str(organizacion_id)
+    return params.urlencode()
+
+
+def _rol_profesor_solicitado(request):
+    return rol_profesor_activo(
+        request.user,
+        organizacion_id=request.GET.get("organizacion"),
+    )
+
+
 @permiso_requerido(ACCION_EXPORTAR_DATOS, permitir_staff_global=False)
 def export_asistencias_xlsx(request):
     periodo = resolver_periodo(request)
@@ -207,7 +230,13 @@ def _estudiantes_sesion_para_usuario(user, sesion):
         alumnos_operativos = AlumnoDisciplina.objects.operativas().filter(
             disciplina=sesion.disciplina,
         ).values("alumno_id")
-        queryset = queryset.filter(pk__in=alumnos_operativos)
+        queryset = queryset.filter(
+            pk__in=alumnos_operativos,
+            activo=True,
+            roles__organizacion=sesion.disciplina.organizacion,
+            roles__rol__codigo__iexact="ESTUDIANTE",
+            roles__activo=True,
+        )
     return queryset.distinct()
 
 
@@ -278,12 +307,14 @@ def _usuario_puede_registrar_asistencia(user, sesion):
 
 
 def _usuario_puede_liberar_clase(user, sesion):
-    return usuario_tiene_permiso(
+    if usuario_tiene_permiso(
         user,
         ACCION_LIBERAR_CLASE,
         organizacion=sesion.disciplina.organizacion,
         permitir_staff_global=False,
-    )
+    ):
+        return True
+    return _usuario_es_profesor_asignado(user, sesion)
 
 
 def _json_error(codigo, mensaje, *, status=400):
@@ -304,7 +335,7 @@ def _sesion_para_endpoint_json(pk):
         return None
 
 
-def _verificar_acceso_sesion_json(user, pk):
+def _verificar_acceso_sesion_json(request, pk):
     """
     Returns (sesion, None) on success.
     Returns (None, error_response) on failure.
@@ -313,6 +344,7 @@ def _verificar_acceso_sesion_json(user, pk):
     - Session not found OR belongs to an org user cannot manage → 404 SESION_NO_ENCONTRADA
       (both cases are intentionally indistinguishable)
     """
+    user = request.user
     if not user.is_authenticated:
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
     if not usuario_tiene_permiso(
@@ -324,6 +356,10 @@ def _verificar_acceso_sesion_json(user, pk):
     sesion = _sesion_para_endpoint_json(pk)
     if not sesion or not _usuario_puede_registrar_asistencia(user, sesion):
         return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
+    if not _usuario_puede_administrar_sesion(user, sesion):
+        rol = _rol_profesor_solicitado(request)
+        if not rol or rol.organizacion_id != sesion.disciplina.organizacion_id:
+            return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
     return sesion, None
 
 
@@ -385,8 +421,50 @@ def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
 def sesiones_hoy(request):
     hoy = timezone.localdate()
     ahora = timezone.localtime()
+    sesiones_qs = sesiones_visibles_para_usuario(request.user)
+    contexto_profesor = None
+    organizacion_solicitada = None
+    if not request.user.is_superuser:
+        organizacion_raw = (request.GET.get("organizacion") or "").strip().lower()
+        rol_profesor = _rol_profesor_solicitado(request)
+        modo_profesor = bool(rol_profesor) or (
+            organizacion_raw == "todos"
+            and organizaciones_profesor(request.user).exists()
+        )
+        if modo_profesor:
+            contexto_profesor = resolver_contexto_profesor(request)
+            organizacion_solicitada = contexto_profesor["organizacion_activa"]
+            sesiones_qs = sesiones_qs.filter(
+                disciplina__organizacion_id__in=contexto_profesor["organizacion_ids"],
+                disciplina_id__in=contexto_profesor["disciplina_ids"],
+                profesores=contexto_profesor["profesor"],
+            )
+        elif request.GET.get("organizacion"):
+            try:
+                organizacion_solicitada = Organizacion.objects.filter(
+                    pk=request.GET.get("organizacion")
+                ).first()
+            except (TypeError, ValueError, ValidationError):
+                organizacion_solicitada = None
+            if not organizacion_solicitada or not usuario_tiene_permiso(
+                request.user,
+                ACCION_ADMINISTRAR_SESIONES,
+                organizacion=organizacion_solicitada,
+                permitir_staff_global=False,
+            ):
+                raise Http404
+        elif not usuario_tiene_permiso(
+            request.user,
+            ACCION_ADMINISTRAR_SESIONES,
+            permitir_staff_global=False,
+        ):
+            raise Http404
+        if organizacion_solicitada:
+            sesiones_qs = sesiones_qs.filter(
+                disciplina__organizacion=organizacion_solicitada,
+            )
     sesiones = list(
-        sesiones_visibles_para_usuario(request.user)
+        sesiones_qs
         .filter(fecha=hoy)
         .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
     )
@@ -421,12 +499,18 @@ def sesiones_hoy(request):
             sesion.momento_clase = "info"
             sesion.momento_icono = "bi-calendar-event"
 
-    context = nav_context(request, permitir_staff_global=False)
+    context = contexto_profesor or nav_context(request, permitir_staff_global=False)
     context.update(
         {
             "hide_periodo": True,
             "fecha_hoy": hoy,
             "sesiones": sesiones,
+            "profesor_mode": bool(contexto_profesor),
+            "base_template": (
+                "asistencias/profesor/base.html"
+                if contexto_profesor
+                else "asistencias/base_app.html"
+            ),
         }
     )
     return render(request, "asistencias/sesiones_hoy.html", context)
@@ -1221,6 +1305,16 @@ def sesion_detail(request, pk):
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
+    profesor_query = ""
+    contexto_profesor = None
+    if puede_registrar and not puede_administrar:
+        rol_profesor = _rol_profesor_solicitado(request)
+        if not rol_profesor or rol_profesor.organizacion_id != sesion.disciplina.organizacion_id:
+            raise Http404
+        contexto_profesor = resolver_contexto_profesor(request)
+        if contexto_profesor["organizacion_todas"]:
+            raise Http404
+        profesor_query = contexto_profesor["profesor_query"]
     estudiantes_qs = _estudiantes_sesion_para_usuario(request.user, sesion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
@@ -1317,21 +1411,29 @@ def sesion_detail(request, pk):
                         messages.success(request, "Persona creada y asignada como estudiante de la sesión.")
                     return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "eliminar_asistente" in request.POST:
-            if not puede_administrar:
+            if not puede_registrar:
                 raise PermissionDenied("No tienes permisos para quitar asistentes de esta sesión.")
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
-            registrar_auditoria(
-                usuario=request.user,
-                accion=AuditLog.ACCION_ELIMINAR,
-                dominio="asistencias",
-                objeto=asistencia,
-                organizacion=sesion.disciplina.organizacion,
-                resumen="Asistente eliminado de sesión",
-                metadata=_metadata_asistencia(asistencia),
-            )
-            asistencia.delete()
-            messages.success(request, f"Asistente eliminado de la sesión: {persona_nombre}.")
+            if puede_administrar:
+                registrar_auditoria(
+                    usuario=request.user,
+                    accion=AuditLog.ACCION_ELIMINAR,
+                    dominio="asistencias",
+                    objeto=asistencia,
+                    organizacion=sesion.disciplina.organizacion,
+                    resumen="Asistente eliminado de sesión",
+                    metadata=_metadata_asistencia(asistencia),
+                )
+                asistencia.delete()
+            else:
+                quitar_asistente_profesor(
+                    user=request.user,
+                    organizacion_id=sesion.disciplina.organizacion_id,
+                    sesion=sesion,
+                    asistencia=asistencia,
+                )
+            messages.success(request, f"Asistente quitado de la sesión: {persona_nombre}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "cambiar_estado" in request.POST:
             if not puede_administrar:
@@ -1383,11 +1485,20 @@ def sesion_detail(request, pk):
                 sesion=sesion,
             )
             try:
-                liberar_clase(
-                    asistencia=asistencia,
-                    motivo=request.POST.get("motivo_liberacion"),
-                    usuario=request.user,
-                )
+                if puede_administrar:
+                    liberar_clase(
+                        asistencia=asistencia,
+                        motivo=request.POST.get("motivo_liberacion"),
+                        usuario=request.user,
+                    )
+                else:
+                    liberar_clase_profesor(
+                        user=request.user,
+                        organizacion_id=sesion.disciplina.organizacion_id,
+                        sesion=sesion,
+                        asistencia=asistencia,
+                        motivo=request.POST.get("motivo_liberacion"),
+                    )
             except ValidationError as exc:
                 messages.error(request, exc.messages[0])
             else:
@@ -1402,10 +1513,18 @@ def sesion_detail(request, pk):
                 sesion=sesion,
             )
             try:
-                revertir_clase_liberada(
-                    asistencia=asistencia,
-                    usuario=request.user,
-                )
+                if puede_administrar:
+                    revertir_clase_liberada(
+                        asistencia=asistencia,
+                        usuario=request.user,
+                    )
+                else:
+                    revertir_clase_liberada_profesor(
+                        user=request.user,
+                        organizacion_id=sesion.disciplina.organizacion_id,
+                        sesion=sesion,
+                        asistencia=asistencia,
+                    )
             except ValidationError as exc:
                 messages.error(request, exc.messages[0])
             else:
@@ -1491,16 +1610,21 @@ def sesion_detail(request, pk):
             asistencia.estado_financiero_label = "Sin consumo"
             asistencia.estado_financiero_clase = "light"
     asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
+    hay_alumnos_elegibles = estudiantes_qs.exclude(pk__in=asistentes_ids).exists()
     sesion_anterior = None
     sesion_siguiente = None
     if puede_registrar and not puede_administrar:
-        alcance = sesiones_visibles_para_usuario(request.user)
+        alcance = sesiones_visibles_para_usuario(request.user).filter(
+            disciplina__organizacion_id=sesion.disciplina.organizacion_id,
+        )
         sesion_anterior = alcance.filter(
             Q(fecha__lt=sesion.fecha) | Q(fecha=sesion.fecha, pk__lt=sesion.pk)
         ).order_by("-fecha", "-pk").first()
         sesion_siguiente = alcance.filter(
             Q(fecha__gt=sesion.fecha) | Q(fecha=sesion.fecha, pk__gt=sesion.pk)
         ).order_by("fecha", "pk").first()
+    if contexto_profesor:
+        context.update(contexto_profesor)
     context.update(
         {
             "sesion": sesion,
@@ -1508,21 +1632,43 @@ def sesion_detail(request, pk):
             "total_asistentes": asistencias.count(),
             "estudiantes": estudiantes,
             "asistentes_ids": asistentes_ids,
+            "hay_alumnos_elegibles": hay_alumnos_elegibles,
             "persona_form": persona_form,
             "open_nueva_persona": open_nueva_persona,
             "puede_administrar_sesion": puede_administrar,
             "puede_registrar_asistencia": puede_registrar,
             "puede_liberar_clase": puede_liberar,
-            "puede_quitar_asistente": puede_administrar,
+            "puede_quitar_asistente": puede_registrar,
             "es_jornada_profesora": puede_registrar and not puede_administrar,
             "profesor_mode": puede_registrar and not puede_administrar,
+            "profesor_query": profesor_query,
+            "base_template": (
+                "asistencias/profesor/base.html"
+                if puede_registrar and not puede_administrar
+                else "asistencias/base_app.html"
+            ),
+            "organizacion_activa": (
+                sesion.disciplina.organizacion
+                if puede_registrar and not puede_administrar
+                else context.get("organizacion_activa")
+            ),
+            "organizacion_id": (
+                str(sesion.disciplina.organizacion_id)
+                if puede_registrar and not puede_administrar
+                else context.get("organizacion_id", "")
+            ),
+            "organizaciones_profesor": (
+                organizaciones_profesor(request.user)
+                if puede_registrar and not puede_administrar
+                else Organizacion.objects.none()
+            ),
             "sesion_anterior": sesion_anterior,
             "sesion_siguiente": sesion_siguiente,
-            "back_url": request.META.get("HTTP_REFERER")
-            or (
-                reverse("asistencias:sesiones_hoy")
-                if not puede_administrar
-                else _url_con_filtros(request, "asistencias:sesiones_list")
+            "back_url": (
+                f"{reverse('profesor:sesiones')}?{profesor_query}"
+                if puede_registrar and not puede_administrar
+                else request.META.get("HTTP_REFERER")
+                or _url_con_filtros(request, "asistencias:sesiones_list")
             ),
         }
     )
@@ -1531,7 +1677,7 @@ def sesion_detail(request, pk):
 
 @require_GET
 def sesion_asistentes_buscar(request, pk):
-    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    sesion, error = _verificar_acceso_sesion_json(request, pk)
     if error:
         return error
 
@@ -1566,7 +1712,7 @@ def sesion_asistentes_buscar(request, pk):
 
 @require_POST
 def sesion_asistente_agregar(request, pk):
-    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    sesion, error = _verificar_acceso_sesion_json(request, pk)
     if error:
         return error
 
@@ -1669,7 +1815,7 @@ def sesion_asistente_agregar(request, pk):
 
 @require_POST
 def sesion_asistencia_estado(request, pk, asistencia_pk):
-    sesion, error = _verificar_acceso_sesion_json(request.user, pk)
+    sesion, error = _verificar_acceso_sesion_json(request, pk)
     if error:
         return error
 

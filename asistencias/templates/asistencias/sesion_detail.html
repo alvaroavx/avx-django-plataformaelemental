@@ -1,4 +1,4 @@
-{% extends "asistencias/base_app.html" %}
+{% extends base_template|default:"asistencias/base_app.html" %}
 {% block title %}Detalle sesión{% endblock %}
 
 {% block extra_head %}
@@ -18,14 +18,11 @@
     white-space: normal;
   }
   .jornada-sesion .estado-rapido button[aria-pressed="true"] {
-    color: #fff;
-    background: #0f766e;
-    border-color: #0f766e;
+    color: var(--prof-bg, #fff);
+    background: var(--prof-payments, #0f766e);
+    border-color: var(--prof-payments, #0f766e);
   }
-  .jornada-sesion .asistente-mobile {
-    border: 1px solid #dbe3df;
-    border-radius: 0.9rem;
-  }
+  .jornada-sesion .asistente-mobile { border-bottom: 1px solid var(--prof-border, #dbe3df); }
   @media (max-width: 575.98px) {
     .jornada-sesion { margin-top: 0.25rem !important; }
     .jornada-sesion .sesion-actions { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
@@ -44,6 +41,91 @@
 {% endblock %}
 
 {% block content %}
+{% if es_jornada_profesora %}
+<div class="jornada-sesion">
+  <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+    <a class="btn btn-outline-profesor" href="{{ back_url }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Mis clases</a>
+    {% if sesion.estado != "cancelada" %}
+    <details class="action-menu">
+      <summary class="icon-button" aria-label="Acciones de la sesión"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></summary>
+      <div class="action-menu-panel">
+        <form method="post" action="{% url 'profesor:sesion_liberar' sesion.pk %}?{{ profesor_query }}" data-sensitive-form data-confirm="La sesión quedará cancelada y la acción será auditada. ¿Continuar?">
+          {% csrf_token %}
+          <label class="form-label" for="motivo-liberar-sesion">Motivo para liberar la sesión</label>
+          <textarea class="form-control mb-2" id="motivo-liberar-sesion" name="motivo" rows="3" required minlength="3"></textarea>
+          <button class="btn btn-critical w-100" type="submit">Liberar sesión</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  <nav class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" aria-label="Sesiones consecutivas autorizadas">
+    {% if sesion_anterior %}<a class="btn btn-outline-profesor jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}?{{ profesor_query }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Anterior</a>{% else %}<span class="btn btn-outline-profesor disabled" aria-disabled="true">Sin anterior</span>{% endif %}
+    {% if sesion_siguiente %}<a class="btn btn-outline-profesor jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}?{{ profesor_query }}">Siguiente<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></a>{% else %}<span class="btn btn-outline-profesor disabled" aria-disabled="true">Sin siguiente</span>{% endif %}
+  </nav>
+
+  <section class="task-surface mb-3" aria-labelledby="detalle-sesion-titulo">
+    <div class="d-flex justify-content-between align-items-start gap-3">
+      <div><span class="eyebrow">{{ sesion.disciplina.organizacion }}</span><h1 class="h3 mb-1" id="detalle-sesion-titulo">{{ sesion.disciplina }}</h1><div class="text-muted">{{ sesion.fecha|date:"d/m/Y" }}{% if sesion.bloque %} · {{ sesion.bloque.hora_inicio|time:"H:i" }}–{{ sesion.bloque.hora_fin|time:"H:i" }}{% endif %}</div></div>
+      <span class="status-text status-session">{% if sesion.estado == "programada" %}<i class="bi bi-clock" aria-hidden="true"></i>{% elif sesion.estado == "abierta" %}<i class="bi bi-play-circle" aria-hidden="true"></i>{% elif sesion.estado == "completada" %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% else %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% endif %}{{ sesion.get_estado_display }}</span>
+    </div>
+    <div class="d-flex align-items-end justify-content-between mt-3"><div><span class="text-muted small">Asistentes</span><div class="h2 mb-0" id="total-asistentes">{{ total_asistentes }}</div></div>{% if sesion.cupo_maximo %}<span class="text-muted">Cupo {{ sesion.cupo_maximo }}</span>{% endif %}</div>
+  </section>
+
+  {% if sesion.estado != "cancelada" %}
+  <form class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" method="post" action="{% url 'profesor:sesion_estado' sesion.pk %}?{{ profesor_query }}" data-prevent-double-submit>
+    {% csrf_token %}
+    <button class="btn btn-outline-profesor jornada-touch" name="estado" value="abierta" type="submit"><i class="bi bi-play-circle me-1" aria-hidden="true"></i>Abrir</button>
+    <button class="btn btn-primary-profesor jornada-touch" name="estado" value="completada" type="submit"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Cerrar</button>
+  </form>
+  {% endif %}
+
+  {% if puede_registrar_asistencia and sesion.estado != "cancelada" %}
+  <section class="task-surface mb-3" aria-labelledby="agregar-asistente-titulo">
+    <div class="d-none" aria-hidden="true">{% csrf_token %}</div>
+    <h2 class="h5" id="agregar-asistente-titulo">Agregar asistente</h2>
+    {% if hay_alumnos_elegibles %}
+      <label id="buscar-asistente-label" class="form-label" for="buscar-asistente">Buscar alumno activo de esta clase</label>
+      <select id="buscar-asistente" placeholder="Escribe 2 o más letras…" style="width:100%"></select>
+      <div id="buscar-status" class="mt-2" role="status" aria-live="polite" aria-atomic="true" style="min-height:1.5rem">Escribe al menos 2 letras para buscar.</div>
+    {% else %}
+      <div class="empty-state" id="buscar-status" role="status"><i class="bi bi-person-x" aria-hidden="true"></i><strong>Aún no hay alumnos activos para esta clase.</strong><a class="btn btn-outline-profesor mt-2" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}&volver_sesion={{ sesion.pk }}">Ir a Alumnos</a></div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="listado-asistentes-titulo">
+    <div class="section-heading"><h2 id="listado-asistentes-titulo">Asistencia</h2></div>
+    <div class="operational-list" id="asistentes-mobile">
+      {% for item in asistencias %}
+      <article class="asistente-mobile py-3" data-asistencia-card="{{ item.pk }}">
+        <div class="d-flex justify-content-between gap-2 align-items-start mb-3">
+          <div><h3 class="h6 mb-1">{{ item.persona }}</h3><div class="small text-muted">Agregada a las {{ item.registrada_en|date:"H:i" }}</div>{% if item.clase_liberada_activa %}<span class="status-text status-session"><i class="bi bi-unlock" aria-hidden="true"></i>Clase liberada</span>{% endif %}</div>
+          <details class="action-menu">
+            <summary aria-label="Acciones de {{ item.persona }}"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></summary>
+            <div class="action-menu-panel">
+              {% if puede_liberar_clase %}
+                {% if item.clase_liberada_activa %}
+                  <form method="post" class="mb-2" data-sensitive-form data-confirm="La clase volverá a consumir saldo o deuda según corresponda. ¿Continuar?">{% csrf_token %}<input type="hidden" name="asistencia_id" value="{{ item.pk }}"><button class="btn btn-outline-profesor w-100" name="revertir_clase_liberada" type="submit">Revertir liberación</button></form>
+                {% else %}
+                  <form method="post" class="mb-2" data-sensitive-form data-confirm="La clase dejará de consumir saldo y la acción será auditada. ¿Continuar?">{% csrf_token %}<input type="hidden" name="asistencia_id" value="{{ item.pk }}"><label class="form-label" for="motivo-liberacion-mobile-{{ item.pk }}">Motivo de liberación</label><textarea id="motivo-liberacion-mobile-{{ item.pk }}" class="form-control mb-2" name="motivo_liberacion" rows="2" required minlength="3"></textarea><button class="btn btn-outline-profesor w-100" name="liberar_clase" type="submit">Liberar clase individual</button></form>
+                {% endif %}
+              {% endif %}
+              {% if puede_quitar_asistente %}<form method="post" data-sensitive-form data-confirm="Se quitará al asistente y se conservará una auditoría de la operación. ¿Continuar?">{% csrf_token %}<input type="hidden" name="asistencia_id" value="{{ item.pk }}"><button class="btn btn-critical w-100" name="eliminar_asistente" type="submit">Quitar asistente</button></form>{% endif %}
+            </div>
+          </details>
+        </div>
+        <div class="estado-rapido" role="group" aria-label="Estado de asistencia de {{ item.persona }}" data-estado-control data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}?{{ profesor_query }}">
+          {% for value, label in item.Estado.choices %}<button class="btn btn-outline-profesor" type="button" data-estado="{{ value }}" aria-pressed="{% if value == item.estado %}true{% else %}false{% endif %}">{% if value == "presente" %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% elif value == "ausente" %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% else %}<i class="bi bi-file-earmark-check" aria-hidden="true"></i>{% endif %} {{ label }}</button>{% endfor %}
+        </div>
+        <div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>
+      </article>
+      {% empty %}<div class="empty-state" data-empty-mobile><i class="bi bi-person-check" aria-hidden="true"></i><span>Sin asistentes registrados.</span></div>{% endfor %}
+    </div>
+  </section>
+</div>
+{% else %}
 <div class="jornada-sesion mt-4">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div class="d-flex gap-2 sesion-actions">
@@ -60,7 +142,7 @@
           <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
         </a>
       {% else %}
-        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_hoy' %}">
+        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_hoy' %}{% if profesor_query %}?{{ profesor_query }}{% endif %}">
           <i class="bi bi-sun"></i><span class="ms-1">Hoy</span>
         </a>
       {% endif %}
@@ -82,11 +164,11 @@
 
   {% if es_jornada_profesora %}
   <nav class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" aria-label="Sesiones consecutivas autorizadas">
-    {% if sesion_anterior %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}"><i class="bi bi-arrow-left me-1"></i>Anterior</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin anterior</span>{% endif %}
-    {% if sesion_siguiente %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}">Siguiente<i class="bi bi-arrow-right ms-1"></i></a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin siguiente</span>{% endif %}
+    {% if sesion_anterior %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}{% if profesor_query %}?{{ profesor_query }}{% endif %}"><i class="bi bi-arrow-left me-1"></i>Anterior</a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin anterior</span>{% endif %}
+    {% if sesion_siguiente %}<a class="btn btn-outline-primary jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}{% if profesor_query %}?{{ profesor_query }}{% endif %}">Siguiente<i class="bi bi-arrow-right ms-1"></i></a>{% else %}<span class="btn btn-outline-secondary disabled" aria-disabled="true">Sin siguiente</span>{% endif %}
   </nav>
-  {% if sesion.estado != "cancelada" %}<form class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" method="post" action="{% url 'profesor:sesion_estado' sesion.pk %}">{% csrf_token %}<button class="btn btn-outline-warning jornada-touch" name="estado" value="abierta" type="submit"><i class="bi bi-play-circle me-1"></i>Abrir sesión</button><button class="btn btn-outline-success jornada-touch" name="estado" value="completada" type="submit"><i class="bi bi-check-circle me-1"></i>Cerrar sesión</button></form>{% endif %}
-  {% if sesion.estado != "cancelada" %}<form class="card card-body mb-3" method="post" action="{% url 'profesor:sesion_liberar' sesion.pk %}">{% csrf_token %}<label class="form-label fw-semibold" for="motivo-liberar-sesion">Liberar esta sesión</label><div class="d-flex flex-column flex-sm-row gap-2"><input class="form-control jornada-touch" id="motivo-liberar-sesion" name="motivo" required minlength="3" placeholder="Glosa o motivo obligatorio"><button class="btn btn-outline-danger jornada-touch" type="submit">Liberar</button></div></form>{% endif %}
+  {% if sesion.estado != "cancelada" %}<form class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" method="post" action="{% url 'profesor:sesion_estado' sesion.pk %}?{{ profesor_query }}">{% csrf_token %}<button class="btn btn-outline-warning jornada-touch" name="estado" value="abierta" type="submit"><i class="bi bi-play-circle me-1"></i>Abrir sesión</button><button class="btn btn-outline-success jornada-touch" name="estado" value="completada" type="submit"><i class="bi bi-check-circle me-1"></i>Cerrar sesión</button></form>{% endif %}
+  {% if sesion.estado != "cancelada" %}<form class="card card-body mb-3" method="post" action="{% url 'profesor:sesion_liberar' sesion.pk %}?{{ profesor_query }}">{% csrf_token %}<label class="form-label fw-semibold" for="motivo-liberar-sesion">Liberar esta sesión</label><div class="d-flex flex-column flex-sm-row gap-2"><input class="form-control jornada-touch" id="motivo-liberar-sesion" name="motivo" required minlength="3" placeholder="Glosa o motivo obligatorio"><button class="btn btn-outline-danger jornada-touch" type="submit">Liberar</button></div></form>{% endif %}
   {% endif %}
 
   <div class="card mb-3">
@@ -291,7 +373,7 @@
                 role="group"
                 aria-label="Estado de asistencia de {{ item.persona }}"
                 data-estado-control
-                data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}"
+                data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}{% if profesor_query %}?{{ profesor_query }}{% endif %}"
               >
                 {% for value, label in item.Estado.choices %}
                   <button
@@ -329,6 +411,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block modals %}
@@ -397,10 +480,12 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 (function () {
-  var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}";
-  var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}";
-  var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}";
+  var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
+  var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
+  var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
   var PUEDE_ADMINISTRAR = {{ puede_administrar_sesion|yesno:"true,false" }};
+  var PUEDE_QUITAR = {{ puede_quitar_asistente|yesno:"true,false" }};
+  var PUEDE_LIBERAR = {{ puede_liberar_clase|yesno:"true,false" }};
   var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
   var statusEl = document.getElementById('buscar-status');
   var counterEl = document.getElementById('total-asistentes');
@@ -460,7 +545,7 @@
     ];
     return estados.map(function (estado) {
       var seleccionado = a.estado === estado[0] ? 'true' : 'false';
-      return '<button class="btn btn-outline-secondary" type="button" data-estado="' + estado[0] +
+      return '<button class="btn btn-outline-profesor" type="button" data-estado="' + estado[0] +
         '" aria-pressed="' + seleccionado + '"><i class="bi ' + estado[1] +
         '" aria-hidden="true"></i> ' + estado[2] + '</button>';
     }).join('');
@@ -475,7 +560,7 @@
     var nombre = a.persona_url
       ? '<a href="' + esc(a.persona_url) + '">' + esc(a.nombre) + '</a>'
       : esc(a.nombre);
-    var accionQuitar = PUEDE_ADMINISTRAR
+    var accionQuitar = PUEDE_QUITAR
       ? '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
           '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
           '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
@@ -484,6 +569,27 @@
           '</button>' +
         '</form>'
       : '';
+
+    var accionesProfesor = '';
+    if (PUEDE_LIBERAR || PUEDE_QUITAR) {
+      accionesProfesor = '<details class="action-menu"><summary aria-label="Acciones de ' + esc(a.nombre) + '">' +
+        '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i></summary><div class="action-menu-panel">' +
+        (PUEDE_LIBERAR
+          ? '<form method="post" class="mb-2" data-sensitive-form data-confirm="La clase dejará de consumir saldo y la acción será auditada. ¿Continuar?">' +
+              '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
+              '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
+              '<label class="form-label" for="motivo-dinamico-' + esc(a.id) + '">Motivo de liberación</label>' +
+              '<textarea class="form-control mb-2" id="motivo-dinamico-' + esc(a.id) + '" name="motivo_liberacion" rows="2" required minlength="3"></textarea>' +
+              '<button class="btn btn-outline-profesor w-100" name="liberar_clase" type="submit">Liberar clase individual</button></form>'
+          : '') +
+        (PUEDE_QUITAR
+          ? '<form method="post" data-sensitive-form data-confirm="Se quitará al asistente y se conservará una auditoría. ¿Continuar?">' +
+              '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
+              '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
+              '<button class="btn btn-critical w-100" name="eliminar_asistente" type="submit">Quitar asistente</button></form>'
+          : '') +
+        '</div></details>';
+    }
 
     if (tbody) {
       var emptyRow = tbody.querySelector('[data-empty-row]');
@@ -502,30 +608,18 @@
       var emptyMobile = mobileList.querySelector('[data-empty-mobile]');
       if (emptyMobile) emptyMobile.remove();
       var article = document.createElement('article');
-      article.className = 'asistente-mobile p-3';
+      article.className = 'asistente-mobile py-3';
       article.setAttribute('data-asistencia-card', a.id);
       article.innerHTML =
         '<div class="d-flex justify-content-between gap-2 align-items-start mb-3">' +
           '<div><h3 class="h6 mb-1">' + esc(a.nombre) + '</h3>' +
-          '<div class="small text-muted">Agregada a las ' + esc(a.hora || '--:--') + '</div></div>' +
-          (a.clase_liberada
-            ? '<span class="badge text-bg-info"><i class="bi bi-info-circle" aria-hidden="true"></i> Clase liberada</span>'
-            : (PUEDE_ADMINISTRAR
-              ? '<span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span>'
-              : '')) +
+          '<div class="small text-muted">Agregada a las ' + esc(a.hora || '--:--') + '</div></div>' + accionesProfesor +
         '</div>' +
         '<div class="estado-rapido" role="group" aria-label="Estado de asistencia de ' + esc(a.nombre) +
           '" data-estado-control data-estado-url="' + esc(urlEstado(a.id)) + '">' +
           botonesEstado(a) +
         '</div>' +
-        '<div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>' +
-        (PUEDE_ADMINISTRAR
-          ? '<form method="post" class="mt-3" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
-              '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
-              '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
-              '<button class="btn btn-outline-danger jornada-touch w-100" name="eliminar_asistente" type="submit">' +
-                '<i class="bi bi-trash"></i> Quitar</button></form>'
-          : '');
+        '<div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>';
       mobileList.insertBefore(article, mobileList.firstChild);
     }
   }
@@ -621,7 +715,7 @@
       });
   }
 
-  if (typeof TomSelect !== 'undefined') {
+  if (typeof TomSelect !== 'undefined' && document.getElementById('buscar-asistente')) {
     new TomSelect('#buscar-asistente', {
       valueField: 'id',
       labelField: 'nombre',
@@ -632,7 +726,7 @@
       shouldLoad: function (q) { return q.length >= 2; },
       load: function (query, callback) {
         mostrarEstado('muted', 'Buscando…', false);
-        fetchJson(BUSCAR_URL + '?q=' + encodeURIComponent(query))
+        fetchJson(BUSCAR_URL + (BUSCAR_URL.indexOf('?') === -1 ? '?' : '&') + 'q=' + encodeURIComponent(query))
           .then(function (resp) {
             if (resp.tipo === 'json_invalido') {
               mostrarEstado('danger', 'Respuesta inválida del servidor. Intenta nuevamente.', false);

@@ -1,0 +1,19 @@
+{% extends "asistencias/profesor/base.html" %}
+{% block title %}Seleccionar contexto · Profesor{% endblock %}
+{% block content %}
+<section class="py-4" aria-labelledby="seleccionar-organizacion-title">
+  <span class="eyebrow">Contexto de trabajo</span>
+  <h1 class="h3" id="seleccionar-organizacion-title">Selecciona una organización</h1>
+  <p class="text-muted">La selección se valida en cada solicitud y no amplía tus asignaciones docentes.</p>
+  {% if sin_organizaciones %}
+    <div class="empty-state"><i class="bi bi-building-x" aria-hidden="true"></i><strong>Sin organización disponible</strong><span>No tienes un rol Profesor activo.</span></div>
+  {% else %}
+    <div class="operational-list">
+      <div class="operational-row"><span class="avatar-profesor" aria-hidden="true"><i class="bi bi-buildings"></i></span><div class="operational-row-main"><div class="operational-row-title">Todas mis organizaciones</div><div class="operational-row-meta">Vista consolidada de lectura</div></div><i class="bi bi-arrow-right" aria-hidden="true"></i><a class="row-link" href="{% url 'profesor:inicio' %}?organizacion=todos{% if profesor_query %}&{{ profesor_query }}{% endif %}"><span class="visually-hidden">Abrir todas mis organizaciones</span></a></div>
+      {% for organizacion in organizaciones_profesor %}
+        <div class="operational-row"><span class="avatar-profesor" aria-hidden="true">{{ organizacion.iniciales }}</span><div class="operational-row-main"><div class="operational-row-title">{{ organizacion.nombre }}</div><div class="operational-row-meta">Trabajar en esta organización</div></div><i class="bi bi-arrow-right" aria-hidden="true"></i><a class="row-link" href="{% url 'profesor:inicio' %}?organizacion={{ organizacion.pk }}{% if profesor_query %}&{{ profesor_query }}{% endif %}"><span class="visually-hidden">Abrir {{ organizacion.nombre }}</span></a></div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

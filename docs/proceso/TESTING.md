@@ -1,6 +1,6 @@
 # Testing
 
-Fecha de actualizacion: 2026-08-10
+Fecha de actualizacion: 2026-08-16
 
 ## Proposito
 Este documento define la estrategia de pruebas vigente.
@@ -10,9 +10,10 @@ La meta no es tener tests por cantidad. La meta es proteger reglas criticas del 
 ## Base de desarrollo autorizada
 
 La base configurada en este checkout es de desarrollo y está separada de
-producción. Puede usarse directamente para pruebas funcionales, cargas masivas,
-previews, importaciones y validaciones de datos de desarrollo; no se requiere
-levantar una instancia PostgreSQL paralela solo para aislar estas operaciones.
+producción. Para este entorno se instruyó usarla directamente y no crear bases,
+clústeres ni bases `test_*` temporales hasta nueva autorización. Los recorridos
+locales deben ser de lectura salvo que una tarea autorice expresamente escrituras
+sobre esos datos.
 
 Esta autorización no convierte resultados locales en evidencia productiva ni
 permite apuntar comandos a producción. Antes de una operación destructiva debe

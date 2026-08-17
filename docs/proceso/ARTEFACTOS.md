@@ -1,6 +1,6 @@
 # Artefactos de trabajo
 
-Fecha de actualización: 2026-08-10
+Fecha de actualización: 2026-08-16
 
 ## Propósito
 
@@ -81,6 +81,31 @@ npm run test:mermaid
   pantallas, comprueba gates y genera `resultado.json`.
 - Es de solo lectura por defecto. `ELEMENTAL_E2E_MUTACIONES=1` habilita creación
   de alumno, asistencia, pago y sesión liberada sobre datos sintéticos.
+- Puede autenticarse con usuario/clave no versionados o con una sesión Django
+  efímera mediante `ELEMENTAL_E2E_SESSION_COOKIE`. Esta última nunca se escribe
+  en el resultado ni debe persistirse fuera del proceso.
+- También puede reutilizar un perfil temporal autenticado manualmente mediante
+  `ELEMENTAL_E2E_USER_DATA_DIR`. El perfil vive fuera del repositorio y debe
+  eliminarse al terminar; ni su ruta ni sus cookies quedan en `resultado.json`.
+- Para sesiones que no deben cerrarse, `ELEMENTAL_E2E_BROWSER_URL` conecta el
+  recorrido a un Chrome abierto con depuración local. El runner abre y cierra
+  solo su pestaña, se desconecta al finalizar y no extrae ni serializa cookies.
+- Exige `ELEMENTAL_E2E_ORGANIZACION_ID`: acepta un ID explícito o `todos`; todo
+  acceso Profesor conserva el valor y permite reutilizar el runner en
+  escenarios multi-organización sin fallback implícito.
+- `ELEMENTAL_E2E_PERIODO_MES` y `ELEMENTAL_E2E_PERIODO_ANIO` fijan un mes;
+  `ELEMENTAL_E2E_PERIODO_TODOS=1` usa el historial paginado y es mutuamente
+  excluyente. `ELEMENTAL_E2E_THEME=light|dark` persiste el tema antes de cargar
+  la primera página. El recorrido de lectura captura Inicio, Clases, detalle,
+  Alumnos, Pagos, la hoja de contexto y formularios cuando el contexto es
+  mutable.
+- `ELEMENTAL_E2E_CAPTURAS=0` conserva solo JSON sanitizado cuando las pantallas
+  contienen datos de desarrollo. `ELEMENTAL_E2E_PAGO_MASIVO=0` omite la selección
+  masiva y `ELEMENTAL_E2E_SOLO_PAGO_PERSONA_ID` ejecuta un pago dirigido a una
+  persona ya autorizada por el formulario.
+- Las capturas se sanitizan por defecto difuminando nombres y datos de contacto.
+  `ELEMENTAL_E2E_SANITIZAR_CAPTURAS=0` solo debe usarse para una inspección local
+  que no vaya a persistirse como evidencia.
 - `ELEMENTAL_E2E_INSPECCIONAR_FORMULARIO=/ruta/` reutiliza el mismo login y
   navegador para inventariar valores de controles, reemplazando el diagnóstico
   puntual de formularios.

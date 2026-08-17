@@ -1,2 +1,24 @@
 {% extends "asistencias/profesor/base.html" %}
-{% block content %}<a class="btn btn-outline-secondary mb-3" href="{% url 'profesor:pagos' %}"><i class="bi bi-arrow-left me-1"></i>Pagos</a><article class="card territorio territorio-agua"><div class="card-body"><div class="small fw-bold texto-agua text-uppercase">Pago confirmado</div><h1 class="h3">${{ pago.monto_total|floatformat:"0g" }}</h1><dl class="row"><dt class="col-5">Alumno</dt><dd class="col-7">{{ pago.persona.nombre_completo }}</dd><dt class="col-5">Clase</dt><dd class="col-7">{{ pago.disciplina.nombre }}</dd><dt class="col-5">Fecha</dt><dd class="col-7">{{ pago.fecha_pago|date:"d/m/Y" }}</dd><dt class="col-5">Método</dt><dd class="col-7">{{ pago.get_metodo_pago_display }}</dd><dt class="col-5">Plan</dt><dd class="col-7">{{ pago.plan.nombre|default:"Sin plan" }}</dd><dt class="col-5">Clases</dt><dd class="col-7">{{ pago.clases_asignadas }}</dd><dt class="col-5">Glosa</dt><dd class="col-7">{{ pago.observaciones }}</dd></dl>{% if pago.transaccion %}<div class="alert alert-success"><i class="bi bi-link-45deg"></i> Transacción #{{ pago.transaccion.pk }} · {{ pago.transaccion.categoria.nombre }} · ${{ pago.transaccion.monto|floatformat:"0g" }}</div>{% else %}<div class="alert alert-warning">Este pago histórico no tiene una transacción enlazada.</div>{% endif %}</div></article>{% endblock %}
+{% block content %}
+<a class="btn btn-outline-profesor mb-3" href="{% url 'profesor:pagos' %}?{{ profesor_query }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Pagos</a>
+<header class="page-heading d-flex justify-content-between align-items-start gap-3">
+  <div>
+    <span class="eyebrow">Detalle de pago</span>
+    <h1>${{ pago.monto_total|floatformat:"0g" }}</h1>
+    {% if pago.revertido_en %}<span class="status-text status-critical"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Pago revertido</span>{% else %}<span class="status-text status-payment"><i class="bi bi-check-circle" aria-hidden="true"></i>Pago registrado</span>{% endif %}
+  </div>
+</header>
+<section class="task-surface" aria-label="Información del pago">
+  <dl class="row mb-0">
+    <dt class="col-5">Alumno</dt><dd class="col-7">{{ pago.persona.nombre_completo }}</dd>
+    <dt class="col-5">Clase</dt><dd class="col-7">{{ pago.disciplina.nombre }}</dd>
+    <dt class="col-5">Fecha</dt><dd class="col-7">{{ pago.fecha_pago|date:"d/m/Y" }}</dd>
+    <dt class="col-5">Método</dt><dd class="col-7">{{ pago.get_metodo_pago_display }}</dd>
+    <dt class="col-5">Plan</dt><dd class="col-7">{{ pago.plan.nombre|default:"Sin plan" }}</dd>
+    <dt class="col-5">Clases</dt><dd class="col-7">{{ pago.clases_asignadas }}</dd>
+    <dt class="col-5">Glosa</dt><dd class="col-7">{{ pago.observaciones }}</dd>
+    {% if pago.revertido_en %}<dt class="col-5">Motivo reversa</dt><dd class="col-7">{{ pago.motivo_reversa }}</dd>{% endif %}
+  </dl>
+  {% if pago.transaccion %}<div class="context-notice mt-3"><i class="bi bi-link-45deg" aria-hidden="true"></i><span>Transacción #{{ pago.transaccion.pk }} · {{ pago.transaccion.categoria.nombre }} · ${{ pago.transaccion.monto|floatformat:"0g" }}</span></div>{% else %}<div class="context-notice mt-3"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><span>Este pago histórico no tiene una transacción enlazada y no puede corregirse desde Profesor.</span></div>{% endif %}
+</section>
+{% endblock %}

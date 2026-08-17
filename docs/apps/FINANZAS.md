@@ -205,6 +205,11 @@ No debe contarse como ingreso o egreso por si solo.
 - Solo lectura puede ver el panel financiero si tiene permiso de lectura, pero no ve accesos mutables.
 - Profesor no accede a finanzas completa. Opera únicamente pagos de alumnos
   matriculados en disciplinas propias desde `/profesor/pagos/`.
+- Profesor puede consultar el detalle de esos pagos, pero no editarlos,
+  eliminarlos ni revertirlos. `revertir_pago` conserva `Payment` y auditoría,
+  pero hoy no genera una `Transaction` de contramovimiento ni una relación
+  formal hacia ella; habilitarlo dejaría el libro de caja sin corregir. La
+  acción permanece restringida hasta resolver esa trazabilidad sin ambigüedad.
 - Estos accesos no colapsan responsabilidades: el servicio de alta de `Payment`
   crea una `Transaction` enlazada, pero ambas siguen siendo entidades distintas;
   crear una `Transaction` manual no crea un `Payment` y un

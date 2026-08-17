@@ -1,6 +1,6 @@
 # Operación Profesor
 
-Fecha de actualización: 2026-08-10
+Fecha de actualización: 2026-08-17
 
 ## Estado implementado
 
@@ -13,7 +13,9 @@ La autorización no depende de botones ni del menú. Cada vista vuelve a resolve
 
 1. usuario y persona activos;
 2. rol `PROFESOR` activo;
-3. organización del rol;
+3. organización solicitada explícitamente mediante `?organizacion=<id>` o la
+   vista agregada `?organizacion=todos`, siempre limitada a sus
+   `PersonaRol(PROFESOR, activo=True)`;
 4. `AsignacionProfesorDisciplina` operativa: activa y explícita, o histórica revisada;
 5. `SesionClase.profesores` para una sesión concreta;
 6. `AlumnoDisciplina` operativa para alumnos, asistentes y pagos;
@@ -22,6 +24,38 @@ La autorización no depende de botones ni del menú. Cada vista vuelve a resolve
 Un identificador de sesión, pago, alumno o lote fuera del alcance no se entrega
 al profesor. Las superficies globales de Personas, Finanzas y Django Admin no
 forman parte del espacio profesor.
+
+## Contexto multi-organización
+
+`PersonaRol` es la única fuente de verdad del selector. La portada
+`GET /profesor/` sin organización no muestra datos operativos: presenta las
+organizaciones donde la persona mantiene un rol `PROFESOR` activo. Elegir una
+genera un request explícito con `?organizacion=<id>`; no existe selección por
+orden, sesión, primera coincidencia ni fallback silencioso. La alternativa
+`organizacion=todos` agrega solo esas organizaciones y es de lectura: no admite
+sesiones, asistencia, alumnos ni pagos mutables.
+
+Todas las demás vistas del espacio Profesor exigen ese parámetro. Un ID
+inexistente, ajeno, inactivo o asociado a otro rol responde `404`. Esto también
+aplica a detalle de sesión y endpoints de búsqueda, alta y corrección de
+asistencia. La selección viaja en la barra inferior, acciones, formularios,
+AJAX, navegación anterior/siguiente y filtros de período. El período usa uno de
+dos contratos excluyentes: `periodo_mes=<1..12>&periodo_anio=<YYYY>` o
+`periodo=todos`. Combinarlos, enviar solo mes/año o usar valores fuera de rango
+responde `404`. `periodo=todos` es un historial de lectura paginado a 25 filas.
+Al aplicar un cambio desde la hoja de contexto se vuelve a Inicio, evitando
+arrastrar identificadores de recursos de la selección anterior.
+
+Seleccionar una organización no basta para operar: cada lectura y escritura
+vuelve a contrastar la organización real del recurso, la asignación operativa
+profesor–disciplina, `SesionClase.profesores` y la matrícula vigente. `is_staff`
+no amplía este alcance; el comportamiento global explícito de superusuario no
+cambia.
+
+Una organización con rol Profesor activo pero sin asignación docente sigue
+visible en el selector y puede abrirse para consultar su estado vacío. No expone
+acciones mutantes; las URLs directas de creación o pago responden `403`. Nunca
+toma disciplinas ni datos de otra organización como fallback.
 
 ## Modelo operativo
 
@@ -45,7 +79,7 @@ transacción inventada, porque hacerlo alteraría retroactivamente el libro de c
 
 | Ruta | Uso | Restricción principal |
 | --- | --- | --- |
-| `GET /profesor/` | Tablero operativo | Rol profesor activo |
+| `GET /profesor/` | Selector sin contexto o tablero con `?organizacion=<id>` | Rol profesor activo en la organización solicitada |
 | `GET /profesor/sesiones/` | Hoy, futuras e históricas | Solo disciplinas y sesiones asignadas |
 | `GET/POST /profesor/sesiones/crear/` | Crear sesión propia futura | Asignación profesor–disciplina |
 | `POST /profesor/sesiones/<id>/estado/` | Abrir/cerrar sesión | Sesión propia |
@@ -54,6 +88,7 @@ transacción inventada, porque hacerlo alteraría retroactivamente el libro de c
 | `GET/POST /profesor/alumnos/crear/` | Crear y matricular alumno | Teléfono o email válido |
 | `GET /profesor/pagos/` | Resumen, pagos y glosas | Pagos de disciplinas asignadas |
 | `GET/POST /profesor/pagos/crear/` | Pago individual | Alumno matriculado en clase propia |
+| `GET /profesor/pagos/<id>/` | Detalle de un pago | Organización y disciplina asignada |
 | `GET/POST /profesor/pagos/masivo/nuevo/` | Preview y lote 10–20 | Alumnos matriculados; atomicidad |
 | `GET /profesor/pagos/masivo/alumnos/` | Búsqueda incremental | Disciplina asignada |
 | `GET /profesor/pagos/masivo/<uuid>/` | Resultado verificado | Lote del mismo alcance |
@@ -74,7 +109,12 @@ Los estados visibles de sesión son:
 Agregar el primer asistente desde el espacio profesor abre la sesión; no la
 cierra silenciosamente. El profesor puede abrir o cerrar de forma explícita.
 Correcciones de asistencia delegan en `cambiar_estado_asistencia` y generan
-auditoría. Crear sesión/alumno, liberar sesión, pagos, transacciones y lotes
+auditoría. Un profesor asignado puede quitar a un asistente; la operación
+bloquea la fila, registra sesión, alumno, consumo y pago vinculados en auditoría,
+y luego elimina la asistencia dentro de la misma transacción. También puede
+liberar o revertir la liberación de una clase individual con las operaciones de
+dominio existentes: motivo obligatorio, actor, `ClaseLiberada` y recálculo del
+consumo. Crear sesión/alumno, liberar sesión, pagos, transacciones y lotes
 también dejan actor y evento.
 
 ## Integridad de pagos
@@ -93,16 +133,20 @@ persistencia revierte lote, pagos y transacciones. La pantalla de resultado solo
 muestra éxito cuando recuenta pagos y transacciones enlazadas y únicas.
 
 Los pagos históricos con `transaccion=NULL` se muestran como tales. No se
-backfillean automáticamente. Editar un pago nuevo sincroniza fecha, monto y glosa
-de su transacción enlazada.
+backfillean automáticamente. Profesor no edita, elimina ni revierte pagos: el
+servicio de reversa existente marca `Payment`, pero no crea ni relaciona un
+contramovimiento para `Transaction`, que es la fuente del libro de caja. Sin una
+trazabilidad contable inequívoca, exponer esa acción dejaría los dos dominios
+divergentes.
 
 ## UI móvil vigente
 
 - Barra inferior: Inicio, Mis clases, Alumnos y Pagos.
-- Cabecera de organización en modo lectura; no expone branding editable.
+- Cabecera compacta que abre una hoja inferior de contexto: organización,
+  período y tema Claro/Oscuro persistido solo en `localStorage`.
 - Próxima sesión y acciones frecuentes antes que resúmenes.
-- Territorios Aire, Tierra, Agua y Fuego con texto e iconos; no representan por
-  sí solos estados.
+- Listas con divisores en lugar de una tarjeta por registro; menú `…` para
+  quitar asistente y liberar/revertir clase individual.
 - Botones frecuentes y navegación inferior superan 44 px en la medición móvil.
 - Selector masivo incremental mantiene foco, usa `Enter`, chips y evita duplicados.
 - Formularios deshabilitan el envío mientras guardan cuando corresponde.
@@ -111,25 +155,31 @@ Contraste medido en componentes principales:
 
 | Par | Ratio |
 | --- | ---: |
-| Aire `#1479A6` / blanco | 4,87:1 |
-| Tierra `#697B36` / blanco | 4,68:1 |
-| Agua `#087D88` / blanco | 4,88:1 |
-| Fuego de acción `#A83B1C` / blanco | 6,35:1 |
-| Fondo `#F8F6F1` / texto `#17232B` | 14,82:1 |
+| Claro: texto `#15201F` / fondo `#F7F8F6` | 15,67:1 |
+| Claro: sesiones `#005F84` / `#F7F8F6` | 6,64:1 |
+| Claro: pagos `#006B70` / `#F7F8F6` | 5,91:1 |
+| Claro: alumnos `#5A7028` / `#F7F8F6` | 5,21:1 |
+| Claro: crítico `#B83F13` / `#F7F8F6` | 5,24:1 |
+| Oscuro: texto `#F6F8F7` / fondo `#111918` | 16,74:1 |
+| Oscuro: secundario `#B9C7C4` / fondo `#111918` | 10,23:1 |
+| Oscuro: acentos / fondo `#111918` | 9,65:1 a 10,90:1 |
 
 ## Límites confirmados
 
-- La prueba automatizada de Google demuestra que identidad no concede permisos,
-  pero el login real con cuenta Google de prueba en QA no se ejecutó en este
-  checkout. Requiere credenciales y entorno externo.
-- La evidencia Chrome local usa login local habilitado solo en el proceso de
-  desarrollo; no demuestra OAuth ni producción.
+- El login Google real se completó en desarrollo local con una cuenta Profesor
+  y callback en el puerto local autorizado. Demuestra el flujo OAuth local y la
+  entrada al perfil, pero no sustituye un smoke productivo.
 - No se implementó edición de nombre, logo, favicon ni acento. El profesor solo
   ve nombre/logo existentes en cabecera.
 - Los pagos históricos pueden carecer de transacción enlazada; corregirlos exige
   conciliación administrativa, no una migración que invente movimientos.
-- Revertir un pago enlazado conserva actualmente la transacción original; la
-  política contable de contramovimiento queda por definir antes de automatizarla.
+- La corrección de pagos Profesor queda bloqueada hasta modelar o demostrar un
+  contramovimiento enlazado que corrija también el libro de caja. El detalle es
+  de lectura y la URL de reversa Profesor no existe.
+- El profesor crea y matricula una persona desde `/profesor/alumnos/crear/`.
+  Desde una sesión, “Ir a Alumnos” lleva a ese flujo con la disciplina
+  preseleccionada y luego vuelve al detalle conservando el contexto; no se
+  duplica el formulario completo dentro de la sesión.
 - `asistencias.0004` obtiene pares históricos únicos e inserta lotes de hasta
   2.000 relaciones inactivas en una transacción, sin cargar todo el historial en
   memoria de aplicación. Su duración y el conjunto que requiere revisión deben
