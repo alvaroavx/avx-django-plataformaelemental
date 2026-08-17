@@ -1232,7 +1232,7 @@ class AsistenciasViewTests(TestCase):
         )
         url = (
             f"{reverse('asistencias:sesion_detail', kwargs={'pk': self.sesion.pk})}"
-            f"?periodo_mes=2&periodo_anio=2026&organizacion={otra_organizacion.pk}"
+            f"?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
         )
 
         response = self.client.post(
