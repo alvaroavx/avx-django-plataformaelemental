@@ -1302,6 +1302,13 @@ def sesion_detail(request, pk):
         ),
         pk=pk,
     )
+    organizacion_solicitada = (request.GET.get("organizacion") or "").strip()
+    if (
+        organizacion_solicitada
+        and organizacion_solicitada.lower() not in {"todos", "todas"}
+        and organizacion_solicitada != str(sesion.disciplina.organizacion_id)
+    ):
+        raise Http404
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
@@ -1646,21 +1653,6 @@ def sesion_detail(request, pk):
                 "asistencias/profesor/base.html"
                 if puede_registrar and not puede_administrar
                 else "asistencias/base_app.html"
-            ),
-            "organizacion_activa": (
-                sesion.disciplina.organizacion
-                if puede_registrar and not puede_administrar
-                else context.get("organizacion_activa")
-            ),
-            "organizacion_id": (
-                str(sesion.disciplina.organizacion_id)
-                if puede_registrar and not puede_administrar
-                else context.get("organizacion_id", "")
-            ),
-            "organizaciones_profesor": (
-                organizaciones_profesor(request.user)
-                if puede_registrar and not puede_administrar
-                else Organizacion.objects.none()
             ),
             "sesion_anterior": sesion_anterior,
             "sesion_siguiente": sesion_siguiente,

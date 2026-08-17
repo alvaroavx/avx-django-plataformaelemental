@@ -514,6 +514,25 @@ class ProfesorMultiOrganizacionTests(TestCase):
 
         self.assertContains(hoy, self.disciplina_a.nombre)
         self.assertNotContains(hoy, self.disciplina_b.nombre)
+        self.assertEqual(detalle.context["organizacion_id"], str(self.org_a.pk))
+        self.assertIn(
+            f"organizacion={self.org_a.pk}",
+            detalle.context["profesor_query"],
+        )
+        self.assertIn(
+            f"organizacion={self.org_a.pk}",
+            detalle.context["back_url"],
+        )
+        self.assertEqual(
+            self.client.get(
+                self._url(
+                    "asistencias:sesion_detail",
+                    self.org_b,
+                    self.sesion_a.pk,
+                )
+            ).status_code,
+            404,
+        )
 
     def test_rol_administrativo_no_rompe_asignaciones_del_contexto_profesor(self):
         rol_admin = Rol.objects.create(

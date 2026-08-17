@@ -100,6 +100,12 @@ class RelacionesHistoricasPermisosTests(TestCase):
         )
         self.client.force_login(self.profesor_user)
 
+    def _url_profesor(self, nombre, *args):
+        return (
+            f"{reverse(nombre, args=args or None)}"
+            f"?organizacion={self.organizacion.pk}"
+        )
+
     def test_asignacion_historica_inactiva_o_sin_revision_no_otorga_acceso(self):
         detalle = reverse("asistencias:sesion_detail", args=[self.sesion.pk])
         self.assertEqual(self.client.get(detalle).status_code, 404)
@@ -127,7 +133,9 @@ class RelacionesHistoricasPermisosTests(TestCase):
         self.assertTrue(AsignacionProfesorDisciplina.objects.operativas().filter(pk=self.asignacion.pk).exists())
         self.assertTrue(AlumnoDisciplina.objects.operativas().filter(pk=self.matricula.pk).exists())
         self.assertEqual(
-            self.client.get(reverse("asistencias:sesion_detail", args=[self.sesion.pk])).status_code,
+            self.client.get(
+                self._url_profesor("asistencias:sesion_detail", self.sesion.pk)
+            ).status_code,
             200,
         )
 
@@ -274,15 +282,16 @@ class RelacionesHistoricasPermisosTests(TestCase):
 
     def test_matricula_historica_no_habilita_busqueda_ni_pago(self):
         activar_asignacion_profesor(user=self.admin_user, asignacion=self.asignacion)
+        pagos_antes = Payment.objects.count()
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
-            {"q": "Alba"},
+            {"q": "Alba", "organizacion": self.organizacion.pk},
         )
         self.assertEqual(busqueda.status_code, 200)
         self.assertEqual(busqueda.json()["resultados"], [])
 
         respuesta = self.client.post(
-            reverse("profesor:pago_crear"),
+            self._url_profesor("profesor:pago_crear"),
             {
                 "disciplina": self.disciplina.pk,
                 "persona": self.alumno.pk,
@@ -294,12 +303,12 @@ class RelacionesHistoricasPermisosTests(TestCase):
             },
         )
         self.assertEqual(respuesta.status_code, 200)
-        self.assertFalse(Payment.objects.exists())
+        self.assertEqual(Payment.objects.count(), pagos_antes)
 
         activar_matricula_alumno(user=self.admin_user, matricula=self.matricula)
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
-            {"q": "Alba"},
+            {"q": "Alba", "organizacion": self.organizacion.pk},
         )
         self.assertEqual([item["id"] for item in busqueda.json()["resultados"]], [self.alumno.pk])
 

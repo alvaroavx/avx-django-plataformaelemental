@@ -1674,11 +1674,27 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["profesor_mode"])
+        self.assertEqual(response.context["organizacion_id"], str(self.organizacion.pk))
         enlace = (
             f'{reverse("asistencias:sesion_edit", kwargs={"pk": self.sesion.pk})}'
             f"?periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
         )
         self.assertContains(response, f'href="{enlace}"', html=False)
+
+    def test_sesion_detail_admin_sin_contexto_profesor_rechaza_organizacion_ajena(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Org ajena al detalle",
+            razon_social="Org ajena al detalle SPA",
+            rut="76.222.333-4",
+        )
+        url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
+
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertEqual(
+            self.client.get(url, {"organizacion": otra_organizacion.pk}).status_code,
+            404,
+        )
 
     def test_sesion_edit_actualiza_datos_y_redirige_a_detalle(self):
         profesor = Persona.objects.create(
