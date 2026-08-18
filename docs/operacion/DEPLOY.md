@@ -1,24 +1,26 @@
 # Deploy
 
-Fecha de actualizacion: 2026-08-12
+Fecha de actualizacion: 2026-08-18
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
 - todo push a `main` ejecuta primero el gate completo sobre PostgreSQL aislado;
 - el job `deploy` depende explícitamente de `test`, exige `success()` y no inicia
   si falla un check, Ruff o una prueba;
-- después del gate, el job usa el environment `production`; la aprobación humana
-  solo existe si GitHub tiene revisores obligatorios configurados allí;
-  `workflow_dispatch` conserva además tag/hash explícito y confirmación literal;
+- en un push a `main`, el job `deploy` queda `skipped` aunque los tests pasen;
+- solo `workflow_dispatch`, con tag/hash explícito, confirmación literal
+  `DESPLEGAR_PRODUCCION` y aprobación del environment `production`, puede
+  alcanzar SSH;
 - el servidor verifica un checkout limpio y cambia al hash probado en modo
   detached, sin `git reset --hard origin/main`;
 - el deploy genérico instala dependencias, respalda en almacenamiento externo,
   migra, recopila estáticos y reinicia `systemd`.
 
-La liberación Operación Profesor mantiene una excepción deliberada para sus dos
-migraciones escalonadas. `scripts/deploy.sh` comprueba que `asistencias.0004` y
-`finanzas.0012` ya estén aplicadas y aborta antes de backup, migraciones,
-estáticos o reinicio si siguen pendientes. Su procedimiento exacto está en
+La liberación Operación Profesor mantiene una excepción deliberada para
+`asistencias.0004`, la reparación defensiva `asistencias.0005` y
+`finanzas.0012`. El deploy genérico no comprueba `0005` antes de su `migrate`
+global y queda expresamente prohibido para esta ventana. Su procedimiento exacto
+está en
 [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 ## Estrategia elegida
@@ -34,6 +36,7 @@ estáticos o reinicio si siguen pendientes. Su procedimiento exacto está en
 - `.github/workflows/deploy.yml`
 - `scripts/deploy.sh`
 - `scripts/release_operacion_profesor.sh`
+- `scripts/release_asistencias_0005.sh`
 - `scripts/validar_gate_ci.py`
 - `scripts/smoke_produccion.sh`
 - `asistencias/management/commands/verificar_smoke_profesor.py`
@@ -223,28 +226,30 @@ Nota operativa:
 
 ## Flujo del workflow
 
-> Excepción Operación Profesor 2026-08-10: no usar este flujo para el tag
-> `release/operacion-profesor-20260810.1`. Ese release requiere el
-> [runbook manual](MIGRACIONES_OPERACION_PROFESOR.md#runbook-manual-de-producción-para-el-piloto).
-> El dispatch directo de ese tag sigue siendo rechazado por
-> `MANUAL_RELEASE_ONLY=1`. Un deploy posterior desde `main` también aborta en el
-> servidor si detecta pendiente cualquiera de sus dos migraciones; primero debe
-> completarse el runbook escalonado.
+> Excepción manual: no usar este flujo para el release archivado
+> `release/operacion-profesor-20260810.1` ni para el candidato
+> `release/asistencias-0005-20260818.1`. Ambos están marcados
+> `MANUAL_RELEASE_ONLY=1`. La reparación `0005` requiere el
+> [runbook vigente](MIGRACIONES_OPERACION_PROFESOR.md#runbook-vigente-para-asistencias0005)
+> y no puede pasar por `scripts/deploy.sh`.
 
 Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh`.
 
 ```mermaid
 flowchart TD
-    A["Push a main o dispatch"] --> B["Job test"]
-    B --> C["Checkout del SHA o ref explícito"]
+    A["Push a main"] --> B["Job test"]
+    B --> G{"Tests exitosos"}
+    G -- "No" --> X["Deploy omitido; sin SSH ni cambios productivos"]
+    G -- "Sí, evento push" --> X
+    W["workflow_dispatch + confirmación"] --> C["Checkout del SHA o ref explícito"]
     C --> D["Instalar dependencias dev"]
     D --> E["ruff check ."]
     E --> F["Tests Django"]
-    F --> G{"Tests exitosos"}
-    G -- "No" --> X["Deploy omitido; sin SSH ni cambios productivos"]
-    G -- "Sí" --> Y["Aprobación environment production"]
-    Y --> H["Validar secrets"]
-    H --> I["Preparar llave SSH y known_hosts"]
+    F --> HD{"Tests exitosos"}
+    HD -- "No" --> X
+    HD -- "Sí" --> Y["Aprobación environment production"]
+    Y --> V["Validar secrets"]
+    V --> I["Preparar llave SSH y known_hosts"]
     I --> J["SSH al servidor"]
     J --> K["Verificar worktree y registrar hash previo"]
     K --> L["Checkout detached del SHA probado"]
@@ -258,30 +263,32 @@ flowchart TD
     S --> T["Smoke HTTP y aislamiento Profesor"]
 ```
 
-1. `actions/checkout` del SHA del push o del tag/hash del dispatch;
-2. en dispatch, comprobar que el propio release contiene el protocolo endurecido
+1. un push a `main` ejecuta el job `test`; incluso verde, `deploy` queda
+   `skipped` porque no es `workflow_dispatch`;
+2. un dispatch hace `actions/checkout` del tag/hash explícito;
+3. en dispatch, comprobar que el propio release contiene el protocolo endurecido
    de `scripts/deploy.sh`, y rechazar cualquier checkout marcado
    `MANUAL_RELEASE_ONLY=1`; esto impide usar el flujo genérico con releases
    anteriores o con esta migración escalonada;
-3. instalar dependencias Python y de desarrollo;
-4. validar estructuralmente el gate con `scripts/validar_gate_ci.py`;
-5. correr `python manage.py check`;
-6. correr `ruff check .`;
-7. correr `python manage.py test asistencias finanzas personas`;
-8. ejecutar explícitamente
+4. instalar dependencias Python y de desarrollo;
+5. validar estructuralmente el gate con `scripts/validar_gate_ci.py`;
+6. correr `python manage.py check`;
+7. correr `ruff check .`;
+8. correr `python manage.py test asistencias finanzas personas`;
+9. ejecutar explícitamente
    `python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests`;
-9. omitir completamente `deploy` si cualquier paso anterior falla;
-10. antes de habilitar el flujo, comprobar que el environment `production`
+10. omitir completamente `deploy` si cualquier paso anterior falla;
+11. antes de habilitar el flujo, comprobar que el environment `production`
     existe y tiene revisores obligatorios; en dispatch exigir además
     `DESPLEGAR_PRODUCCION`;
-11. validar secrets obligatorios;
-12. escribir y validar la llave privada, y poblar `known_hosts`;
-13. abrir SSH solo después del éxito del job `test` y la aprobación productiva;
-14. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
-15. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
-16. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
+12. validar secrets obligatorios;
+13. escribir y validar la llave privada, y poblar `known_hosts`;
+14. abrir SSH solo después del éxito del job `test` y la aprobación productiva;
+15. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
+16. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
+17. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
     explícita de migración completa.
-17. ejecutar `scripts/smoke_produccion.sh` como paso separado. Un fallo deja el
+18. ejecutar `scripts/smoke_produccion.sh` como paso separado. Un fallo deja el
     workflow rojo y evidencia en el log, pero no revierte código ni base de datos.
 
 ## Base De Datos En CI
@@ -317,6 +324,9 @@ flowchart TD
 - valida que PostgreSQL apunte a la base productiva esperada antes de migrar
 - exige que las migraciones escalonadas `asistencias.0004` y `finanzas.0012` ya
   estén aplicadas; si no, deriva al runbook manual antes de cualquier escritura;
+- no comprueba `asistencias.0005` antes de ejecutar su `migrate` global; por esa
+  razón no se usa para el release defensivo de `0005`, aunque `0004` y `0012`
+  aparezcan aplicadas;
 - crea virtualenv si no existe
 - instala dependencias
 - ejecuta backup PostgreSQL previo a migraciones usando `pg_dump` en el destino

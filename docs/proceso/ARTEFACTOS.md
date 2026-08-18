@@ -1,6 +1,6 @@
 # Artefactos de trabajo
 
-Fecha de actualización: 2026-08-16
+Fecha de actualización: 2026-08-18
 
 ## Propósito
 
@@ -221,6 +221,23 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 - `docs/evidencia/release-manual-operacion-profesor-20260810/RESULTADOS.md`:
   evidencia sanitizada de sintaxis Bash/YAML, gates estructurales, documentación,
   lint y check local. No contiene secretos, datos de producción ni dumps.
+
+### Release defensivo de `asistencias.0005`
+
+- `scripts/release_asistencias_0005.sh`: sucesor versionado para la reparación
+  defensiva. Distingue Ruta A y Ruta B por el estado real de migraciones, ejecuta
+  un preflight PostgreSQL read-only, valida un dump restaurado y un snapshot
+  previo mediante confirmaciones auditables, y aplica únicamente destinos de
+  migración explícitos.
+- `asistencias/test_release_asistencias_0005.py`: contrato estático sin base de
+  datos. Comprueba la máquina de estados, la ausencia de `migrate` global, la
+  conservación del release anterior y los requisitos documentales.
+- Runbook vigente:
+  `docs/operacion/MIGRACIONES_OPERACION_PROFESOR.md#runbook-vigente-para-asistencias0005`.
+- El script solo escribe actas sanitizadas en `RELEASE_OPS_DIR`, fuera del
+  checkout. Dumps, snapshots, logs PostgreSQL y reportes nominales nunca se
+  versionan. Para evidencia futura conservar Markdown y, si aporta valor, un
+  JSON agregado mínimo; no agregar nuevas capturas PNG redundantes.
 
 ### Gate CI y smoke de producción
 

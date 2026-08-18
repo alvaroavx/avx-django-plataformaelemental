@@ -1,25 +1,18 @@
 # Migraciones de Operación Profesor
 
-Fecha de actualización: 2026-08-16
+Fecha de actualización: 2026-08-18
 
 ## Estado y decisión
 
-**Gate actual: LISTO PARA VENTANA MANUAL, condicionado al preflight.** No existe
-QA/staging separado; la persona responsable aceptó un piloto controlado con
-pocos usuarios y mantenimiento. El código evita que la historia otorgue permisos
-presentes y fue probado con PostgreSQL real y datos sintéticos. La medición real,
-el backup y la decisión final se ejecutan en producción durante la ventana por
-infraestructura. Producción no fue consultada ni modificada al preparar este
-documento.
+**Gate actual: NO-GO.** Producción no fue consultada ni modificada al preparar
+este procedimiento. La ventana solo podrá proponerse cuando exista un commit
+final revisado, se entregue su SHA exacto y se cree el tag anotado nuevo descrito
+abajo. Hasta entonces no se debe ejecutar `workflow_dispatch` ni este runbook.
 
-`asistencias.0004` se corrigió directamente. La decisión se apoya en evidencia
-Git reproducible: después de `git fetch --prune origin`, `origin/main` permanece
-en `d4a4e48` y no contiene `asistencias.0004` ni `finanzas.0012`; ambas forman
-parte del release local único, todavía no publicado. No se encontró configuración
-ni evidencia versionada de un QA/staging que las hubiera aplicado. Si un ambiente
-compartido las recibió manualmente desde ese commit local, se debe detener el
-deploy y crear una migración correctiva posterior: no se debe editar el historial
-que ese ambiente ya considere aplicado.
+`asistencias.0004` se corrigió antes de su liberación formal. Sin embargo, existe
+la posibilidad de que una base haya aplicado manualmente una versión precommit.
+Por eso el procedimiento no presupone un único estado de migraciones y trata
+`asistencias.0005` como una reparación defensiva, no como una migración rutinaria.
 
 Una base que hubiera aplicado la versión local precommit de `0004` queda con un
 historial incompatible con el archivo corregido: figuran creadas las relaciones,
@@ -34,7 +27,304 @@ relaciones que tienen `asignada_por`; las que no tienen actor quedan
 sesiones o asistencias. La activación posterior sigue requiriendo
 `activar_relaciones_operativas` y queda auditada.
 
-## Runbook manual de producción para el piloto
+## Runbook vigente para `asistencias.0005`
+
+La decisión operativa completa se registra en
+[ADR 0002](../adr/0002-release-defensivo-asistencias-0005.md). El coordinador
+versionado es `scripts/release_asistencias_0005.sh` y nunca ejecuta `migrate`
+global, crea/restaura respaldos, activa relaciones ni reinicia servicios.
+
+El tag propuesto es `release/asistencias-0005-20260818.1` y su padre esperado es
+`4b687d109315e71391d840a1881d808fcc7e428d`. El SHA final no puede escribirse
+dentro del mismo commit que se identifica a sí mismo. Por eso se entrega después
+del commit como `RELEASE_EXPECTED_COMMIT`; el script exige que ese SHA coincida
+simultáneamente con `HEAD` y con el commit resuelto por el tag anotado. No se debe
+crear el tag hasta recibir autorización expresa.
+
+El tag `release/operacion-profesor-20260810.1` y
+`scripts/release_operacion_profesor.sh` quedan archivados e inmutables. No se
+reutilizan, editan ni relajan para esta reparación.
+
+### Estados y rutas admitidas
+
+| Ruta | Estado inicial exacto | Secuencia autorizada |
+| --- | --- | --- |
+| A: producción actual | `asistencias.0004` aplicada, `asistencias.0005` pendiente y `finanzas.0012` aplicada | preflight → mantenimiento → solo `asistencias.0005` → reporte/revisión → validación |
+| B: instalación pendiente | `asistencias.0004`, `asistencias.0005` y `finanzas.0012` pendientes | preflight → mantenimiento → solo `0004` → solo `0005` → reporte/revisión administrativa → solo `finanzas.0012` → validación |
+
+Cualquier otra combinación es `UNKNOWN` y obliga a detenerse. El script también
+reconoce estados intermedios únicamente para verificar la etapa siguiente o
+diagnosticar una interrupción; no los acepta como preflight inicial silencioso.
+
+### 1. Identidad, variables y hash productivo
+
+Antes de cambiar el checkout, infraestructura registra el estado real:
+
+```bash
+set -euo pipefail
+umask 077
+export APP_DIR=/ruta/absoluta/del/checkout-productivo
+export DEPLOY_VENV_DIR=/ruta/absoluta/del/venv-productivo
+export DEPLOY_ENV_FILE=/ruta/absoluta/del/environment-file-productivo
+export RELEASE_OPS_DIR=/ruta/protegida/actas/asistencias-0005
+export RELEASE_BACKUP_FILE=/montaje/externo/seguro/elemental-previo.dump
+export DEPLOY_SERVICE=plataforma-elemental.service
+export RELEASE_TAG=release/asistencias-0005-20260818.1
+export RELEASE_EXPECTED_COMMIT='<SHA completo entregado después del commit>'
+export RELEASE_REPO_DIR="$APP_DIR"
+
+cd "$APP_DIR"
+mkdir -p "$RELEASE_OPS_DIR"
+test -z "$(git status --porcelain)"
+export PROD_PREV_COMMIT="$(git rev-parse HEAD)"
+git show --no-patch --format='%H %cI %s' "$PROD_PREV_COMMIT" \
+  | tee "$RELEASE_OPS_DIR/produccion-antes.txt"
+git fetch --prune --tags origin
+test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = \
+  "$RELEASE_EXPECTED_COMMIT"
+git show "$RELEASE_EXPECTED_COMMIT:scripts/release_asistencias_0005.sh" \
+  | bash -s -- verify-release
+```
+
+`verify-release` se ejecuta directamente desde el objeto Git candidato, sin
+hacerle checkout. Solo lee Git, el worktree y el estado systemd; exige que el
+servicio todavía esté activo. Un worktree sucio, SHA no entregado, padre
+diferente, tag liviano o servicio ya detenido son NO-GO.
+
+### 2. Mantenimiento, snapshot, dump y checkout candidato
+
+Después de `verify-release`, activar mantenimiento y detener el servicio de
+aplicación. Confirmar que no quedan escritores. Solo entonces crear snapshot y
+dump, antes de hacer checkout del candidato. Sus ubicaciones no pueden ser el
+checkout ni `/tmp`; el script no realiza estas operaciones:
+
+```bash
+set -a
+# shellcheck disable=SC1090
+source "$DEPLOY_ENV_FILE"
+set +a
+export PGPASSWORD="$POSTGRES_PASSWORD"
+
+pg_dump --host "$POSTGRES_HOST" --port "$POSTGRES_PORT" \
+  --username "$POSTGRES_USER" --format=custom --no-owner --no-acl \
+  --file "$RELEASE_BACKUP_FILE" "$POSTGRES_DB"
+pg_restore --list "$RELEASE_BACKUP_FILE" >/dev/null
+sha256sum "$RELEASE_BACKUP_FILE" \
+  | tee "$RELEASE_OPS_DIR/backup-sha256.txt"
+```
+
+Infraestructura debe crear además un snapshot consistente y registrar solo su
+identificador opaco en `RELEASE_SNAPSHOT_REFERENCE`. Antes de continuar debe
+restaurar el dump en una base aislada, verificar que `pg_restore` termina sin
+errores y eliminar esa base conforme al procedimiento de infraestructura. El
+runbook no crea esa base ni automatiza la restauración.
+
+```bash
+export RELEASE_BACKUP_STORAGE_CONFIRMED=EXTERNO_SEGURO_VERIFICADO
+export RELEASE_BACKUP_RESTORE_CONFIRMED=RESTAURACION_VERIFICADA
+export RELEASE_SNAPSHOT_REFERENCE='<identificador-opaco>'
+export RELEASE_SNAPSHOT_CONFIRMED=SNAPSHOT_PREVIO_VERIFICADO
+```
+
+Si no se puede demostrar restauración, snapshot previo o almacenamiento externo,
+la ventana queda en NO-GO.
+
+Recién después de esas confirmaciones se permite cambiar el checkout y preparar
+el entorno ejecutable:
+
+```bash
+git checkout --detach "$RELEASE_EXPECTED_COMMIT"
+test "$(git rev-parse HEAD)" = "$RELEASE_EXPECTED_COMMIT"
+test -z "$(git status --porcelain)"
+bash scripts/release_asistencias_0005.sh install
+```
+
+`install` no cambia otra vez el checkout, no reinicia servicios y no ejecuta
+migraciones. Sí puede modificar el virtualenv mediante `pip install`; por eso
+exige mantenimiento, dump restaurado y snapshot confirmado antes de comenzar.
+Solo al finalizar correctamente crea su marcador de instalación.
+
+### 3. Preflight obligatorio de solo lectura
+
+```bash
+bash scripts/release_asistencias_0005.sh preflight
+```
+
+Se ejecuta después de `install`, todavía con mantenimiento activo y antes de
+cualquier migración. El comando conecta PostgreSQL con
+`default_transaction_read_only=on` y registra:
+
+- SHA, padre, tag y worktree limpio;
+- estado exacto de `asistencias.0004`, `asistencias.0005` y `finanzas.0012`;
+- hash del archivo `0005` presente en el checkout;
+- columnas reales `activa`, `asignada_por_id`, `origen`, `revisada_en` y
+  `revisada_por_id`;
+- conteos agregados de relaciones activas, inactivas, sin actor, históricas y
+  explícitas, sin nombres ni identificadores personales;
+- versión y tamaño PostgreSQL, espacio libre, filesystem del dump y servicio de
+  aplicación inactivo por mantenimiento;
+- checksum del dump y hash de la referencia opaca del snapshot.
+
+Si `origen` ya existe pero es nullable, carece del default `explicita` o contiene
+valores desconocidos, `0005` no corrige ese estado parcial: es NO-GO y requiere
+una corrección forward revisada. En Ruta B inicial, la existencia de las tablas
+de relaciones mientras `0004` figura pendiente también es NO-GO.
+
+### 4. Ruta A
+
+Con mantenimiento todavía activo:
+
+```bash
+export RELEASE_CONFIRM_0005=APLICAR_ASISTENCIAS_0005
+bash scripts/release_asistencias_0005.sh route-a-migrate-0005
+bash scripts/release_asistencias_0005.sh report
+```
+
+La acción ejecutada es exactamente:
+
+```bash
+PGOPTIONS='-c lock_timeout=5s -c statement_timeout=15min' \
+  "$DEPLOY_VENV_DIR/bin/python" manage.py migrate asistencias 0005 --noinput
+```
+
+`/usr/bin/time -p` mide la duración y el log queda en `RELEASE_OPS_DIR`. No se
+toca `finanzas.0012`. Aunque la Ruta A ya tenga finanzas aplicada, el reporte y
+la revisión administrativa siguen siendo obligatorios antes de volver a abrir.
+
+### 5. Ruta B escalonada
+
+```bash
+export RELEASE_CONFIRM_0004=APLICAR_ASISTENCIAS_0004
+bash scripts/release_asistencias_0005.sh route-b-migrate-0004
+
+export RELEASE_CONFIRM_0005=APLICAR_ASISTENCIAS_0005
+bash scripts/release_asistencias_0005.sh route-b-migrate-0005
+
+bash scripts/release_asistencias_0005.sh report
+```
+
+Las acciones de escritura son exclusivamente:
+
+```bash
+python manage.py migrate asistencias 0004 --noinput
+python manage.py migrate asistencias 0005 --noinput
+```
+
+Después del reporte, la ejecución se detiene. Si `review_count` es cero, el
+marcador deja explícito `review_required=no`; no se exige actor ni ejecutar
+`confirm-activations`. Si es mayor que cero, administración revisa el detalle
+protegido fuera de Git y define un `User.id` activo. El script valida que dicho
+usuario tenga, sin bypass por `is_staff`, permisos para administrar sesiones y
+personas en todo el alcance pendiente:
+
+```bash
+export RELEASE_ACTIVATION_USER_ID=123
+export RELEASE_CONFIRM_ACTIVACIONES=RELACIONES_VIGENTES_REVISADAS
+bash scripts/release_asistencias_0005.sh confirm-activations
+```
+
+El comando anterior no activa relaciones. Para las relaciones que la persona
+administradora decida activar, resolver el username desde el ID validado sin
+escribirlo en el runbook y usar primero preview, luego confirmación explícita:
+
+```bash
+ACTOR_USERNAME="$(python manage.py shell -c \
+  'from django.contrib.auth import get_user_model; print(get_user_model().objects.get(pk='"$RELEASE_ACTIVATION_USER_ID"').get_username())')"
+
+python manage.py activar_relaciones_operativas \
+  --tipo profesor --ids ID_1 ID_2 --actor-username "$ACTOR_USERNAME"
+python manage.py activar_relaciones_operativas \
+  --tipo profesor --ids ID_1 ID_2 --actor-username "$ACTOR_USERNAME" \
+  --confirmar ACTIVAR_RELACIONES_REVISADAS
+
+python manage.py activar_relaciones_operativas \
+  --tipo alumno --ids ID_3 ID_4 --actor-username "$ACTOR_USERNAME"
+python manage.py activar_relaciones_operativas \
+  --tipo alumno --ids ID_3 ID_4 --actor-username "$ACTOR_USERNAME" \
+  --confirmar ACTIVAR_RELACIONES_REVISADAS
+unset ACTOR_USERNAME
+```
+
+Es válido revisar y decidir no activar una relación; no es válido omitir la
+revisión cuando `review_required=yes`. El script nunca activa automáticamente.
+Al terminar —o inmediatamente si el reporte indicó cero pendientes—:
+
+```bash
+export RELEASE_CONFIRM_FINANZAS=APLICAR_FINANZAS_0012
+bash scripts/release_asistencias_0005.sh route-b-migrate-finanzas
+```
+
+La última acción ejecuta exclusivamente:
+
+```bash
+python manage.py migrate finanzas 0012 --noinput
+```
+
+### 6. Fallo parcial de `0005`
+
+`0005` usa `atomic=False`; no existe rollback automático. Ante cualquier error:
+
+1. mantener mantenimiento y detener toda etapa siguiente;
+2. conservar el log temporizado completo y hora del fallo;
+3. ejecutar solo el diagnóstico read-only:
+
+   ```bash
+   bash scripts/release_asistencias_0005.sh diagnose-0005
+   ```
+
+4. guardar `showmigrations`, columnas, constraints, índices, conteos agregados y
+   logs PostgreSQL del intervalo en almacenamiento protegido;
+5. no ejecutar `migrate <anterior>`, `--fake`, restauración, snapshot rollback ni
+   comandos SQL ad hoc;
+6. si `0005` continúa pendiente y el diagnóstico muestra uno de los esquemas que
+   la migración soporta, corregir primero la causa externa —por ejemplo el lock—
+   y reanudar ejecutando nuevamente **la misma** acción `migrate-0005`; sus
+   operaciones son reintentables;
+7. si Django marca `0005` aplicada pero la validación posterior falla, mantener
+   NO-GO y preparar una migración correctiva forward separada.
+
+Restaurar dump o snapshot es contingencia excepcional decidida por
+infraestructura. Puede perder todas las escrituras posteriores a su fecha y no
+está automatizado por este repositorio.
+
+### 7. Validación final y reapertura
+
+Tanto en Ruta A como en Ruta B:
+
+```bash
+bash scripts/release_asistencias_0005.sh finalize
+```
+
+`finalize` exige reporte y revisión administrativa, valida esquema, ejecuta
+`migrate --check`, `check --deploy` y guarda el plan final; no ejecuta
+`collectstatic`, no reinicia el servicio y no abre tráfico. Infraestructura
+realiza esos pasos manualmente y luego ejecuta el smoke de solo lectura ya
+versionado. Un fallo se resuelve forward-only bajo mantenimiento.
+
+### 8. Criterios GO / NO-GO
+
+GO requiere simultáneamente:
+
+- tag anotado, SHA entregado y padre coincidentes;
+- worktree limpio y runtime confirmado;
+- estado inicial exactamente Ruta A o Ruta B;
+- esquema clasificado como soportado por el preflight;
+- dump externo con restauración verificada y snapshot previo identificado;
+- espacio suficiente y servicio sano antes de mantenimiento;
+- `lock_timeout=5s`, logs y marcadores protegidos disponibles;
+- reporte sin relaciones históricas activas sin revisión;
+- revisión administrativa firmada antes de finalizar o migrar finanzas.
+
+Es NO-GO cualquier estado desconocido, backup/snapshot no demostrado, estructura
+parcial que `0005` no repare, lock que exceda cinco segundos, error de migración,
+marcador ausente, discrepancia de SHA o intento de usar `migrate` global.
+
+## Runbook archivado del release 2026-08-10 — no ejecutar para `0005`
+
+> El contenido siguiente conserva la trazabilidad del release anterior. Solo
+> aplica al tag inmutable `release/operacion-profesor-20260810.1`; no contempla
+> `asistencias.0005` y no se debe reutilizar para la próxima ventana.
 
 Este procedimiento reemplaza `scripts/deploy.sh` para esta versión. No hacer
 push a `main` ni invocar el workflow de deploy durante la ventana. El único

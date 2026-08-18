@@ -27,6 +27,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 
 ## ADR
 - [docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md): decision y gates de seguridad para autenticacion Google y solicitudes de acceso.
+- [docs/adr/0002-release-defensivo-asistencias-0005.md](adr/0002-release-defensivo-asistencias-0005.md): rutas, preflight y recuperación forward-only de la reparación defensiva `asistencias.0005`.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.
