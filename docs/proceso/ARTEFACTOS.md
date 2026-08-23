@@ -295,7 +295,40 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 
 ## Regla de reemplazo
 
+### Release escalonado de asistencias
+
+- `scripts/release_asistencias_escalonado.sh`: preflight read-only y aplicación
+  forward-only con recuperación únicamente antes de iniciar una migración.
+- `.github/workflows/release-asistencias-escalonado.yml`: dispatch separado para
+  preflight y apply, environments protegidos y concurrencia productiva.
+- `docs/operacion/RELEASE_ESCALONADO_ASISTENCIAS.md`: contrato, estados y
+  límites. Reutilizar el script para futuras reparaciones solo mediante un tag
+  y SHA nuevos; nunca copiarlo manualmente al servidor.
+- `docs/evidencia/release-escalonado-20260823/reproduccion.json`: evidencia
+  agregada de la restauración aislada del dump y de la secuencia 0004b/0005/0006.
+  No contiene PII, dumps ni logs crudos.
+- `docs/operacion/GITHUB_ENVIRONMENTS_RELEASE_ESCALONADO.md`: checklist de
+  environments, revisores, secrets aislados y wrappers SSH restringidos.
+- `scripts/infra/elemental_release_*`: wrappers root-owned parametrizados para
+  preflight y apply. El wrapper readonly no acepta código por stdin; el de
+  apply solo acepta tag/SHA/padre y delega al launcher limitado.
+- `docs/evidencia/release-escalonado-20260823/infraestructura.json`: huellas
+  públicas, permisos efectivos y pruebas sanitizadas de los dos canales SSH y
+  environments GitHub; no contiene claves privadas ni contraseñas.
+
 Si una herramienta nueva reemplaza otra, no se borra silenciosamente la anterior.
 Debe marcarse como `reemplazada`, indicar fecha y enlazar la versión canónica. Si
 la versión anterior contenía un secreto o dato prohibido, no se copia: se conserva
 solo una descripción sanitizada del motivo y se rota el secreto si correspondía.
+
+### Inspección de canal SSH y función de preflight 2026-08-23
+
+- `docs/evidencia/release-escalonado-20260823/inspeccion-funcion-wrappers.json`:
+  evidencia sanitizada, solo lectura, de owner/ACL/search_path de
+  `public.elemental_release_preflight()` y de permisos efectivos de wrappers,
+  `authorized_keys` y sudo.
+- `scripts/infra/provision_preflight_owner.sh`: provisión idempotente del owner
+  NOLOGIN y de los permisos mínimos de lectura de la función. Se ejecutó con
+  checksum verificado; no contiene secretos.
+- La evidencia registra la corrección del owner y las pruebas posteriores sin
+  reiniciar servicios ni modificar tablas, datos o migraciones.

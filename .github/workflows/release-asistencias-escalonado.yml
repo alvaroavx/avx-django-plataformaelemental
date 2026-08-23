@@ -1,0 +1,133 @@
+name: release asistencias escalonado
+
+on:
+  workflow_dispatch:
+    inputs:
+      etapa:
+        description: "Etapa independiente"
+        required: true
+        type: choice
+        options: [preflight, apply]
+      release_tag:
+        description: "Tag anotado e inmutable"
+        required: true
+        type: string
+      release_sha:
+        description: "SHA completo del tag"
+        required: true
+        type: string
+      confirmacion:
+        description: "Escribir RELEASE_ESCALONADO_ASISTENCIAS"
+        required: true
+        type: string
+
+concurrency:
+  group: release-asistencias-production
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: ${{ inputs.etapa == 'preflight' && inputs.confirmacion == 'RELEASE_ESCALONADO_ASISTENCIAS' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production-readonly
+    steps:
+      - name: Checkout exacto del tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Verificar identidad inmutable
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_TYPE}" = tag
+          test "${GITHUB_REF_NAME}" = "${RELEASE_TAG}"
+          test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${RELEASE_SHA}"
+          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
+          git status --porcelain | tee /tmp/worktree.txt
+          test ! -s /tmp/worktree.txt
+
+      - name: Preparar SSH de solo lectura
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh; chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/release_key
+          chmod 600 ~/.ssh/release_key
+          ssh-keygen -y -f ~/.ssh/release_key >/dev/null
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Preflight remoto sin mantenimiento
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
+          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "preflight --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"
+
+  apply:
+    if: ${{ inputs.etapa == 'apply' && inputs.confirmacion == 'RELEASE_ESCALONADO_ASISTENCIAS' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Checkout exacto del tag para apply
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Verificar que este dispatch proviene del tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_TYPE}" = tag
+          test "${GITHUB_REF_NAME}" = "${RELEASE_TAG}"
+          test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${RELEASE_SHA}"
+          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
+
+      - name: Preparar SSH de producción
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh; chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/release_key
+          chmod 600 ~/.ssh/release_key
+          ssh-keygen -y -f ~/.ssh/release_key >/dev/null
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Aplicar etapa escalonada
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
+          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "apply --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"

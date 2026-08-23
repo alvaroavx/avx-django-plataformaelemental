@@ -1,0 +1,32 @@
+{
+  "fecha": "2026-08-23",
+  "tipo": "inspeccion_solo_lectura",
+  "alcance": ["public.elemental_release_preflight()", "wrappers SSH", "sudo de apply"],
+  "sanitizacion": "No contiene secretos, claves privadas, connection strings, datos personales ni dumps.",
+  "funcion_postgresql": {
+    "firma": "public.elemental_release_preflight()",
+    "pronargs": 0,
+    "security_definer": true,
+    "search_path_fijo": "pg_catalog, public",
+    "schema_public_permite_CREATE_a_PUBLIC": false,
+    "owner": {"rol": "elemental_release_preflight_owner", "rolcanlogin": false, "rolsuper": false, "rolcreaterole": false, "rolcreatedb": false, "cumple_owner_nologin_sin_escritura": true},
+    "acl": {"public_execute": false, "elemental_release_ro_execute": true, "acl_observada": "elemental_release_ro=X/elemental_release_preflight_owner"},
+    "cuerpo": {"contiene_dynamic_execute": false, "contiene_format": false, "tamano_definicion": 1062},
+    "resultado": "CUMPLE",
+    "correccion": {"script": "scripts/infra/provision_preflight_owner.sh", "sha256": "ee3ea4a9eb16170d6dbd2133f1a92e3a3997b3bdbf462613e031ffdf3de4cd11", "ruta_remota": "/usr/local/sbin/elemental-release-provision-preflight-owner", "modo_remoto": "750", "owner_remoto": "root:root"}
+  },
+  "wrappers": {
+    "archivos": [
+      {"ruta": "/usr/local/sbin/elemental-release-preflight", "modo": "755", "owner": "root:root", "sha256": "0ce9ad0f9297db396e678ac841f25a9363138fab19a3a7ff4c6c1816e141b394"},
+      {"ruta": "/usr/local/sbin/elemental-release-apply-wrapper", "modo": "755", "owner": "root:root", "sha256": "422a2b22a84d34e3268c201c615984e13f870df2a040ae90dd3e15898e7e154a"},
+      {"ruta": "/usr/local/sbin/elemental-release-apply", "modo": "750", "owner": "root:root", "sha256": "7caf826b219b136d817a64a2b9f39333fa1b7698ed666de231dda8fb008e1ba"}
+    ],
+    "usuarios_ssh_no_escriben_wrappers": true,
+    "authorized_keys": {"readonly": "restrict + forced-command a /usr/local/sbin/elemental-release-preflight; root:elemental-release-ro, modo 640", "apply": "restrict + forced-command a /usr/local/sbin/elemental-release-apply-wrapper; root:elemental-release-app, modo 640", "shell_libre": false, "stdin_al_wrapper": "redirigido a /dev/null"},
+    "sudo": {"archivo": "/etc/sudoers.d/elemental-release-app", "modo": "440", "owner": "root:root", "regla": "elemental-release-app ALL=(root) NOPASSWD: /usr/local/sbin/elemental-release-apply *", "env_reset": true, "alcance": "solo launcher root-owned; el launcher valida tag, SHA y padre con expresiones estrictas", "comandos_arbitrarios_por_stdin": false},
+    "resultado": "CUMPLE_CONTROLES_DE_WRAPPER_Y_SUDO"
+  },
+  "pruebas_post_correccion": {"funcion_responde": true, "claves_respuesta": ["counts", "migrations", "schema"], "ddl_rechazado": true, "insert_rechazado": true, "update_rechazado": true, "delete_rechazado": true, "gunicorn": "active", "nginx": "active", "http_local": 301},
+  "comandos_inspeccion": ["stat y sha256sum de los tres wrappers", "sudo -n -l -U elemental-release-app", "sudo -u postgres psql -X -At sobre pg_proc/pg_roles/ACL", "psql TCP como elemental_release_ro para función y pruebas de escritura", "getent passwd y stat de authorized_keys; inspeccion de forced-command"],
+  "conclusion": "Owner corregido mediante script versionado e idempotente. La función mantiene SECURITY DEFINER, search_path fijo, ACL restringida y lectura agregada; los wrappers, sudo, Gunicorn y HTTP permanecen activos."
+}

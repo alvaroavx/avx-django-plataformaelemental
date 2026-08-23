@@ -45,6 +45,13 @@ El tag `release/operacion-profesor-20260810.1` y
 `scripts/release_operacion_profesor.sh` quedan archivados e inmutables. No se
 reutilizan, editan ni relajan para esta reparación.
 
+Para el nuevo release escalonado, la reparación se ejecuta como
+`0004b_reparar_precondiciones_0005`, seguida por la migración de reemplazo
+`0005_reparar_schema_0004_aplicada_precommit_v2` y, obligatoriamente,
+`0006_merge_0004b_y_0005`. Toda migración futura debe depender de `0006`; no se
+debe ejecutar directamente la `0005` publicada en una instalación que aún no
+haya pasado por `0004b`.
+
 ### Estados y rutas admitidas
 
 | Ruta | Estado inicial exacto | Secuencia autorizada |

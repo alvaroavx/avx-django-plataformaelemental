@@ -1,0 +1,57 @@
+{
+  "objetivo": "reproducir_estado_parcial_0005",
+  "fuente": "dump_productivo_verificado_fuera_de_ci",
+  "datos_personales": false,
+  "estado_inicial": {
+    "asistencias_0004": "aplicada",
+    "asistencias_0005": "pendiente",
+    "finanzas_0012": "aplicada",
+    "origen": {
+      "presente": true,
+      "nulabilidad": "NO",
+      "default_explicita": false
+    }
+  },
+  "secuencia": [
+    "asistencias.0004b_reparar_precondiciones_0005",
+    "asistencias.0005_reparar_schema_0004_aplicada_precommit_v2",
+    "asistencias.0006_merge_0004b_y_0005"
+  ],
+  "resultado": {
+    "0004b": "ok",
+    "0005": "ok",
+    "0006": "ok",
+    "origen_final_nulabilidad": "NO",
+    "origen_final_default_explicita": true,
+    "base_temporal_eliminada": true
+  },
+  "escenarios_grafo": {
+    "A_produccion_reproducida": {
+      "resultado": "ok",
+      "plan": ["0004b_reparar_precondiciones_0005", "0005_reparar_schema_0004_aplicada_precommit_v2", "0006_merge_0004b_y_0005"]
+    },
+    "B_0005_original_ya_aplicada": {
+      "resultado": "ok",
+      "arbol_historico": "9d2a2d38b7e42a518dc6aea4dfe308e476c97699",
+      "observacion": "la 0005 original se ejecuto realmente desde el arbol historico; el arbol nuevo reconocio replaces, el plan ejecuto 0004b y 0006, no las operaciones de v2",
+      "showmigrations_sin_bifurcacion": true,
+      "estructura_final": "origen NOT NULL con default explicita; revisada_en y revisada_por_id presentes"
+    },
+    "C_instalacion_limpia_desde_0004": {
+      "resultado": "ok",
+      "plan": ["0004b_reparar_precondiciones_0005", "0005_reparar_schema_0004_aplicada_precommit_v2", "0006_merge_0004b_y_0005", "0007_sintetica_dependiente_de_merge"]
+    }
+  },
+  "sin_downtime": {
+    "resultado": "ok",
+    "systemctl_observado": true,
+    "gunicorn_sintetico_activo": true,
+    "stop_invocado": false,
+    "mantenimiento_alterado": false
+  },
+  "limitaciones": [
+    "No se subio el dump ni logs crudos a GitHub.",
+    "La restauracion se ejecuto fuera de GitHub Actions en una instancia PostgreSQL local aislada.",
+    "No representa una autorizacion para desplegar produccion."
+  ]
+}

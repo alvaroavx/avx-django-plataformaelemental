@@ -1,0 +1,37 @@
+{
+  "production_readonly": {
+    "usuario": "elemental-release-ro",
+    "fingerprint": "SHA256:uIlC109KP8vzBOC1At0419I1/3W2QSegwmoZDvV9PhY",
+    "forced_command": "/usr/local/sbin/elemental-release-preflight",
+    "shell_libre": false,
+    "sudo": false,
+    "systemctl_stop_start": false,
+    "lectura_env_virtualenv_dump": false,
+    "postgres": {
+      "rol": "elemental_release_ro",
+      "funcion_unica": "public.elemental_release_preflight",
+      "ddl": false,
+      "insert": false,
+      "update": false,
+      "delete": false
+    }
+  },
+  "production_apply": {
+    "usuario": "elemental-release-app",
+    "fingerprint": "SHA256:nFJPKgTsSpo60OguYR2LZOC7FNYXDS+OTQko43s7mMk",
+    "forced_command": "/usr/local/sbin/elemental-release-apply-wrapper",
+    "sudo": "/usr/local/sbin/elemental-release-apply *",
+    "shell_libre": false
+  },
+  "github": {
+    "environments": ["production-readonly", "production"],
+    "reviewer": "alvaroavx",
+    "environment_secrets": ["DEPLOY_HOST", "DEPLOY_PORT", "DEPLOY_USER", "DEPLOY_SSH_KEY_B64"],
+    "repository_ssh_secrets_preserved": true
+  },
+  "production": {
+    "service": "active",
+    "http_local": 301,
+    "migrations_or_data_changed": false
+  }
+}
