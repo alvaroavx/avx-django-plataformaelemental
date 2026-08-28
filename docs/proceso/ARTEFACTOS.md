@@ -299,13 +299,15 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 
 - `scripts/release_asistencias_escalonado.sh`: preflight read-only y aplicación
   forward-only con recuperación únicamente antes de iniciar una migración.
-- `.github/workflows/release-asistencias-escalonado.yml`: dispatch separado para
-  preflight y apply, environments protegidos y concurrencia productiva.
+- `.github/workflows/release-asistencias-escalonado.yml`: workflow automático por
+  tag anotado, con preflight y apply separados, environments protegidos y
+  concurrencia productiva. Los pushes a `main` no despliegan.
 - `docs/operacion/RELEASE_ESCALONADO_ASISTENCIAS.md`: contrato, estados y
   límites. Reutilizar el script para futuras reparaciones solo mediante un tag
   y SHA nuevos; nunca copiarlo manualmente al servidor.
-- `docs/evidencia/release-escalonado-20260823/reproduccion.json`: evidencia
-  agregada de la restauración aislada del dump y de la secuencia 0004b/0005/0006.
+- `docs/evidencia/release-asistencias-20260827/migraciones-aisladas.json`:
+  evidencia agregada de los escenarios A/B/C, la secuencia 0004b/0005_v2/0006/0007
+  y la limitación conocida de instalaciones que ya ejecutaron la 0005 original.
   No contiene PII, dumps ni logs crudos.
 - `docs/operacion/GITHUB_ENVIRONMENTS_RELEASE_ESCALONADO.md`: checklist de
   environments, revisores, secrets aislados y wrappers SSH restringidos.
@@ -315,6 +317,13 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 - `docs/evidencia/release-escalonado-20260823/infraestructura.json`: huellas
   públicas, permisos efectivos y pruebas sanitizadas de los dos canales SSH y
   environments GitHub; no contiene claves privadas ni contraseñas.
+- `docs/evidencia/release-escalonado-20260823/preflight-20260828.json`: reporte
+  prospectivo sanitizado del tag `release/asistencias-escalonado-20260823.2`.
+  Registra Ruta A, checksum del dump, referencia de snapshot, estructura de
+  `origen`, conteos agregados, health check y detención por revisión humana.
+- `docs/evidencia/release-escalonado-20260823/revision-humana-20260828.json`:
+  predicado reproducido de `0004b`/`0005_v2`, conteos de filas objetivo e IDs
+  técnicos de relaciones activas que serían desactivadas; no contiene PII.
 
 Si una herramienta nueva reemplaza otra, no se borra silenciosamente la anterior.
 Debe marcarse como `reemplazada`, indicar fecha y enlazar la versión canónica. Si

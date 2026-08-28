@@ -4,9 +4,10 @@ from django.db import models
 
 class RelacionOperativaQuerySet(models.QuerySet):
     def operativas(self):
-        """Solo relaciones explícitas o históricas revisadas que estén activas."""
+        """Relaciones activas explícitas o reconciliadas; historia requiere revisión."""
         return self.filter(activa=True).filter(
             models.Q(origen="explicita")
+            | models.Q(origen="reconciliada")
             | models.Q(
                 origen="historica",
                 revisada_en__isnull=False,
@@ -86,6 +87,7 @@ class AsignacionProfesorDisciplina(models.Model):
     class Origen(models.TextChoices):
         EXPLICITA = "explicita", "Explícita"
         HISTORICA = "historica", "Inferida desde historia"
+        RECONCILIADA = "reconciliada", "Reconciliada técnicamente"
 
     disciplina = models.ForeignKey(
         Disciplina,
@@ -143,6 +145,7 @@ class AlumnoDisciplina(models.Model):
     class Origen(models.TextChoices):
         EXPLICITA = "explicita", "Explícita"
         HISTORICA = "historica", "Inferida desde historia"
+        RECONCILIADA = "reconciliada", "Reconciliada técnicamente"
 
     disciplina = models.ForeignKey(
         Disciplina,

@@ -1,44 +1,42 @@
 # Release escalonado de asistencias
 
-Estado: diseño implementado localmente, sin commit, tag ni producción.
+Estado: implementado localmente; requiere publicar un tag nuevo y ejecutar CI.
 
 Este procedimiento reemplaza la ejecución manual por SSH del release de
 `asistencias.0005`. El workflow rutinario sigue siendo `deploy.yml`; este
-workflow separado solo se ejecuta mediante `workflow_dispatch` desde un tag.
-Los pushes a `main` no despliegan.
+ workflow separado se activa únicamente por un tag anotado `release/asistencias-*`.
+Los pushes a `main` ejecutan CI y no despliegan.
 
 ## Etapas independientes
 
 ### Preflight
 
-El dispatch `etapa=preflight` requiere el environment protegido
-`production-readonly`. Usa una clave SSH restringida y no detiene Gunicorn.
+El job de preflight usa el environment protegido `production-readonly`, una clave
+SSH restringida y no detiene Gunicorn.
 Verifica tag anotado, `tag^{}`, SHA, padre, worktree, dump, snapshot, espacio,
 servicio y migraciones. También verifica `origen` en ambas relaciones, incluida
 su nulabilidad y default.
 
-El estado que motivó esta corrección (`0004` aplicada, `0005` pendiente,
-`origen` existente sin default `explicita`) queda rechazado por el preflight
-antiguo y es la ruta sintética cubierta por las pruebas del nuevo script.
+El estado esperado de producción (`0004` aplicada, `0005` pendiente, `origen`
+existente NOT NULL sin default `explicita`) se identifica como Ruta A reparable.
 
 El marcador JSON se guarda fuera del checkout, contiene SHA/tag/padre,
 checksum del dump, timestamp, vencimiento breve y conteos agregados. No contiene
 nombres, correos, IDs personales ni dumps.
 
-El preflight siempre genera un reporte prospectivo sanitizado, pero falla cerrado
-cuando la reparación requiere revisión: no crea un marker aplicable. La etapa
-`review` exige confirmación literal, actor y evidencia; solo entonces genera un
-marker con `review_required=false`, hashes de reporte/dump y referencia de
-snapshot. `apply` rechaza cualquier marker con revisión pendiente, vencido o con
-identidad, dump o snapshot distintos.
+El preflight genera un reporte prospectivo sanitizado y solo crea marcador cuando
+el estado coincide exactamente con Ruta A. La reconciliación conserva las
+relaciones activas y las identifica como `reconciliada`; no hay activación humana
+ni desactivación automática. `apply` rechaza marcadores vencidos o con identidad,
+dump, snapshot o reporte distintos.
 
 Las conexiones SSH usan `DEPLOY_KNOWN_HOSTS` provisto por el environment
 protegido; no se ejecuta `ssh-keyscan` dinámico.
 
 ### Apply
 
-El dispatch `etapa=apply` requiere el environment `production`, aprobación
-humana y un marcador vigente del mismo tag y SHA. La concurrencia
+El job apply requiere el environment `production` y un marcador vigente del mismo
+tag y SHA. La concurrencia
 `release-asistencias-production` impide dos ejecuciones simultáneas.
 
 Antes de detener la aplicación se vuelve a validar identidad, marcador y estado.
@@ -47,6 +45,8 @@ Luego se ejecutan exclusivamente:
 ```text
 asistencias.0004b_reparar_precondiciones_0005
 asistencias.0005_reparar_schema_0004_aplicada_precommit_v2
+asistencias.0006_merge_0004b_y_0005
+asistencias.0007_reconciliar_relaciones_activas
 ```
 
 No se usa `migrate` global, `--fake`, downgrade ni SQL manual.
@@ -63,16 +63,16 @@ puede subir a Actions si no contiene datos productivos.
 ## Migraciones
 
 `0004b_reparar_precondiciones_0005` es una reparación forward explícita para el
-estado parcialmente preparado. No activa relaciones: los registros sin actor
-administrativo quedan históricos e inactivos.
+estado parcialmente preparado. Las relaciones activas sin actor se conservan y
+se marcan `reconciliada`; las inactivas siguen `historica`.
 
 `0005_reparar_schema_0004_aplicada_precommit_v2` es una migración de reemplazo:
 no edita el archivo `0005` publicado, pero hace que el grafo operativo dependa
 de `0004b` antes de ejecutar sus operaciones equivalentes.
 
 `0006_merge_0004b_y_0005` une las dos ramas resultantes. Toda migración futura
-debe depender de `0006_merge_0004b_y_0005`; no se deben crear migraciones nuevas
-que dependan directamente de `0005`.
+debe depender de `0006_merge_0004b_y_0005`; `0007_reconciliar_relaciones_activas`
+es la raíz actual para nuevas migraciones y no se deben crear ramas desde `0005`.
 
 Antes de cualquier release se debe restaurar el dump productivo en una máquina
 aislada y controlada, fuera de Actions, reproducir el esquema ambiguo y ejecutar

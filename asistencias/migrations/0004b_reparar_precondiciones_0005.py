@@ -32,14 +32,15 @@ def reparar_precondiciones_0005(apps, schema_editor):
                     f"ALTER TABLE {quote(tabla)} ADD COLUMN {quote('origen')} varchar(20)"
                 )
 
-            # Una relación sin actor administrativo explícito no puede conservar
-            # autorización operativa, incluso si el esquema parcial la marcó como
-            # explícita. Los valores desconocidos también se degradan a históricos.
+            # Las relaciones activas históricas se conservan operativas y se
+            # identifican honestamente como reconciliadas por esta reparación.
+            # Las inactivas permanecen históricas; nunca se inventa un actor.
             cursor.execute(
                 f"""
                 UPDATE {quote(tabla)}
                    SET {quote('origen')} = CASE
                        WHEN {quote('asignada_por_id')} IS NOT NULL THEN 'explicita'
+                       WHEN {quote('activa')} THEN 'reconciliada'
                        ELSE 'historica'
                    END
                  WHERE {quote('origen')} IS NULL
@@ -47,10 +48,6 @@ def reparar_precondiciones_0005(apps, schema_editor):
                     OR ({quote('origen')} = 'explicita'
                         AND {quote('asignada_por_id')} IS NULL)
                 """
-            )
-            cursor.execute(
-                f"UPDATE {quote(tabla)} SET {quote('activa')} = false "
-                f"WHERE {quote('origen')} = 'historica'"
             )
             cursor.execute(
                 f"ALTER TABLE {quote(tabla)} ALTER COLUMN {quote('origen')} "

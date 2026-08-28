@@ -1,0 +1,28 @@
+{
+  "fecha_utc": "2026-08-28",
+  "fuente": "dump_productivo_verificado_sanitizado",
+  "escenario_a": {
+    "estado_inicial": "0004 aplicada, 0005 pendiente, origen existente NOT NULL sin default explicita",
+    "secuencia": ["0004b_reparar_precondiciones_0005", "0005_reparar_schema_0004_aplicada_precommit_v2", "0006_merge_0004b_y_0005", "0007_reconciliar_relaciones_activas"],
+    "resultado": "OK",
+    "asignaciones_activas_antes": 6,
+    "matriculas_activas_antes": 51,
+    "asignaciones_activas_despues": 6,
+    "matriculas_activas_despues": 51,
+    "activas_historicas_despues": 0,
+    "repeticion_idempotente": "OK"
+  },
+  "escenario_b": {
+    "procedimiento": "0004 en árbol histórico; ejecución real de 0005 original; cambio al árbol nuevo; plan y aplicación hasta 0007",
+    "showmigrations_reemplazo": "OK: 0005_v2 satisfecha por replaces sin reejecutar operaciones",
+    "0004b": "OK: no altera esquema ya preparado",
+    "0006_y_0007": "OK: aplicadas sin bifurcación",
+    "limitacion_historica": "La 0005 original ya había desactivado relaciones históricas y esa pérdida de estado no es reversible sin evidencia externa; el release solo admite Ruta A cuando 0005 está pendiente.",
+    "datos_personales": false
+  },
+  "escenario_c": {
+    "resultado": "OK: el grafo nuevo encadena 0004b antes de 0005_v2 y 0006 es la raíz de continuidad",
+    "migracion_posterior_sintetica": "planificada después de 0006/0007 sin bifurcación"
+  },
+  "limpieza": "clúster temporal y dump eliminados al finalizar"
+}

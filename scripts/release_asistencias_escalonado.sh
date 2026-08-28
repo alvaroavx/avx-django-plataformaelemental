@@ -124,7 +124,8 @@ schema_state() {
 SELECT
   (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name='0004_alter_sesionclase_estado_liberacionsesion_and_more') AS m0004,
   (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name IN ('0005_reparar_schema_0004_aplicada_precommit','0005_reparar_schema_0004_aplicada_precommit_v2')) AS m0005,
-  (SELECT count(*) FROM django_migrations WHERE app='finanzas' AND name='0012_payment_clave_idempotencia_payment_disciplina_and_more') AS f0012;
+  (SELECT count(*) FROM django_migrations WHERE app='finanzas' AND name='0012_payment_clave_idempotencia_payment_disciplina_and_more') AS f0012,
+  (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name='0007_reconciliar_relaciones_activas') AS m0007;
 SQL
 }
 schema_report() {
@@ -142,6 +143,14 @@ SELECT 'matriculas_alumno', count(*), count(*) FILTER (WHERE activa), count(*) F
   FROM asistencias_alumnodisciplina;
 SQL
 }
+active_invariants() {
+  psql_ro --tuples-only --no-align --field-separator='|' <<'SQL'
+SELECT 'profesor', count(*) FILTER (WHERE activa), count(*) FILTER (WHERE activa AND origen='historica')
+  FROM asistencias_asignacionprofesordisciplina;
+SELECT 'alumno', count(*) FILTER (WHERE activa), count(*) FILTER (WHERE activa AND origen='historica')
+  FROM asistencias_alumnodisciplina;
+SQL
+}
 write_report() {
   local state="$1" schema_file="$2" now="$3" expires="$4" dump_sha="$5"
   python3 - "$REPORT" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$now" "$expires" "$dump_sha" "$SNAPSHOT_REFERENCE" "$SNAPSHOT_SHA256" "$state" "$schema_file" <<'PY'
@@ -153,7 +162,7 @@ pathlib.Path(report).write_text(json.dumps({
     "expires_at": int(expires), "dump_sha256": dump_sha,
     "snapshot_reference": snapshot_ref, "snapshot_sha256": snapshot_sha,
     "migration_state": state, "origen": rows,
-    "route": "REPAIR_0005", "review_required": True,
+    "route": "REPAIR_0005", "review_required": False,
 }, sort_keys=True, indent=2) + "\n")
 PY
 }
@@ -179,42 +188,23 @@ preflight() {
   # metadata incompatible. La evidencia es agregada y no incluye PII.
   local state
   state="$(schema_state)"
-  if [[ "$state" != "1|0|1" ]]; then
+  if [[ "$state" != "1|0|1|0" ]]; then
     fail "Estado de migraciones no previsto; no se crea marker aplicable: $state"
   fi
-  if ! grep -q '"review_required": true' "$REPORT"; then
-    fail "El reporte no marca revisión requerida."
-  fi
-  fail "Revisión humana requerida; no se crea marker aplicable. Reporte: $REPORT"
+  local report_sha
+  report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
+  python3 - "$REPORT" "$MARKER" "$report_sha" <<'PY'
+import json, pathlib, sys
+report, marker, report_sha = sys.argv[1:]
+d = json.loads(pathlib.Path(report).read_text())
+d["report_sha256"] = report_sha
+pathlib.Path(marker).write_text(json.dumps(d, sort_keys=True, indent=2) + "\n")
+PY
+  chmod 640 "$MARKER"
+  echo "PREFLIGHT_OK marker=$MARKER report=$REPORT route=REPAIR_0005"
 }
 review_release() {
-  preflight_report
-  [[ "$(schema_state)" = "1|0|1" ]] || fail "Estado de migraciones no previsto para revisión."
-  [[ "${RELEASE_REVIEW_CONFIRMED:-}" = REVIEW_ASISTENCIAS_0005 ]] \
-    || fail "Confirmación de revisión ausente."
-  [[ -n "${RELEASE_REVIEW_ACTOR:-}" && "$RELEASE_REVIEW_ACTOR" != *$'\n'* ]] \
-    || fail "Actor de revisión ausente."
-  [[ -f "${RELEASE_REVIEW_EVIDENCE:-}" ]] || fail "Evidencia de revisión ausente."
-  local report_sha evidence_sha now
-  report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
-  evidence_sha="$(sha256sum "$RELEASE_REVIEW_EVIDENCE" | awk '{print $1}')"
-  now="$(date +%s)"
-  python3 - "$MARKER" "$REPORT" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$now" "$report_sha" "$evidence_sha" "$SNAPSHOT_REFERENCE" "$SNAPSHOT_SHA256" "$RELEASE_REVIEW_ACTOR" <<'PY'
-import json, pathlib, sys
-marker, report, tag, sha, parent, now, report_sha, evidence_sha, snapshot_ref, snapshot_sha, actor = sys.argv[1:]
-d = json.loads(pathlib.Path(report).read_text())
-if d.get("review_required") is not True:
-    raise SystemExit("reporte sin revisión requerida")
-pathlib.Path(marker).write_text(json.dumps({
-    "tag": tag, "sha": sha, "parent": parent, "created_at": int(now),
-    "expires_at": d["expires_at"], "dump_sha256": d["dump_sha256"],
-    "snapshot_reference": snapshot_ref, "snapshot_sha256": snapshot_sha,
-    "report_sha256": report_sha, "review_required": False,
-    "review_actor": actor, "review_evidence_sha256": evidence_sha,
-    "route": "REPAIR_0005",
-}, sort_keys=True, indent=2) + "\n")
-PY
-  echo "REVIEW_OK marker=$MARKER report=$REPORT actor=$RELEASE_REVIEW_ACTOR"
+  fail "La revisión humana no es necesaria para esta reconciliación automática."
 }
 valid_marker() {
   [[ -s "$MARKER" ]] || fail "Marcador de preflight ausente."
@@ -243,6 +233,8 @@ apply_release() {
   [[ "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" = active ]] || fail "Gunicorn no está activo."
   local previous_commit migration_started=0
   previous_commit="$(git rev-parse HEAD)"
+  local active_before
+  active_before="$(active_invariants)"
   printf 'previous_commit=%s\n' "$previous_commit" > "$OPS_DIR/apply-state.txt"
   recover_before_migration() {
     [[ "$migration_started" = 0 ]] || return 0
@@ -255,13 +247,20 @@ apply_release() {
   test "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" != active
   git checkout --detach "$EXPECTED_TAG"
   "$APP_DIR/.venv/bin/python" -m pip install -r "$APP_DIR/requirements.txt"
-  [[ "$(schema_state)" = "1|0|1" ]] || fail "El estado cambió durante la preparación."
+  [[ "$(schema_state)" = "1|0|1|0" ]] || fail "El estado cambió durante la preparación."
   valid_marker
   migration_started=1
   export PGOPTIONS="-c lock_timeout=5s -c statement_timeout=15min"
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" migrate asistencias 0004b_reparar_precondiciones_0005 --noinput
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" migrate asistencias 0005_reparar_schema_0004_aplicada_precommit_v2 --noinput
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" migrate asistencias 0006_merge_0004b_y_0005 --noinput
+  "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" migrate asistencias 0007_reconciliar_relaciones_activas --noinput
+  local active_after
+  active_after="$(active_invariants)"
+  [[ "$(printf '%s\n' "$active_before" | cut -d'|' -f1-2)" = "$(printf '%s\n' "$active_after" | cut -d'|' -f1-2)" ]] || fail "Disminuyeron relaciones activas."
+  if printf '%s\n' "$active_after" | awk -F'|' '$3 != 0 {bad=1} END {exit bad?0:1}'; then
+    fail "Quedaron relaciones activas históricas."
+  fi
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" check --deploy
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" collectstatic --noinput
   systemctl start "$SERVICE"

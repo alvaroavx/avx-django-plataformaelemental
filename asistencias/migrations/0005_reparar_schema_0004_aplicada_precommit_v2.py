@@ -34,9 +34,8 @@ def reparar_schema_0004_precommit(apps, schema_editor):
             if "origen" not in columnas:
                 cursor.execute(f"ALTER TABLE {quote(tabla)} ADD COLUMN {quote('origen')} varchar(20)")
                 cursor.execute(
-                    f"UPDATE {quote(tabla)} SET {quote('origen')} = CASE WHEN {quote('asignada_por_id')} IS NOT NULL THEN 'explicita' ELSE 'historica' END"
+                    f"UPDATE {quote(tabla)} SET {quote('origen')} = CASE WHEN {quote('asignada_por_id')} IS NOT NULL THEN 'explicita' WHEN {quote('activa')} THEN 'reconciliada' ELSE 'historica' END"
                 )
-                cursor.execute(f"UPDATE {quote(tabla)} SET {quote('activa')} = false WHERE {quote('origen')} = 'historica'")
                 cursor.execute(f"ALTER TABLE {quote(tabla)} ALTER COLUMN {quote('origen')} SET DEFAULT 'explicita'")
                 cursor.execute(f"ALTER TABLE {quote(tabla)} ALTER COLUMN {quote('origen')} SET NOT NULL")
             if "revisada_en" not in columnas:

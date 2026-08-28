@@ -1,0 +1,39 @@
+{
+  "tipo": "revision_humana_solo_lectura",
+  "tag": "release/asistencias-escalonado-20260823.2",
+  "predicado": "0004b: origen IS NULL OR origen NOT IN (historica, explicita) OR (origen=explicita AND asignada_por_id IS NULL); luego activa=false para todo origen=historica. 0005_v2 solo agrega columnas/constraints ausentes.",
+  "tablas": {
+    "asistencias_asignacionprofesordisciplina": {
+      "filas_candidatas_origen": 0,
+      "origen_accion": "sin cambios de filas",
+      "origen_activas": 0,
+      "origen_inactivas": 0,
+      "filas_objetivo_activa": 10,
+      "activa_accion": "establecer false para origen historica",
+      "activa_activas": 6,
+      "activa_inactivas": 4,
+      "ids_tecnicos_activas_a_desactivar": [1, 2, 3, 5, 8, 9],
+      "revisada_en_y_revisada_por_id": "columnas ya existentes; 0005_v2 no modifica valores de filas"
+    },
+    "asistencias_alumnodisciplina": {
+      "filas_candidatas_origen": 0,
+      "origen_accion": "sin cambios de filas",
+      "origen_activas": 0,
+      "origen_inactivas": 0,
+      "filas_objetivo_activa": 112,
+      "activa_accion": "establecer false para origen historica",
+      "activa_activas": 28,
+      "activa_inactivas": 84,
+      "ids_tecnicos_activas_a_desactivar": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 29, 35, 80],
+      "revisada_en_y_revisada_por_id": "columnas ya existentes; 0005_v2 no modifica valores de filas"
+    }
+  },
+  "resultado": {
+    "relaciones_activas_desactivadas": true,
+    "relaciones_activas_reclasificadas_por_origen": false,
+    "requiere_aprobacion_explicita": true,
+    "acciones_ejecutadas": false
+  },
+  "sanitizacion": "IDs técnicos únicamente; sin nombres, correos, teléfonos ni otros datos personales.",
+  "consulta": "Consulta PostgreSQL de solo lectura reproduciendo literalmente las condiciones de 0004b y la condición de columnas ausentes de 0005_v2."
+}

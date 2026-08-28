@@ -10,6 +10,7 @@ PREFLIGHT_RUNNER = ROOT / "scripts" / "infra" / "elemental_release_preflight_run
 MIGRATION_0004B = ROOT / "asistencias" / "migrations" / "0004b_reparar_precondiciones_0005.py"
 MIGRATION_0006 = ROOT / "asistencias" / "migrations" / "0006_merge_0004b_y_0005.py"
 MIGRATION_0005V2 = ROOT / "asistencias" / "migrations" / "0005_reparar_schema_0004_aplicada_precommit_v2.py"
+MIGRATION_0007 = ROOT / "asistencias" / "migrations" / "0007_reconciliar_relaciones_activas.py"
 
 
 class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
@@ -57,15 +58,15 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         bloque = self.script[inicio:fin]
         self.assertIn('systemctl is-active "$SERVICE"', bloque)
         self.assertNotIn("systemctl stop", bloque)
-        self.assertIn('"review_required": True', self.script)
-        self.assertIn("PREFLIGHT_REPORT_OK", bloque)
-        self.assertIn("no se crea marker aplicable", self.script)
+        self.assertIn('"review_required": False', self.script)
+        self.assertIn("PREFLIGHT_REPORT_OK", self.script)
 
     def test_apply_solo_migra_0004b_y_0005_y_no_global(self):
         bloque = self.script[self.script.index("apply_release() {") :]
         self.assertLess(bloque.index("valid_marker"), bloque.index('systemctl stop "$SERVICE"'))
         self.assertIn("migrate asistencias 0004b_reparar_precondiciones_0005", bloque)
         self.assertIn("migrate asistencias 0005_reparar_schema_0004_aplicada_precommit_v2", bloque)
+        self.assertIn("migrate asistencias 0007_reconciliar_relaciones_activas", bloque)
         self.assertNotIn("manage.py migrate --noinput", bloque)
         self.assertIn("migration_started=1", bloque)
         self.assertIn("recover_before_migration", bloque)
@@ -74,8 +75,9 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn("snapshot_sha256", self.script)
 
     def test_workflow_solo_dispatch_tag_y_environments_protegidos(self):
-        self.assertIn("workflow_dispatch:", self.workflow)
-        self.assertNotIn("push:", self.workflow)
+        self.assertIn("push:", self.workflow)
+        self.assertIn('"release/asistencias-*"', self.workflow)
+        self.assertNotIn("workflow_dispatch:", self.workflow)
         self.assertNotIn("ssh-keyscan", self.workflow)
         self.assertIn("DEPLOY_KNOWN_HOSTS", self.workflow)
         self.assertIn("name: production-readonly", self.workflow)
@@ -84,17 +86,17 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn("cat-file -t", self.workflow)
         self.assertIn("refs/tags/${RELEASE_TAG}^{commit}", self.workflow)
         self.assertIn("release-asistencias-production", self.workflow)
-        preflight = self.workflow[self.workflow.index("Preflight remoto sin mantenimiento") : self.workflow.index("  apply:")]
+        preflight = self.workflow[self.workflow.index("Preflight remoto sin downtime") : self.workflow.index("  apply:")]
         self.assertNotIn("git fetch --no-tags origin", preflight)
         self.assertIn('"preflight --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"', preflight)
 
     def test_runner_readonly_falla_cerrado_y_omite_venv(self):
         runner = PREFLIGHT_RUNNER.read_text(encoding="utf-8")
         self.assertIn("preflight-report.json", runner)
-        self.assertIn("PREFLIGHT_REVIEW_REQUIRED", runner)
+        self.assertIn("PREFLIGHT_OK", runner)
         self.assertIn(":(exclude).venv", runner)
         self.assertIn('rm -f "$state_dir/preflight.json"', runner)
-        self.assertNotIn('marker="$state_dir/preflight.json"', runner)
+        self.assertIn('marker="$state_dir/preflight.json"', runner)
 
     def test_grafo_0006_une_las_dos_ramas(self):
         migration = MIGRATION_0006.read_text(encoding="utf-8")
@@ -106,6 +108,13 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn("SET DEFAULT 'explicita'", repair)
         self.assertIn("SET NOT NULL", repair)
         self.assertIn("replaces =", MIGRATION_0005V2.read_text(encoding="utf-8"))
+
+    def test_0007_preserva_activas_y_reconcilia_origen(self):
+        migration = MIGRATION_0007.read_text(encoding="utf-8")
+        self.assertIn('dependencies = [("asistencias", "0006_merge_0004b_y_0005")]', migration)
+        self.assertIn("WHERE {quote('activa')} AND {quote('origen')} = 'historica'", migration)
+        self.assertIn('"reconciliada", "Reconciliada técnicamente"', migration)
+        self.assertNotIn("SET {quote('activa')} = false", migration)
 
 
 if __name__ == "__main__":

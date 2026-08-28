@@ -1,0 +1,23 @@
+{
+  "tag": "release/asistencias-escalonado-20260823.2",
+  "sha": "2b5d093d9267b6554d75ca73043d73db5491e446",
+  "parent": "a99d7fdd6d4f62c31aecdf12015f60a160f991a2",
+  "route": "REPAIR_0005",
+  "migration_state": "1|0|1",
+  "review_required": true,
+  "marker_created": false,
+  "report_expiry_epoch": 1787886623,
+  "dump_sha256": "4327cd924911ad7e73aa4bcd7fcecb8563f4cb0e214e746c005768f1eb4fe5d4",
+  "snapshot_reference": "plataformaelemental-django-postgresql-ubuntu-1vcpu-1787072331078",
+  "schema_origen": [
+    {"table": "asistencias_alumnodisciplina", "nullable": "NO", "default": "", "status": "bad"},
+    {"table": "asistencias_asignacionprofesordisciplina", "nullable": "NO", "default": "", "status": "bad"}
+  ],
+  "conteos_agregados": {
+    "asignaciones_profesor": {"total": 10, "activas": 6, "inactivas": 4},
+    "matriculas_alumno": {"total": 135, "activas": 51, "inactivas": 84}
+  },
+  "health": {"gunicorn": "active", "nginx": "active", "http_local": 301},
+  "sanitizacion": "Solo metadatos, estructura y conteos agregados; sin PII, secretos ni contenido de dump.",
+  "resultado": "PREFLIGHT_DETENIDO_POR_REVISION_HUMANA"
+}

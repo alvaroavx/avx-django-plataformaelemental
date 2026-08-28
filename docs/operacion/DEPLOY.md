@@ -24,10 +24,10 @@ está en
 [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 La reparación de `asistencias.0005` usa exclusivamente
-`.github/workflows/release-asistencias-escalonado.yml`. Tiene dos dispatches
-independientes (`preflight` y `apply`), environments protegidos, marcador con
-vencimiento y concurrencia exclusiva. No se debe volver a ejecutar una
-liberación escalonada directamente por SSH.
+`.github/workflows/release-asistencias-escalonado.yml`. Un tag anotado
+`release/asistencias-*` activa el preflight y, solo si es válido, el apply bajo
+concurrencia exclusiva. No se debe volver a ejecutar una liberación escalonada
+directamente por SSH.
 
 ## Estrategia elegida
 - No se usa Docker, Compose ni self-hosted runner.

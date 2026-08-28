@@ -1,33 +1,19 @@
-name: release asistencias escalonado
+name: release asistencias automatico
 
 on:
-  workflow_dispatch:
-    inputs:
-      etapa:
-        description: "Etapa independiente"
-        required: true
-        type: choice
-        options: [preflight, apply]
-      release_tag:
-        description: "Tag anotado e inmutable"
-        required: true
-        type: string
-      release_sha:
-        description: "SHA completo del tag"
-        required: true
-        type: string
-      confirmacion:
-        description: "Escribir RELEASE_ESCALONADO_ASISTENCIAS"
-        required: true
-        type: string
+  push:
+    tags:
+      - "release/asistencias-*"
 
 concurrency:
   group: release-asistencias-production
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   preflight:
-    if: ${{ inputs.etapa == 'preflight' && inputs.confirmacion == 'RELEASE_ESCALONADO_ASISTENCIAS' }}
     runs-on: ubuntu-latest
     environment:
       name: production-readonly
@@ -35,24 +21,21 @@ jobs:
       - name: Checkout exacto del tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
-
-      - name: Verificar identidad inmutable
+      - name: Verificar tag, SHA y padre
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           test "${GITHUB_REF_TYPE}" = tag
-          test "${GITHUB_REF_NAME}" = "${RELEASE_TAG}"
           test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
-          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${RELEASE_SHA}"
-          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
-          git status --porcelain | tee /tmp/worktree.txt
-          test ! -s /tmp/worktree.txt
-
-      - name: Preparar SSH de solo lectura
+          RELEASE_SHA="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
+          printf 'RELEASE_SHA=%s\nRELEASE_PARENT=%s\n' "$RELEASE_SHA" "$RELEASE_PARENT" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Preparar SSH readonly con host verificado
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
@@ -60,54 +43,46 @@ jobs:
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          test -n "$DEPLOY_KNOWN_HOSTS"
           mkdir -p ~/.ssh; chmod 700 ~/.ssh
           printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/release_key
           chmod 600 ~/.ssh/release_key
           ssh-keygen -y -f ~/.ssh/release_key >/dev/null
-          test -n "$DEPLOY_KNOWN_HOSTS"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-
-      - name: Preflight remoto sin mantenimiento
+      - name: Preflight remoto sin downtime
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
-          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "preflight --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"
+          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" "preflight --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"
 
   apply:
-    if: ${{ inputs.etapa == 'apply' && inputs.confirmacion == 'RELEASE_ESCALONADO_ASISTENCIAS' }}
+    needs: preflight
     runs-on: ubuntu-latest
     environment:
       name: production
     steps:
-      - name: Checkout exacto del tag para apply
+      - name: Checkout exacto del tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
-
-      - name: Verificar que este dispatch proviene del tag
+      - name: Verificar identidad del release
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           test "${GITHUB_REF_TYPE}" = tag
-          test "${GITHUB_REF_NAME}" = "${RELEASE_TAG}"
           test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
-          test "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" = "${RELEASE_SHA}"
-          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
-
-      - name: Preparar SSH de producción
+          RELEASE_SHA="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          printf 'RELEASE_SHA=%s\nRELEASE_PARENT=%s\n' "$RELEASE_SHA" "$RELEASE_PARENT" >> "$GITHUB_ENV"
+      - name: Preparar SSH apply con host verificado
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
@@ -115,25 +90,19 @@ jobs:
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          test -n "$DEPLOY_KNOWN_HOSTS"
           mkdir -p ~/.ssh; chmod 700 ~/.ssh
           printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/release_key
           chmod 600 ~/.ssh/release_key
           ssh-keygen -y -f ~/.ssh/release_key >/dev/null
-          test -n "$DEPLOY_KNOWN_HOSTS"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-
-      - name: Aplicar etapa escalonada
+      - name: Apply escalonado automático
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          RELEASE_SHA: ${{ inputs.release_sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          RELEASE_PARENT="$(git rev-parse "${RELEASE_SHA}^")"
-          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "apply --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"
+          ssh -i ~/.ssh/release_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" "apply --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"
