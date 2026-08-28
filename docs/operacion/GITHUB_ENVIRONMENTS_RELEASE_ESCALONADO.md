@@ -9,7 +9,7 @@ prepara la configuración; no crea environments ni rota secrets.
 Crear un environment con revisores obligatorios y definir allí, no a nivel de
 repositorio, los secrets `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER`,
 `DEPLOY_PATH`, `DEPLOY_ENV_FILE`, `DEPLOY_SERVICE`, `RELEASE_BACKUP_FILE`,
-`RELEASE_OPS_DIR` y `DEPLOY_SSH_KEY_B64`.
+`RELEASE_OPS_DIR`, `DEPLOY_SSH_KEY_B64` y `DEPLOY_KNOWN_HOSTS`.
 
 La clave debe usar una entrada `authorized_keys` con `restrict` y un
 `command=` que permita únicamente el preflight con argumentos validados y la escritura del
@@ -28,8 +28,8 @@ ssh -i clave-readonly usuario@host 'git checkout --detach SHA'
 ## production
 
 Crear un environment distinto, también con revisores obligatorios y secrets
-propios. Usa los mismos nombres operativos, pero `DEPLOY_SSH_KEY_B64` debe ser
-una clave de aplicación distinta.
+propios. Usa los mismos nombres operativos, pero `DEPLOY_SSH_KEY_B64` y
+`DEPLOY_KNOWN_HOSTS` deben corresponder al canal de aplicación separado.
 
 El wrapper de aplicación permite solo el procedimiento versionado de
 `release_asistencias_escalonado.sh`: detener/iniciar el servicio, instalar

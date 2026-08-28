@@ -5,7 +5,11 @@ tag="$1"; sha="$2"; parent="$3"
 [[ "$tag" =~ ^release/[A-Za-z0-9._-]+$ ]]
 [[ "$sha" =~ ^[0-9a-f]{40}$ && "$parent" =~ ^[0-9a-f]{40}$ ]]
 cd /srv/elementos
-test -z "$(git status --porcelain)"
+if ! worktree_status="$(git status --porcelain -- . ':(exclude).venv')"; then
+  echo 'apply: no se pudo comprobar el worktree' >&2
+  exit 1
+fi
+test -z "$worktree_status"
 git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
 test "$(git cat-file -t "refs/tags/$tag")" = tag
 test "$(git rev-parse "refs/tags/$tag^{commit}")" = "$sha"

@@ -25,6 +25,16 @@ El marcador JSON se guarda fuera del checkout, contiene SHA/tag/padre,
 checksum del dump, timestamp, vencimiento breve y conteos agregados. No contiene
 nombres, correos, IDs personales ni dumps.
 
+El preflight siempre genera un reporte prospectivo sanitizado, pero falla cerrado
+cuando la reparación requiere revisión: no crea un marker aplicable. La etapa
+`review` exige confirmación literal, actor y evidencia; solo entonces genera un
+marker con `review_required=false`, hashes de reporte/dump y referencia de
+snapshot. `apply` rechaza cualquier marker con revisión pendiente, vencido o con
+identidad, dump o snapshot distintos.
+
+Las conexiones SSH usan `DEPLOY_KNOWN_HOSTS` provisto por el environment
+protegido; no se ejecuta `ssh-keyscan` dinámico.
+
 ### Apply
 
 El dispatch `etapa=apply` requiere el environment `production`, aprobación

@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "release_asistencias_escalonado.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "release-asistencias-escalonado.yml"
+PREFLIGHT_RUNNER = ROOT / "scripts" / "infra" / "elemental_release_preflight_runner.sh"
 MIGRATION_0004B = ROOT / "asistencias" / "migrations" / "0004b_reparar_precondiciones_0005.py"
 MIGRATION_0006 = ROOT / "asistencias" / "migrations" / "0006_merge_0004b_y_0005.py"
 MIGRATION_0005V2 = ROOT / "asistencias" / "migrations" / "0005_reparar_schema_0004_aplicada_precommit_v2.py"
@@ -39,27 +40,44 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
         self.assertIn("sin stop ni downtime", resultado.stdout)
 
+    def test_apply_rechaza_marker_con_revision_pendiente(self):
+        resultado = subprocess.run(
+            ["bash", str(SCRIPT), "marker-self-test"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+        self.assertIn("review_required=true rechaza apply", resultado.stdout)
+
     def test_preflight_invalido_no_detiene_gunicorn(self):
-        inicio = self.script.index("preflight() {\n")
+        inicio = self.script.index("preflight_report() {\n")
         fin = self.script.index("valid_marker() {\n", inicio)
         bloque = self.script[inicio:fin]
         self.assertIn('systemctl is-active "$SERVICE"', bloque)
         self.assertNotIn("systemctl stop", bloque)
-        self.assertIn("origen no presenta la condición parcial esperada", bloque)
-        self.assertIn("PREFLIGHT_OK", bloque)
+        self.assertIn('"review_required": True', self.script)
+        self.assertIn("PREFLIGHT_REPORT_OK", bloque)
+        self.assertIn("no se crea marker aplicable", self.script)
 
     def test_apply_solo_migra_0004b_y_0005_y_no_global(self):
         bloque = self.script[self.script.index("apply_release() {") :]
-        self.assertLess(bloque.index("preflight"), bloque.index('systemctl stop "$SERVICE"'))
+        self.assertLess(bloque.index("valid_marker"), bloque.index('systemctl stop "$SERVICE"'))
         self.assertIn("migrate asistencias 0004b_reparar_precondiciones_0005", bloque)
         self.assertIn("migrate asistencias 0005_reparar_schema_0004_aplicada_precommit_v2", bloque)
         self.assertNotIn("manage.py migrate --noinput", bloque)
         self.assertIn("migration_started=1", bloque)
         self.assertIn("recover_before_migration", bloque)
+        self.assertIn('sha256sum "$BACKUP_FILE"', self.script)
+        self.assertIn("snapshot_reference", self.script)
+        self.assertIn("snapshot_sha256", self.script)
 
     def test_workflow_solo_dispatch_tag_y_environments_protegidos(self):
         self.assertIn("workflow_dispatch:", self.workflow)
         self.assertNotIn("push:", self.workflow)
+        self.assertNotIn("ssh-keyscan", self.workflow)
+        self.assertIn("DEPLOY_KNOWN_HOSTS", self.workflow)
         self.assertIn("name: production-readonly", self.workflow)
         self.assertIn("name: production", self.workflow)
         self.assertIn('"${GITHUB_REF_TYPE}" = tag', self.workflow)
@@ -69,6 +87,14 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         preflight = self.workflow[self.workflow.index("Preflight remoto sin mantenimiento") : self.workflow.index("  apply:")]
         self.assertNotIn("git fetch --no-tags origin", preflight)
         self.assertIn('"preflight --tag ${RELEASE_TAG} --sha ${RELEASE_SHA} --parent ${RELEASE_PARENT}"', preflight)
+
+    def test_runner_readonly_falla_cerrado_y_omite_venv(self):
+        runner = PREFLIGHT_RUNNER.read_text(encoding="utf-8")
+        self.assertIn("preflight-report.json", runner)
+        self.assertIn("PREFLIGHT_REVIEW_REQUIRED", runner)
+        self.assertIn(":(exclude).venv", runner)
+        self.assertIn('rm -f "$state_dir/preflight.json"', runner)
+        self.assertNotIn('marker="$state_dir/preflight.json"', runner)
 
     def test_grafo_0006_une_las_dos_ramas(self):
         migration = MIGRATION_0006.read_text(encoding="utf-8")

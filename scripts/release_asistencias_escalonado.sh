@@ -12,7 +12,10 @@ BACKUP_FILE="${RELEASE_BACKUP_FILE:-}"
 ENV_FILE="${RELEASE_ENV_FILE:-}"
 SERVICE="${RELEASE_SERVICE:-plataforma-elemental.service}"
 MARKER="${RELEASE_PREFLIGHT_MARKER:-$OPS_DIR/preflight.json}"
+REPORT="${RELEASE_PREFLIGHT_REPORT:-$OPS_DIR/preflight-report.json}"
 TTL_SECONDS="${RELEASE_PREFLIGHT_TTL_SECONDS:-1800}"
+SNAPSHOT_REFERENCE="${RELEASE_SNAPSHOT_REFERENCE:-}"
+SNAPSHOT_SHA256="${RELEASE_SNAPSHOT_SHA256:-}"
 
 fail() { echo "ERROR RELEASE ESCALONADO: $*" >&2; exit 1; }
 self_test() {
@@ -45,10 +48,36 @@ SH
   rm -rf "$fake_dir"
   echo "Runtime self-test: preflight inválido con Gunicorn activo, sin stop ni downtime"
 }
+marker_self_test() {
+  local dir marker
+  dir="$(mktemp -d)"
+  marker="$dir/marker.json"
+  cat >"$marker" <<'JSON'
+{"tag":"release/synthetic","sha":"0000000000000000000000000000000000000000","parent":"1111111111111111111111111111111111111111","route":"REPAIR_0005","review_required":true,"expires_at":4102444800}
+JSON
+  if MARKER="$marker" EXPECTED_TAG=release/synthetic \
+      EXPECTED_SHA=0000000000000000000000000000000000000000 \
+      EXPECTED_PARENT=1111111111111111111111111111111111111111 \
+      valid_marker; then
+    rm -rf "$dir"
+    fail "marker review_required=true fue aceptado por apply."
+  fi
+  rm -rf "$dir"
+  echo "Marker self-test: review_required=true rechaza apply"
+}
 require_sha() {
   [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "RELEASE_EXPECTED_SHA inválido.";
   [[ "$EXPECTED_PARENT" =~ ^[0-9a-f]{40}$ ]] || fail "RELEASE_EXPECTED_PARENT inválido.";
   [[ -n "$EXPECTED_TAG" ]] || fail "RELEASE_EXPECTED_TAG requerido.";
+}
+require_paths() {
+  [[ "$OPS_DIR" = /* ]] || fail "RELEASE_OPS_DIR absoluto requerido."
+  [[ "$MARKER" = /* && "$REPORT" = /* ]] || fail "Marker/report deben ser rutas absolutas."
+  [[ -n "$SNAPSHOT_REFERENCE" && "$SNAPSHOT_REFERENCE" != *$'\n'* ]] \
+    || fail "RELEASE_SNAPSHOT_REFERENCE requerido."
+  if [[ -n "$SNAPSHOT_SHA256" ]]; then
+    [[ "$SNAPSHOT_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || fail "RELEASE_SNAPSHOT_SHA256 inválido."
+  fi
 }
 load_env() {
   [[ -f "$ENV_FILE" ]] || fail "No existe RELEASE_ENV_FILE.";
@@ -66,7 +95,11 @@ psql_ro() {
 }
 check_identity() {
   cd "$APP_DIR"
-  test -z "$(git status --porcelain)" || fail "worktree productivo sucio."
+  local status_output
+  if ! status_output="$(git status --porcelain -- . ':(exclude).venv')"; then
+    fail "no se pudo comprobar el worktree productivo."
+  fi
+  [[ -z "$status_output" ]] || fail "worktree productivo sucio."
   if [[ "${RELEASE_REMOTE_TAG_VERIFIED:-}" == 1 ]]; then
     [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "SHA remoto inválido."
     [[ "$EXPECTED_PARENT" =~ ^[0-9a-f]{40}$ ]] || fail "Padre remoto inválido."
@@ -84,6 +117,7 @@ validate_backup() {
   pg_restore --list "$BACKUP_FILE" >/dev/null || fail "Dump ilegible."
   [[ "${RELEASE_BACKUP_CONFIRMED:-}" = EXTERNO_SEGURO_VERIFICADO ]] || fail "Backup no confirmado."
   [[ "${RELEASE_SNAPSHOT_CONFIRMED:-}" = SNAPSHOT_PREVIO_VERIFICADO ]] || fail "Snapshot no confirmado."
+  [[ -n "$SNAPSHOT_REFERENCE" ]] || fail "Referencia de snapshot ausente."
 }
 schema_state() {
   psql_ro --tuples-only --no-align <<'SQL'
@@ -108,51 +142,105 @@ SELECT 'matriculas_alumno', count(*), count(*) FILTER (WHERE activa), count(*) F
   FROM asistencias_alumnodisciplina;
 SQL
 }
-preflight() {
-  require_sha; load_env; check_identity; validate_backup
-  [[ "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" = active ]] || fail "Gunicorn no está activo."
-  local state schema_file now expires
-  state="$(schema_state)"
-  schema_file="$(mktemp)"; trap 'rm -f "$schema_file"' RETURN
-  schema_report >"$schema_file"
-  now="$(date +%s)"; expires=$((now + TTL_SECONDS))
-  # Ruta reparable: 0004 aplicada, 0005 pendiente y origen ya presente con
-  # metadata incompatible. La evidencia es agregada y no incluye PII.
-  if [[ "$state" != "1|0|1" ]]; then
-    fail "Estado de migraciones no previsto: $state"
-  fi
-  if ! awk -F'|' '$2=="origen" && ($3!="NO" || $5!="ok") {ok=1} END {exit ok?0:1}' "$schema_file"; then
-    fail "origen no presenta la condición parcial esperada; revisión requerida."
-  fi
-  mkdir -p "$OPS_DIR"
-  local dump_sha; dump_sha="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
-  python3 - "$MARKER" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$now" "$expires" "$dump_sha" "$state" "$schema_file" <<'PY'
+write_report() {
+  local state="$1" schema_file="$2" now="$3" expires="$4" dump_sha="$5"
+  python3 - "$REPORT" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$now" "$expires" "$dump_sha" "$SNAPSHOT_REFERENCE" "$SNAPSHOT_SHA256" "$state" "$schema_file" <<'PY'
 import json, pathlib, sys
-marker, tag, sha, parent, now, expires, dump_sha, state, schema = sys.argv[1:]
+report, tag, sha, parent, now, expires, dump_sha, snapshot_ref, snapshot_sha, state, schema = sys.argv[1:]
 rows = [line.split('|') for line in pathlib.Path(schema).read_text().splitlines() if line]
-pathlib.Path(marker).write_text(json.dumps({
+pathlib.Path(report).write_text(json.dumps({
     "tag": tag, "sha": sha, "parent": parent, "created_at": int(now),
     "expires_at": int(expires), "dump_sha256": dump_sha,
+    "snapshot_reference": snapshot_ref, "snapshot_sha256": snapshot_sha,
     "migration_state": state, "origen": rows,
     "route": "REPAIR_0005", "review_required": True,
 }, sort_keys=True, indent=2) + "\n")
 PY
-  echo "PREFLIGHT_OK marker=$MARKER expires=$expires route=REPAIR_0005"
+}
+preflight_report() {
+  require_sha; require_paths; load_env; check_identity; validate_backup
+  [[ "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" = active ]] || fail "Gunicorn no está activo."
+  local state schema_file now expires
+  state="$(schema_state)"
+  schema_file="$(mktemp)"; trap 'rm -f "$schema_file"' RETURN
+  mkdir -p "$OPS_DIR"
+  rm -f "$MARKER"
+  if ! schema_report >"$schema_file"; then
+    fail "no se pudo generar el reporte prospectivo."
+  fi
+  now="$(date +%s)"; expires=$((now + TTL_SECONDS))
+  local dump_sha; dump_sha="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
+  write_report "$state" "$schema_file" "$now" "$expires" "$dump_sha"
+  echo "PREFLIGHT_REPORT_OK report=$REPORT expires=$expires route=REPAIR_0005"
+}
+preflight() {
+  preflight_report
+  # Ruta reparable: 0004 aplicada, 0005 pendiente y origen ya presente con
+  # metadata incompatible. La evidencia es agregada y no incluye PII.
+  local state
+  state="$(schema_state)"
+  if [[ "$state" != "1|0|1" ]]; then
+    fail "Estado de migraciones no previsto; no se crea marker aplicable: $state"
+  fi
+  if ! grep -q '"review_required": true' "$REPORT"; then
+    fail "El reporte no marca revisión requerida."
+  fi
+  fail "Revisión humana requerida; no se crea marker aplicable. Reporte: $REPORT"
+}
+review_release() {
+  preflight_report
+  [[ "$(schema_state)" = "1|0|1" ]] || fail "Estado de migraciones no previsto para revisión."
+  [[ "${RELEASE_REVIEW_CONFIRMED:-}" = REVIEW_ASISTENCIAS_0005 ]] \
+    || fail "Confirmación de revisión ausente."
+  [[ -n "${RELEASE_REVIEW_ACTOR:-}" && "$RELEASE_REVIEW_ACTOR" != *$'\n'* ]] \
+    || fail "Actor de revisión ausente."
+  [[ -f "${RELEASE_REVIEW_EVIDENCE:-}" ]] || fail "Evidencia de revisión ausente."
+  local report_sha evidence_sha now
+  report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
+  evidence_sha="$(sha256sum "$RELEASE_REVIEW_EVIDENCE" | awk '{print $1}')"
+  now="$(date +%s)"
+  python3 - "$MARKER" "$REPORT" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$now" "$report_sha" "$evidence_sha" "$SNAPSHOT_REFERENCE" "$SNAPSHOT_SHA256" "$RELEASE_REVIEW_ACTOR" <<'PY'
+import json, pathlib, sys
+marker, report, tag, sha, parent, now, report_sha, evidence_sha, snapshot_ref, snapshot_sha, actor = sys.argv[1:]
+d = json.loads(pathlib.Path(report).read_text())
+if d.get("review_required") is not True:
+    raise SystemExit("reporte sin revisión requerida")
+pathlib.Path(marker).write_text(json.dumps({
+    "tag": tag, "sha": sha, "parent": parent, "created_at": int(now),
+    "expires_at": d["expires_at"], "dump_sha256": d["dump_sha256"],
+    "snapshot_reference": snapshot_ref, "snapshot_sha256": snapshot_sha,
+    "report_sha256": report_sha, "review_required": False,
+    "review_actor": actor, "review_evidence_sha256": evidence_sha,
+    "route": "REPAIR_0005",
+}, sort_keys=True, indent=2) + "\n")
+PY
+  echo "REVIEW_OK marker=$MARKER report=$REPORT actor=$RELEASE_REVIEW_ACTOR"
 }
 valid_marker() {
   [[ -s "$MARKER" ]] || fail "Marcador de preflight ausente."
-  python3 - "$MARKER" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$TTL_SECONDS" <<'PY'
+  python3 - "$MARKER" <<'PY'
+import json, sys
+if json.load(open(sys.argv[1], encoding='utf-8')).get('review_required') is not False:
+    raise SystemExit('marker requiere revisión humana')
+PY
+  local dump_sha report_sha
+  dump_sha="$(sha256sum "$BACKUP_FILE" | awk '{print $1}')"
+  report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
+  python3 - "$MARKER" "$EXPECTED_TAG" "$EXPECTED_SHA" "$EXPECTED_PARENT" "$TTL_SECONDS" "$dump_sha" "$SNAPSHOT_REFERENCE" "$SNAPSHOT_SHA256" "$report_sha" <<'PY'
 import json, sys, time
 d=json.load(open(sys.argv[1], encoding='utf-8'))
 assert d['tag']==sys.argv[2] and d['sha']==sys.argv[3] and d['parent']==sys.argv[4]
 assert d['route']=='REPAIR_0005' and d['expires_at'] >= int(time.time())
+assert d['review_required'] is False
+assert d['dump_sha256']==sys.argv[6]
+assert d['snapshot_reference']==sys.argv[7]
+assert d['snapshot_sha256']==sys.argv[8]
+assert d['report_sha256']==sys.argv[9]
 PY
 }
 apply_release() {
-  require_sha; load_env; check_identity; valid_marker; validate_backup
-  # La segunda comprobación ocurre todavía con Gunicorn activo, antes de
-  # cualquier ventana de mantenimiento.
-  preflight
+  require_sha; require_paths; load_env; check_identity; validate_backup; valid_marker
+  [[ "$(systemctl is-active "$SERVICE" 2>/dev/null || true)" = active ]] || fail "Gunicorn no está activo."
   local previous_commit migration_started=0
   previous_commit="$(git rev-parse HEAD)"
   printf 'previous_commit=%s\n' "$previous_commit" > "$OPS_DIR/apply-state.txt"
@@ -184,8 +272,10 @@ apply_release() {
 case "$ACTION" in
   self-test) self_test ;;
   runtime-self-test) runtime_self_test ;;
+  marker-self-test) marker_self_test ;;
   preflight) preflight ;;
+  review) review_release ;;
   apply) apply_release ;;
   diagnose) load_env; schema_state; schema_report ;;
-  *) echo "Uso: $0 {preflight|apply|diagnose}" >&2; exit 2 ;;
+  *) echo "Uso: $0 {preflight|review|apply|diagnose}" >&2; exit 2 ;;
 esac

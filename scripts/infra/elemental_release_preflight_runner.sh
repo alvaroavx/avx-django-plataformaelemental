@@ -6,7 +6,7 @@ app_dir=/srv/elementos
 service=plataforma-elemental.service
 state_dir=/var/lib/elemental-release
 status_file="$state_dir/backup-status.json"
-marker="$state_dir/preflight.json"
+report="$state_dir/preflight-report.json"
 pgpass=/etc/elemental-release-ro/pgpass
 
 [[ "$tag" =~ ^release/[A-Za-z0-9._-]+$ ]]
@@ -14,7 +14,12 @@ pgpass=/etc/elemental-release-ro/pgpass
 [[ "$(systemctl is-active "$service" 2>/dev/null || true)" = active ]]
 [[ -r "$status_file" && -r "$pgpass" ]]
 [[ -f "$app_dir/manage.py" ]]
-[[ -z "$(git -C "$app_dir" status --porcelain)" ]]
+rm -f "$state_dir/preflight.json"
+if ! worktree_status="$(git -C "$app_dir" status --porcelain -- . ':(exclude).venv')"; then
+  echo 'preflight: no se pudo comprobar el worktree' >&2
+  exit 1
+fi
+[[ -z "$worktree_status" ]]
 
 db_json="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only \
   --host 127.0.0.1 --username elemental_release_ro \
@@ -22,13 +27,13 @@ db_json="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only \
 [[ "$db_json" == \{*\} ]]
 disk_json="$(df -Pk "$app_dir" | tail -1 | awk '{print "{\"filesystem\":\""$1"\",\"available_kb\":"$4"}"}')"
 status_json="$(tr -d '\n' < "$status_file")"
-python3 - "$marker" "$tag" "$sha" "$parent" "$db_json" "$disk_json" "$status_json" <<'PY'
+python3 - "$report" "$tag" "$sha" "$parent" "$db_json" "$disk_json" "$status_json" <<'PY'
 import json
 import pathlib
 import sys
 import time
 
-marker, tag, sha, parent, db, disk, status = sys.argv[1:]
+report, tag, sha, parent, db, disk, status = sys.argv[1:]
 data = {
     "tag": tag,
     "sha": sha,
@@ -40,8 +45,14 @@ data = {
     "disk": json.loads(disk),
     "backup_status": json.loads(status),
     "route": "REPAIR_0005",
+    "review_required": True,
 }
-pathlib.Path(marker).write_text(json.dumps(data, sort_keys=True) + "\n", encoding="utf-8")
+backup = data["backup_status"]
+data["dump_sha256"] = backup.get("dump_sha256", "")
+data["snapshot_reference"] = backup.get("snapshot_reference", "")
+data["snapshot_sha256"] = backup.get("snapshot_sha256", "")
+pathlib.Path(report).write_text(json.dumps(data, sort_keys=True) + "\n", encoding="utf-8")
 PY
-chmod 640 "$marker"
-printf 'PREFLIGHT_OK tag=%s sha=%s marker=%s\n' "$tag" "$sha" "$marker"
+chmod 640 "$report"
+printf 'PREFLIGHT_REVIEW_REQUIRED tag=%s sha=%s report=%s\n' "$tag" "$sha" "$report" >&2
+exit 1
