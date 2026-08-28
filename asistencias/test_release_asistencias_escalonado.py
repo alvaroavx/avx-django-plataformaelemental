@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "release_asistencias_escalonado.sh"
+APPLY_ROOT = ROOT / "scripts" / "infra" / "elemental_release_apply_root.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "release-asistencias-escalonado.yml"
 PREFLIGHT_RUNNER = ROOT / "scripts" / "infra" / "elemental_release_preflight_runner.sh"
 MIGRATION_0004B = ROOT / "asistencias" / "migrations" / "0004b_reparar_precondiciones_0005.py"
@@ -97,6 +98,14 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn(":(exclude).venv", runner)
         self.assertIn('rm -f "$state_dir/preflight.json"', runner)
         self.assertIn('marker="$state_dir/preflight.json"', runner)
+
+    def test_launcher_ejecuta_script_del_tag_sin_bootstrap_inexistente(self):
+        launcher = APPLY_ROOT.read_text(encoding="utf-8")
+        self.assertIn('git show "$tag:scripts/release_asistencias_escalonado.sh"', launcher)
+        self.assertIn('mktemp /run/elemental-release-asistencias.', launcher)
+        self.assertIn('bash -n "$release_script"', launcher)
+        self.assertIn('RELEASE_APP_DIR=/srv/elementos', launcher)
+        self.assertNotIn('/srv/elementos/scripts/release_asistencias_escalonado.sh apply', launcher)
 
     def test_grafo_0006_une_las_dos_ramas(self):
         migration = MIGRATION_0006.read_text(encoding="utf-8")
