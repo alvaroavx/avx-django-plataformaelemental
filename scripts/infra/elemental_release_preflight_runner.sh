@@ -26,36 +26,25 @@ db_json="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only \
   --host 127.0.0.1 --username elemental_release_ro \
   --dbname plataforma_elemental_prod --command 'SELECT elemental_release_preflight()')"
 [[ "$db_json" == \{*\} ]]
-schema_state="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only --field-separator='|' \
-  --host 127.0.0.1 --username elemental_release_ro --dbname plataforma_elemental_prod \
-  --command "SELECT (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name='0004_alter_sesionclase_estado_liberacionsesion_and_more'), (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name IN ('0005_reparar_schema_0004_aplicada_precommit','0005_reparar_schema_0004_aplicada_precommit_v2')), (SELECT count(*) FROM django_migrations WHERE app='finanzas' AND name='0012_payment_clave_idempotencia_payment_disciplina_and_more'), (SELECT count(*) FROM django_migrations WHERE app='asistencias' AND name='0007_reconciliar_relaciones_activas')")"
-[[ "$schema_state" = '1|0|1|0' ]] || { echo 'preflight: estado de migraciones no corresponde a la reparación esperada' >&2; exit 1; }
-origin_schema="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only --field-separator='|' \
-  --host 127.0.0.1 --username elemental_release_ro --dbname plataforma_elemental_prod \
-  --command "SELECT table_name, is_nullable, coalesce(column_default,'') FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('asistencias_asignacionprofesordisciplina','asistencias_alumnodisciplina') AND column_name='origen' ORDER BY table_name")"
-[[ "$(printf '%s\n' "$origin_schema" | sed '/^$/d' | wc -l)" = 2 ]] || { echo 'preflight: estructura de origen incompleta' >&2; exit 1; }
-while IFS='|' read -r _ nullable _default; do
-  [[ "$nullable" = NO ]] || { echo 'preflight: origen debe ser NOT NULL antes de reparar' >&2; exit 1; }
-done <<<"$origin_schema"
-active_json="$(PGPASSFILE="$pgpass" psql --no-psqlrc --no-align --tuples-only --field-separator='|' \
-  --host 127.0.0.1 --username elemental_release_ro --dbname plataforma_elemental_prod \
-  --command "SELECT 'profesor', count(*) FILTER (WHERE activa), count(*) FILTER (WHERE activa AND origen='historica') FROM asistencias_asignacionprofesordisciplina; SELECT 'alumno', count(*) FILTER (WHERE activa), count(*) FILTER (WHERE activa AND origen='historica') FROM asistencias_alumnodisciplina;")"
 disk_json="$(df -Pk "$app_dir" | tail -1 | awk '{print "{\"filesystem\":\""$1"\",\"available_kb\":"$4"}"}')"
 status_json="$(tr -d '\n' < "$status_file")"
-python3 - "$report" "$marker" "$tag" "$sha" "$parent" "$db_json" "$disk_json" "$status_json" "$active_json" <<'PY'
+python3 - "$report" "$marker" "$tag" "$sha" "$parent" "$db_json" "$disk_json" "$status_json" <<'PY'
 import json
 import hashlib
 import pathlib
 import sys
 import time
 
-report, marker, tag, sha, parent, db, disk, status, active = sys.argv[1:]
+report, marker, tag, sha, parent, db, disk, status = sys.argv[1:]
 backup = json.loads(status)
-active_rows = {}
-for line in active.splitlines():
-    if line:
-        name, total, historical = line.split("|")
-        active_rows[name] = {"active": int(total), "active_historical": int(historical)}
+preflight = json.loads(db)
+migrations = preflight.get("migrations", {})
+if [migrations.get(k) for k in ("asistencias_0004", "asistencias_0005", "finanzas_0012", "asistencias_0007")] != [1, 0, 1, 0]:
+    raise SystemExit("preflight: estado de migraciones no corresponde a la reparación esperada")
+schema = preflight.get("schema", [])
+if len(schema) != 2 or any(row.get("nullable") != "NO" for row in schema):
+    raise SystemExit("preflight: estructura de origen incompleta o incompatible")
+active_rows = preflight.get("counts", {})
 data = {
     "tag": tag,
     "sha": sha,
@@ -63,7 +52,7 @@ data = {
     "created_at": int(time.time()),
     "expires_at": int(time.time()) + 1800,
     "service": "active",
-    "database": json.loads(db),
+    "database": preflight,
     "disk": json.loads(disk),
     "backup_status": json.loads(status),
     "route": "REPAIR_0005",

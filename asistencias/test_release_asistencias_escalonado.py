@@ -98,6 +98,16 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn(":(exclude).venv", runner)
         self.assertIn('rm -f "$state_dir/preflight.json"', runner)
         self.assertIn('marker="$state_dir/preflight.json"', runner)
+        self.assertNotIn("FROM django_migrations", runner)
+        self.assertNotIn("FROM asistencias_asignacionprofesordisciplina", runner)
+        self.assertNotIn("FROM asistencias_alumnodisciplina", runner)
+        self.assertIn("elemental_release_preflight()", runner)
+
+    def test_runner_no_concede_lectura_directa_al_rol_readonly(self):
+        runner = PREFLIGHT_RUNNER.read_text(encoding="utf-8")
+        for tabla in ("django_migrations", "asistencias_asignacionprofesordisciplina", "asistencias_alumnodisciplina"):
+            self.assertNotIn(f"FROM {tabla}", runner)
+        self.assertEqual(runner.count("elemental_release_preflight()"), 1)
 
     def test_launcher_ejecuta_script_del_tag_sin_bootstrap_inexistente(self):
         launcher = APPLY_ROOT.read_text(encoding="utf-8")
