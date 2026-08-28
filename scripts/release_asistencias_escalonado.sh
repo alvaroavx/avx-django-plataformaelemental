@@ -265,7 +265,7 @@ apply_release() {
   "$APP_DIR/.venv/bin/python" "$APP_DIR/manage.py" collectstatic --noinput
   systemctl start "$SERVICE"
   systemctl is-active --quiet "$SERVICE"
-  bash "$APP_DIR/scripts/smoke_produccion.sh"
+  DEPLOY_ENV_FILE="$ENV_FILE" bash "$APP_DIR/scripts/smoke_produccion.sh"
   echo "APPLY_OK sha=$EXPECTED_SHA previous=$previous_commit"
 }
 case "$ACTION" in

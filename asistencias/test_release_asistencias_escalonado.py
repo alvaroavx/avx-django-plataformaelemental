@@ -75,6 +75,9 @@ class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):
         self.assertIn("snapshot_reference", self.script)
         self.assertIn("snapshot_sha256", self.script)
 
+    def test_apply_transfiere_entorno_real_al_smoke(self):
+        self.assertIn('DEPLOY_ENV_FILE="$ENV_FILE" bash "$APP_DIR/scripts/smoke_produccion.sh"', self.script)
+
     def test_workflow_solo_dispatch_tag_y_environments_protegidos(self):
         self.assertIn("push:", self.workflow)
         self.assertIn('"release/asistencias-*"', self.workflow)
