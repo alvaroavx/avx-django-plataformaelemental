@@ -1,8 +1,8 @@
 {% extends "asistencias/profesor/base.html" %}
 {% block content %}
 <header class="page-heading d-flex justify-content-between align-items-start gap-3">
-  <div><span class="eyebrow">Agenda e historial</span><h1>Mis clases</h1></div>
-  {% if puede_operar_profesor %}<a class="btn btn-primary-profesor" href="{% url 'profesor:sesion_crear' %}?{{ profesor_query }}"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="visually-hidden">Crear sesión</span><span class="d-none d-sm-inline ms-1">Crear</span></a>{% endif %}
+  <div><h1>Mis clases</h1><p class="page-description">Tu agenda y registro de asistencia.</p></div>
+  {% if puede_operar_profesor %}<a class="btn btn-primary-profesor" href="{% url 'profesor:sesion_crear' %}?{{ profesor_query }}"><i class="bi bi-plus-lg" aria-hidden="true"></i><span class="ms-1">Crear sesión</span></a>{% endif %}
 </header>
 {% if not contexto_mutable %}<div class="context-notice mb-3" role="status"><i class="bi bi-eye" aria-hidden="true"></i><div><strong>Historial de lectura</strong><div>{{ mensaje_contexto_accion }}</div></div></div>{% endif %}
 {% if periodo_todos %}

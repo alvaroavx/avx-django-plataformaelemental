@@ -1799,6 +1799,7 @@ def sesion_asistente_agregar(request, pk):
             "asistencia": payload,
             "estado_financiero": estado_financiero,
             "total": total,
+            "sesion": {"estado": sesion.estado, "estado_label": sesion.get_estado_display()},
             "mensaje": "Asistente agregado",
         },
         status=201,

@@ -270,6 +270,7 @@ async function recorridoMutaciones(page, resultado) {
     puedeQuitarAsistente: Boolean(await page.$('button[name="eliminar_asistente"]')),
     puedeLiberarClaseAlumno: Boolean(await page.$('button[name="liberar_clase"]')),
   };
+  const idsAntes = await page.$$eval('#asistentes-mobile [data-asistencia-card]', cards => cards.map(card => card.dataset.asistenciaCard));
   const antes = Number(await page.$eval('#total-asistentes', element => element.textContent.trim()));
   await page.type('.ts-control input', process.env.ELEMENTAL_E2E_BUSQUEDA_ALUMNO || 'Alumno');
   await page.waitForSelector('.ts-dropdown .option', {visible: true, timeout: 10000});
@@ -279,14 +280,32 @@ async function recorridoMutaciones(page, resultado) {
     {timeout: 10000},
     antes + 1,
   );
-  await page.click('#asistentes-mobile article:first-child [data-estado="justificada"]');
+  const asistenciaNueva = await page.$$eval('#asistentes-mobile [data-asistencia-card]', (cards, anteriores) => {
+    const nuevas = cards.filter(card => !anteriores.includes(card.dataset.asistenciaCard));
+    if (nuevas.length !== 1) throw new Error('No se pudo identificar una única asistencia recién agregada.');
+    return nuevas[0].dataset.asistenciaCard;
+  }, idsAntes);
+  const selectorAsistencia = `#asistentes-mobile [data-asistencia-card="${asistenciaNueva}"]`;
+  const selectorJustificada = `${selectorAsistencia} [data-estado="justificada"]`;
+  // La fila se inserta dinámicamente después de cargar el documento. Disparar el
+  // evento sobre el botón localizado evita depender de su posición o visibilidad
+  // transitoria durante la animación de TomSelect.
+  await page.$eval(selectorJustificada, boton => boton.click());
   await page.waitForFunction(
-    () => document.querySelector('#asistentes-mobile article:first-child [data-estado-status]')
-      .textContent.includes('guardada'),
+    selector => {
+      const boton = document.querySelector(`${selector} [data-estado="justificada"]`);
+      const estado = document.querySelector(`${selector} [data-estado-status]`);
+      return boton?.getAttribute('aria-pressed') === 'true'
+        && estado?.textContent.includes('guardada');
+    },
     {timeout: 10000},
+    selectorAsistencia,
   );
   await page.reload({waitUntil: 'domcontentloaded'});
+  const estadoPersistido = await page.$eval(`${selectorAsistencia} [data-estado="justificada"]`, boton => boton.getAttribute('aria-pressed') === 'true');
+  if (!estadoPersistido) throw new Error('La asistencia recién agregada no conservó su estado tras recargar.');
   resultado.mutaciones.asistencia = {
+    estadoPersistido,
     antes,
     despues: Number(await page.$eval('#total-asistentes', element => element.textContent.trim())),
   };
@@ -299,7 +318,7 @@ async function recorridoMutaciones(page, resultado) {
   await page.type('#id_email', `browser.alumno.${runId}@example.com`);
   await Promise.all([
     page.waitForNavigation({waitUntil: 'domcontentloaded'}),
-    page.click('button[type=submit]'),
+    page.click('form.formulario-operativo button[type=submit]'),
   ]);
   resultado.mutaciones.alumno = {url: urlEvidencia(page.url()), runId};
 
@@ -310,13 +329,12 @@ async function recorridoMutaciones(page, resultado) {
     await seleccionarPrimeraOpcion(page, '#id_plan');
   }
   await page.select('#id_metodo_pago', 'efectivo');
-  await page.$eval('#id_fecha_pago', (element, valor) => { element.value = valor; }, fechaIso());
   await page.type('#id_monto', process.env.ELEMENTAL_E2E_MONTO || '15000');
   await page.$eval('#id_clases_asignadas', element => { element.value = '3'; });
   await page.type('#id_glosa', `Pago navegador E2E ${runId}`);
   await Promise.all([
     page.waitForNavigation({waitUntil: 'domcontentloaded'}),
-    page.click('button[type=submit]'),
+    page.click('form.formulario-operativo button[type=submit]'),
   ]);
   resultado.mutaciones.pago = {
     url: urlEvidencia(page.url()),
@@ -331,10 +349,18 @@ async function recorridoMutaciones(page, resultado) {
   await page.$eval('#id_fecha', (element, valor) => { element.value = valor; }, fechaIso(10));
   await Promise.all([
     page.waitForNavigation({waitUntil: 'domcontentloaded'}),
-    page.click('button[type=submit]'),
+    page.click('form.formulario-operativo button[type=submit]'),
   ]);
   const urlCreada = urlEvidencia(page.url());
+  await page.click('summary[aria-label="Acciones de la sesión"]');
+  await page.waitForSelector('#motivo-liberar-sesion', {visible: true, timeout: 10000});
   await page.type('#motivo-liberar-sesion', `Liberación navegador E2E ${runId}`);
+  // La confirmación nativa se cubre en la prueba de interacción. Este recorrido
+  // valida la mutación real y evita que un diálogo del navegador bloquee el
+  // proceso sin aportar evidencia adicional.
+  await page.$eval('form[action*="/liberar/"]', formulario => {
+    formulario.removeAttribute('data-sensitive-form');
+  });
   await Promise.all([
     page.waitForNavigation({waitUntil: 'domcontentloaded'}),
     page.click('form[action*="/liberar/"] button[type=submit]'),
@@ -350,13 +376,12 @@ async function recorridoPagoEspecifico(page, resultado) {
   if (!opcionExiste) throw new Error('La persona indicada no está disponible en el pago Profesor.');
   await page.select('#id_persona', soloPagoPersonaId);
   await page.select('#id_metodo_pago', 'efectivo');
-  await page.$eval('#id_fecha_pago', (element, valor) => { element.value = valor; }, fechaIso());
   await page.type('#id_monto', process.env.ELEMENTAL_E2E_MONTO || '12000');
   await page.$eval('#id_clases_asignadas', element => { element.value = '2'; });
   await page.type('#id_glosa', `Pago dirigido navegador E2E ${runId}`);
   await Promise.all([
     page.waitForNavigation({waitUntil: 'domcontentloaded'}),
-    page.click('button[type=submit]'),
+    page.click('form.formulario-operativo button[type=submit]'),
   ]);
   resultado.mutaciones.pagoDirigido = {
     url: urlEvidencia(page.url()),
@@ -404,7 +429,6 @@ async function main() {
     if (message.type() === 'error') resultado.erroresConsola.push(message.text());
   });
   page.on('pageerror', error => resultado.erroresConsola.push(error.message));
-
   try {
     await loginLocal(page);
     if (soloPagoPersonaId) {

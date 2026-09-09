@@ -79,6 +79,9 @@ npm run test:mermaid
 - `scripts/e2e/profesor_operacion.js`: sucesor parametrizado de los recorridos
   creados para el sprint Operación Profesor. Ejecuta navegación móvil, captura
   pantallas, comprueba gates y genera `resultado.json`.
+- `scripts/e2e/profesor_interacciones_test.js`: prueba de DOM sin base de datos
+  para submitters de acciones sensibles, prevención de doble envío, renderizado
+  seguro de nombres y recuperación de selección masiva.
 - Es de solo lectura por defecto. `ELEMENTAL_E2E_MUTACIONES=1` habilita creación
   de alumno, asistencia, pago y sesión liberada sobre datos sintéticos.
 - Puede autenticarse con usuario/clave no versionados o con una sesión Django
@@ -132,6 +135,11 @@ Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
 `ELEMENTAL_E2E_PERIODO_ANIO`, `ELEMENTAL_E2E_PERIODO_TODOS`,
 `ELEMENTAL_E2E_THEME`, `ELEMENTAL_E2E_USER_DATA_DIR`,
 `ELEMENTAL_E2E_BROWSER_URL` y `ELEMENTAL_E2E_SANITIZAR_CAPTURAS`.
+
+El modo de mutaciones confirma los cambios desde los controles reales del
+formulario. El runner no reemplaza globalmente `window.confirm`; las acciones
+sensibles se cubren además en la prueba de interacción, que simula la
+confirmación solo dentro de su DOM aislado.
 
 ### Refresh visual Profesor 2026-08-16
 

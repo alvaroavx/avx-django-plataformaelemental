@@ -2,9 +2,17 @@
 {% block content %}
 <header class="page-heading d-flex justify-content-between align-items-start gap-3">
   <div><span class="eyebrow">Personas de tus clases</span><h1>Alumnos</h1></div>
-  {% if puede_operar_profesor %}<a class="btn btn-student" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i><span class="visually-hidden">Agregar alumno</span><span class="d-none d-sm-inline ms-1">Agregar</span></a>{% endif %}
+  {% if puede_operar_profesor %}<a class="btn btn-student" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i><span class="visually-hidden">Agregar alumno</span><span class="ms-1" aria-hidden="true">Agregar alumno</span></a>{% endif %}
 </header>
 {% if not contexto_mutable %}<div class="context-notice mb-3" role="status"><i class="bi bi-eye" aria-hidden="true"></i><div><strong>Vista de lectura</strong><div>{{ mensaje_contexto_accion }}</div></div></div>{% endif %}
+<form method="get" class="mb-3" role="search">
+  <input type="hidden" name="organizacion" value="{{ organizacion_id }}">
+  {% if periodo_todos %}<input type="hidden" name="periodo" value="todos">{% else %}<input type="hidden" name="periodo_mes" value="{{ periodo_mes }}"><input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">{% endif %}
+  <label class="form-label" for="buscar-alumnos">Buscar alumnos</label>
+  <div class="d-flex gap-2"><input class="form-control" id="buscar-alumnos" name="q" type="search" maxlength="150" value="{{ busqueda }}" placeholder="Nombre o contacto"><button class="btn btn-outline-profesor" type="submit">Buscar</button></div>
+  {% if busqueda %}<a href="?{{ profesor_query }}">Limpiar búsqueda</a>{% endif %}
+</form>
+<p class="text-muted" role="status">{{ page_obj.paginator.count }} alumno{{ page_obj.paginator.count|pluralize:"s" }}</p>
 <div class="operational-list">
   {% for alumno in alumnos %}
     <article class="operational-row">
@@ -15,6 +23,7 @@
         {% for matricula in alumno.matriculas_profesor %}<div class="status-text status-student"><i class="bi bi-person-check" aria-hidden="true"></i>{{ matricula.disciplina.nombre }}{% if organizacion_todas %} · {{ matricula.disciplina.organizacion.nombre }}{% endif %}</div>{% endfor %}
       </div>
     </article>
-  {% empty %}<div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><strong>Sin alumnos activos</strong><span>Aún no hay alumnos activos para tus clases.</span></div>{% endfor %}
+  {% empty %}<div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i>{% if busqueda %}<strong>Sin resultados</strong><span>Prueba otro nombre o contacto, o limpia la búsqueda.</span>{% else %}<strong>Sin alumnos activos</strong><span>Aún no hay alumnos activos para tus clases.</span>{% endif %}</div>{% endfor %}
 </div>
+{% include "asistencias/profesor/_paginacion.html" with profesor_query=alumnos_query %}
 {% endblock %}

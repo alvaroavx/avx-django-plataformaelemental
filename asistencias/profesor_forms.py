@@ -1,3 +1,5 @@
+from calendar import monthrange
+from datetime import date
 import json
 import uuid
 
@@ -51,11 +53,38 @@ class AlumnoProfesorForm(forms.Form):
         return cleaned
 
 
-class PagoProfesorForm(forms.Form):
+class FechaPagoPeriodoMixin:
+    """Mantiene la fecha contable dentro del contexto mensual explícito."""
+
+    def __init__(self, *args, periodo_mes=None, periodo_anio=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.periodo_pago = (periodo_anio, periodo_mes) if periodo_mes and periodo_anio else None
+        if self.periodo_pago:
+            inicio = date(periodo_anio, periodo_mes, 1)
+            fin = inicio.replace(day=monthrange(periodo_anio, periodo_mes)[1])
+            hoy = timezone.localdate()
+            self.initial["fecha_pago"] = hoy if inicio <= hoy <= fin else inicio
+            self.fields["fecha_pago"].widget.attrs.update(min=inicio.isoformat(), max=fin.isoformat())
+            self.fields["fecha_pago"].help_text = (
+                f"Registra una fecha del período {periodo_mes:02d}/{periodo_anio}. "
+                "Para otro mes, cambia el contexto de trabajo."
+            )
+
+    def clean_fecha_pago(self):
+        fecha = self.cleaned_data["fecha_pago"]
+        if self.periodo_pago and (fecha.year, fecha.month) != self.periodo_pago:
+            raise forms.ValidationError("La fecha debe pertenecer al período seleccionado. Cambia el contexto para registrar otro mes.")
+        return fecha
+
+
+class PagoProfesorForm(FechaPagoPeriodoMixin, forms.Form):
     disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.none(), label="Clase")
     persona = forms.ModelChoiceField(queryset=Persona.objects.none(), label="Alumno")
     plan = forms.ModelChoiceField(queryset=PaymentPlan.objects.none(), required=False)
-    fecha_pago = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    fecha_pago = forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
     metodo_pago = forms.ChoiceField(choices=Payment.Metodo.choices)
     numero_comprobante = forms.CharField(max_length=100, required=False)
     monto = forms.DecimalField(max_digits=12, decimal_places=0, min_value=1, label="Monto CLP")
@@ -90,10 +119,13 @@ class PagoProfesorForm(forms.Form):
         return cleaned
 
 
-class PagoMasivoProfesorForm(forms.Form):
+class PagoMasivoProfesorForm(FechaPagoPeriodoMixin, forms.Form):
     disciplina = forms.ModelChoiceField(queryset=Disciplina.objects.none(), label="Clase")
     personas_seleccionadas = forms.CharField(widget=forms.HiddenInput)
-    fecha_pago = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    fecha_pago = forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
     plan = forms.ModelChoiceField(queryset=PaymentPlan.objects.none(), required=False)
     metodo_pago = forms.ChoiceField(choices=Payment.Metodo.choices)
     numero_comprobante = forms.CharField(max_length=100, required=False)

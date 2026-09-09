@@ -42,13 +42,26 @@
   document.addEventListener('submit', function (evento) {
     var formulario = evento.target.closest('[data-sensitive-form]');
     if (!formulario) return;
+    if (formulario.dataset.enviando === '1') {
+      evento.preventDefault();
+      return;
+    }
     var mensaje = formulario.dataset.confirm || '¿Confirmas esta acción?';
     if (!window.confirm(mensaje)) {
       evento.preventDefault();
       return;
     }
-    var boton = formulario.querySelector('button[type="submit"]');
+    formulario.dataset.enviando = '1';
+    var boton = evento.submitter || formulario.querySelector('button[type="submit"]');
     if (boton) {
+      // Un submitter deshabilitado no participa en los datos enviados por el navegador.
+      if (boton.name) {
+        var accion = document.createElement('input');
+        accion.type = 'hidden';
+        accion.name = boton.name;
+        accion.value = boton.value;
+        formulario.appendChild(accion);
+      }
       boton.disabled = true;
       boton.setAttribute('aria-busy', 'true');
     }

@@ -527,6 +527,24 @@ idempotente del dominio; ausencias y justificaciones no recuperan cupo.
   revisión completa.
 - Contrato completo: [OPERACION_PROFESOR.md](OPERACION_PROFESOR.md).
 
+### Correcciones de operación Profesor — 2026-09-09
+
+- Los formularios sensibles conservan el `name` y `value` del botón que inició
+  el envío antes de deshabilitarlo; así el servidor recibe acciones como liberar,
+  revertir o quitar un asistente y el navegador bloquea el doble envío.
+- El alta AJAX de asistentes devuelve el estado autoritativo de la sesión para
+  actualizar su indicador sin recargar ni mantener una etiqueta obsoleta.
+- La selección del pago masivo se serializa como JSON y los nombres se agregan
+  al DOM como texto, nunca como HTML interpretable.
+- Los pagos creados desde un mes acotado solo aceptan fechas de ese mes. El
+  formulario usa el formato ISO requerido por `input[type=date]`.
+- En el contexto global `todos`, el detalle de un pago sigue siendo visible para
+  su dueña o dueño, pero no habilita edición, reversa ni eliminación.
+- Alumnos permite buscar por nombre, correo o teléfono, pagina de forma estable
+  y conserva la consulta en los enlaces de página.
+- Inicio y Mis clases muestran una acción principal por sesión, estados y horas
+  legibles, y una navegación móvil que no tapa la acción de crear clase.
+
 ## API
 La API de datos de `asistencias` queda desactivada en v1.0.
 

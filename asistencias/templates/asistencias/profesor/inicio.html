@@ -1,7 +1,6 @@
 {% extends "asistencias/profesor/base.html" %}
 {% block content %}
 <header class="page-heading">
-  <span class="eyebrow">Resumen</span>
   <h1>Inicio</h1>
 </header>
 
@@ -14,11 +13,12 @@
 
 <section class="primary-session mb-4" aria-labelledby="sesion-principal-titulo">
   {% if proxima_sesion %}
-    <span class="eyebrow">{% if proxima_sesion.fecha == fecha_hoy %}Sesión de hoy{% elif periodo_todos %}Sesión destacada{% else %}Próxima sesión del período{% endif %}</span>
-    <h2 class="h4 mt-1 mb-2" id="sesion-principal-titulo">{{ proxima_sesion.disciplina.nombre }}</h2>
+    <span class="eyebrow">{% if proxima_sesion.fecha == fecha_hoy %}Sesión de hoy{% elif proxima_sesion.fecha < fecha_hoy %}Última clase del período{% else %}Tu próxima clase{% endif %}</span>
+    <h2 class="primary-session-title" id="sesion-principal-titulo">{{ proxima_sesion.disciplina.nombre }}</h2>
     {% if organizacion_todas %}<div class="operational-row-meta mb-1"><i class="bi bi-building" aria-hidden="true"></i> {{ proxima_sesion.disciplina.organizacion.nombre }}</div>{% endif %}
-    <p class="mb-3"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i>{{ proxima_sesion.fecha|date:"d/m/Y" }}{% if proxima_sesion.bloque %} · {{ proxima_sesion.bloque.hora_inicio|time:"H:i" }}{% endif %}</p>
-    {% if puede_operar_profesor %}<a class="btn btn-critical" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}?{{ profesor_query }}"><i class="bi bi-play-circle me-1" aria-hidden="true"></i>Abrir sesión</a>{% endif %}
+    <p class="primary-session-meta"><i class="bi bi-calendar-event" aria-hidden="true"></i>{{ proxima_sesion.fecha|date:"d M Y" }} · {% if proxima_sesion.bloque %}{{ proxima_sesion.bloque.hora_inicio|time:"H:i" }}{% else %}Horario pendiente{% endif %}</p>
+    <p class="primary-session-status"><span class="status-text"><i class="bi bi-circle-fill" aria-hidden="true"></i>{{ proxima_sesion.get_estado_display }}</span></p>
+    {% if puede_operar_profesor %}<a class="btn btn-primary-profesor" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}?{{ profesor_query }}"><i class="bi bi-person-check me-1" aria-hidden="true"></i>{% if proxima_sesion.estado == 'completada' %}Ver clase y asistencia{% else %}Ir a asistencia{% endif %}<i class="bi bi-arrow-right ms-2" aria-hidden="true"></i></a>{% endif %}
   {% else %}
     <span class="eyebrow">Agenda</span>
     <h2 class="h4 mt-1" id="sesion-principal-titulo">Sin sesiones para este período</h2>
@@ -28,28 +28,34 @@
 
 {% if puede_operar_profesor %}
 <section aria-labelledby="acciones-title" class="mb-4">
-  <div class="section-heading"><h2 id="acciones-title">Acciones rápidas</h2></div>
+  <div class="section-heading"><h2 id="acciones-title">Organizar</h2></div>
   <div class="quick-actions">
-    <a class="btn btn-primary-profesor" href="{% url 'profesor:sesion_crear' %}?{{ profesor_query }}"><i class="bi bi-calendar-plus" aria-hidden="true"></i>Crear sesión</a>
-    {% if proxima_sesion %}<a class="btn btn-outline-profesor" href="{% url 'asistencias:sesion_detail' proxima_sesion.pk %}?{{ profesor_query }}"><i class="bi bi-person-check" aria-hidden="true"></i>Asistencia</a>{% endif %}
-    <a class="btn btn-student" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i>Agregar alumno</a>
-    <a class="btn btn-payment" href="{% url 'profesor:pago_crear' %}?{{ profesor_query }}"><i class="bi bi-cash-coin" aria-hidden="true"></i>Registrar pago</a>
+    <a class="btn btn-outline-profesor" href="{% url 'profesor:sesion_crear' %}?{{ profesor_query }}"><i class="bi bi-calendar-plus" aria-hidden="true"></i>Crear sesión</a>
+    <a class="btn btn-outline-profesor" href="{% url 'profesor:alumno_crear' %}?{{ profesor_query }}"><i class="bi bi-person-plus" aria-hidden="true"></i>Agregar alumno</a>
+    <a class="btn btn-outline-profesor" href="{% url 'profesor:pago_crear' %}?{{ profesor_query }}"><i class="bi bi-cash-coin" aria-hidden="true"></i>Registrar pago</a>
   </div>
 </section>
 {% endif %}
 
+{% if sesiones_hoy %}
+{% if sesiones_hoy|length > 1 or proxima_sesion.fecha != fecha_hoy %}
 <section aria-labelledby="sesiones-resumen">
-  <div class="section-heading"><h2 id="sesiones-resumen">Sesiones</h2><a href="{% url 'profesor:sesiones' %}?{{ profesor_query }}">Ver historial</a></div>
+  <div class="section-heading"><h2 id="sesiones-resumen">También hoy</h2><a href="{% url 'profesor:sesiones' %}?{{ profesor_query }}">Ver historial</a></div>
   <div class="operational-list">
     {% for sesion in sesiones_hoy %}
+      {% if sesion.pk != proxima_sesion.pk %}
       <div class="operational-row">
         <span class="avatar-profesor avatar-session" aria-hidden="true"><i class="bi bi-calendar2-check"></i></span>
         <div class="operational-row-main"><div class="operational-row-title">{{ sesion.disciplina.nombre }}</div><div class="operational-row-meta">{% if organizacion_todas %}{{ sesion.disciplina.organizacion.nombre }} · {% endif %}{{ sesion.bloque.hora_inicio|time:"H:i"|default:"Horario pendiente" }}</div></div>
         {% if puede_operar_profesor %}<a class="row-link" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ profesor_query }}"><span class="visually-hidden">Abrir {{ sesion.disciplina.nombre }}</span></a>{% endif %}
       </div>
-    {% empty %}<div class="empty-state"><i class="bi bi-calendar-x" aria-hidden="true"></i><span>Sin sesiones para hoy en este contexto.</span></div>{% endfor %}
+      {% endif %}
+    {% endfor %}
   </div>
 </section>
+
+{% endif %}
+{% endif %}
 
 <section aria-labelledby="alumnos-resumen">
   <div class="section-heading"><h2 id="alumnos-resumen">Alumnos</h2><a href="{% url 'profesor:alumnos' %}?{{ profesor_query }}">Ver todos</a></div>

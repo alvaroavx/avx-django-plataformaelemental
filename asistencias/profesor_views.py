@@ -287,7 +287,12 @@ def alumnos(request):
     alumnos_qs = _alumnos_profesor(contexto).prefetch_related(
         Prefetch("disciplinas_asignadas", queryset=matriculas, to_attr="matriculas_profesor")
     )
-    contexto["alumnos"] = alumnos_qs
+    busqueda = request.GET.get("q", "").strip()[:150]
+    if busqueda:
+        alumnos_qs = filtrar_por_fragmentos(alumnos_qs, busqueda, campos=("nombres", "apellidos", "email", "telefono"))
+    pagina = Paginator(alumnos_qs.order_by("nombres", "apellidos", "pk"), 25).get_page(request.GET.get("pagina"))
+    contexto.update({"alumnos": pagina, "page_obj": pagina, "busqueda": busqueda})
+    contexto["alumnos_query"] = contexto["profesor_query"] + ("&" + urlencode({"q": busqueda}) if busqueda else "")
     return render(request, "asistencias/profesor/alumnos.html", contexto)
 
 
@@ -369,6 +374,8 @@ def pago_crear(request):
         disciplinas=contexto["disciplinas_profesor"],
         alumnos=_alumnos_profesor(contexto),
         planes=_planes_profesor(contexto),
+        periodo_mes=contexto["periodo_mes"],
+        periodo_anio=contexto["periodo_anio"],
     )
     if request.method == "POST" and form.is_valid():
         datos = form.cleaned_data
@@ -402,17 +409,18 @@ def pago_crear(request):
     return render(request, "asistencias/profesor/formulario.html", contexto | {"titulo": "Registrar pago"})
 
 
+@require_GET
 @login_required
 def pago_detalle(request, pk):
     contexto = _contexto_profesor(request)
-    exigir_contexto_mutable(contexto)
-    pago = get_object_or_404(
-        Payment.objects.select_related("persona", "disciplina", "plan", "transaccion", "transaccion__categoria"),
-        pk=pk,
-        organizacion=contexto["organizacion_activa"],
-        disciplina__organizacion=contexto["organizacion_activa"],
+    pagos_qs = Payment.objects.select_related(
+        "persona", "disciplina", "plan", "transaccion", "transaccion__categoria"
+    ).filter(
+        organizacion_id__in=contexto["organizacion_ids"],
+        disciplina__organizacion_id__in=contexto["organizacion_ids"],
         disciplina_id__in=contexto["disciplina_ids"],
     )
+    pago = get_object_or_404(filtrar_periodo(pagos_qs, "fecha_pago", contexto), pk=pk)
     contexto["pago"] = pago
     return render(request, "asistencias/profesor/pago_detalle.html", contexto)
 
@@ -515,6 +523,8 @@ def pago_masivo(request):
         disciplinas=contexto["disciplinas_profesor"],
         alumnos=_alumnos_profesor(contexto),
         planes=_planes_profesor(contexto),
+        periodo_mes=contexto["periodo_mes"],
+        periodo_anio=contexto["periodo_anio"],
     )
     filas = []
     errores = {}
@@ -540,7 +550,24 @@ def pago_masivo(request):
             if not creado:
                 messages.info(request, "El lote ya había sido procesado; no se duplicó ningún pago.")
             return redirect(_url_profesor(request, "profesor:pago_masivo_resultado", pk=lote.pk))
-    contexto.update({"form": form, "filas": filas, "errores_filas": errores, "preview": preview})
+    # Recupera también selecciones válidas cuando otro campo impide la vista previa.
+    ids_seleccionados = [
+        int(valor) for valor in request.POST.get("personas_seleccionadas", "").split(",")
+        if valor.strip().isascii() and valor.strip().isdigit() and len(valor.strip()) <= 19
+    ]
+    ids_seleccionados = [pk for pk in ids_seleccionados if 0 < pk < 2**63]
+    alumnos_autorizados = {
+        alumno.pk: alumno.nombre_completo
+        for alumno in _alumnos_profesor(contexto).filter(pk__in=ids_seleccionados)
+    }
+    alumnos_seleccionados = [
+        {"id": pk, "nombre": alumnos_autorizados[pk]}
+        for pk in dict.fromkeys(ids_seleccionados) if pk in alumnos_autorizados
+    ]
+    contexto.update({
+        "form": form, "filas": filas, "errores_filas": errores, "preview": preview,
+        "alumnos_seleccionados": alumnos_seleccionados,
+    })
     return render(request, "asistencias/profesor/pago_masivo.html", contexto)
 
 

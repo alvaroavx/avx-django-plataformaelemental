@@ -37,6 +37,10 @@ admin.site.index_title = _("Gestión de operaciones")
 
 urlpatterns = [
     path("", elemental_apps, name="elemental_apps"),
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=f"{settings.STATIC_URL}img/isotipo-negro.png", permanent=False),
+    ),
     path("admin/", admin.site.urls),
     path(
         "accounts/login/",

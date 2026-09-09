@@ -1,4 +1,4 @@
-<section class="mb-4" aria-labelledby="sesiones-{{ titulo|slugify }}">
+<section class="session-list-section" aria-labelledby="sesiones-{{ titulo|slugify }}">
   <div class="section-heading"><h2 id="sesiones-{{ titulo|slugify }}">{{ titulo }}</h2></div>
   <div class="operational-list">
     {% for sesion in lista %}
@@ -9,7 +9,7 @@
           <div class="operational-row-meta">{% if organizacion_todas %}{{ sesion.disciplina.organizacion.nombre }} · {% endif %}{{ sesion.fecha|date:"d/m/Y" }}{% if sesion.bloque %} · {{ sesion.bloque.hora_inicio|time:"H:i" }}{% endif %}</div>
           <div class="status-text status-session">
             {% if sesion.estado == 'programada' %}<i class="bi bi-clock" aria-hidden="true"></i>{% elif sesion.estado == 'abierta' %}<i class="bi bi-play-circle" aria-hidden="true"></i>{% elif sesion.estado == 'completada' %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% else %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% endif %}
-            {{ sesion.get_estado_display }} · {{ sesion.total_asistentes }} asistentes
+            {{ sesion.get_estado_display }} · {{ sesion.total_asistentes }} asistente{{ sesion.total_asistentes|pluralize:"s" }}
           </div>
         </div>
         {% if puede_operar_profesor %}
@@ -32,6 +32,6 @@
           </div>
         {% endif %}
       </article>
-    {% empty %}<div class="empty-state"><i class="bi bi-calendar-x" aria-hidden="true"></i><span>Sin resultados para este período.</span></div>{% endfor %}
+    {% empty %}<div class="empty-state empty-state-inline"><i class="bi bi-calendar2" aria-hidden="true"></i><span>{% if titulo == "Hoy" %}No tienes clases hoy.{% elif titulo == "Próximas" %}No hay próximas clases en este período.{% elif titulo == "Anteriores" %}No hay clases anteriores en este período.{% else %}No hay clases para este período.{% endif %}</span></div>{% endfor %}
   </div>
 </section>
