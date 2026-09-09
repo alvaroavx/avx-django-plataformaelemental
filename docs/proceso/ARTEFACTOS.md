@@ -251,8 +251,9 @@ confirmación solo dentro de su DOM aislado.
 
 - `scripts/validar_gate_ci.py`: valida la estructura de
   `.github/workflows/deploy.yml`: trigger de `main`, PostgreSQL efímero, comandos
-  completos, `needs: test`, ausencia de `always()`, `success()` explícito y smoke
-  posterior al deploy. Se ejecuta dentro de los workflows de test y deploy.
+  completos, verificación de migraciones, `needs: test`, ausencia de `always()`,
+  `success()` explícito, bloqueo ante cambios de esquema y smoke posterior al
+  deploy. Se ejecuta dentro de los workflows de test y deploy.
 - `scripts/smoke_produccion.sh`: smoke de solo lectura posterior al reinicio.
   Comprueba los códigos HTTP públicos y delega la autorización Profesor al
   comando Django. Lee parámetros desde el `DEPLOY_ENV_FILE` local del servidor;

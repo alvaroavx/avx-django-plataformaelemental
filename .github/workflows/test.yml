@@ -54,6 +54,9 @@ jobs:
       - name: Run Django checks
         run: python manage.py check
 
+      - name: Reject model changes without a migration
+        run: python manage.py makemigrations --check --dry-run
+
       - name: Run lint
         run: ruff check .
 

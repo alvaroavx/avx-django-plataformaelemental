@@ -7,20 +7,17 @@ Este documento describe el CI/CD minimo del proyecto:
 - todo push a `main` ejecuta primero el gate completo sobre PostgreSQL aislado;
 - el job `deploy` depende explícitamente de `test`, exige `success()` y no inicia
   si falla un check, Ruff o una prueba;
-- en un push a `main`, el job `deploy` queda `skipped` aunque los tests pasen;
-- solo `workflow_dispatch`, con tag/hash explícito, confirmación literal
-  `DESPLEGAR_PRODUCCION` y aprobación del environment `production`, puede
-  alcanzar SSH;
+- CI rechaza cambios de modelos sin migración y detecta archivos bajo
+  `*/migrations/*.py` en el rango del push;
+- un push sin cambios de esquema despliega automáticamente tras CI verde; un push
+  con migraciones deja `deploy` omitido;
 - el servidor verifica un checkout limpio y cambia al hash probado en modo
   detached, sin `git reset --hard origin/main`;
-- el deploy genérico instala dependencias, respalda en almacenamiento externo,
-  migra, recopila estáticos y reinicia `systemd`.
+- el deploy genérico instala dependencias, recopila estáticos y reinicia
+  `systemd`; nunca ejecuta migraciones.
 
-La liberación Operación Profesor mantiene una excepción deliberada para
-`asistencias.0004`, la reparación defensiva `asistencias.0005` y
-`finanzas.0012`. El deploy genérico no comprueba `0005` antes de su `migrate`
-global y queda expresamente prohibido para esta ventana. Su procedimiento exacto
-está en
+Toda migración, incluida la reparación defensiva de `asistencias.0005`, usa un
+release escalonado y no el deploy automático. Su procedimiento exacto está en
 [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 La reparación de `asistencias.0005` usa exclusivamente
@@ -68,13 +65,9 @@ directamente por SSH.
   - ruta absoluta del archivo de entorno productivo del servidor, por ejemplo `/srv/elementos/.env.prod`
   - `scripts/deploy.sh` falla si esta variable viene vacia o si el archivo no existe
   - es una ruta, no el contenido del archivo; GitHub Actions la pasa por SSH y el servidor carga el archivo local
-- `DEPLOY_BACKUP_DIR`
-  - directorio absoluto, existente, escribible y externo al checkout;
-  - debe residir en almacenamiento seguro con retención operativa definida.
-
 ## Archivo de entorno productivo
 
-`DEPLOY_ENV_FILE` identifica un archivo existente solo en el servidor. `scripts/deploy.sh` lo carga para migraciones y validaciones, y el unit de systemd debe referenciar el mismo archivo mediante `EnvironmentFile` para Gunicorn.
+`DEPLOY_ENV_FILE` identifica un archivo existente solo en el servidor. `scripts/deploy.sh` lo carga para validaciones, y el unit de systemd debe referenciar el mismo archivo mediante `EnvironmentFile` para Gunicorn.
 
 El archivo debe incluir las credenciales sensibles (`DJANGO_SECRET_KEY`, PostgreSQL y `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`) y las configuraciones no sensibles de Django, hosts, cookies y HSTS. No se copia a GitHub Actions, no se imprime y no se versiona.
 
@@ -227,8 +220,8 @@ Nota operativa:
    - copiarlo a `/etc/systemd/system/plataforma-elemental.service`
    - `sudo systemctl daemon-reload`
    - `sudo systemctl enable plataforma-elemental`
-7. Configurar el environment protegido `production`, con revisores obligatorios,
-   y ejecutar el primer release mediante `workflow_dispatch`.
+7. Configurar los secrets de Actions y hacer un push a `main` sin cambios de
+   esquema para ejecutar el primer deploy automático.
 
 ## Flujo del workflow
 
@@ -243,59 +236,28 @@ Este diagrama resume el flujo real documentado del workflow y `scripts/deploy.sh
 
 ```mermaid
 flowchart TD
-    A["Push a main"] --> B["Job test"]
-    B --> G{"Tests exitosos"}
-    G -- "No" --> X["Deploy omitido; sin SSH ni cambios productivos"]
-    G -- "Sí, evento push" --> X
-    W["workflow_dispatch + confirmación"] --> C["Checkout del SHA o ref explícito"]
-    C --> D["Instalar dependencias dev"]
-    D --> E["ruff check ."]
-    E --> F["Tests Django"]
-    F --> HD{"Tests exitosos"}
-    HD -- "No" --> X
-    HD -- "Sí" --> Y["Aprobación environment production"]
-    Y --> V["Validar secrets"]
-    V --> I["Preparar llave SSH y known_hosts"]
-    I --> J["SSH al servidor"]
-    J --> K["Verificar worktree y registrar hash previo"]
-    K --> L["Checkout detached del SHA probado"]
-    L --> M["scripts/deploy.sh"]
-    M --> N["Validar hash e instalar requirements"]
-    N --> O["Validar entorno y migraciones escalonadas"]
-    O --> P["Backup PostgreSQL externo con pg_dump"]
-    P --> Q["migrate --noinput"]
-    Q --> R["clearsessions y collectstatic"]
-    R --> S["check --deploy y restart systemd"]
-    S --> T["Smoke HTTP y aislamiento Profesor"]
+    A["Push a main"] --> B["CI: checks, migraciones, lint y tests"]
+    A --> C["Detectar cambios en migrations"]
+    B --> D{"CI verde"}
+    C --> E{"Sin cambios de esquema"}
+    D -- "No" --> X["Deploy omitido"]
+    E -- "No" --> X
+    D -- "Sí" --> F["SSH y checkout detached del SHA probado"]
+    E -- "Sí" --> F
+    F --> G["Instalar dependencias y validar modelo"]
+    G --> H["collectstatic, check --deploy y restart systemd"]
+    H --> I["Smoke post-deploy"]
 ```
 
-1. un push a `main` ejecuta el job `test`; incluso verde, `deploy` queda
-   `skipped` porque no es `workflow_dispatch`;
-2. un dispatch hace `actions/checkout` del tag/hash explícito;
-3. en dispatch, comprobar que el propio release contiene el protocolo endurecido
-   de `scripts/deploy.sh`, y rechazar cualquier checkout marcado
-   `MANUAL_RELEASE_ONLY=1`; esto impide usar el flujo genérico con releases
-   anteriores o con esta migración escalonada;
-4. instalar dependencias Python y de desarrollo;
-5. validar estructuralmente el gate con `scripts/validar_gate_ci.py`;
-6. correr `python manage.py check`;
-7. correr `ruff check .`;
-8. correr `python manage.py test asistencias finanzas personas`;
-9. ejecutar explícitamente
-   `python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests`;
-10. omitir completamente `deploy` si cualquier paso anterior falla;
-11. antes de habilitar el flujo, comprobar que el environment `production`
-    existe y tiene revisores obligatorios; en dispatch exigir además
-    `DESPLEGAR_PRODUCCION`;
-12. validar secrets obligatorios;
-13. escribir y validar la llave privada, y poblar `known_hosts`;
-14. abrir SSH solo después del éxito del job `test` y la aprobación productiva;
-15. abortar si el checkout remoto está sucio y registrar su `HEAD` real;
-16. resolver y hacer checkout detached del SHA exacto probado, sin reset a main;
-17. ejecutar `bash scripts/deploy.sh` con hashes, backup externo y aprobación
-    explícita de migración completa.
-18. ejecutar `scripts/smoke_produccion.sh` como paso separado. Un fallo deja el
-    workflow rojo y evidencia en el log, pero no revierte código ni base de datos.
+1. cada push a `main` corre `check`, `makemigrations --check --dry-run`, Ruff y
+   la suite Django sobre PostgreSQL aislado;
+2. el job `cambios_esquema` revisa el rango del push. Si encuentra una migración,
+   no abre SSH ni modifica el servidor;
+3. con CI verde y sin migraciones, `deploy` valida secrets, hace checkout
+   detached del SHA probado, instala dependencias, ejecuta `collectstatic`,
+   `check --deploy`, reinicia `systemd` y corre el smoke;
+4. `scripts/deploy.sh` no ejecuta `migrate`. Un cambio de esquema se libera solo
+   mediante el workflow escalonado por tag y su runbook específico.
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
@@ -309,7 +271,7 @@ flowchart TD
   el contenedor PostgreSQL junto con el runner efímero.
 - El job no carga `.env.prod`, `DEPLOY_ENV_FILE` ni secrets de PostgreSQL.
 - SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
-- `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
+- `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, incluido `makemigrations --check --dry-run`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
 
 ## SSH En CI
 - El workflow valida `DEPLOY_SSH_KEY_B64` como secret obligatorio.
@@ -322,22 +284,12 @@ flowchart TD
 - exige `DEPLOY_ENV_FILE`
 - exige `DEPLOY_EXPECTED_COMMIT`, `DEPLOY_PREVIOUS_COMMIT`, un worktree limpio y
   que `HEAD` coincida exactamente con el SHA probado;
-- exige `DEPLOY_BACKUP_DIR` fuera del checkout;
-- exige `DEPLOY_ALLOW_FULL_MIGRATE=FULL_MIGRATE_APPROVED`; por eso no sirve para
-  la liberación escalonada de Operación Profesor;
 - carga variables desde `DEPLOY_ENV_FILE`
 - valida `DJANGO_ENV=prod`
-- valida que PostgreSQL apunte a la base productiva esperada antes de migrar
-- exige que las migraciones escalonadas `asistencias.0004` y `finanzas.0012` ya
-  estén aplicadas; si no, deriva al runbook manual antes de cualquier escritura;
-- no comprueba `asistencias.0005` antes de ejecutar su `migrate` global; por esa
-  razón no se usa para el release defensivo de `0005`, aunque `0004` y `0012`
-  aparezcan aplicadas;
+- valida que PostgreSQL apunte a la base productiva esperada;
 - crea virtualenv si no existe
 - instala dependencias
-- ejecuta backup PostgreSQL previo a migraciones usando `pg_dump` en el destino
-  externo configurado;
-- ejecuta `python manage.py migrate --noinput`
+- ejecuta `python manage.py makemigrations --check --dry-run`
 - ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
 - ejecuta `python manage.py check --deploy`
@@ -350,9 +302,9 @@ Checklist operativo para validar el deploy que incluye `Organizacion.logo`:
 
 1. Confirmar que `Pillow` esta en `requirements.txt`.
 2. Confirmar que el workflow remoto ejecuta `pip install -r requirements.txt` mediante `scripts/deploy.sh`.
-3. Ejecutar deploy por `workflow_dispatch`, indicando tag/hash y obteniendo la
-   aprobación del environment `production`.
-4. Verificar que la migracion `personas.0005_organizacion_logo` se aplica durante `python manage.py migrate --noinput`.
+3. Hacer push a `main` sin migraciones y confirmar que CI activa el deploy.
+4. Si el cambio incluye una migración, usar el release escalonado antes de
+   publicar código que dependa de ella.
 5. Confirmar que `python manage.py check --deploy` corre en el script.
 6. Confirmar que `python manage.py collectstatic --noinput` corre en el script.
 7. Confirmar que Gunicorn/systemd se reinicia y queda activo.
@@ -429,15 +381,12 @@ Validaciones:
 
 La configuración efectiva de Nginx debe comprobarse en el servidor durante el Gate 3. No se puede declarar seguro el despliegue únicamente porque las vistas Django estén protegidas.
 
-## Backup PostgreSQL Previo A Migraciones
-- El script genérico exige `DJANGO_ENV=prod`.
-- Usa `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` y `POSTGRES_PORT` cargadas desde `DEPLOY_ENV_FILE` o desde el entorno del proceso.
-- Guarda los archivos en `DEPLOY_BACKUP_DIR`, que debe ser absoluto, escribible y
-  estar fuera del checkout.
-- El nombre del archivo incluye base de datos, timestamp y commit corto, por ejemplo `plataforma_elemental_20260508_153000_abc1234.dump`.
-- El formato es `custom` de `pg_dump`, pensado para restaurar con `pg_restore`.
-- Si `pg_dump` falla, el deploy aborta antes de ejecutar migraciones.
-- El script no imprime la password; la entrega a `pg_dump` mediante `PGPASSWORD`.
+## Backup PostgreSQL Para Releases Con Migraciones
+
+El deploy automático no crea backups ni ejecuta migraciones. Cada release de
+esquema debe definir un backup externo y verificable en su runbook escalonado,
+antes de la primera escritura. El procedimiento de `asistencias.0005` conserva
+esa exigencia en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 ## Rollback
 

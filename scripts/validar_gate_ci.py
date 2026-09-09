@@ -6,6 +6,7 @@ import yaml
 
 
 WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "deploy.yml"
+DEPLOY_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "deploy.sh"
 
 
 def exigir(condicion, mensaje):
@@ -29,20 +30,14 @@ def main():
     triggers = workflow.get("on", {})
     ramas_push = triggers.get("push", {}).get("branches", [])
     exigir("main" in ramas_push, "el workflow no se ejecuta en push a main.")
-    confirmacion = (
-        triggers.get("workflow_dispatch", {})
-        .get("inputs", {})
-        .get("confirmacion", {})
-    )
-    exigir(
-        confirmacion.get("required") == "true",
-        "workflow_dispatch debe exigir la confirmación manual.",
-    )
+    exigir("workflow_dispatch" not in triggers, "deploy no debe requerir despacho manual.")
 
     jobs = workflow.get("jobs", {})
     test = jobs.get("test")
+    cambios_esquema = jobs.get("cambios_esquema")
     deploy = jobs.get("deploy")
     exigir(isinstance(test, dict), "falta el job test.")
+    exigir(isinstance(cambios_esquema, dict), "falta el job cambios_esquema.")
     exigir(isinstance(deploy, dict), "falta el job deploy.")
 
     postgres = test.get("services", {}).get("postgres", {})
@@ -68,6 +63,7 @@ def main():
     comandos_test = comandos(test)
     for comando_requerido in (
         "python manage.py check",
+        "python manage.py makemigrations --check --dry-run",
         "ruff check .",
         "python manage.py test asistencias finanzas personas",
         "python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests",
@@ -85,27 +81,43 @@ def main():
 
     needs = deploy.get("needs")
     exigir(
-        needs == "test" or (isinstance(needs, list) and "test" in needs),
-        "deploy debe declarar needs: test.",
+        isinstance(needs, list) and {"test", "cambios_esquema"}.issubset(needs),
+        "deploy debe depender de test y cambios_esquema.",
     )
     condicion_deploy = deploy.get("if", "")
     exigir("always()" not in condicion_deploy, "deploy no puede usar if: always().")
     exigir("success()" in condicion_deploy, "deploy debe exigir success() explícitamente.")
     exigir(
-        "github.event_name == 'push'" not in condicion_deploy,
-        "un push a main no puede habilitar deploy.",
+        "needs.cambios_esquema.outputs.hay_cambios_esquema == 'false'" in condicion_deploy,
+        "deploy debe bloquearse si el push contiene migraciones.",
     )
     exigir(
-        "github.event_name == 'workflow_dispatch'" in condicion_deploy,
-        "deploy debe requerir workflow_dispatch.",
+        "workflow_dispatch" not in condicion_deploy,
+        "deploy no debe requerir despacho manual.",
     )
     exigir(
-        "inputs.confirmacion == 'DESPLEGAR_PRODUCCION'" in condicion_deploy,
-        "deploy debe requerir la confirmación DESPLEGAR_PRODUCCION.",
+        "github.event_name" not in condicion_deploy,
+        "deploy debe activarse por el push que aprobó CI.",
     )
     exigir(
-        deploy.get("environment", {}).get("name") == "production",
-        "deploy debe conservar la aprobación del environment production.",
+        "environment" not in deploy,
+        "deploy automático no debe requerir una aprobación de environment.",
+    )
+
+    comandos_esquema = comandos(cambios_esquema)
+    exigir(
+        "migrations/[^/]+\\.py" in comandos_esquema,
+        "cambios_esquema debe detectar archivos de migración.",
+    )
+
+    deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    exigir(
+        "manage.py migrate" not in deploy_script,
+        "el deploy automático no puede ejecutar migraciones.",
+    )
+    exigir(
+        "DEPLOY_ALLOW_FULL_MIGRATE" not in deploy_script,
+        "el deploy automático no debe pedir una autorización de migración.",
     )
 
     pasos_deploy = deploy.get("steps", [])
@@ -122,8 +134,8 @@ def main():
     )
 
     print(
-        "Gate CI válido: push main -> test PostgreSQL completo -> deploy omitido; "
-        "workflow_dispatch confirmado -> deploy -> smoke post-deploy"
+        "Gate CI válido: push main -> test PostgreSQL completo y sin migraciones "
+        "-> deploy automático -> smoke post-deploy"
     )
 
 

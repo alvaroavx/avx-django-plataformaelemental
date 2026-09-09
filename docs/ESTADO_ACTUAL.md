@@ -203,9 +203,9 @@ explícitamente PostgreSQL ni dependencias externas.
 
 ### Operación y despliegue
 
-- El patch de transición separa CI y producción: un push a `main` ejecuta pruebas
-  sin desplegar; producción requiere `workflow_dispatch`, confirmación literal y
-  el environment protegido `production`.
+- Un push a `main` despliega automáticamente solo tras CI verde y si el rango no
+  contiene migraciones. Los cambios de esquema se reservan para su release
+  escalonado y no ejecutan `migrate` desde el deploy rutinario.
 - El checkout productivo se rechaza si está sucio y cambia en modo detached al
   SHA exacto probado; ya no se fuerza a `origin/main`.
 - La protección efectiva exige configurar revisores obligatorios en el

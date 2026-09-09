@@ -42,6 +42,9 @@ Para cambios de migraciones:
 python manage.py makemigrations --check --dry-run
 ```
 
+CI ejecuta este mismo comando antes de cualquier deploy. Un archivo nuevo o
+modificado bajo `*/migrations/*.py` impide el despliegue automático del push.
+
 Para produccion:
 
 ```bash

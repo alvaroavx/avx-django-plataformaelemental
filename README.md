@@ -191,8 +191,8 @@ curl http://127.0.0.1:8000/api/version/
 
 El proyecto incluye una base mínima de CI/CD con GitHub Actions:
 - corre tests en cada push a `main`
-- si los tests pasan, despliega por SSH al servidor
-- el servidor actualiza código, instala dependencias, migra, recopila estáticos y reinicia `systemd`
+- si los tests pasan y el push no contiene migraciones, despliega por SSH al servidor
+- el servidor actualiza código, instala dependencias, recopila estáticos y reinicia `systemd`; las migraciones usan su release escalonado
 
 La guía operativa completa está en:
 - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)

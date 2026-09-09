@@ -4,16 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
-    inputs:
-      release_ref:
-        description: "Tag o hash exacto que se probará y desplegará"
-        required: true
-        type: string
-      confirmacion:
-        description: "Escribir DESPLEGAR_PRODUCCION para habilitar el job protegido"
-        required: true
-        type: string
 
 concurrency:
   group: deploy-production
@@ -56,18 +46,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.sha }}
-
-      - name: Verify release deploy protocol
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          set -euo pipefail
-          grep -Fq 'DEPLOY_ALLOW_FULL_MIGRATE' scripts/deploy.sh
-          grep -Fq 'DEPLOY_EXPECTED_COMMIT' scripts/deploy.sh
-          if grep -Fq 'MANUAL_RELEASE_ONLY=1' scripts/release_operacion_profesor.sh 2>/dev/null; then
-            echo "Este release exige su runbook manual por etapas." >&2
-            exit 1
-          fi
+          ref: ${{ github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -87,6 +66,9 @@ jobs:
       - name: Run Django checks
         run: python manage.py check
 
+      - name: Reject model changes without a migration
+        run: python manage.py makemigrations --check --dry-run
+
       - name: Run lint
         run: ruff check .
 
@@ -104,12 +86,38 @@ jobs:
           [[ "$release_commit" =~ ^[0-9a-f]{40}$ ]]
           echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
 
+  cambios_esquema:
+    runs-on: ubuntu-latest
+    outputs:
+      hay_cambios_esquema: ${{ steps.detectar.outputs.hay_cambios_esquema }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect schema changes in this push
+        id: detectar
+        env:
+          BEFORE: ${{ github.event.before }}
+          CURRENT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$BEFORE" =~ ^0+$ ]]; then
+            BEFORE="${CURRENT}^"
+          fi
+          if git diff --name-only "$BEFORE" "$CURRENT" | grep -Eq '(^|/)migrations/[^/]+\.py$'; then
+            echo "hay_cambios_esquema=true" >> "$GITHUB_OUTPUT"
+            echo "Se detectaron migraciones: este push no puede desplegar automáticamente."
+          else
+            echo "hay_cambios_esquema=false" >> "$GITHUB_OUTPUT"
+            echo "Sin migraciones en el rango: el deploy automático queda habilitado tras CI."
+          fi
+
   deploy:
     runs-on: ubuntu-latest
-    needs: test
-    if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.confirmacion == 'DESPLEGAR_PRODUCCION' }}
-    environment:
-      name: production
+    needs: [test, cambios_esquema]
+    if: ${{ success() && needs.cambios_esquema.outputs.hay_cambios_esquema == 'false' }}
 
     steps:
       - name: Validate deploy secrets
@@ -123,14 +131,13 @@ jobs:
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
           DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
           DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
-          DEPLOY_BACKUP_DIR: ${{ secrets.DEPLOY_BACKUP_DIR }}
         run: |
           set -euo pipefail
 
           missing=0
 
           # Validamos antes de abrir SSH para fallar con un mensaje claro cuando falte un secret esencial.
-          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY_B64 DEPLOY_PATH DEPLOY_SERVICE DEPLOY_ENV_FILE DEPLOY_BACKUP_DIR; do
+          for required_var in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY_B64 DEPLOY_PATH DEPLOY_SERVICE DEPLOY_ENV_FILE; do
             if [[ -z "${!required_var:-}" ]]; then
               echo "Falta el secret requerido ${required_var}. El deploy no puede continuar sin ese valor." >&2
               missing=1
@@ -176,7 +183,6 @@ jobs:
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
           DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
           DEPLOY_PYTHON_BIN: ${{ secrets.DEPLOY_PYTHON_BIN }}
-          DEPLOY_BACKUP_DIR: ${{ secrets.DEPLOY_BACKUP_DIR }}
           RELEASE_COMMIT: ${{ needs.test.outputs.release_commit }}
         run: |
           set -euo pipefail
@@ -207,10 +213,8 @@ jobs:
           export DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE}"
           export DEPLOY_VENV_DIR="${DEPLOY_VENV_DIR}"
           export DEPLOY_PYTHON_BIN="${DEPLOY_PYTHON_BIN}"
-          export DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR}"
           export DEPLOY_EXPECTED_COMMIT="${RELEASE_COMMIT}"
           export DEPLOY_PREVIOUS_COMMIT="\$previous_commit"
-          export DEPLOY_ALLOW_FULL_MIGRATE="FULL_MIGRATE_APPROVED"
           bash scripts/deploy.sh
           EOF
 

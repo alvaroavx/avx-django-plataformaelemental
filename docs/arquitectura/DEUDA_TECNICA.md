@@ -87,11 +87,10 @@ productivos antes de construir la aplicación.
 
 Estado: parcialmente resuelta.
 
-El patch de transición deja los pushes a `main` solo con pruebas y exige
-`workflow_dispatch`, confirmación literal y environment `production` para
-desplegar un tag/hash explícito. El clon remoto rechaza cambios locales y usa el
-SHA probado en modo detached. Sigue pendiente configurar revisores obligatorios
-en GitHub y reemplazar el healthcheck HTTP superficial por uno más profundo.
+Los pushes a `main` despliegan automáticamente solo cuando CI pasa y no hay
+migraciones en el rango. El clon remoto rechaza cambios locales y usa el SHA
+probado en modo detached. Los cambios de esquema siguen en el release escalonado.
+Sigue pendiente reemplazar el healthcheck HTTP superficial por uno más profundo.
 
 Acción: verificar la política real del environment y diseñar healthcheck profundo.
 
