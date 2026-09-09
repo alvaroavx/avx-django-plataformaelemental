@@ -71,7 +71,7 @@ directamente por SSH.
 
 El archivo debe incluir las credenciales sensibles (`DJANGO_SECRET_KEY`, PostgreSQL y `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`) y las configuraciones no sensibles de Django, hosts, cookies y HSTS. No se copia a GitHub Actions, no se imprime y no se versiona.
 
-El smoke post-deploy lee además, solo desde ese archivo local del servidor:
+El smoke manual lee además, solo desde ese archivo local del servidor:
 
 ```dotenv
 DEPLOY_SMOKE_BASE_URL=https://apps.espacioelementos.cl
@@ -255,7 +255,7 @@ flowchart TD
    no abre SSH ni modifica el servidor;
 3. con CI verde y sin migraciones, `deploy` valida secrets, hace checkout
    detached del SHA probado, instala dependencias, ejecuta `collectstatic`,
-   `check --deploy`, reinicia `systemd` y corre el smoke;
+   `check --deploy` y reinicia `systemd`;
 4. `scripts/deploy.sh` no ejecuta `migrate`. Un cambio de esquema se libera solo
    mediante el workflow escalonado por tag y su runbook específico.
 
@@ -416,11 +416,11 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
   política en el repositorio.
 - Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
   productivo debe comprobar el valor exacto antes de iniciar procesos.
-- El smoke final verifica `/` → login, `/accounts/login/` → `200` y el contrato
+- El smoke manual verifica `/` → login, `/accounts/login/` → `200` y el contrato
   Profesor `200/404` con organizaciones autorizada/ajena. No prueba OAuth Google,
   escritura de media ni restaurabilidad del backup.
-- Un smoke fallido marca el workflow como fallido después del deploy. No existe
-  rollback automático de migraciones ni restauración automática del dump.
+- El workflow automático no ejecuta el smoke. No existe rollback automático de
+  migraciones ni restauración automática del dump.
 - El repositorio crea backups previos a migraciones, pero no versiona una prueba
   periodica de `pg_restore`; un dump no debe llamarse recuperable hasta probarlo.
 

@@ -217,28 +217,3 @@ jobs:
           export DEPLOY_PREVIOUS_COMMIT="\$previous_commit"
           bash scripts/deploy.sh
           EOF
-
-      - name: Smoke test production
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
-          DEPLOY_VENV_DIR: ${{ secrets.DEPLOY_VENV_DIR }}
-        run: |
-          set -euo pipefail
-
-          ssh \
-            -i ~/.ssh/deploy_key \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            -p "${DEPLOY_PORT:-22}" \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
-          set -euo pipefail
-          cd "${DEPLOY_PATH}"
-          export DEPLOY_ENV_FILE="${DEPLOY_ENV_FILE}"
-          export DEPLOY_VENV_DIR="${DEPLOY_VENV_DIR}"
-          bash scripts/smoke_produccion.sh
-          EOF

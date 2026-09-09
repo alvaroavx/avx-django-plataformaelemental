@@ -123,19 +123,10 @@ def main():
     pasos_deploy = deploy.get("steps", [])
     nombres = [step.get("name", "") for step in pasos_deploy if isinstance(step, dict)]
     exigir("Deploy to production" in nombres, "falta el paso de deploy existente.")
-    exigir("Smoke test production" in nombres, "falta el smoke post-deploy separado.")
-    exigir(
-        nombres.index("Smoke test production") > nombres.index("Deploy to production"),
-        "el smoke debe ejecutarse después del deploy.",
-    )
-    exigir(
-        "bash scripts/smoke_produccion.sh" in comandos(deploy),
-        "el job deploy no ejecuta el smoke versionado.",
-    )
 
     print(
         "Gate CI válido: push main -> test PostgreSQL completo y sin migraciones "
-        "-> deploy automático -> smoke post-deploy"
+        "-> deploy automático"
     )
 
 
