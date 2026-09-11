@@ -1,10 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from auditoria.models import AuditLog
-from finanzas.models import Category, DocumentoTributario, Payment, Transaction
+from finanzas.models import AttendanceConsumption, Category, DocumentoTributario, Payment, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 
@@ -159,6 +160,126 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "periodo_mes=3")
         self.assertContains(response, "periodo_anio=2026")
         self.assertContains(response, f"organizacion={self.organizacion.pk}")
+
+    def test_sidebar_usa_dominios_como_encabezados_y_marca_pagina_actual(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("asistencias:dashboard"),
+            {"organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="elemental-nav-heading active"', html=False)
+        self.assertContains(response, 'aria-current="page"', html=False)
+        self.assertContains(response, "Sesiones")
+        self.assertContains(response, "data-elemental-sidebar-toggle", html=False)
+        self.assertContains(response, "plataformaelemental/js/shell.js")
+        self.assertContains(response, reverse("asistencias:sesiones_list"))
+        self.assertContains(response, reverse("finanzas:pagos_list"))
+
+    def test_dashboard_general_calcula_metricas_con_semantica_explicita(self):
+        estudiante = Persona.objects.create(
+            nombres="Ana",
+            apellidos="Métrica",
+            email="ana.metrica@example.com",
+        )
+        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        PersonaRol.objects.create(
+            persona=estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Danza")
+        sesion = SesionClase.objects.create(
+            disciplina=disciplina,
+            fecha="2026-02-12",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        asistencia = Asistencia.objects.create(sesion=sesion, persona=estudiante)
+        AttendanceConsumption.objects.filter(asistencia=asistencia).update(
+            estado=AttendanceConsumption.Estado.DEUDA,
+        )
+        categoria = Category.objects.create(nombre="Ingreso MVP", tipo=Category.Tipo.INGRESO)
+        Transaction.objects.create(
+            organizacion=self.organizacion,
+            categoria=categoria,
+            fecha="2026-02-13",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=25000,
+            descripcion="Ingreso dashboard",
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["dashboard_academico"]["sesiones_completadas"], 1)
+        self.assertEqual(response.context["dashboard_academico"]["personas_con_asistencia"], 1)
+        self.assertEqual(response.context["dashboard_financiero"]["clases_en_deuda"], 1)
+        self.assertEqual(response.context["dashboard_financiero"]["ingresos_contables"], 25000)
+        self.assertContains(response, "Personas con asistencia registrada")
+        self.assertContains(response, "Ingresos contables")
+
+    def test_consulta_persona_no_expone_otra_organizacion(self):
+        otra_organizacion = Organizacion.objects.create(
+            nombre="Otra Org",
+            razon_social="Otra Org SPA",
+            rut="55.555.555-5",
+        )
+        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        visible = Persona.objects.create(nombres="Elena", apellidos="Visible", email="elena@example.com")
+        oculta = Persona.objects.create(nombres="Elena", apellidos="Oculta", email="oculta@example.com")
+        PersonaRol.objects.create(persona=visible, rol=rol_estudiante, organizacion=self.organizacion, activo=True)
+        PersonaRol.objects.create(persona=oculta, rol=rol_estudiante, organizacion=otra_organizacion, activo=True)
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"organizacion": self.organizacion.pk, "persona_q": "Elena"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Elena Visible")
+        self.assertNotContains(response, "Elena Oculta")
+
+        seleccion_forzada = self.client.get(
+            reverse("elemental_apps"),
+            {"organizacion": self.organizacion.pk, "persona_id": oculta.pk},
+        )
+        self.assertIsNone(seleccion_forzada.context["consulta_persona"]["persona"])
+
+    def test_proximas_sesiones_excluye_completadas(self):
+        hoy = timezone.localdate()
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Agenda")
+        completada = SesionClase.objects.create(
+            disciplina=disciplina,
+            fecha=hoy,
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        programada = SesionClase.objects.create(
+            disciplina=disciplina,
+            fecha=hoy,
+            estado=SesionClase.Estado.PROGRAMADA,
+        )
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {
+                "periodo_mes": hoy.month,
+                "periodo_anio": hoy.year,
+                "organizacion": self.organizacion.pk,
+            },
+        )
+
+        proximas = list(response.context["dashboard_academico"]["proximas_sesiones"])
+        self.assertIn(programada, proximas)
+        self.assertNotIn(completada, proximas)
 
     def test_topbar_muestra_logo_de_organizacion_seleccionada(self):
         self.organizacion.logo = "organizaciones/logos/org-ux.png"

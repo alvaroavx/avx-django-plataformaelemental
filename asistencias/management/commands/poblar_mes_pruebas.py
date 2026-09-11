@@ -1,12 +1,15 @@
 import calendar
 import json
 from datetime import date, time
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from personas.models import Organizacion, Persona, PersonaRol
+from finanzas.models import Payment, PaymentPlan
+from finanzas.services import crear_pago_operacional, imputar_pago_a_deudas
 
 from asistencias.models import (
     AlumnoDisciplina,
@@ -125,6 +128,7 @@ class Command(BaseCommand):
                 for escenario in escenarios
                 for _estado, cantidad in escenario["patron"]
             ),
+            "pagos_previstos": sum(min(6, len(escenario["estudiantes"])) for escenario in escenarios),
         }
         if not options["aplicar"]:
             self.stdout.write(json.dumps(plan, ensure_ascii=False, indent=2))
@@ -138,6 +142,7 @@ class Command(BaseCommand):
             )
             escenarios[2]["disciplina"] = disciplina_circo
             resultado = self._aplicar_escenarios(escenarios, anio, mes)
+            resultado.update(self._aplicar_pagos(escenarios, anio, mes))
 
         self.stdout.write(json.dumps(plan | resultado, ensure_ascii=False, indent=2))
         self.stdout.write(self.style.SUCCESS("Mes de pruebas poblado correctamente."))
@@ -374,3 +379,86 @@ class Command(BaseCommand):
                 }
             )
         return conteos | {"detalle": detalle}
+
+    def _plan_pruebas(self, organizacion, anio, mes):
+        nombre = f"Plan sintético {anio}-{mes:02d}"
+        plan = PaymentPlan.objects.filter(organizacion=organizacion, nombre=nombre).first()
+        if plan and MARCADOR not in plan.descripcion:
+            raise CommandError(f"El plan {nombre} ya existe sin el marcador de datos de prueba.")
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        if plan:
+            plan.num_clases = 4
+            plan.precio = Decimal("40000")
+            plan.precio_incluye_iva = False
+            plan.fecha_inicio = date(anio, mes, 1)
+            plan.fecha_fin = date(anio, mes, ultimo_dia)
+            plan.descripcion = f"{MARCADOR} Plan sintético mensual para validación visual."
+            plan.activo = True
+            plan.save()
+            return plan, False
+        return PaymentPlan.objects.create(
+            organizacion=organizacion,
+            nombre=nombre,
+            num_clases=4,
+            precio=Decimal("40000"),
+            precio_incluye_iva=False,
+            fecha_inicio=date(anio, mes, 1),
+            fecha_fin=date(anio, mes, ultimo_dia),
+            descripcion=f"{MARCADOR} Plan sintético mensual para validación visual.",
+            activo=True,
+        ), True
+
+    def _aplicar_pagos(self, escenarios, anio, mes):
+        conteos = {
+            "planes_creados": 0,
+            "pagos_creados": 0,
+            "pagos_existentes": 0,
+            "deudas_imputadas": 0,
+        }
+        planes = {}
+        clases_variadas = (2, 4, 6, 3, 8, 1)
+        montos_variados = (20000, 40000, 60000, 30000, 80000, 10000)
+        metodos = (
+            Payment.Metodo.TRANSFERENCIA,
+            Payment.Metodo.EFECTIVO,
+            Payment.Metodo.TARJETA,
+            Payment.Metodo.OTRO,
+        )
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+
+        for escenario in escenarios:
+            organizacion = escenario["organizacion"]
+            if organizacion.pk not in planes:
+                plan, creado = self._plan_pruebas(organizacion, anio, mes)
+                planes[organizacion.pk] = plan
+                conteos["planes_creados"] += int(creado)
+            plan = planes[organizacion.pk]
+
+            for posicion, estudiante in enumerate(escenario["estudiantes"][:6]):
+                clave = f"datos-prueba-{anio}-{mes:02d}-{escenario['codigo']}-{estudiante.pk}"
+                existente = Payment.objects.filter(clave_idempotencia=clave).first()
+                if existente:
+                    if existente.organizacion_id != organizacion.pk or existente.persona_id != estudiante.pk:
+                        raise CommandError(f"La clave sintética {clave} está asociada a otro pago.")
+                    pago = existente
+                    conteos["pagos_existentes"] += 1
+                else:
+                    pago = crear_pago_operacional(
+                        pago=Payment(
+                            persona=estudiante,
+                            organizacion=organizacion,
+                            plan=plan,
+                            disciplina=escenario["disciplina"],
+                            fecha_pago=date(anio, mes, min(5 + posicion * 3, ultimo_dia)),
+                            metodo_pago=metodos[posicion % len(metodos)],
+                            aplica_iva=not organizacion.es_exenta_iva,
+                            monto_referencia=Decimal(montos_variados[posicion]),
+                            clases_asignadas=clases_variadas[posicion],
+                            observaciones=f"{MARCADOR} Pago sintético {escenario['codigo']}.",
+                        ),
+                        origen="poblador_mes_pruebas",
+                        clave_idempotencia=clave,
+                    )
+                    conteos["pagos_creados"] += 1
+                conteos["deudas_imputadas"] += imputar_pago_a_deudas(pago)
+        return conteos

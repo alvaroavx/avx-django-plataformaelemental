@@ -1,6 +1,6 @@
 # Navegacion Y Contexto Global
 
-Fecha de actualizacion: 2026-08-16
+Fecha de actualizacion: 2026-09-11
 
 ## Proposito
 Este documento concentra las reglas transversales de navegacion, periodo, organizacion activa y contexto global de UI.
@@ -101,6 +101,42 @@ Reglas:
 - El objetivo es continuidad operativa, no navegacion aislada por app.
 - En mobile puede cambiar la disposicion visual, pero debe conservar la misma necesidad funcional.
 - `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
+- En el sidebar administrativo, los dominios son encabezados de agrupación y
+  las páginas son los destinos navegables. `Panel` sigue siendo un destino
+  explícito; el encabezado no combina la semántica de título y enlace.
+- La página exacta usa `aria-current="page"`; el dominio activo aporta contexto
+  visual, pero no reemplaza esa identificación.
+- En desktop, el sidebar se puede contraer a un rail de accesos primarios. La
+  preferencia vive en `localStorage`, no en el modelo de usuario. El control
+  conserva nombre accesible, `aria-expanded` y objetivo de 44 px.
+- El dominio dueño de la operación académica se rotula `Sesiones` en la
+  navegación; `asistencias` permanece como nombre técnico de app, rutas y
+  modelos.
+
+## Dashboard General
+
+La ruta `/` compone bloques de lectura mediante
+`plataformaelemental.dashboard`. Cada bloque determina primero las organizaciones
+para las que el usuario posee la capacidad correspondiente y solo después
+ejecuta sus consultas.
+
+Fuentes y semántica iniciales:
+
+| Indicador | Fuente | Período | Organización | Semántica |
+| --- | --- | --- | --- | --- |
+| Sesiones completadas | `SesionClase.COMPLETADA` | `fecha` | disciplina | sesiones cerradas |
+| Personas con asistencia registrada | `Asistencia.persona` distinta | `sesion.fecha` | disciplina | incluye cualquier estado de asistencia |
+| Clases en deuda | `AttendanceConsumption.DEUDA` | `clase_fecha` | asistencia/sesión/disciplina | no incluye `PENDIENTE` |
+| Ingresos contables | `Transaction.INGRESO` | `fecha` | transacción | no suma `Payment` ni documentos |
+
+`Clases disponibles` no forma parte de esta entrega: existe diferencia entre
+saldo por pago y agregaciones acotadas al período. Incorporarlo exige fijar antes
+la pregunta temporal y extraer una regla canónica.
+
+La búsqueda de personas parte de un queryset previamente acotado por capacidad
+y organización. El helper de texto no concede acceso. El resultado individual
+presenta registros de asistencia, pagos operacionales, monto pagado y clases en
+deuda del contexto; no los convierte en participación, ingreso contable ni saldo.
 
 ## Responsabilidad por capa
 - El modulo neutral arma contexto global reutilizable.

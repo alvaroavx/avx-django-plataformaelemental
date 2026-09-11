@@ -4,6 +4,9 @@ from django.shortcuts import redirect, render
 from personas.models import PersonaRol
 from personas.permissions import normalizar_codigo_rol
 
+from .context import nav_context, organizacion_desde_request
+from .dashboard import construir_dashboard_general
+
 
 @login_required
 def elemental_apps(request):
@@ -15,4 +18,7 @@ def elemental_apps(request):
         }
         if "profesor" in roles and not roles.intersection({"admin", "staff_asistencia", "finanzas"}):
             return redirect("profesor:inicio")
-    return render(request, "plataformaelemental/elemental_apps.html")
+    context = nav_context(request)
+    organizacion = organizacion_desde_request(request)
+    context.update(construir_dashboard_general(request, organizacion=organizacion))
+    return render(request, "plataformaelemental/elemental_apps.html", context)

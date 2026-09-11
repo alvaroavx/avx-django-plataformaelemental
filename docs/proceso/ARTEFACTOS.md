@@ -270,12 +270,16 @@ confirmación solo dentro de su DOM aislado.
 ### Poblador mensual operativo
 
 - `asistencias/management/commands/poblar_mes_pruebas.py`: genera un mes
-  sintético para Lyra, LatinRengo y una disciplina circense parametrizable.
+  sintético para Lyra, LatinRengo y una disciplina circense parametrizable;
+  también genera planes, pagos variados y sus transacciones enlazadas mediante
+  los servicios canónicos de Finanzas.
 - Tiene preview por defecto, confirmación `--aplicar`, transacción atómica,
   protección `DEBUG=True`, marcador de datos de prueba e idempotencia.
 - Reutiliza personas y organizaciones por ID; no guarda correos ni crea alumnos.
 - `docs/evidencia/poblado-agosto-20260810/`: preview, aplicación, segunda
   ejecución y verificación del primer escenario cargado.
+- `docs/evidencia/poblado-septiembre-20260911/`: reutilización para septiembre,
+  conteos sanitizados e idempotencia de sesiones, asistencias, pagos y caja.
 - Puede reutilizarse para poblar otro mes cambiando `--anio` y `--mes`, siempre
   sobre una base no productiva con suficientes estudiantes activos.
 

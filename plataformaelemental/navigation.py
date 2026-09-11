@@ -34,12 +34,14 @@ def _item(request, *, label, icon, url_name=None, url=None, children=None, activ
     href = url or (_url(request, url_name) if url_name else "#")
     path = request.path
     active = any(path.startswith(prefix) for prefix in (active_prefixes or []))
+    current = path == href.split("?", 1)[0]
     return {
         "label": label,
         "icon": icon,
         "url": href,
         "children": children or [],
         "active": active,
+        "current": current,
         "badge": badge,
     }
 
@@ -85,7 +87,7 @@ def build_navigation(request):
         items.append(
             _item(
                 request,
-                label="Asistencias",
+                label="Sesiones",
                 icon="bi-clipboard-check",
                 url_name="asistencias:dashboard",
                 active_prefixes=["/asistencias/"],

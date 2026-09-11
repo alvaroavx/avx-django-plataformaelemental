@@ -4,7 +4,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
-from finanzas.models import AttendanceConsumption
+from finanzas.models import AttendanceConsumption, Payment, PaymentPlan, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 from .management.commands.poblar_mes_pruebas import MARCADOR
@@ -70,6 +70,23 @@ class PoblarMesPruebasTests(TestCase):
         self.assertEqual(SesionClase.objects.filter(notas__contains=MARCADOR).count(), 14)
         self.assertEqual(Asistencia.objects.filter(comentario__contains=MARCADOR).count(), 25)
         self.assertEqual(AttendanceConsumption.objects.filter(asistencia__comentario__contains=MARCADOR).count(), 25)
+        self.assertEqual(PaymentPlan.objects.filter(descripcion__contains=MARCADOR).count(), 2)
+        self.assertEqual(Payment.objects.filter(observaciones__contains=MARCADOR).count(), 18)
+        self.assertEqual(Transaction.objects.filter(pago_operacional__observaciones__contains=MARCADOR).count(), 18)
+        self.assertGreater(
+            AttendanceConsumption.objects.filter(
+                asistencia__comentario__contains=MARCADOR,
+                estado=AttendanceConsumption.Estado.CONSUMIDO,
+            ).count(),
+            0,
+        )
+        self.assertGreater(
+            AttendanceConsumption.objects.filter(
+                asistencia__comentario__contains=MARCADOR,
+                estado=AttendanceConsumption.Estado.DEUDA,
+            ).count(),
+            0,
+        )
         self.assertEqual(
             SesionClase.objects.get(disciplina=self.lyra, fecha="2026-08-03").estado,
             SesionClase.Estado.COMPLETADA,
@@ -96,6 +113,8 @@ class PoblarMesPruebasTests(TestCase):
         call_command("poblar_mes_pruebas", aplicar=True, stdout=StringIO(), **self.opciones())
         self.assertEqual(SesionClase.objects.filter(notas__contains=MARCADOR).count(), 14)
         self.assertEqual(Asistencia.objects.filter(comentario__contains=MARCADOR).count(), 25)
+        self.assertEqual(Payment.objects.filter(observaciones__contains=MARCADOR).count(), 18)
+        self.assertEqual(Transaction.objects.filter(pago_operacional__observaciones__contains=MARCADOR).count(), 18)
 
     @override_settings(DEBUG=False)
     def test_rechaza_entorno_sin_debug(self):

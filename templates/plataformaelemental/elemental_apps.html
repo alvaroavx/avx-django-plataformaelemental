@@ -1,55 +1,160 @@
 {% extends "asistencias/base_app.html" %}
-{% block title %}Elemental Apps{% endblock %}
+{% load finanzas_format %}
+{% block title %}Inicio · Elemental Apps{% endblock %}
 {% block content %}
-<div class="mt-2 mt-lg-3">
-  <div class="row align-items-center g-3 mb-4">
-    <div class="col-lg-8">
-      <div class="text-muted small text-uppercase">Plataforma Elemental</div>
-      <h1 class="display-6 fw-bold mb-2">Elemental Apps</h1>
-      <p class="lead text-muted mb-0">Operación mensual para personas, asistencias y finanzas.</p>
-    </div>
-  </div>
+<div class="elemental-dashboard py-2 py-lg-3">
+  <header class="mb-4">
+    <div class="text-muted small text-uppercase fw-semibold">Inicio</div>
+    <h1 class="h2 mb-1">Resumen de operación</h1>
+    <p class="text-muted mb-0">Lo que ocurrió y lo que requiere atención en {{ periodo_descripcion }}.</p>
+  </header>
 
-  {% if elemental_dashboard_cards %}
-    <div class="row g-3">
-      {% for item in elemental_dashboard_cards %}
-        <div class="col-md-6 col-xl-4">
-          <div class="card elemental-app-card h-100">
-            <div class="card-body d-flex flex-column">
-              <div class="d-flex align-items-center gap-3 mb-3">
-                <div class="rounded-4 bg-dark text-white d-inline-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
-                  <i class="bi {{ item.icon }} fs-4"></i>
-                </div>
-                <div>
-                  <h2 class="h5 mb-0">{{ item.label }}</h2>
-                  <div class="text-muted small">Acceso operativo</div>
-                </div>
-              </div>
-              {% if item.label == "Personas" %}
-                <p class="text-muted">Gestión de estudiantes, profesores, organizaciones y contactos.</p>
-              {% elif item.label == "Asistencias" %}
-                <p class="text-muted">Sesiones, asistencia, estudiantes y operación diaria.</p>
-              {% elif item.label == "Finanzas" %}
-                <p class="text-muted">Pagos, documentos, transacciones, reportes y exportaciones.</p>
-              {% elif item.label == "Admin" %}
-                <p class="text-muted">Administración interna del sistema.</p>
-              {% else %}
-                <p class="text-muted">Herramienta operacional de Elemental Apps.</p>
-              {% endif %}
-              <div class="mt-auto">
-                <a class="btn btn-primary" href="{{ item.url }}">
-                  <i class="bi bi-arrow-right-circle"></i><span class="ms-1">Entrar</span>
-                </a>
-              </div>
-            </div>
+  {% if dashboard_academico or dashboard_financiero %}
+    <section aria-labelledby="resumen-periodo-titulo" class="mb-4">
+      <h2 class="visually-hidden" id="resumen-periodo-titulo">Resumen del período</h2>
+      <div class="row g-2 g-lg-3">
+        {% if dashboard_academico %}
+          <div class="col-6 col-xl-3">
+            <a class="elemental-kpi" href="{% url 'asistencias:dashboard' %}?{{ dashboard_query_global }}">
+              <span class="elemental-kpi-value">{{ dashboard_academico.sesiones_completadas }}</span>
+              <span class="elemental-kpi-label">Sesiones completadas</span>
+            </a>
           </div>
+          <div class="col-6 col-xl-3">
+            <a class="elemental-kpi" href="{% url 'asistencias:dashboard' %}?{{ dashboard_query_global }}">
+              <span class="elemental-kpi-value">{{ dashboard_academico.personas_con_asistencia }}</span>
+              <span class="elemental-kpi-label">Personas con asistencia registrada</span>
+            </a>
+          </div>
+        {% endif %}
+        {% if dashboard_financiero %}
+          <div class="col-6 col-xl-3">
+            <a class="elemental-kpi" href="{% url 'finanzas:dashboard' %}?{{ dashboard_query_global }}">
+              <span class="elemental-kpi-value">{{ dashboard_financiero.clases_en_deuda }}</span>
+              <span class="elemental-kpi-label">Clases en deuda</span>
+            </a>
+          </div>
+          <div class="col-6 col-xl-3">
+            <a class="elemental-kpi" href="{% url 'finanzas:dashboard' %}?{{ dashboard_query_global }}">
+              <span class="elemental-kpi-value elemental-kpi-money">{{ dashboard_financiero.ingresos_contables|clp }}</span>
+              <span class="elemental-kpi-label">Ingresos contables</span>
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <div class="row g-3 align-items-start">
+      <div class="col-xl-7 order-1">
+        <section class="card elemental-dashboard-panel" aria-labelledby="atencion-titulo">
+          <div class="card-body p-3 p-lg-4">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+              <div>
+                <div class="text-muted small text-uppercase fw-semibold">Prioridad</div>
+                <h2 class="h4 mb-0" id="atencion-titulo">Requiere atención</h2>
+              </div>
+              <i class="bi bi-exclamation-diamond fs-4 text-warning" aria-hidden="true"></i>
+            </div>
+            {% if dashboard_alertas %}
+              <div class="elemental-operational-list">
+                {% for alerta in dashboard_alertas %}
+                  <a class="elemental-operational-row" href="{{ alerta.url }}">
+                    <i class="bi {{ alerta.icono }}" aria-hidden="true"></i>
+                    <span><strong>{{ alerta.cantidad }}</strong> {{ alerta.texto }}</span>
+                    <i class="bi bi-arrow-right ms-auto" aria-hidden="true"></i>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="mb-0 text-muted">No hay asuntos que requieran tu atención entre los datos visibles para este contexto.</p>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+
+      {% if consulta_persona %}
+        <div class="col-xl-5 order-2">
+          <section class="card elemental-dashboard-panel" aria-labelledby="consulta-titulo" id="consulta-persona">
+            <div class="card-body p-3 p-lg-4">
+              <div class="text-muted small text-uppercase fw-semibold">Respuesta rápida</div>
+              <h2 class="h4 mb-1" id="consulta-titulo">Consulta de persona</h2>
+              <p class="small text-muted">Los resultados respetan el período, la organización y tus permisos.</p>
+              <form method="get" role="search" class="mb-3" action="#consulta-persona">
+                {% for key, value in request.GET.items %}
+                  {% if key != 'persona_q' and key != 'persona_id' %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}
+                {% endfor %}
+                <label class="form-label" for="persona-q">Nombre, correo, teléfono o RUT</label>
+                <div class="input-group">
+                  <input class="form-control" id="persona-q" name="persona_q" type="search" value="{{ consulta_persona.termino }}" minlength="2" autocomplete="off">
+                  <button class="btn btn-primary" type="submit"><i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">Buscar persona</span></button>
+                </div>
+              </form>
+
+              {% if consulta_persona.persona %}
+                {% with resumen=consulta_persona.persona %}
+                  <div class="elemental-person-summary">
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+                      <div class="elemental-person-identity"><strong class="d-block">{{ resumen.objeto.nombre_completo }}</strong><span class="small text-muted">Resumen de {{ periodo_descripcion_corta }}</span></div>
+                      <a class="btn btn-sm btn-outline-primary" href="{{ resumen.detalle_url }}">Ver perfil</a>
+                    </div>
+                    <dl class="row g-2 mb-0 small">
+                      <dt class="col-7 fw-normal text-muted">Asistencias registradas</dt><dd class="col-5 text-end fw-semibold">{{ resumen.asistencias_registradas }}</dd>
+                      <dt class="col-7 fw-normal text-muted">Última asistencia</dt><dd class="col-5 text-end fw-semibold">{{ resumen.ultima_asistencia|date:'d/m/Y'|default:'Sin registros' }}</dd>
+                      <dt class="col-7 fw-normal text-muted">Pagos registrados</dt><dd class="col-5 text-end fw-semibold">{{ resumen.pagos_registrados }}</dd>
+                      <dt class="col-7 fw-normal text-muted">Monto pagado</dt><dd class="col-5 text-end fw-semibold">{{ resumen.monto_pagado|clp }}</dd>
+                      <dt class="col-7 fw-normal text-muted">Clases en deuda</dt><dd class="col-5 text-end fw-semibold">{{ resumen.clases_en_deuda }}</dd>
+                    </dl>
+                  </div>
+                {% endwith %}
+              {% elif consulta_persona.termino|length >= 2 %}
+                {% if consulta_persona.coincidencias %}
+                  <div class="list-group" aria-label="Coincidencias de personas">
+                    {% for persona in consulta_persona.coincidencias %}
+                      <a class="list-group-item list-group-item-action d-flex justify-content-between gap-2" href="?{{ dashboard_query_global }}&amp;persona_q={{ consulta_persona.termino|urlencode }}&amp;persona_id={{ persona.pk }}#consulta-persona">
+                        <span class="elemental-person-identity"><strong class="d-block">{{ persona.nombre_completo }}</strong><small class="text-muted">{{ persona.email|default:'Sin correo registrado' }}</small></span>
+                        <i class="bi bi-arrow-right align-self-center" aria-hidden="true"></i>
+                      </a>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="mb-0 text-muted" role="status">No encontramos personas visibles con ese criterio.</p>
+                {% endif %}
+              {% else %}
+                <p class="mb-0 text-muted small">Escribe al menos dos caracteres para comenzar.</p>
+              {% endif %}
+            </div>
+          </section>
         </div>
-      {% endfor %}
+      {% endif %}
+
+      {% if dashboard_academico %}
+        <div class="col-xl-7 order-3">
+          <section class="card elemental-dashboard-panel" aria-labelledby="proximas-titulo">
+            <div class="card-body p-3 p-lg-4">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h4 mb-0" id="proximas-titulo">Próximas sesiones</h2>
+                <a class="elemental-dashboard-action small" href="{% url 'asistencias:sesiones_list' %}?{{ dashboard_query_global }}">Ver calendario</a>
+              </div>
+              {% if dashboard_academico.proximas_sesiones %}
+                <div class="elemental-operational-list">
+                  {% for sesion in dashboard_academico.proximas_sesiones %}
+                    <a class="elemental-operational-row" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ dashboard_query_global }}">
+                      <span class="elemental-date"><strong>{{ sesion.fecha|date:'d' }}</strong>{{ sesion.fecha|date:'M' }}<span class="visually-hidden"> de {{ sesion.fecha|date:'Y' }}</span></span>
+                      <span><strong class="d-block">{{ sesion.disciplina.nombre }}</strong><small class="text-muted">{{ sesion.disciplina.organizacion.nombre }} · {% if sesion.bloque %}{{ sesion.bloque.hora_inicio|time:'H:i' }}{% else %}Horario pendiente{% endif %}</small></span>
+                      <i class="bi bi-arrow-right ms-auto" aria-hidden="true"></i>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="mb-0 text-muted">No hay sesiones próximas en el período seleccionado.</p>
+              {% endif %}
+            </div>
+          </section>
+        </div>
+      {% endif %}
     </div>
   {% else %}
-    <div class="alert alert-light border">
-      Tu usuario no tiene accesos operativos visibles. Contacta a un administrador para revisar roles y permisos.
-    </div>
+    <div class="alert alert-light border">Tu usuario no tiene información operacional visible en este contexto. Revisa la organización seleccionada o solicita acceso a un administrador.</div>
   {% endif %}
 </div>
 {% endblock %}

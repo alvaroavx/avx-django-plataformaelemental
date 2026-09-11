@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-07-26
+Fecha de actualizacion: 2026-09-11
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -12,19 +12,25 @@ La UX v1.0 prioriza:
 - accesos visibles segun permisos existentes
 
 ## Home Oficial
-La ruta `/` muestra el panel general `Elemental Apps`.
+La ruta `/` muestra un resumen operacional transversal, no un catálogo de apps
+ni una réplica de los paneles especializados.
 
-El panel muestra cards de acceso a:
-- Personas
-- Asistencias
-- Finanzas
-- Admin, solo para `staff` o `superuser`
+La primera entrega incluye, según permisos y organizaciones visibles:
+- sesiones completadas;
+- personas con una asistencia registrada, sin inferir presencia ni participación;
+- clases en deuda desde `AttendanceConsumption.DEUDA`;
+- ingresos contables desde `Transaction.INGRESO`;
+- incidencias calculables con enlace al flujo resolutivo;
+- hasta tres sesiones futuras no canceladas;
+- consulta acotada de persona para administradores de Personas.
 
-No muestra:
-- Monitor, porque queda fuera de navegacion v1.0 y se evaluara eliminarlo.
-- API, porque no existe una vista HTML operativa para usuarios internos.
+La consulta conserva período y organización. Distingue pagos operacionales de
+ingresos contables y no muestra todavía saldo de clases: las superficies actuales
+usan cortes temporales diferentes para ese concepto. Profesor puro conserva su
+redirección a `/profesor/`.
 
-Si un usuario autenticado no tiene accesos visibles, se muestra un mensaje controlado y no un error.
+Si un usuario autenticado no tiene información operacional visible, se muestra
+un mensaje controlado y no un error. `Monitor` y `API` permanecen fuera del home.
 
 ## Login
 El login usa una pantalla limpia y centrada con el nombre `Elemental Apps`.
@@ -42,9 +48,16 @@ Reglas:
 La navegacion principal vive en un sidebar global responsive.
 
 Desktop:
-- sidebar izquierdo persistente
+- sidebar izquierdo expandido o contraído mediante un control visible de 44 px
+- la preferencia se conserva localmente en `elemental-sidebar-collapsed`
+- el rail contraído muestra Inicio y un acceso primario inequívoco por dominio
 - nombre `Elemental Apps`
-- grupos por dominio visible
+- Inicio como destino independiente
+- dominios visibles como encabezados no clickeables
+- páginas autorizadas siempre visibles bajo cada dominio
+- página actual marcada visualmente y mediante `aria-current="page"`
+- el dominio académico se presenta como `Sesiones`; no cambia las URLs ni el
+  nombre técnico de la app `asistencias`
 
 Mobile:
 - boton hamburguesa

@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-08-16
+Fecha de actualizacion: 2026-09-11
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -26,11 +26,13 @@ python manage.py poblar_mes_pruebas \
   --profesor-lyra-id 10 --profesor-latin-id 3 --profesor-circo-id 2
 ```
 
-Agregar `--aplicar` confirma la escritura. Las sesiones y asistencias quedan
-marcadas con `[DATOS_PRUEBA_MES_OPERATIVO]`; no se crean personas. El comando
-mantiene las señales de dominio activas, por lo que cada asistencia genera su
-`AttendanceConsumption`. Si no existen pagos de ese período, esos consumos
-quedan correctamente como deuda sintética.
+Agregar `--aplicar` confirma la escritura. Las sesiones, asistencias, planes y
+pagos quedan marcados con `[DATOS_PRUEBA_MES_OPERATIVO]`; no se crean personas.
+El comando mantiene las señales y servicios de dominio activos: cada asistencia
+genera su `AttendanceConsumption`, cada pago genera exactamente una
+`Transaction` y los pagos se imputan contra deudas del mismo período y
+organización. Los montos, clases y métodos de pago varían para conservar casos
+con consumo, saldo y deuda.
 
 El escenario base produce:
 
@@ -38,9 +40,14 @@ El escenario base produce:
 - LatinRengo los sábados: una cerrada, una atrasada sin información y tres
   planificadas;
 - Tela Aérea los viernes: una abierta parcial y tres planificadas.
+- hasta seis pagos por escenario, con clases y métodos variados;
+- un plan sintético mensual por organización y transacciones enlazadas.
 
 Evidencia del primer uso:
 [docs/evidencia/poblado-agosto-20260810/RESULTADOS.md](../evidencia/poblado-agosto-20260810/RESULTADOS.md).
+
+Reutilización para septiembre de 2026:
+[docs/evidencia/poblado-septiembre-20260911/RESULTADOS.md](../evidencia/poblado-septiembre-20260911/RESULTADOS.md).
 
 ## Transición de relaciones históricas
 
