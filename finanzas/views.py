@@ -471,6 +471,17 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     q = request.GET.get("q")
     metodo = request.GET.get("metodo")
     persona_id = request.GET.get("persona")
+    persona_filtrada = None
+    if persona_id and persona_id.isdigit():
+        personas_visibles = Persona.objects.filter(pk=persona_id)
+        if organizacion:
+            personas_visibles = personas_visibles.filter(
+                roles__activo=True,
+                roles__organizacion=organizacion,
+            )
+        persona_filtrada = personas_visibles.distinct().first()
+    query_sin_persona = request.GET.copy()
+    query_sin_persona.pop("persona", None)
 
     resumen_pagos_data = resumen_pagos(pagos_qs)
     pagos = enriquecer_pagos_para_listado(list(pagos_qs))
@@ -513,6 +524,8 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
             "metodos_pago": Payment.Metodo.choices,
             "q": q or "",
             "metodo": metodo or "",
+            "persona_filtrada": persona_filtrada,
+            "query_sin_persona": query_sin_persona.urlencode(),
             "total_pagos_monto": resumen_pagos_data["total_pagos_monto"] or 0,
             "total_iva_monto": resumen_pagos_data["total_iva_monto"] or 0,
             "total_clases_pagadas": resumen_pagos_data["total_clases_pagadas"] or 0,

@@ -44,6 +44,13 @@
     </div>
   </div>
 
+  {% if persona_filtrada %}
+    <div class="alert alert-primary d-flex flex-wrap align-items-center justify-content-between gap-2" role="status">
+      <span>Mostrando únicamente los pagos de <strong>{{ persona_filtrada.nombre_completo }}</strong> en el período y organización seleccionados.</span>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'finanzas:pagos_list' %}{% if query_sin_persona %}?{{ query_sin_persona }}{% endif %}">Ver todos los pagos</a>
+    </div>
+  {% endif %}
+
   <div class="row g-3 mb-3">
     <div class="col-md-6 col-xl-3">
       <div class="card border-0 shadow-sm bg-success-subtle">
@@ -85,6 +92,7 @@
         <input type="hidden" name="periodo_mes" value="{{ periodo_mes }}">
         <input type="hidden" name="periodo_anio" value="{{ periodo_anio }}">
         <input type="hidden" name="organizacion" value="{{ organizacion_id }}">
+        {% if persona_filtrada %}<input type="hidden" name="persona" value="{{ persona_filtrada.pk }}">{% endif %}
         <div class="col-md-4">
           <label class="form-label">Buscar alumno</label>
           <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Nombre o apellido">

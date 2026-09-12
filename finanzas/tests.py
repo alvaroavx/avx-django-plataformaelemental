@@ -671,6 +671,53 @@ class FinanzasAccessTests(TestCase):
         self.assertTrue(response.context["open_registrar_pago"])
         self.assertEqual(str(response.context["form"].initial["persona"]), str(self.persona_no_admin.pk))
 
+    def test_pagos_list_filtra_realmente_por_persona(self):
+        otra_persona = Persona.objects.create(
+            nombres="Otra",
+            apellidos="Estudiante",
+            email="otra.estudiante@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=otra_persona,
+            rol=self.rol_estudiante,
+            organizacion=self.org,
+            activo=True,
+        )
+        pago_objetivo = Payment.objects.create(
+            persona=self.persona_no_admin,
+            organizacion=self.org,
+            fecha_pago="2026-09-05",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=12000,
+        )
+        Payment.objects.create(
+            persona=otra_persona,
+            organizacion=self.org,
+            fecha_pago="2026-09-06",
+            metodo_pago=Payment.Metodo.EFECTIVO,
+            aplica_iva=False,
+            monto_referencia=15000,
+        )
+        self.client.force_login(self.user_finanzas)
+
+        response = self.client.get(
+            reverse("finanzas:pagos_list"),
+            {
+                "periodo_mes": 9,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "persona": self.persona_no_admin.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([pago.pk for pago in response.context["pagos"]], [pago_objetivo.pk])
+        self.assertEqual(response.context["persona_filtrada"], self.persona_no_admin)
+        self.assertContains(response, "Mostrando únicamente los pagos de")
+        self.assertContains(response, "Ver todos los pagos")
+        self.assertContains(response, "/static/plataformaelemental/js/shell.js")
+
     def test_pagos_list_crea_pago_y_auditlog(self):
         self.client.force_login(self.user_admin)
 

@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from asistencias.models import Asistencia, SesionClase
 from finanzas.models import AttendanceConsumption, Payment, Transaction
+from finanzas.services import resumen_financiero_estudiante, resumen_financiero_estudiante_periodo
 from personas.models import Persona, SolicitudAcceso
 from personas.permissions import (
     ACCION_ROLES,
@@ -19,7 +20,7 @@ from personas.permissions import (
 )
 from personas.search import filtrar_por_fragmentos
 
-from .context import aplicar_periodo, organizaciones_visibles_para_usuario
+from .context import aplicar_periodo, organizaciones_visibles_para_usuario, resolver_periodo
 
 
 def _alcances_por_accion(request, organizacion):
@@ -232,7 +233,7 @@ def construir_detalle_metrica(request, *, metrica, organizacion):
     return detalle
 
 
-def _consulta_persona(request, organizaciones_ids):
+def _consulta_persona(request, organizaciones_ids, organizacion):
     termino = (request.GET.get("persona_q") or "").strip()
     persona_id = request.GET.get("persona_id")
     resultado = {"termino": termino, "coincidencias": [], "persona": None}
@@ -252,7 +253,7 @@ def _consulta_persona(request, organizaciones_ids):
                 prefijo="dashboard_persona",
             ).order_by("apellidos", "nombres")[:8]
         )
-    if not persona_id:
+    if not persona_id or not persona_id.isdigit():
         return resultado
 
     persona = base.filter(pk=persona_id).first()
@@ -268,6 +269,14 @@ def _consulta_persona(request, organizaciones_ids):
     consumos = aplicar_periodo(
         AttendanceConsumption.objects.filter(persona=persona), "clase_fecha", request=request
     ).filter(asistencia__sesion__disciplina__organizacion_id__in=organizaciones_ids)
+    periodo = resolver_periodo(request)
+    resumen_periodo = resumen_financiero_estudiante_periodo(
+        persona,
+        organizacion=organizacion,
+        mes=periodo["mes"],
+        anio=periodo["anio"],
+    )
+    resumen_actual = resumen_financiero_estudiante(persona, organizacion=organizacion) if organizacion else None
     resumen_pagos = pagos.aggregate(total=Sum("monto_total"), cantidad=Count("id"))
     resultado["persona"] = {
         "objeto": persona,
@@ -275,8 +284,17 @@ def _consulta_persona(request, organizaciones_ids):
         "ultima_asistencia": asistencias.order_by("-sesion__fecha").values_list("sesion__fecha", flat=True).first(),
         "pagos_registrados": resumen_pagos["cantidad"],
         "monto_pagado": resumen_pagos["total"] or Decimal("0"),
-        "clases_en_deuda": consumos.filter(estado=AttendanceConsumption.Estado.DEUDA).count(),
+        "resumen_periodo": resumen_periodo,
+        "resumen_actual": resumen_actual,
+        "asistencias_recientes": list(
+            asistencias.select_related("sesion__disciplina", "sesion__disciplina__organizacion")
+            .order_by("-sesion__fecha", "-pk")[:3]
+        ),
+        "pagos_recientes": list(
+            pagos.select_related("organizacion", "plan").order_by("-fecha_pago", "-pk")[:3]
+        ),
         "detalle_url": f'{reverse("personas:persona_detail", args=[persona.pk])}?{_query_global(request)}',
+        "pagos_url": f'{reverse("finanzas:pagos_list")}?{_query_global(request, persona=persona.pk)}',
     }
     return resultado
 
@@ -299,7 +317,7 @@ def construir_dashboard_general(request, *, organizacion):
     if organizaciones_financieras:
         context["dashboard_financiero"] = _metricas_financieras(request, organizaciones_financieras)
     if organizaciones_personas:
-        context["consulta_persona"] = _consulta_persona(request, organizaciones_personas)
+        context["consulta_persona"] = _consulta_persona(request, organizaciones_personas, organizacion)
 
     financiero = context["dashboard_financiero"]
     if financiero and organizaciones_personas and financiero["personas_con_deuda"]:

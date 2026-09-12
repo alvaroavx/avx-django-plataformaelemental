@@ -210,7 +210,10 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Sesiones")
         self.assertContains(response, "data-elemental-sidebar-toggle", html=False)
         self.assertContains(response, "plataformaelemental/js/shell.js")
-        self.assertContains(response, 'aria-label="Elemental Apps"', html=False)
+        self.assertContains(response, "Resumen de operación")
+        self.assertContains(response, 'aria-label="Menú principal"', html=False)
+        self.assertContains(response, 'aria-label="Cerrar menú"', html=False)
+        self.assertNotContains(response, 'id="elementalSidebarLabel"', html=False)
         self.assertContains(response, reverse("asistencias:sesiones_list"))
         self.assertContains(response, reverse("finanzas:pagos_list"))
 
@@ -362,6 +365,87 @@ class ElementalAppsUXTests(TestCase):
         )
         self.assertIsNone(seleccion_forzada.context["consulta_persona"]["persona"])
 
+        seleccion_invalida = self.client.get(
+            reverse("elemental_apps"),
+            {"organizacion": self.organizacion.pk, "persona_id": "valor-invalido"},
+        )
+        self.assertEqual(seleccion_invalida.status_code, 200)
+        self.assertIsNone(seleccion_invalida.context["consulta_persona"]["persona"])
+
+    def test_consulta_persona_entrega_resumen_operacional_360(self):
+        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        estudiante = Persona.objects.create(
+            nombres="Camila",
+            apellidos="Resumen",
+            email="camila.resumen@example.com",
+        )
+        PersonaRol.objects.create(
+            persona=estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        pago = Payment.objects.create(
+            persona=estudiante,
+            organizacion=self.organizacion,
+            fecha_pago="2026-09-03",
+            metodo_pago=Payment.Metodo.TRANSFERENCIA,
+            aplica_iva=False,
+            monto_referencia=18000,
+            clases_asignadas=1,
+        )
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Danza resumen")
+        for dia in (5, 12):
+            sesion = SesionClase.objects.create(
+                disciplina=disciplina,
+                fecha=f"2026-09-{dia:02d}",
+                estado=SesionClase.Estado.COMPLETADA,
+            )
+            Asistencia.objects.create(sesion=sesion, persona=estudiante, estado=Asistencia.Estado.PRESENTE)
+
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {
+                "periodo_mes": 9,
+                "periodo_anio": 2026,
+                "organizacion": self.organizacion.pk,
+                "persona_id": estudiante.pk,
+            },
+        )
+
+        resumen = response.context["consulta_persona"]["persona"]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(resumen["asistencias_registradas"], 2)
+        self.assertEqual(resumen["pagos_registrados"], 1)
+        self.assertEqual(resumen["monto_pagado"], pago.monto_total)
+        self.assertEqual(resumen["resumen_periodo"]["clases_pagadas"], 1)
+        self.assertEqual(resumen["resumen_periodo"]["clases_consumidas"], 1)
+        self.assertEqual(resumen["resumen_periodo"]["deuda_pendiente"], 1)
+        self.assertEqual(resumen["resumen_actual"]["saldo_clases"], 0)
+        self.assertIn(f"persona={estudiante.pk}", resumen["pagos_url"])
+        self.assertContains(response, "Situación actual")
+        self.assertContains(response, "Danza resumen")
+
+    def test_consulta_persona_no_agrega_saldo_actual_entre_organizaciones(self):
+        rol_estudiante = Rol.objects.create(nombre="Estudiante", codigo="ESTUDIANTE")
+        estudiante = Persona.objects.create(nombres="Saldo", apellidos="Multi Org")
+        PersonaRol.objects.create(
+            persona=estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.client.force_login(self.user_staff)
+
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 9, "periodo_anio": 2026, "persona_id": estudiante.pk},
+        )
+
+        self.assertIsNone(response.context["consulta_persona"]["persona"]["resumen_actual"])
+        self.assertContains(response, "Selecciona una organización para calcular un saldo de clases comparable.")
+
     def test_proximas_sesiones_excluye_completadas(self):
         hoy = timezone.localdate()
         disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Agenda")
@@ -427,6 +511,8 @@ class ElementalAppsUXTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Elemental Apps")
+        self.assertContains(response, "Cambiar período y organización")
+        self.assertContains(response, 'id="elementalContextControls"', html=False)
         self.assertNotContains(response, 'class="elemental-org-logo"', html=False)
         self.assertNotContains(response, 'class="elemental-org-fallback"', html=False)
 

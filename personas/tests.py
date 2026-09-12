@@ -738,6 +738,7 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Org Personas")
         self.assertContains(response, "Ingresos periodo")
+        self.assertContains(response, "/static/plataformaelemental/js/shell.js")
         self.assertEqual(len(response.context["organizaciones"]), 1)
 
     def test_logo_organizacion_es_opcional(self):

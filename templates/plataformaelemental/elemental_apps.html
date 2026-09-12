@@ -47,7 +47,7 @@
     {% endif %}
 
     <div class="row g-3 align-items-start">
-      <div class="col-xl-7 order-1">
+      <div class="{% if consulta_persona.persona %}col-12{% else %}col-xl-7{% endif %} order-1">
         <section class="card elemental-dashboard-panel" aria-labelledby="atencion-titulo">
           <div class="card-body p-3 p-lg-4">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -75,7 +75,7 @@
       </div>
 
       {% if consulta_persona %}
-        <div class="col-xl-5 order-2">
+        <div class="{% if consulta_persona.persona %}col-12{% else %}col-xl-5{% endif %} order-2">
           <section class="card elemental-dashboard-panel" aria-labelledby="consulta-titulo" id="consulta-persona">
             <div class="card-body p-3 p-lg-4">
               <div class="text-muted small text-uppercase fw-semibold">Respuesta rápida</div>
@@ -97,15 +97,45 @@
                   <div class="elemental-person-summary">
                     <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
                       <div class="elemental-person-identity"><strong class="d-block">{{ resumen.objeto.nombre_completo }}</strong><span class="small text-muted">Resumen de {{ periodo_descripcion_corta }}</span></div>
-                      <a class="btn btn-sm btn-outline-primary" href="{{ resumen.detalle_url }}">Ver perfil</a>
+                      <div class="d-flex flex-wrap justify-content-end gap-2">
+                        <a class="btn btn-sm btn-outline-primary" href="{{ resumen.detalle_url }}">Ver perfil</a>
+                        <a class="btn btn-sm btn-primary" href="{{ resumen.pagos_url }}">Ver pagos</a>
+                      </div>
                     </div>
-                    <dl class="row g-2 mb-0 small">
-                      <dt class="col-7 fw-normal text-muted">Asistencias registradas</dt><dd class="col-5 text-end fw-semibold">{{ resumen.asistencias_registradas }}</dd>
-                      <dt class="col-7 fw-normal text-muted">Última asistencia</dt><dd class="col-5 text-end fw-semibold">{{ resumen.ultima_asistencia|date:'d/m/Y'|default:'Sin registros' }}</dd>
-                      <dt class="col-7 fw-normal text-muted">Pagos registrados</dt><dd class="col-5 text-end fw-semibold">{{ resumen.pagos_registrados }}</dd>
-                      <dt class="col-7 fw-normal text-muted">Monto pagado</dt><dd class="col-5 text-end fw-semibold">{{ resumen.monto_pagado|clp }}</dd>
-                      <dt class="col-7 fw-normal text-muted">Clases en deuda</dt><dd class="col-5 text-end fw-semibold">{{ resumen.clases_en_deuda }}</dd>
-                    </dl>
+                    <div class="row g-4">
+                      <div class="col-lg-6">
+                        <h3 class="h6 mb-2">Actividad del período</h3>
+                        <div class="elemental-person-metrics small">
+                          <div class="elemental-person-metric"><span class="text-muted">Asistencias</span><strong>{{ resumen.asistencias_registradas }}</strong></div>
+                          <div class="elemental-person-metric"><span class="text-muted">Última asistencia</span><strong>{{ resumen.ultima_asistencia|date:'d/m/Y'|default:'Sin registros' }}</strong></div>
+                          <div class="elemental-person-metric"><span class="text-muted">Pagos · monto</span><strong>{{ resumen.pagos_registrados }} · {{ resumen.monto_pagado|clp }}</strong></div>
+                          <div class="elemental-person-metric"><span class="text-muted">Clases pagadas</span><strong>{{ resumen.resumen_periodo.clases_pagadas }}</strong></div>
+                          <div class="elemental-person-metric"><span class="text-muted">Clases consumidas</span><strong>{{ resumen.resumen_periodo.clases_consumidas }}</strong></div>
+                          <div class="elemental-person-metric"><span class="text-muted">Clases en deuda</span><strong>{{ resumen.resumen_periodo.deuda_pendiente }}</strong></div>
+                        </div>
+                      </div>
+                      <div class="col-lg-3">
+                        <h3 class="h6 mb-2">Situación actual</h3>
+                        {% if resumen.resumen_actual %}
+                          <div class="elemental-person-metric small mb-2"><span class="text-muted">Saldo de clases</span><strong>{{ resumen.resumen_actual.saldo_clases }}</strong></div>
+                          <div class="elemental-person-metric small"><span class="text-muted">Último pago</span><strong>{{ resumen.resumen_actual.fecha_ultimo_pago|date:'d/m/Y'|default:'Sin registros' }}</strong></div>
+                        {% else %}
+                          <p class="small text-muted mb-0">Selecciona una organización para calcular un saldo de clases comparable.</p>
+                        {% endif %}
+                      </div>
+                      <div class="col-lg-3">
+                        <h3 class="h6 mb-2">Actividad reciente</h3>
+                        <div class="small">
+                          {% for asistencia in resumen.asistencias_recientes %}
+                            <div class="elemental-person-recent-item"><strong class="d-block">{{ asistencia.sesion.fecha|date:'d/m/Y' }} · {{ asistencia.sesion.disciplina.nombre }}</strong><span class="text-muted">Asistencia</span></div>
+                          {% empty %}{% endfor %}
+                          {% for pago in resumen.pagos_recientes %}
+                            <div class="elemental-person-recent-item"><strong class="d-block">{{ pago.fecha_pago|date:'d/m/Y' }} · {{ pago.monto_total|clp }}</strong><span class="text-muted">Pago · {{ pago.organizacion.nombre }}</span></div>
+                          {% empty %}{% endfor %}
+                          {% if not resumen.asistencias_recientes and not resumen.pagos_recientes %}<span class="text-muted">Sin registros en el período.</span>{% endif %}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 {% endwith %}
               {% elif consulta_persona.termino|length >= 2 %}

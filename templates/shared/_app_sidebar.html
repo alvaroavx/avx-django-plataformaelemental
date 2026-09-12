@@ -24,11 +24,8 @@
   {% include "shared/_sidebar_nav.html" with hide_sidebar_brand=True %}
 </aside>
 
-<div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="elementalSidebar" aria-labelledby="elementalSidebarLabel">
-  <div class="offcanvas-header">
-    <h5 class="offcanvas-title" id="elementalSidebarLabel">Elemental Apps</h5>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
-  </div>
+<div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="elementalSidebar" aria-label="Menú principal">
+  <button type="button" class="btn-close btn-close-white elemental-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Cerrar menú"></button>
   <div class="offcanvas-body p-0">
     {% include "shared/_sidebar_nav.html" %}
   </div>

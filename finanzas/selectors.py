@@ -66,6 +66,7 @@ def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
 
     q = request.GET.get("q")
     metodo = request.GET.get("metodo")
+    persona_id = (request.GET.get("persona") or "").strip()
     if q:
         queryset = filtrar_por_fragmentos(
             queryset,
@@ -75,6 +76,8 @@ def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
         )
     if metodo:
         queryset = queryset.filter(metodo_pago=metodo)
+    if persona_id:
+        queryset = queryset.filter(persona_id=persona_id) if persona_id.isdigit() else queryset.none()
     return queryset
 
 

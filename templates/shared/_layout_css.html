@@ -18,6 +18,7 @@
 
   .elemental-sidebar-desktop {
     width: 280px;
+    flex: 0 0 280px;
     min-height: 100vh;
     background: var(--ea-sidebar-bg);
     color: var(--ea-sidebar-text);
@@ -28,7 +29,7 @@
   }
 
   body.elemental-sidebar-ready .elemental-sidebar-desktop {
-    transition: width 0.18s ease;
+    transition: width 0.18s ease, flex-basis 0.18s ease;
   }
 
   .elemental-sidebar-header {
@@ -67,6 +68,7 @@
 
   body.elemental-sidebar-collapsed .elemental-sidebar-desktop {
     width: 84px;
+    flex-basis: 84px;
   }
 
   body.elemental-sidebar-collapsed .elemental-sidebar-toggle {
@@ -137,13 +139,27 @@
   }
 
   .elemental-main {
+    width: 0;
+    flex: 1 1 0;
     min-width: 0;
+    overflow-x: hidden;
   }
 
   .elemental-brand {
     color: #fff;
     text-decoration: none;
     letter-spacing: -0.02em;
+  }
+
+  .elemental-offcanvas-close {
+    position: absolute;
+    z-index: 2;
+    top: 1.15rem;
+    right: 1rem;
+  }
+
+  #elementalSidebar .elemental-brand {
+    padding-right: 3rem;
   }
 
   .elemental-nav-link {
@@ -207,6 +223,25 @@
     z-index: 1020;
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(10px);
+  }
+
+  .elemental-context-summary {
+    min-height: 48px;
+  }
+
+  .elemental-context-toggle {
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .elemental-context-toggle-chevron {
+    margin-left: 0.2rem;
+    transition: transform 0.18s ease;
+  }
+
+  .elemental-context-toggle[aria-expanded="true"] .elemental-context-toggle-chevron {
+    transform: rotate(180deg);
   }
 
   .elemental-content {
@@ -362,6 +397,38 @@
     border-radius: 0.9rem;
   }
 
+  .elemental-person-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .elemental-person-metric {
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.7rem;
+  }
+
+  .elemental-person-metric span,
+  .elemental-person-metric strong {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .elemental-person-recent-item + .elemental-person-recent-item {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .elemental-breakable {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .elemental-person-identity {
     min-width: 0;
     overflow-wrap: anywhere;
@@ -377,6 +444,10 @@
       min-height: 44px;
       display: inline-flex;
       align-items: center;
+    }
+
+    .elemental-person-metrics {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -422,6 +493,23 @@
   @media (min-width: 992px) {
     .elemental-content {
       padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .elemental-context-bar > .container-fluid {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+
+    .elemental-context-summary {
+      flex: 0 1 auto;
+    }
+
+    .elemental-context-controls {
+      display: block !important;
+      flex: 1 1 auto;
     }
   }
 

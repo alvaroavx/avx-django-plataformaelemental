@@ -84,7 +84,7 @@ def build_navigation(request):
     items = [
         _item(
             request,
-            label="Elemental Apps",
+            label="Resumen de operación",
             icon="bi-grid",
             url_name="elemental_apps",
             active_prefixes=["/"],
@@ -202,7 +202,7 @@ def build_navigation(request):
 
 
 def build_dashboard_cards(request):
-    return [item for item in build_navigation(request) if item["label"] not in {"Elemental Apps"}]
+    return [item for item in build_navigation(request) if item["label"] not in {"Resumen de operación"}]
 
 
 def navigation_context(request):
