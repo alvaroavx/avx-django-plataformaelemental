@@ -187,7 +187,11 @@ En el archivo de entorno de produccion conviene definir al menos:
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 
-El deploy en produccion usa estas mismas variables para ejecutar un backup con `pg_dump` antes de aplicar migraciones.
+El deploy en produccion usa estas mismas variables para ejecutar un backup con
+`pg_dump` antes de aplicar migraciones. Cuando existan migraciones pendientes,
+también exige `DEPLOY_BACKUP_DIR`, configurable como secret de Actions o dentro
+del environment file productivo: una ruta absoluta, persistente, existente,
+escribible y ubicada fuera del checkout y de `/tmp`.
 
 Dominio publico vigente:
 - `apps.espacioelementos.cl`
@@ -220,8 +224,9 @@ Nota operativa:
    - copiarlo a `/etc/systemd/system/plataforma-elemental.service`
    - `sudo systemctl daemon-reload`
    - `sudo systemctl enable plataforma-elemental`
-7. Configurar los secrets de Actions y hacer un push a `main` sin cambios de
-   esquema para ejecutar el primer deploy automático.
+7. Configurar los secrets de Actions y hacer un push a `main` para ejecutar el
+   deploy automático. Definir `DEPLOY_BACKUP_DIR` antes de liberar cualquier
+   migración nueva.
 
 ## Flujo del workflow
 
@@ -239,25 +244,30 @@ flowchart TD
     A["Push a main"] --> B["CI: checks, migraciones, lint y tests"]
     A --> C["Detectar cambios en migrations"]
     B --> D{"CI verde"}
-    C --> E{"Sin cambios de esquema"}
+    C --> E{"Hay migraciones pendientes en producción"}
     D -- "No" --> X["Deploy omitido"]
-    E -- "No" --> X
     D -- "Sí" --> F["SSH y checkout detached del SHA probado"]
-    E -- "Sí" --> F
-    F --> G["Instalar dependencias y validar modelo"]
-    G --> H["collectstatic, check --deploy y restart systemd"]
+    F --> G["Instalar dependencias y validar plan"]
+    E -- "Sí" --> M["Detener servicio, pg_dump validado y migrate"]
+    E -- "No" --> H
+    M --> H["collectstatic con nombres versionados, check y restart"]
     H --> I["Smoke post-deploy"]
 ```
 
 1. cada push a `main` corre `check`, `makemigrations --check --dry-run`, Ruff y
    la suite Django sobre PostgreSQL aislado;
-2. el job `cambios_esquema` revisa el rango del push. Si encuentra una migración,
-   no abre SSH ni modifica el servidor;
-3. con CI verde y sin migraciones, `deploy` valida secrets, hace checkout
-   detached del SHA probado, instala dependencias, ejecuta `collectstatic`,
-   `check --deploy` y reinicia `systemd`;
-4. `scripts/deploy.sh` no ejecuta `migrate`. Un cambio de esquema se libera solo
-   mediante el workflow escalonado por tag y su runbook específico.
+2. el job `cambios_esquema` informa si el push contiene archivos de migración,
+   pero no sustituye la comprobación efectiva de migraciones pendientes contra
+   la base productiva;
+3. con CI verde, `deploy` valida secrets, hace checkout detached del SHA probado
+   e instala dependencias;
+4. si `migrate --check` detecta pendientes, valida `DEPLOY_BACKUP_DIR`, detiene
+   el servicio, crea un dump PostgreSQL custom, valida su catálogo, guarda su
+   SHA-256 y ejecuta `migrate --noinput`;
+5. la reparación histórica de Operación Profesor `0004b–0007` sigue bloqueada
+   en este camino si está pendiente y requiere su runbook escalonado;
+6. finalmente ejecuta `collectstatic` con nombres versionados por contenido,
+   `check --deploy`, reinicia `systemd` y comprueba que quede activo.
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
@@ -383,10 +393,12 @@ La configuración efectiva de Nginx debe comprobarse en el servidor durante el G
 
 ## Backup PostgreSQL Para Releases Con Migraciones
 
-El deploy automático no crea backups ni ejecuta migraciones. Cada release de
-esquema debe definir un backup externo y verificable en su runbook escalonado,
-antes de la primera escritura. El procedimiento de `asistencias.0005` conserva
-esa exigencia en [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
+El deploy automático crea un dump custom antes de toda migración rutinaria,
+valida que `pg_restore` pueda leer su catálogo y guarda un checksum SHA-256 junto
+al archivo. No elimina respaldos automáticamente: la retención corresponde a
+infraestructura. El procedimiento histórico de `asistencias.0005` conserva sus
+controles adicionales —snapshot, restauración ensayada y revisión humana— en
+[MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 ## Rollback
 
@@ -421,8 +433,9 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
   escritura de media ni restaurabilidad del backup.
 - El workflow automático no ejecuta el smoke. No existe rollback automático de
   migraciones ni restauración automática del dump.
-- El repositorio crea backups previos a migraciones, pero no versiona una prueba
-  periodica de `pg_restore`; un dump no debe llamarse recuperable hasta probarlo.
+- El deploy valida el catálogo con `pg_restore --list`, pero no restaura el dump
+  en una base aislada. Un respaldo no debe llamarse recuperable hasta probar una
+  restauración completa fuera de la ventana de deploy.
 
 ## Recomendaciones inmediatas
 - usar un usuario de despliegue dedicado

@@ -38,3 +38,14 @@ DATABASES = {
         "PORT": os.environ["POSTGRES_PORT"],
     }
 }
+
+# Los nombres con hash evitan que navegadores y proxies conserven CSS o JS de
+# una versión anterior después de collectstatic, incluida la app de Profesor.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+    },
+}

@@ -2,6 +2,13 @@
 
 Fecha de actualización: 2026-08-17
 
+> Nota de despliegue (2026-09-11): producción usa
+> `ManifestStaticFilesStorage`, por lo que `profesor.css` y
+> `profesor_contexto.js` cambian de URL cuando cambia su contenido. El pipeline
+> ejecuta toda la suite de `asistencias` y los 25 tests específicos de Profesor antes del
+> deploy; luego aplica migraciones rutinarias pendientes con respaldo previo y
+> recolecta los estáticos antes de reiniciar el servicio.
+
 ## Estado implementado
 
 El espacio `/profesor/` es una superficie HTML server-rendered y mobile-first

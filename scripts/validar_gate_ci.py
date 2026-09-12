@@ -66,7 +66,7 @@ def main():
         "python manage.py makemigrations --check --dry-run",
         "ruff check .",
         "python manage.py test asistencias finanzas personas",
-        "python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests",
+        "python manage.py test asistencias.test_profesor_ux asistencias.test_operacion_profesor",
     ):
         exigir(
             comando_requerido in comandos_test,
@@ -88,8 +88,8 @@ def main():
     exigir("always()" not in condicion_deploy, "deploy no puede usar if: always().")
     exigir("success()" in condicion_deploy, "deploy debe exigir success() explícitamente.")
     exigir(
-        "needs.cambios_esquema.outputs.hay_cambios_esquema == 'false'" in condicion_deploy,
-        "deploy debe bloquearse si el push contiene migraciones.",
+        "needs.cambios_esquema.outputs.hay_cambios_esquema == 'false'" not in condicion_deploy,
+        "deploy no debe omitir automáticamente releases que contienen migraciones.",
     )
     exigir(
         "workflow_dispatch" not in condicion_deploy,
@@ -111,22 +111,33 @@ def main():
     )
 
     deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-    exigir(
-        "manage.py migrate" not in deploy_script,
-        "el deploy automático no puede ejecutar migraciones.",
-    )
-    exigir(
-        "DEPLOY_ALLOW_FULL_MIGRATE" not in deploy_script,
-        "el deploy automático no debe pedir una autorización de migración.",
-    )
+    for contrato_deploy in (
+        "python manage.py migrate --check",
+        "backup_database",
+        "pg_dump",
+        "pg_restore --list",
+        "systemctl stop",
+        "python manage.py migrate --noinput",
+        "python manage.py collectstatic --noinput",
+        "ManifestStaticFilesStorage",
+    ):
+        origen = contenido if contrato_deploy == "ManifestStaticFilesStorage" else deploy_script
+        if contrato_deploy == "ManifestStaticFilesStorage":
+            origen = (DEPLOY_SCRIPT.parents[1] / "plataformaelemental/config/prod.py").read_text(
+                encoding="utf-8"
+            )
+        exigir(
+            contrato_deploy in origen,
+            f"falta el contrato de release: {contrato_deploy}",
+        )
 
     pasos_deploy = deploy.get("steps", [])
     nombres = [step.get("name", "") for step in pasos_deploy if isinstance(step, dict)]
     exigir("Deploy to production" in nombres, "falta el paso de deploy existente.")
 
     print(
-        "Gate CI válido: push main -> test PostgreSQL completo y sin migraciones "
-        "-> deploy automático"
+        "Gate CI válido: push main -> test PostgreSQL completo -> respaldo si hay "
+        "migraciones -> migrate, estáticos versionados y deploy automático"
     )
 
 

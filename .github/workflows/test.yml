@@ -63,5 +63,5 @@ jobs:
       - name: Run complete domain test suite on PostgreSQL 16
         run: python manage.py test asistencias finanzas personas
 
-      - name: Run Profesor multi-organization tests explicitly
-        run: python manage.py test asistencias.test_operacion_profesor.ProfesorMultiOrganizacionTests
+      - name: Run Profesor application tests explicitly
+        run: python manage.py test asistencias.test_profesor_ux asistencias.test_operacion_profesor
