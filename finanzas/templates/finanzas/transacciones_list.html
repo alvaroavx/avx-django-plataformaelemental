@@ -24,6 +24,13 @@
     </div>
   </div>
 
+  {% if sin_documento %}
+    <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2" role="status">
+      <span>Mostrando únicamente transacciones sin documento asociado.</span>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'finanzas:transacciones_list' %}{% if query_sin_documento %}?{{ query_sin_documento }}{% endif %}">Ver todas</a>
+    </div>
+  {% endif %}
+
   <div class="row g-3 mb-3">
     <div class="col-md-3">
       <div class="card border-0 shadow-sm bg-secondary-subtle">

@@ -1,8 +1,8 @@
 # Poblado sintético de septiembre de 2026
 
-Fecha de ejecución: 2026-09-11  
-Entorno: desarrollo local (`DEBUG=True`)  
-Marcador: `poblado_mes_pruebas`
+Fecha de ejecución: 2026-09-11
+Entorno: desarrollo local (`DEBUG=True`)
+Marcador: `[DATOS_PRUEBA_MES_OPERATIVO]`
 
 ## Alcance
 
@@ -30,9 +30,19 @@ El contador explícito `deudas_imputadas` del comando fue 0 porque las señales 
 
 - Ejecución limitada a la base de desarrollo local.
 - Sin migraciones de esquema.
-- Sin commit, push ni despliegue.
+- La ejecución de datos fue local. El cambio de aplicación fue posteriormente
+  incluido en `7107c24`, subido y desplegado por el pipeline automático.
 - Los registros creados se identifican por el marcador del comando y la clave de idempotencia de cada pago.
 
 ## Idempotencia
 
 Una segunda ejecución del comando actualizó las 12 sesiones y las 25 asistencias administradas por el marcador, sin crear registros nuevos: 0 sesiones, 0 asistencias, 0 matrículas, 0 bloques, 0 planes y 0 pagos adicionales. Los 18 pagos existentes fueron reconocidos por sus claves de idempotencia.
+
+## Corrección posterior
+
+La implementación posterior incorpora `--fecha-corte` y, por defecto, ya no
+declara operación futura. Esta evidencia conserva los conteos históricos del
+poblado original de mes completo; no afirma que la base local haya sido
+reconciliada con la nueva fecha de corte. Una ejecución nueva aborta antes de
+sobrescribir pagos sintéticos divergentes o sobrantes y exige una decisión
+explícita para limpiar o conservar esos datos de desarrollo.

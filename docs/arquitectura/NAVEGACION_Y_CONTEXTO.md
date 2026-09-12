@@ -108,7 +108,9 @@ Reglas:
   visual, pero no reemplaza esa identificación.
 - En desktop, el sidebar se puede contraer a un rail de accesos primarios. La
   preferencia vive en `localStorage`, no en el modelo de usuario. El control
-  conserva nombre accesible, `aria-expanded` y objetivo de 44 px.
+  conserva nombre accesible, `aria-expanded`, objetivo de 44 px y disponibilidad
+  durante el desplazamiento. El rail conserva nombres accesibles, ubicación de
+  dominio y badges operacionales.
 - El dominio dueño de la operación académica se rotula `Sesiones` en la
   navegación; `asistencias` permanece como nombre técnico de app, rutas y
   modelos.
@@ -120,6 +122,11 @@ La ruta `/` compone bloques de lectura mediante
 para las que el usuario posee la capacidad correspondiente y solo después
 ejecuta sus consultas.
 
+Los roles organizacionales no reciben agregados ni enlaces operativos cuando el
+contexto está en `Todas`: las vistas de destino exigen una organización concreta
+y la portada no elige una silenciosamente. Staff y superusuarios conservan el
+agregado global porque sus decoradores permiten ese alcance.
+
 Fuentes y semántica iniciales:
 
 | Indicador | Fuente | Período | Organización | Semántica |
@@ -128,6 +135,12 @@ Fuentes y semántica iniciales:
 | Personas con asistencia registrada | `Asistencia.persona` distinta | `sesion.fecha` | disciplina | incluye cualquier estado de asistencia |
 | Clases en deuda | `AttendanceConsumption.DEUDA` | `clase_fecha` | asistencia/sesión/disciplina | no incluye `PENDIENTE` |
 | Ingresos contables | `Transaction.INGRESO` | `fecha` | transacción | no suma `Payment` ni documentos |
+
+Cada KPI y su detalle reutilizan los mismos selectores internos de período y
+alcance. Las rutas `/resumen/<indicador>/` no reinterpretan la cifra: paginan el
+conjunto que la compone. En ingresos, el encabezado conserva la suma monetaria y
+la tabla enumera sus transacciones; en personas, el valor es la cantidad de
+personas únicas y cada fila informa cuántos registros aportó.
 
 `Clases disponibles` no forma parte de esta entrega: existe diferencia entre
 saldo por pago y agregaciones acotadas al período. Incorporarlo exige fijar antes

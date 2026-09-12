@@ -9,19 +9,20 @@
     <p class="text-muted mb-0">Lo que ocurrió y lo que requiere atención en {{ periodo_descripcion }}.</p>
   </header>
 
-  {% if dashboard_academico or dashboard_financiero %}
-    <section aria-labelledby="resumen-periodo-titulo" class="mb-4">
+  {% if dashboard_academico or dashboard_financiero or consulta_persona or dashboard_alertas %}
+    {% if dashboard_academico or dashboard_financiero %}
+      <section aria-labelledby="resumen-periodo-titulo" class="mb-4">
       <h2 class="visually-hidden" id="resumen-periodo-titulo">Resumen del período</h2>
       <div class="row g-2 g-lg-3">
         {% if dashboard_academico %}
           <div class="col-6 col-xl-3">
-            <a class="elemental-kpi" href="{% url 'asistencias:dashboard' %}?{{ dashboard_query_global }}">
+            <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'sesiones-completadas' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_academico.sesiones_completadas }}</span>
               <span class="elemental-kpi-label">Sesiones completadas</span>
             </a>
           </div>
           <div class="col-6 col-xl-3">
-            <a class="elemental-kpi" href="{% url 'asistencias:dashboard' %}?{{ dashboard_query_global }}">
+            <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'personas-con-asistencia' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_academico.personas_con_asistencia }}</span>
               <span class="elemental-kpi-label">Personas con asistencia registrada</span>
             </a>
@@ -29,20 +30,21 @@
         {% endif %}
         {% if dashboard_financiero %}
           <div class="col-6 col-xl-3">
-            <a class="elemental-kpi" href="{% url 'finanzas:dashboard' %}?{{ dashboard_query_global }}">
+            <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'clases-en-deuda' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_financiero.clases_en_deuda }}</span>
               <span class="elemental-kpi-label">Clases en deuda</span>
             </a>
           </div>
           <div class="col-6 col-xl-3">
-            <a class="elemental-kpi" href="{% url 'finanzas:dashboard' %}?{{ dashboard_query_global }}">
+            <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'ingresos-contables' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value elemental-kpi-money">{{ dashboard_financiero.ingresos_contables|clp }}</span>
               <span class="elemental-kpi-label">Ingresos contables</span>
             </a>
           </div>
         {% endif %}
       </div>
-    </section>
+      </section>
+    {% endif %}
 
     <div class="row g-3 align-items-start">
       <div class="col-xl-7 order-1">
@@ -132,7 +134,7 @@
           <section class="card elemental-dashboard-panel" aria-labelledby="proximas-titulo">
             <div class="card-body p-3 p-lg-4">
               <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                <h2 class="h4 mb-0" id="proximas-titulo">Próximas sesiones</h2>
+                <h2 class="h4 mb-0" id="proximas-titulo">Próximas sesiones del período</h2>
                 <a class="elemental-dashboard-action small" href="{% url 'asistencias:sesiones_list' %}?{{ dashboard_query_global }}">Ver calendario</a>
               </div>
               {% if dashboard_academico.proximas_sesiones %}

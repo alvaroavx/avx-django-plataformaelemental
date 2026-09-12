@@ -1320,6 +1320,9 @@ def transacciones_list(request):
     organizacion = organizacion_desde_request(request)
     periodo = resolver_periodo(request)
     trans_qs = transacciones_queryset(request, organizacion=organizacion)
+    sin_documento = request.GET.get("sin_documento") == "si"
+    if sin_documento:
+        trans_qs = trans_qs.filter(documentos_tributarios__isnull=True)
     resumen_transacciones_data = resumen_transacciones(trans_qs)
     total_ingresos = resumen_transacciones_data["total_ingresos"] or 0
     total_egresos = resumen_transacciones_data["total_egresos"] or 0
@@ -1346,6 +1349,8 @@ def transacciones_list(request):
         messages.success(request, "Transaccion registrada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
 
+    query_sin_documento = request.GET.copy()
+    query_sin_documento.pop("sin_documento", None)
     context.update(
         {
             "transacciones": trans_qs,
@@ -1355,6 +1360,8 @@ def transacciones_list(request):
             "total_egresos": total_egresos,
             "balance_transacciones": total_ingresos - total_egresos,
             "open_nueva_transaccion": request.GET.get("open") == "nueva_transaccion",
+            "sin_documento": sin_documento,
+            "query_sin_documento": query_sin_documento.urlencode(),
             "ayuda_seccion": _ayuda_finanzas("transacciones"),
         }
     )

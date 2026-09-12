@@ -274,7 +274,10 @@ confirmación solo dentro de su DOM aislado.
   también genera planes, pagos variados y sus transacciones enlazadas mediante
   los servicios canónicos de Finanzas.
 - Tiene preview por defecto, confirmación `--aplicar`, transacción atómica,
-  protección `DEBUG=True`, marcador de datos de prueba e idempotencia.
+  protección `DEBUG=True`, marcador de datos de prueba, fecha de corte e
+  idempotencia validada por contenido.
+- No reactiva relaciones inactivas, no reclasifica relaciones activas existentes
+  y aborta ante bloques o pagos sintéticos que no pueda reconciliar con seguridad.
 - Reutiliza personas y organizaciones por ID; no guarda correos ni crea alumnos.
 - `docs/evidencia/poblado-agosto-20260810/`: preview, aplicación, segunda
   ejecución y verificación del primer escenario cargado.

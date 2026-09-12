@@ -130,6 +130,11 @@ flowchart TD
 ```
 
 ### Flujo De Transacciones
+
+El listado acepta `sin_documento=si` para mostrar únicamente transacciones sin
+documento tributario asociado. El dashboard general usa este filtro al enlazar
+la alerta correspondiente, de modo que el destino presente los casos anunciados
+y recalcule el resumen sobre ese subconjunto.
 Este flujo separa el movimiento financiero real de documentos tributarios y pagos operacionales.
 
 ```mermaid

@@ -1706,6 +1706,53 @@ class FinanzasAccessTests(TestCase):
         self.assertContains(response, "Total transacciones")
         self.assertContains(response, "Balance")
 
+    def test_transacciones_list_filtra_transacciones_sin_documento(self):
+        categoria = Category.objects.create(nombre="Venta sin documento", tipo="ingreso", activa=True)
+        sin_documento = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-05",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=120000,
+            descripcion="Pendiente documental",
+        )
+        con_documento = Transaction.objects.create(
+            organizacion=self.org,
+            categoria=categoria,
+            fecha="2026-02-06",
+            tipo=Transaction.Tipo.INGRESO,
+            monto=30000,
+            descripcion="Documentada",
+        )
+        documento = DocumentoTributario.objects.create(
+            organizacion=self.org,
+            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
+            folio="FILTRO-1",
+            fecha_emision="2026-02-06",
+            nombre_emisor="Emisor",
+            rut_emisor="76.000.000-0",
+            monto_neto=30000,
+            monto_total=30000,
+        )
+        con_documento.documentos_tributarios.add(documento)
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(
+            reverse("finanzas:transacciones_list"),
+            {
+                "periodo_mes": 2,
+                "periodo_anio": 2026,
+                "organizacion": self.org.pk,
+                "sin_documento": "si",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["transacciones"]), [sin_documento])
+        self.assertEqual(response.context["total_transacciones"], 1)
+        self.assertContains(response, "Mostrando únicamente transacciones sin documento asociado")
+        self.assertNotContains(response, "Documentada")
+
     def test_transacciones_list_crea_transaccion_y_auditlog(self):
         categoria = Category.objects.create(nombre="Venta audit", tipo="ingreso", activa=True)
         self.client.force_login(self.user_admin)

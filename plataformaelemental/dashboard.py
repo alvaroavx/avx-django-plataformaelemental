@@ -1,6 +1,9 @@
 from decimal import Decimal
 
-from django.db.models import Count, Sum
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
+from django.db.models import Count, Max, Sum
+from django.http import Http404
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,6 +32,13 @@ def _alcances_por_accion(request, organizacion):
     if request.user.is_superuser or request.user.is_staff:
         return {accion: organizaciones_ids for accion in acciones}
 
+    # Las vistas de detalle de estos dominios exigen una organización concreta
+    # para los roles organizacionales. No construimos un agregado multi-org con
+    # enlaces que después responderían 403 ni elegimos una organización de forma
+    # silenciosa: el usuario debe seleccionar el contexto que quiere operar.
+    if organizacion is None:
+        return {accion: [] for accion in acciones}
+
     persona = getattr(request.user, "persona", None)
     if not persona:
         return {accion: [] for accion in acciones}
@@ -52,17 +62,38 @@ def _query_global(request, **extra):
     params = request.GET.copy()
     params.pop("persona_q", None)
     params.pop("persona_id", None)
+    params.pop("page", None)
     params.update({key: value for key, value in extra.items() if value not in (None, "")})
     return params.urlencode()
 
 
-def _metricas_academicas(request, organizaciones_ids):
-    sesiones = aplicar_periodo(SesionClase.objects.all(), "fecha", request=request).filter(
+def _sesiones_periodo(request, organizaciones_ids):
+    return aplicar_periodo(SesionClase.objects.all(), "fecha", request=request).filter(
         disciplina__organizacion_id__in=organizaciones_ids
     )
-    asistencias = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request).filter(
+
+
+def _asistencias_periodo(request, organizaciones_ids):
+    return aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request).filter(
         sesion__disciplina__organizacion_id__in=organizaciones_ids
     )
+
+
+def _consumos_periodo(request, organizaciones_ids):
+    return aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request).filter(
+        asistencia__sesion__disciplina__organizacion_id__in=organizaciones_ids
+    )
+
+
+def _transacciones_periodo(request, organizaciones_ids):
+    return aplicar_periodo(Transaction.objects.all(), "fecha", request=request).filter(
+        organizacion_id__in=organizaciones_ids
+    )
+
+
+def _metricas_academicas(request, organizaciones_ids):
+    sesiones = _sesiones_periodo(request, organizaciones_ids)
+    asistencias = _asistencias_periodo(request, organizaciones_ids)
     resumen = asistencias.aggregate(
         registros=Count("id"),
         personas=Count("persona_id", distinct=True),
@@ -82,12 +113,8 @@ def _metricas_academicas(request, organizaciones_ids):
 
 
 def _metricas_financieras(request, organizaciones_ids):
-    consumos = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request).filter(
-        asistencia__sesion__disciplina__organizacion_id__in=organizaciones_ids
-    )
-    transacciones = aplicar_periodo(Transaction.objects.all(), "fecha", request=request).filter(
-        organizacion_id__in=organizaciones_ids
-    )
+    consumos = _consumos_periodo(request, organizaciones_ids)
+    transacciones = _transacciones_periodo(request, organizaciones_ids)
     deuda = consumos.filter(estado=AttendanceConsumption.Estado.DEUDA)
     resumen_deuda = deuda.aggregate(clases=Count("id"), personas=Count("persona_id", distinct=True))
     ingresos = (
@@ -105,6 +132,104 @@ def _metricas_financieras(request, organizaciones_ids):
         "ingresos_contables": ingresos,
         "transacciones_sin_documento": transacciones_sin_documento,
     }
+
+
+def _detalle_sesiones(request, organizaciones_ids):
+    registros = (
+        _sesiones_periodo(request, organizaciones_ids)
+        .filter(estado=SesionClase.Estado.COMPLETADA)
+        .select_related("disciplina", "disciplina__organizacion", "bloque")
+        .annotate(asistencias_total=Count("asistencias"))
+        .order_by("-fecha", "disciplina__nombre", "pk")
+    )
+    return {
+        "titulo": "Sesiones completadas",
+        "descripcion": "Sesiones cerradas que componen el indicador del período seleccionado.",
+        "tipo": "sesiones",
+        "registros": registros,
+        "valor": registros.count(),
+    }
+
+
+def _detalle_personas_asistencia(request, organizaciones_ids):
+    registros = (
+        _asistencias_periodo(request, organizaciones_ids)
+        .values("persona_id", "persona__nombres", "persona__apellidos")
+        .annotate(registros_total=Count("id"), ultima_fecha=Max("sesion__fecha"))
+        .order_by("persona__apellidos", "persona__nombres", "persona_id")
+    )
+    return {
+        "titulo": "Personas con asistencia registrada",
+        "descripcion": "Personas únicas con al menos un registro de asistencia en el período.",
+        "tipo": "personas_asistencia",
+        "registros": registros,
+        "valor": registros.count(),
+    }
+
+
+def _detalle_clases_deuda(request, organizaciones_ids):
+    registros = (
+        _consumos_periodo(request, organizaciones_ids)
+        .filter(estado=AttendanceConsumption.Estado.DEUDA)
+        .select_related(
+            "persona",
+            "asistencia__sesion__disciplina",
+            "asistencia__sesion__disciplina__organizacion",
+        )
+        .order_by("-clase_fecha", "persona__apellidos", "persona__nombres", "pk")
+    )
+    return {
+        "titulo": "Clases en deuda",
+        "descripcion": "Consumos de asistencia que permanecen en estado de deuda en el período.",
+        "tipo": "clases_deuda",
+        "registros": registros,
+        "valor": registros.count(),
+    }
+
+
+def _detalle_ingresos(request, organizaciones_ids):
+    registros = (
+        _transacciones_periodo(request, organizaciones_ids)
+        .filter(tipo=Transaction.Tipo.INGRESO)
+        .select_related("organizacion", "categoria")
+        .order_by("-fecha", "-pk")
+    )
+    monto = registros.aggregate(total=Sum("monto"))["total"] or Decimal("0")
+    return {
+        "titulo": "Ingresos contables",
+        "descripcion": "Transacciones de ingreso cuya suma produce el indicador del período.",
+        "tipo": "ingresos",
+        "registros": registros,
+        "valor": monto,
+        "cantidad_registros": registros.count(),
+    }
+
+
+DETALLES_METRICAS = {
+    "sesiones-completadas": (ACCION_ADMINISTRAR_SESIONES, _detalle_sesiones),
+    "personas-con-asistencia": (ACCION_ADMINISTRAR_SESIONES, _detalle_personas_asistencia),
+    "clases-en-deuda": (ACCION_VER_FINANZAS, _detalle_clases_deuda),
+    "ingresos-contables": (ACCION_VER_FINANZAS, _detalle_ingresos),
+}
+
+
+def construir_detalle_metrica(request, *, metrica, organizacion):
+    configuracion = DETALLES_METRICAS.get(metrica)
+    if configuracion is None:
+        raise Http404("El indicador solicitado no existe.")
+    accion, constructor = configuracion
+    organizaciones_ids = _alcances_por_accion(request, organizacion)[accion]
+    if not organizaciones_ids:
+        raise PermissionDenied("No tienes acceso al detalle de este indicador en el contexto seleccionado.")
+
+    detalle = constructor(request, organizaciones_ids)
+    paginator = Paginator(detalle.pop("registros"), 25)
+    detalle["page_obj"] = paginator.get_page(request.GET.get("page"))
+    detalle["paginator"] = paginator
+    detalle["metrica"] = metrica
+    detalle["dashboard_query_global"] = _query_global(request)
+    detalle["volver_url"] = f'{reverse("elemental_apps")}?{_query_global(request)}'
+    return detalle
 
 
 def _consulta_persona(request, organizaciones_ids):
@@ -192,7 +317,7 @@ def construir_dashboard_general(request, *, organizacion):
                 "icono": "bi-file-earmark-excel",
                 "cantidad": financiero["transacciones_sin_documento"],
                 "texto": "transacciones sin documento asociado",
-                "url": f'{reverse("finanzas:transacciones_list")}?{_query_global(request)}',
+                "url": f'{reverse("finanzas:transacciones_list")}?{_query_global(request, sin_documento="si")}',
             }
         )
     if request.user.has_perm("personas.gestionar_solicitudes_acceso"):

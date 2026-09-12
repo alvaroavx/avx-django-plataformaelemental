@@ -59,10 +59,19 @@ def build_navigation(request):
     except Exception:
         organizacion = None
 
-    can_personas = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_PERSONAS, organizacion=organizacion)
-    can_asistencias = usuario_tiene_permiso(user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion)
-    can_jornada = usuario_tiene_permiso(user, ACCION_VER_SESION, organizacion=organizacion)
-    can_finanzas = usuario_tiene_permiso(user, ACCION_VER_FINANZAS, organizacion=organizacion)
+    contexto_operable = organizacion is not None or user.is_staff or user.is_superuser
+    can_personas = contexto_operable and usuario_tiene_permiso(
+        user, ACCION_ADMINISTRAR_PERSONAS, organizacion=organizacion
+    )
+    can_asistencias = contexto_operable and usuario_tiene_permiso(
+        user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion
+    )
+    can_jornada = contexto_operable and usuario_tiene_permiso(
+        user, ACCION_VER_SESION, organizacion=organizacion
+    )
+    can_finanzas = contexto_operable and usuario_tiene_permiso(
+        user, ACCION_VER_FINANZAS, organizacion=organizacion
+    )
     can_gestionar_solicitudes = settings.ACCESS_REQUESTS_ENABLED and user.has_perm(
         "personas.gestionar_solicitudes_acceso"
     )

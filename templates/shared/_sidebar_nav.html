@@ -1,17 +1,22 @@
 {% load static %}
 <div class="p-3">
-  <a class="elemental-brand d-flex align-items-center gap-2 mb-4" href="{% url 'elemental_apps' %}">
-    <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
-    <span class="fw-bold">Elemental Apps</span>
-  </a>
+  {% if not hide_sidebar_brand %}
+    <a class="elemental-brand d-flex align-items-center gap-2 mb-4" href="{% url 'elemental_apps' %}" title="Elemental Apps">
+      <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
+      <span class="fw-bold">Elemental Apps</span>
+    </a>
+  {% endif %}
   <nav class="d-flex flex-column gap-1" aria-label="Navegación principal">
     {% for item in elemental_nav_items %}
       {% if item.children %}
         <div class="elemental-nav-heading {% if item.active %}active{% endif %}">
           <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
         </div>
-        <a class="elemental-nav-collapsed-link {% if item.active %}active{% endif %}" href="{{ item.url }}" title="{{ item.label }}">
+        <a class="elemental-nav-collapsed-link {% if item.active %}active{% endif %}" href="{{ item.url }}" title="{{ item.label }}" {% if item.active %}aria-current="location"{% endif %}>
           <i class="bi {{ item.icon }}" aria-hidden="true"></i><span class="visually-hidden">{{ item.label }}</span>
+          {% for child in item.children %}
+            {% if child.badge %}<span class="elemental-nav-rail-badge" aria-label="{{ child.badge }} solicitudes pendientes">{{ child.badge }}</span>{% endif %}
+          {% endfor %}
         </a>
         <div class="d-flex flex-column mb-2" role="group" aria-label="{{ item.label }}">
           {% for child in item.children %}
@@ -22,8 +27,9 @@
           {% endfor %}
         </div>
       {% else %}
-        <a class="elemental-nav-link {% if item.active %}active{% endif %}" href="{{ item.url }}" {% if item.current %}aria-current="page"{% endif %}>
+        <a class="elemental-nav-link {% if item.active %}active{% endif %}" href="{{ item.url }}" title="{{ item.label }}" aria-label="{{ item.label }}" {% if item.current %}aria-current="page"{% elif item.active %}aria-current="location"{% endif %}>
           <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
+          {% if item.badge %}<span class="elemental-nav-rail-badge" aria-label="{{ item.badge }} solicitudes pendientes">{{ item.badge }}</span>{% endif %}
         </a>
       {% endif %}
     {% endfor %}

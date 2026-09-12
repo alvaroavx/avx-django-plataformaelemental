@@ -24,6 +24,17 @@ La primera entrega incluye, según permisos y organizaciones visibles:
 - hasta tres sesiones futuras no canceladas;
 - consulta acotada de persona para administradores de Personas.
 
+Los cuatro indicadores principales no enlazan a índices genéricos. Cada uno abre
+un detalle paginado construido desde el mismo queryset que produce su cifra:
+
+- sesiones completadas muestra exclusivamente esas sesiones;
+- personas con asistencia agrupa personas únicas e indica cantidad y último registro;
+- clases en deuda muestra cada consumo que permanece en deuda;
+- ingresos contables muestra las transacciones de ingreso cuya suma produce el total.
+
+El detalle conserva período, organización y permisos, explicita la definición
+del indicador y permite volver al resumen sin perder el contexto.
+
 La consulta conserva período y organización. Distingue pagos operacionales de
 ingresos contables y no muestra todavía saldo de clases: las superficies actuales
 usan cortes temporales diferentes para ese concepto. Profesor puro conserva su
@@ -51,6 +62,9 @@ Desktop:
 - sidebar izquierdo expandido o contraído mediante un control visible de 44 px
 - la preferencia se conserva localmente en `elemental-sidebar-collapsed`
 - el rail contraído muestra Inicio y un acceso primario inequívoco por dominio
+- los enlaces compactos conservan nombre accesible, contexto activo y badges
+- el control permanece disponible al desplazar el menú y el estado guardado se
+  aplica antes de habilitar la transición visual
 - nombre `Elemental Apps`
 - Inicio como destino independiente
 - dominios visibles como encabezados no clickeables
@@ -78,7 +92,7 @@ La parte superior del area principal contiene:
 
 Los filtros conservan parametros adicionales del querystring y se autoaplican al cambiar.
 
-Si la organizacion seleccionada es `Todas`, la barra muestra `Elemental Apps` y no muestra logo de ninguna organizacion.
+Si la organizacion seleccionada es `Todas`, la barra muestra `Elemental Apps` y no muestra logo de ninguna organizacion. Staff y superusuarios pueden operar agregados globales; los roles acotados a organizaciones deben seleccionar una antes de recibir navegación y métricas operativas.
 
 El logo de organizacion vive en `Organizacion.logo`, es opcional y se administra inicialmente desde Django Admin.
 

@@ -22,6 +22,7 @@ personales en el código:
 ```bash
 python manage.py poblar_mes_pruebas \
   --anio 2026 --mes 8 \
+  --fecha-corte 2026-08-31 \
   --organizacion-elementos-id 1 --organizacion-latin-id 2 \
   --profesor-lyra-id 10 --profesor-latin-id 3 --profesor-circo-id 2
 ```
@@ -33,6 +34,17 @@ genera su `AttendanceConsumption`, cada pago genera exactamente una
 `Transaction` y los pagos se imputan contra deudas del mismo período y
 organización. Los montos, clases y métodos de pago varían para conservar casos
 con consumo, saldo y deuda.
+
+`--fecha-corte` impide declarar sesiones, asistencias o pagos posteriores a una
+fecha conocida. Si se omite, usa la fecha local acotada al período: para meses
+pasados usa su último día y para el mes vigente usa hoy. Las sesiones posteriores
+quedan programadas y sin asistencias; los pagos posteriores no se crean.
+
+El poblador preserva asignaciones y matrículas activas existentes sin cambiar su
+origen. Si encuentra una relación inactiva o un bloque horario compatible que no
+puede acreditar como propio, aborta toda la transacción. La idempotencia además
+valida que los pagos sintéticos existentes conserven el contrato esperado; no
+sobrescribe divergencias ni elimina pagos sobrantes automáticamente.
 
 El escenario base produce:
 

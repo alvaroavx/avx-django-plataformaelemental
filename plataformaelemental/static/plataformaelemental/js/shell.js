@@ -24,6 +24,9 @@
     collapsed = false;
   }
   applyCollapsed(collapsed);
+  window.requestAnimationFrame(function () {
+    body.classList.add("elemental-sidebar-ready");
+  });
 
   button.addEventListener("click", function () {
     collapsed = !body.classList.contains("elemental-sidebar-collapsed");

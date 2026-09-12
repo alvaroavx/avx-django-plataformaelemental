@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
 from personas.models import Organizacion, Persona, PersonaRol
 from finanzas.models import Payment, PaymentPlan
@@ -37,6 +38,14 @@ class Command(BaseCommand):
         parser.add_argument("--profesor-circo-id", type=int, required=True)
         parser.add_argument("--disciplina-circo", default="Tela Aérea")
         parser.add_argument(
+            "--fecha-corte",
+            type=date.fromisoformat,
+            help=(
+                "Fecha máxima que puede declararse operada, en formato AAAA-MM-DD. "
+                "Por defecto usa la fecha local de ejecución, acotada al período."
+            ),
+        )
+        parser.add_argument(
             "--aplicar",
             action="store_true",
             help="Escribe los datos. Sin esta opción solo muestra el plan.",
@@ -54,6 +63,11 @@ class Command(BaseCommand):
             date(anio, mes, 1)
         except ValueError as exc:
             raise CommandError("El año y mes no forman un período válido.") from exc
+        inicio_mes = date(anio, mes, 1)
+        fin_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
+        fecha_corte = min(options.get("fecha_corte") or timezone.localdate(), fin_mes)
+        if fecha_corte < inicio_mes:
+            fecha_corte = inicio_mes.fromordinal(inicio_mes.toordinal() - 1)
 
         elementos = self._organizacion(options["organizacion_elementos_id"])
         latin = self._organizacion(options["organizacion_latin_id"])
@@ -118,6 +132,7 @@ class Command(BaseCommand):
         plan = {
             "modo": "aplicar" if options["aplicar"] else "preview",
             "periodo": f"{anio}-{mes:02d}",
+            "fecha_corte": fecha_corte.isoformat(),
             "disciplina_circo": options["disciplina_circo"],
             "sesiones_previstas": sum(
                 len(self._fechas_mes(anio, mes, escenario["dia_semana"]))
@@ -126,9 +141,22 @@ class Command(BaseCommand):
             "asistencias_previstas": sum(
                 cantidad
                 for escenario in escenarios
-                for _estado, cantidad in escenario["patron"]
+                for indice, fecha in enumerate(
+                    self._fechas_mes(anio, mes, escenario["dia_semana"])
+                )
+                for _estado, cantidad in [
+                    escenario["patron"][indice]
+                    if indice < len(escenario["patron"]) and fecha <= fecha_corte
+                    else (SesionClase.Estado.PROGRAMADA, 0)
+                ]
             ),
-            "pagos_previstos": sum(min(6, len(escenario["estudiantes"])) for escenario in escenarios),
+            "pagos_previstos": sum(
+                sum(
+                    self._fecha_pago(anio, mes, posicion) <= fecha_corte
+                    for posicion, _estudiante in enumerate(escenario["estudiantes"][:6])
+                )
+                for escenario in escenarios
+            ),
         }
         if not options["aplicar"]:
             self.stdout.write(json.dumps(plan, ensure_ascii=False, indent=2))
@@ -141,8 +169,8 @@ class Command(BaseCommand):
                 options["disciplina_circo"],
             )
             escenarios[2]["disciplina"] = disciplina_circo
-            resultado = self._aplicar_escenarios(escenarios, anio, mes)
-            resultado.update(self._aplicar_pagos(escenarios, anio, mes))
+            resultado = self._aplicar_escenarios(escenarios, anio, mes, fecha_corte)
+            resultado.update(self._aplicar_pagos(escenarios, anio, mes, fecha_corte))
 
         self.stdout.write(json.dumps(plan | resultado, ensure_ascii=False, indent=2))
         self.stdout.write(self.style.SUCCESS("Mes de pruebas poblado correctamente."))
@@ -248,21 +276,32 @@ class Command(BaseCommand):
 
     def _bloque(self, escenario):
         disciplina = escenario["disciplina"]
-        existente = (
-            BloqueHorario.objects.filter(
-                organizacion=escenario["organizacion"],
-                disciplina=disciplina,
-                dia_semana=escenario["dia_semana"],
-            )
-            .order_by("hora_inicio", "pk")
-            .first()
+        coincidencias = BloqueHorario.objects.filter(
+            organizacion=escenario["organizacion"],
+            disciplina=disciplina,
+            dia_semana=escenario["dia_semana"],
+            hora_inicio=escenario["hora_inicio"],
+            hora_fin=escenario["hora_fin"],
         )
+        if coincidencias.count() > 1:
+            raise CommandError(
+                f"Hay más de un bloque compatible con el escenario {escenario['codigo']}."
+            )
+        existente = coincidencias.first()
         if existente:
+            administrado = SesionClase.objects.filter(
+                bloque=existente,
+                notas__contains=MARCADOR,
+            ).exists()
+            if not administrado:
+                raise CommandError(
+                    f"El bloque compatible {existente.pk} no pertenece al poblador; no se reutilizó."
+                )
             return existente, False
         return BloqueHorario.objects.get_or_create(
             organizacion=escenario["organizacion"],
             disciplina=disciplina,
-            nombre=escenario["bloque_nombre"],
+            nombre=f"{MARCADOR} {escenario['bloque_nombre']}",
             defaults={
                 "dia_semana": escenario["dia_semana"],
                 "hora_inicio": escenario["hora_inicio"],
@@ -270,41 +309,55 @@ class Command(BaseCommand):
             },
         )
 
-    def _aplicar_escenarios(self, escenarios, anio, mes):
+    def _aplicar_escenarios(self, escenarios, anio, mes, fecha_corte):
         conteos = {
             "sesiones_creadas": 0,
             "sesiones_actualizadas": 0,
             "sesiones_omitidas_por_conflicto": 0,
             "asistencias_creadas": 0,
             "asistencias_actualizadas": 0,
+            "asistencias_eliminadas": 0,
             "matriculas_creadas": 0,
             "bloques_creados": 0,
         }
         detalle = []
         for escenario in escenarios:
             disciplina = escenario["disciplina"]
-            asignacion, _ = AsignacionProfesorDisciplina.objects.update_or_create(
+            asignacion = AsignacionProfesorDisciplina.objects.filter(
                 disciplina=disciplina,
                 profesor=escenario["profesor"],
-                defaults={
-                    "activa": True,
-                    "origen": AsignacionProfesorDisciplina.Origen.EXPLICITA,
-                },
-            )
-            if not asignacion.activa:
-                raise CommandError("No se pudo activar la asignación del profesor.")
+            ).first()
+            if asignacion and not asignacion.activa:
+                raise CommandError(
+                    "Existe una asignación inactiva ajena al poblador; no se reactivó automáticamente."
+                )
+            if asignacion is None:
+                asignacion = AsignacionProfesorDisciplina.objects.create(
+                    disciplina=disciplina,
+                    profesor=escenario["profesor"],
+                    activa=True,
+                    origen=AsignacionProfesorDisciplina.Origen.EXPLICITA,
+                )
             bloque, bloque_creado = self._bloque(escenario)
             conteos["bloques_creados"] += int(bloque_creado)
 
             for estudiante in escenario["estudiantes"]:
-                _matricula, creada = AlumnoDisciplina.objects.update_or_create(
+                matricula = AlumnoDisciplina.objects.filter(
                     disciplina=disciplina,
                     alumno=estudiante,
-                    defaults={
-                        "activa": True,
-                        "origen": AlumnoDisciplina.Origen.EXPLICITA,
-                    },
-                )
+                ).first()
+                if matricula and not matricula.activa:
+                    raise CommandError(
+                        "Existe una matrícula inactiva ajena al poblador; no se reactivó automáticamente."
+                    )
+                creada = matricula is None
+                if creada:
+                    AlumnoDisciplina.objects.create(
+                        disciplina=disciplina,
+                        alumno=estudiante,
+                        activa=True,
+                        origen=AlumnoDisciplina.Origen.EXPLICITA,
+                    )
                 conteos["matriculas_creadas"] += int(creada)
 
             sesiones_escenario = []
@@ -315,6 +368,8 @@ class Command(BaseCommand):
                     if indice < len(escenario["patron"])
                     else (SesionClase.Estado.PROGRAMADA, 0)
                 )
+                if fecha > fecha_corte:
+                    estado, cantidad = SesionClase.Estado.PROGRAMADA, 0
                 nota = f"{MARCADOR} {anio}-{mes:02d} · {escenario['codigo']}"
                 existentes = SesionClase.objects.filter(disciplina=disciplina, fecha=fecha).order_by("pk")
                 if existentes.count() > 1:
@@ -345,7 +400,15 @@ class Command(BaseCommand):
                     conteos["sesiones_creadas"] += 1
                 sesion.profesores.add(escenario["profesor"])
 
-                for posicion, estudiante in enumerate(escenario["estudiantes"][:cantidad]):
+                estudiantes_esperados = escenario["estudiantes"][:cantidad]
+                esperados_ids = {estudiante.pk for estudiante in estudiantes_esperados}
+                obsoletas = Asistencia.objects.filter(
+                    sesion=sesion,
+                    comentario__contains=MARCADOR,
+                ).exclude(persona_id__in=esperados_ids)
+                conteos["asistencias_eliminadas"] += obsoletas.count()
+                obsoletas.delete()
+                for posicion, estudiante in enumerate(estudiantes_esperados):
                     estado_asistencia = Asistencia.Estado.PRESENTE
                     if posicion == cantidad - 1:
                         estado_asistencia = Asistencia.Estado.JUSTIFICADA
@@ -408,7 +471,11 @@ class Command(BaseCommand):
             activo=True,
         ), True
 
-    def _aplicar_pagos(self, escenarios, anio, mes):
+    def _fecha_pago(self, anio, mes, posicion):
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        return date(anio, mes, min(5 + posicion * 3, ultimo_dia))
+
+    def _aplicar_pagos(self, escenarios, anio, mes, fecha_corte):
         conteos = {
             "planes_creados": 0,
             "pagos_creados": 0,
@@ -424,7 +491,7 @@ class Command(BaseCommand):
             Payment.Metodo.TARJETA,
             Payment.Metodo.OTRO,
         )
-        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        claves_esperadas = set()
 
         for escenario in escenarios:
             organizacion = escenario["organizacion"]
@@ -435,11 +502,33 @@ class Command(BaseCommand):
             plan = planes[organizacion.pk]
 
             for posicion, estudiante in enumerate(escenario["estudiantes"][:6]):
+                fecha_pago = self._fecha_pago(anio, mes, posicion)
+                if fecha_pago > fecha_corte:
+                    continue
                 clave = f"datos-prueba-{anio}-{mes:02d}-{escenario['codigo']}-{estudiante.pk}"
+                claves_esperadas.add(clave)
                 existente = Payment.objects.filter(clave_idempotencia=clave).first()
                 if existente:
-                    if existente.organizacion_id != organizacion.pk or existente.persona_id != estudiante.pk:
-                        raise CommandError(f"La clave sintética {clave} está asociada a otro pago.")
+                    valores_esperados = {
+                        "organizacion_id": organizacion.pk,
+                        "persona_id": estudiante.pk,
+                        "plan_id": plan.pk,
+                        "disciplina_id": escenario["disciplina"].pk,
+                        "fecha_pago": fecha_pago,
+                        "metodo_pago": metodos[posicion % len(metodos)],
+                        "monto_referencia": Decimal(montos_variados[posicion]),
+                        "clases_asignadas": clases_variadas[posicion],
+                    }
+                    divergentes = [
+                        campo
+                        for campo, esperado in valores_esperados.items()
+                        if getattr(existente, campo) != esperado
+                    ]
+                    if divergentes:
+                        raise CommandError(
+                            f"El pago sintético {clave} fue modificado ({', '.join(divergentes)}); "
+                            "no se sobrescribió."
+                        )
                     pago = existente
                     conteos["pagos_existentes"] += 1
                 else:
@@ -449,7 +538,7 @@ class Command(BaseCommand):
                             organizacion=organizacion,
                             plan=plan,
                             disciplina=escenario["disciplina"],
-                            fecha_pago=date(anio, mes, min(5 + posicion * 3, ultimo_dia)),
+                            fecha_pago=fecha_pago,
                             metodo_pago=metodos[posicion % len(metodos)],
                             aplica_iva=not organizacion.es_exenta_iva,
                             monto_referencia=Decimal(montos_variados[posicion]),
@@ -461,4 +550,15 @@ class Command(BaseCommand):
                     )
                     conteos["pagos_creados"] += 1
                 conteos["deudas_imputadas"] += imputar_pago_a_deudas(pago)
+        prefijo = f"datos-prueba-{anio}-{mes:02d}-"
+        organizaciones_ids = {escenario["organizacion"].pk for escenario in escenarios}
+        sobrantes = Payment.objects.filter(
+            organizacion_id__in=organizaciones_ids,
+            clave_idempotencia__startswith=prefijo,
+        ).exclude(clave_idempotencia__in=claves_esperadas)
+        if sobrantes.exists():
+            raise CommandError(
+                "Existen pagos sintéticos del período fuera del escenario o posteriores a la fecha de corte; "
+                "no se eliminaron automáticamente."
+            )
         return conteos

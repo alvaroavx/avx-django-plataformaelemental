@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -6,7 +7,7 @@ from django.utils import timezone
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from auditoria.models import AuditLog
 from finanzas.models import AttendanceConsumption, Category, DocumentoTributario, Payment, Transaction
-from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
 
 
 TEST_PASSWORD = "not-a-real-test-password"
@@ -125,13 +126,47 @@ class ElementalAppsUXTests(TestCase):
 
     def test_dashboard_general_finanzas_no_ve_admin_ni_personas(self):
         self.client.force_login(self.user_finanzas)
-        response = self.client.get(reverse("elemental_apps"))
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"organizacion": self.organizacion.pk},
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Finanzas")
         self.assertNotContains(response, "Admin")
         self.assertNotContains(response, "Personas")
         self.assertNotContains(response, "Asistencias")
+
+    def test_rol_organizacional_sin_organizacion_no_recibe_enlaces_que_responden_403(self):
+        self.client.force_login(self.user_admin)
+
+        response = self.client.get(reverse("elemental_apps"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["dashboard_academico"])
+        self.assertIsNone(response.context["dashboard_financiero"])
+        self.assertNotContains(response, reverse("asistencias:dashboard"))
+        self.assertNotContains(response, reverse("finanzas:dashboard"))
+        self.assertNotContains(response, reverse("personas:personas_list"))
+        self.assertContains(response, "Revisa la organización seleccionada")
+
+    @override_settings(ACCESS_REQUESTS_ENABLED=True)
+    def test_gestor_solo_de_solicitudes_ve_pendiente_en_home(self):
+        User = get_user_model()
+        gestor = User.objects.create_user("gestor_solicitudes_home", password=TEST_PASSWORD)
+        gestor.user_permissions.add(Permission.objects.get(codename="gestionar_solicitudes_acceso"))
+        SolicitudAcceso.objects.create(
+            provider="google",
+            provider_subject="solicitud-home-pendiente",
+            email="pendiente.home@example.com",
+        )
+        self.client.force_login(gestor)
+
+        response = self.client.get(reverse("elemental_apps"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "solicitudes de acceso pendientes")
+        self.assertContains(response, reverse("personas:solicitudes_acceso_list"))
 
     def test_dashboard_general_profesor_redirige_a_operacion_acotada(self):
         self.client.force_login(self.user_profesor)
@@ -175,6 +210,7 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Sesiones")
         self.assertContains(response, "data-elemental-sidebar-toggle", html=False)
         self.assertContains(response, "plataformaelemental/js/shell.js")
+        self.assertContains(response, 'aria-label="Elemental Apps"', html=False)
         self.assertContains(response, reverse("asistencias:sesiones_list"))
         self.assertContains(response, reverse("finanzas:pagos_list"))
 
@@ -201,14 +237,31 @@ class ElementalAppsUXTests(TestCase):
         AttendanceConsumption.objects.filter(asistencia=asistencia).update(
             estado=AttendanceConsumption.Estado.DEUDA,
         )
+        otra_sesion = SesionClase.objects.create(
+            disciplina=disciplina,
+            fecha="2026-02-19",
+            estado=SesionClase.Estado.COMPLETADA,
+        )
+        otra_asistencia = Asistencia.objects.create(sesion=otra_sesion, persona=estudiante)
+        AttendanceConsumption.objects.filter(asistencia=otra_asistencia).update(
+            estado=AttendanceConsumption.Estado.CONSUMIDO,
+        )
         categoria = Category.objects.create(nombre="Ingreso MVP", tipo=Category.Tipo.INGRESO)
-        Transaction.objects.create(
+        ingreso = Transaction.objects.create(
             organizacion=self.organizacion,
             categoria=categoria,
             fecha="2026-02-13",
             tipo=Transaction.Tipo.INGRESO,
             monto=25000,
             descripcion="Ingreso dashboard",
+        )
+        Transaction.objects.create(
+            organizacion=self.organizacion,
+            categoria=categoria,
+            fecha="2026-02-14",
+            tipo=Transaction.Tipo.EGRESO,
+            monto=7000,
+            descripcion="Egreso que no compone el indicador",
         )
         self.client.force_login(self.user_admin)
 
@@ -218,12 +271,68 @@ class ElementalAppsUXTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["dashboard_academico"]["sesiones_completadas"], 1)
+        self.assertEqual(response.context["dashboard_academico"]["sesiones_completadas"], 2)
         self.assertEqual(response.context["dashboard_academico"]["personas_con_asistencia"], 1)
         self.assertEqual(response.context["dashboard_financiero"]["clases_en_deuda"], 1)
         self.assertEqual(response.context["dashboard_financiero"]["ingresos_contables"], 25000)
         self.assertContains(response, "Personas con asistencia registrada")
         self.assertContains(response, "Ingresos contables")
+
+        parametros = {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk}
+        detalle_sesiones = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["sesiones-completadas"]),
+            parametros,
+        )
+        self.assertEqual(detalle_sesiones.status_code, 200)
+        self.assertEqual(detalle_sesiones.context["valor"], 2)
+        self.assertEqual(list(detalle_sesiones.context["page_obj"]), [otra_sesion, sesion])
+
+        detalle_personas = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["personas-con-asistencia"]),
+            parametros,
+        )
+        self.assertEqual(detalle_personas.status_code, 200)
+        self.assertEqual(detalle_personas.context["valor"], 1)
+        persona_fila = list(detalle_personas.context["page_obj"])[0]
+        self.assertEqual(persona_fila["persona_id"], estudiante.pk)
+        self.assertEqual(persona_fila["registros_total"], 2)
+
+        detalle_deuda = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["clases-en-deuda"]),
+            parametros,
+        )
+        self.assertEqual(detalle_deuda.status_code, 200)
+        self.assertEqual(detalle_deuda.context["valor"], 1)
+        self.assertEqual(list(detalle_deuda.context["page_obj"])[0].asistencia_id, asistencia.pk)
+
+        detalle_ingresos = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["ingresos-contables"]),
+            parametros,
+        )
+        self.assertEqual(detalle_ingresos.status_code, 200)
+        self.assertEqual(detalle_ingresos.context["valor"], 25000)
+        self.assertEqual(detalle_ingresos.context["cantidad_registros"], 1)
+        self.assertEqual(list(detalle_ingresos.context["page_obj"]), [ingreso])
+        self.assertContains(
+            response,
+            reverse("elemental_apps_detalle_metrica", args=["sesiones-completadas"]),
+        )
+
+    def test_detalle_metrica_rechaza_tipo_desconocido_y_permiso_ajeno(self):
+        self.client.force_login(self.user_finanzas)
+        parametros = {"organizacion": self.organizacion.pk}
+
+        desconocida = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["no-existe"]),
+            parametros,
+        )
+        academica = self.client.get(
+            reverse("elemental_apps_detalle_metrica", args=["sesiones-completadas"]),
+            parametros,
+        )
+
+        self.assertEqual(desconocida.status_code, 404)
+        self.assertEqual(academica.status_code, 403)
 
     def test_consulta_persona_no_expone_otra_organizacion(self):
         otra_organizacion = Organizacion.objects.create(

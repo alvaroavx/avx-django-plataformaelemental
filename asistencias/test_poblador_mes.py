@@ -1,4 +1,5 @@
 from io import StringIO
+from datetime import date
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -115,6 +116,50 @@ class PoblarMesPruebasTests(TestCase):
         self.assertEqual(Asistencia.objects.filter(comentario__contains=MARCADOR).count(), 25)
         self.assertEqual(Payment.objects.filter(observaciones__contains=MARCADOR).count(), 18)
         self.assertEqual(Transaction.objects.filter(pago_operacional__observaciones__contains=MARCADOR).count(), 18)
+
+    def test_fecha_corte_no_declara_operacion_futura(self):
+        opciones = self.opciones() | {"anio": 2026, "mes": 9, "fecha_corte": date(2026, 9, 11)}
+
+        salida = StringIO()
+        call_command("poblar_mes_pruebas", aplicar=True, stdout=salida, **opciones)
+
+        self.assertIn('"fecha_corte": "2026-09-11"', salida.getvalue())
+        self.assertEqual(Asistencia.objects.filter(comentario__contains=MARCADOR).count(), 22)
+        self.assertFalse(
+            Asistencia.objects.filter(
+                comentario__contains=MARCADOR,
+                sesion__fecha__gt=date(2026, 9, 11),
+            ).exists()
+        )
+        self.assertFalse(
+            SesionClase.objects.filter(
+                notas__contains=MARCADOR,
+                fecha__gt=date(2026, 9, 11),
+            ).exclude(estado=SesionClase.Estado.PROGRAMADA).exists()
+        )
+        self.assertEqual(Payment.objects.filter(observaciones__contains=MARCADOR).count(), 9)
+        self.assertFalse(
+            Payment.objects.filter(
+                observaciones__contains=MARCADOR,
+                fecha_pago__gt=date(2026, 9, 11),
+            ).exists()
+        )
+
+    def test_no_reactiva_asignacion_preexistente_inactiva(self):
+        asignacion = AsignacionProfesorDisciplina.objects.create(
+            disciplina=self.lyra,
+            profesor=self.evelyn,
+            activa=False,
+            origen=AsignacionProfesorDisciplina.Origen.HISTORICA,
+        )
+
+        with self.assertRaisesMessage(CommandError, "asignación inactiva"):
+            call_command("poblar_mes_pruebas", aplicar=True, stdout=StringIO(), **self.opciones())
+
+        asignacion.refresh_from_db()
+        self.assertFalse(asignacion.activa)
+        self.assertEqual(asignacion.origen, AsignacionProfesorDisciplina.Origen.HISTORICA)
+        self.assertFalse(SesionClase.objects.filter(notas__contains=MARCADOR).exists())
 
     @override_settings(DEBUG=False)
     def test_rechaza_entorno_sin_debug(self):

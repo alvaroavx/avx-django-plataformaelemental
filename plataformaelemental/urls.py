@@ -28,7 +28,7 @@ from personas.auth_views import (
     inicio_google,
 )
 from asistencias.forms import CustomLoginForm
-from .views import elemental_apps
+from .views import detalle_metrica, elemental_apps
 from django.utils.translation import gettext_lazy as _
 
 admin.site.site_header = _("Administración Plataforma Elemental")
@@ -37,6 +37,7 @@ admin.site.index_title = _("Gestión de operaciones")
 
 urlpatterns = [
     path("", elemental_apps, name="elemental_apps"),
+    path("resumen/<slug:metrica>/", detalle_metrica, name="elemental_apps_detalle_metrica"),
     path(
         "favicon.ico",
         RedirectView.as_view(url=f"{settings.STATIC_URL}img/isotipo-negro.png", permanent=False),
