@@ -46,6 +46,38 @@
       </section>
     {% endif %}
 
+    {% if dashboard_academico %}
+      <section class="card elemental-dashboard-panel mb-3" aria-labelledby="jornada-hoy-titulo">
+        <div class="card-body p-3 p-lg-4">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+              <div class="text-muted small text-uppercase fw-semibold">Jornada de hoy</div>
+              <h2 class="h4 mb-0" id="jornada-hoy-titulo">{{ dashboard_academico.fecha_hoy|date:'l d \d\e F'|capfirst }}</h2>
+            </div>
+            <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:asistencias_list' %}?{{ dashboard_query_global }}">Gestionar sesiones</a>
+          </div>
+          {% if dashboard_academico.sesiones_hoy %}
+            <div class="row g-2">
+              {% for sesion in dashboard_academico.sesiones_hoy %}
+                <div class="col-md-6 col-xl-4">
+                  <a class="elemental-today-session" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ dashboard_query_global }}">
+                    <span class="d-flex justify-content-between gap-2">
+                      <strong>{{ sesion.disciplina.nombre }}</strong>
+                      <span class="badge text-bg-{% if sesion.estado == 'completada' %}success{% elif sesion.estado == 'cancelada' %}secondary{% elif sesion.estado == 'abierta' %}warning{% else %}info{% endif %}">{{ sesion.get_estado_display }}</span>
+                    </span>
+                    <span class="small text-muted">{{ sesion.disciplina.organizacion.nombre }} · {% if sesion.bloque %}{{ sesion.bloque.hora_inicio|time:'H:i' }}–{{ sesion.bloque.hora_fin|time:'H:i' }}{% else %}Horario pendiente{% endif %}</span>
+                    <span class="small">{% for profesor in sesion.profesores.all %}{{ profesor }}{% if not forloop.last %}, {% endif %}{% empty %}Sin profesor asignado{% endfor %} · {{ sesion.asistencias_total }} asistentes</span>
+                  </a>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="mb-0 text-muted">No hay sesiones programadas para hoy en este contexto.</p>
+          {% endif %}
+        </div>
+      </section>
+    {% endif %}
+
     <div class="row g-3 align-items-start">
       <div class="{% if consulta_persona.persona %}col-12{% else %}col-xl-7{% endif %} order-1">
         <section class="card elemental-dashboard-panel" aria-labelledby="atencion-titulo">

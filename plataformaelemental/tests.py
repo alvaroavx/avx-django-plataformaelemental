@@ -78,6 +78,8 @@ class ElementalAppsUXTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Elemental Apps")
         self.assertContains(response, "Plataforma Elemental")
+        self.assertContains(response, ':root[data-theme="dark"] .login-page', html=False)
+        self.assertContains(response, "login-google-button", html=False)
 
     @override_settings(GOOGLE_AUTH_ENFORCED=False)
     def test_login_post_valido_respeta_next(self):
@@ -195,6 +197,8 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "periodo_mes=3")
         self.assertContains(response, "periodo_anio=2026")
         self.assertContains(response, f"organizacion={self.organizacion.pk}")
+        self.assertContains(response, "data-elemental-theme-toggle", html=False)
+        self.assertContains(response, 'localStorage.getItem("elemental-theme")', html=False)
 
     def test_sidebar_usa_dominios_como_encabezados_y_marca_pagina_actual(self):
         self.client.force_login(self.user_admin)
@@ -216,6 +220,10 @@ class ElementalAppsUXTests(TestCase):
         self.assertNotContains(response, 'id="elementalSidebarLabel"', html=False)
         self.assertContains(response, reverse("asistencias:sesiones_list"))
         self.assertContains(response, reverse("finanzas:pagos_list"))
+        sesiones_nav = next(
+            item for item in response.context["elemental_nav_items"] if item["label"] == "Sesiones"
+        )
+        self.assertNotIn("Hoy", [item["label"] for item in sesiones_nav["children"]])
 
     def test_dashboard_general_calcula_metricas_con_semantica_explicita(self):
         estudiante = Persona.objects.create(
@@ -473,6 +481,10 @@ class ElementalAppsUXTests(TestCase):
         proximas = list(response.context["dashboard_academico"]["proximas_sesiones"])
         self.assertIn(programada, proximas)
         self.assertNotIn(completada, proximas)
+        sesiones_hoy = response.context["dashboard_academico"]["sesiones_hoy"]
+        self.assertIn(programada, sesiones_hoy)
+        self.assertIn(completada, sesiones_hoy)
+        self.assertContains(response, "Jornada de hoy")
 
     def test_topbar_muestra_logo_de_organizacion_seleccionada(self):
         self.organizacion.logo = "organizaciones/logos/org-ux.png"

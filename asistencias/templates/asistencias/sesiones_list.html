@@ -2,7 +2,7 @@
 {% block title %}Calendario{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
     <h2>
       {% if mostrar_calendario %}
         Calendario - {{ mes_actual|date:"F Y" }}
@@ -10,7 +10,7 @@
         Calendario - {{ periodo_descripcion_vista }}
       {% endif %}
     </h2>
-    <div class="d-flex flex-wrap gap-2 justify-content-end">
+    <div class="elemental-page-actions justify-content-md-end" aria-label="Acciones del calendario">
       <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
         <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
       </a>
@@ -31,9 +31,58 @@
     </div>
   {% endif %}
   {% if mostrar_calendario %}
-    <div class="table-responsive">
-      <table class="table table-bordered align-middle">
-        <thead class="table-light">
+    <div class="d-md-none mb-3">
+      <button class="btn btn-outline-primary w-100" type="button" data-calendar-view-toggle aria-pressed="false">
+        <i class="bi bi-calendar3" aria-hidden="true"></i>
+        <span data-calendar-view-label>Ver mes</span>
+      </button>
+    </div>
+
+    <div class="elemental-calendar-week-view d-md-none" data-calendar-week-view>
+      <p class="small text-muted mb-2" id="calendar-swipe-help">Desliza horizontalmente para cambiar de semana.</p>
+      <div class="elemental-calendar-weeks" data-calendar-weeks data-initial-week="{{ semana_inicial }}" tabindex="0" aria-describedby="calendar-swipe-help">
+        {% for semana in semanas %}
+          <section class="elemental-calendar-week" aria-label="Semana del {{ semana.0.fecha|date:'d/m' }} al {{ semana.6.fecha|date:'d/m' }}">
+            <div class="elemental-calendar-week-heading">
+              Semana del {{ semana.0.fecha|date:"d M" }} al {{ semana.6.fecha|date:"d M" }}
+            </div>
+            {% for dia in semana %}
+              <div class="elemental-calendar-day {% if not dia.en_mes %}elemental-calendar-outside{% endif %}">
+                <div class="elemental-calendar-day-heading">
+                  <span class="fw-semibold">{{ dia.fecha|date:"l"|capfirst }}</span>
+                  <span class="elemental-calendar-day-number">{{ dia.fecha|date:"d" }}</span>
+                </div>
+                <div class="elemental-calendar-day-events">
+                  {% for item in dia.sesiones %}
+                    <a class="elemental-calendar-mobile-event" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                      <span class="d-flex align-items-center gap-2">
+                        {% if item.sesion.estado == "cancelada" %}
+                          <i class="bi bi-x-circle-fill text-danger" aria-hidden="true"></i>
+                        {% elif item.sesion.estado == "completada" %}
+                          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+                        {% else %}
+                          <i class="bi bi-calendar-event-fill text-info" aria-hidden="true"></i>
+                        {% endif %}
+                        <strong>{{ item.sesion.disciplina }}</strong>
+                      </span>
+                      <span class="small text-muted">
+                        {% if item.sesion.estado == "cancelada" %}Sesión cancelada{% else %}{{ item.sesion.asistencias.count }} asistentes{% endif %}
+                      </span>
+                    </a>
+                  {% empty %}
+                    <span class="small text-muted">Sin sesiones</span>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </section>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="table-responsive elemental-calendar-month-view" data-calendar-month-view>
+      <table class="table table-bordered align-middle elemental-calendar">
+        <thead class="elemental-calendar-head">
           <tr>
             <th>Lunes</th>
             <th>Martes</th>
@@ -48,11 +97,11 @@
           {% for semana in semanas %}
           <tr style="height: 140px;">
             {% for dia in semana %}
-            <td class="position-relative {% if not dia.en_mes %}bg-light text-muted{% endif %}">
+            <td class="position-relative {% if not dia.en_mes %}elemental-calendar-outside text-muted{% endif %}">
               <div class="position-absolute top-0 start-0 m-2 fw-bold fs-6">{{ dia.fecha|date:"d" }}</div>
               <div class="pt-4">
               {% for item in dia.sesiones %}
-                <div class="mb-2 p-2 bg-white border rounded">
+                <div class="mb-2 p-2 border rounded elemental-calendar-event">
                   <div class="d-flex align-items-center gap-2 mb-1">
                     {% if item.sesion.estado == "cancelada" %}
                       <i class="bi bi-x-circle-fill text-danger fs-5 flex-shrink-0" title="Cancelada" aria-hidden="true"></i><span class="visually-hidden">Cancelada</span>
@@ -218,6 +267,37 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if mostrar_calendario %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggle = document.querySelector("[data-calendar-view-toggle]");
+    const weekView = document.querySelector("[data-calendar-week-view]");
+    const monthView = document.querySelector("[data-calendar-month-view]");
+    const weeks = document.querySelector("[data-calendar-weeks]");
+    if (!toggle || !weekView || !monthView || !weeks) return;
+
+    const label = toggle.querySelector("[data-calendar-view-label]");
+    const icon = toggle.querySelector("i");
+    function setMonthView(showMonth) {
+      weekView.classList.toggle("d-none", showMonth);
+      monthView.classList.toggle("elemental-calendar-month-mobile-visible", showMonth);
+      toggle.setAttribute("aria-pressed", String(showMonth));
+      label.textContent = showMonth ? "Ver semana" : "Ver mes";
+      icon.classList.toggle("bi-calendar3", !showMonth);
+      icon.classList.toggle("bi-calendar-week", showMonth);
+    }
+
+    toggle.addEventListener("click", function () {
+      setMonthView(toggle.getAttribute("aria-pressed") !== "true");
+    });
+
+    const initialWeek = Number.parseInt(weeks.dataset.initialWeek || "0", 10);
+    window.requestAnimationFrame(function () {
+      weeks.scrollTo({ left: weeks.clientWidth * initialWeek, behavior: "auto" });
+    });
+  });
+</script>
+{% endif %}
 {% if open_sesiones_masivas %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {

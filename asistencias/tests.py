@@ -736,6 +736,10 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="elemental-page-actions elemental-page-actions-equal mb-3"', html=False)
+        self.assertContains(response, 'class="bi bi-person-check"', html=False)
+        self.assertContains(response, 'id="filtros-sesiones"', html=False)
+        self.assertContains(response, 'aria-expanded="false"', html=False)
         disciplinas = list(response.context["disciplinas"])
         profesores = list(response.context["profesores"])
         self.assertIn(self.disciplina, disciplinas)
@@ -1917,6 +1921,9 @@ class AsistenciasViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "disciplina-badge-verde")
+        self.assertContains(response, "Ver mes")
+        self.assertContains(response, "Desliza horizontalmente para cambiar de semana.")
+        self.assertContains(response, 'data-calendar-weeks data-initial-week="0"', html=False)
         self.assertContains(response, 'd-flex align-items-center gap-2 mb-1', html=False)
         self.assertContains(response, 'bi-calendar-event-fill', html=False)
         self.assertContains(response, 'text-info fs-5 flex-shrink-0', html=False)

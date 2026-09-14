@@ -46,6 +46,11 @@ un mensaje controlado y no un error. `Monitor` y `API` permanecen fuera del home
 ## Login
 El login usa una pantalla limpia y centrada con el nombre `Elemental Apps`.
 
+El tema oscuro utiliza un fondo azul profundo continuo, superficies elevadas y
+texto de alto contraste; no conserva el lienzo claro del tema diurno. Los
+botones de Google y acceso local tienen estados propios legibles sobre la tarjeta
+oscura sin cambiar sus acciones ni la política de autenticación.
+
 Reglas:
 - Google muestra el texto explicativo, un botón visible `Continuar con Google` con identificador gráfico de Google y un isotipo Elemental ampliado cuando `GOOGLE_AUTH_ENABLED=true`; no repite el nombre de la plataforma dentro de la tarjeta.
 - La pantalla pública `personas/solicitar-acceso/` usa la misma composición centrada del login, con un isotipo Elemental más pequeño, tarjeta de estado y acciones a ancho completo. Conserva el texto aprobado del flujo de solicitud.
@@ -89,12 +94,68 @@ La parte superior del area principal contiene:
 - filtros `periodo_mes`, `periodo_anio` y `organizacion`
 - usuario actual
 - logout
+- control de tema claro/oscuro siempre visible
 
 Los filtros conservan parametros adicionales del querystring y se autoaplican al cambiar.
 
 Si la organizacion seleccionada es `Todas`, la barra muestra `Elemental Apps` y no muestra logo de ninguna organizacion. Staff y superusuarios pueden operar agregados globales; los roles acotados a organizaciones deben seleccionar una antes de recibir navegación y métricas operativas.
 
 El logo de organizacion vive en `Organizacion.logo`, es opcional y se administra inicialmente desde Django Admin.
+
+## Tema visual
+
+El shell administrativo y Operación Profesor comparten una única preferencia
+cliente `elemental-theme`. Se aplica en el `<head>` antes de cargar Bootstrap
+para evitar un destello del tema contrario, y mantiene sincronizados
+`data-theme` y `data-bs-theme` para reutilizar tanto las variables propias de
+Profesor como el soporte nativo de Bootstrap 5.3.
+
+Si no existe preferencia guardada, se respeta `prefers-color-scheme`; el control
+de la barra de contexto alterna Claro/Oscuro con nombre accesible e icono. La
+clave anterior `profesor-theme` se lee una vez como compatibilidad y se elimina
+al guardar una nueva elección. No se persiste ninguna preferencia en la base de
+datos.
+
+En modo oscuro, paneles, tablas, tarjetas de métricas y eventos de calendario
+usan superficies y bordes semánticos del shell. Los botones de contorno deben
+mantener texto y borde reconocibles en reposo; el hover no puede ser la única
+forma de descubrir una acción. Las variantes de métricas conservan su familia
+de color, pero elevan contraste de fondo, borde y texto.
+
+## Resumen de operación y jornada diaria
+
+El Resumen de operación incorpora las sesiones de la fecha actual visibles para
+el usuario, con organización, horario, profesores, estado y asistentes. La
+selección global de organización limita también esta sección. El acceso `Hoy`
+se retira del menú administrativo para evitar dos puntos de entrada a la misma
+información; la ruta `/asistencias/hoy/` se conserva porque sigue siendo la
+jornada operativa de la aplicación de profesores.
+
+## Calendario responsive
+
+En pantallas menores a `768px`, el calendario abre en modo semanal: cada semana
+ocupa el ancho del contenedor, sus siete días se ordenan verticalmente y el
+desplazamiento horizontal permite recorrer las demás semanas del mes. Si el
+período corresponde al mes actual, la posición inicial es la semana de hoy; en
+otros meses comienza en la primera semana. El control `Ver mes` alterna a la
+grilla mensual y cambia su etiqueta a `Ver semana`. En desktop la vista mensual
+continúa siendo la presentación predeterminada.
+
+## Densidad operativa en mobile
+
+Los encabezados móviles priorizan el título y el contenido propio de la página.
+Las acciones superiores se representan con iconos de al menos `44px`, nombre
+accesible y una sola fila horizontal desplazable cuando no caben; sus etiquetas
+completas reaparecen desde tablet/desktop. Las métricas de resumen se compactan
+en grillas de dos o tres columnas según cantidad y longitud, evitando que cada
+tarjeta consuma por sí sola el ancho y alto inicial de la pantalla. En desktop
+se conservan las etiquetas y acciones expandidas.
+
+Los filtros extensos de listados permanecen visibles en desktop. En mobile se
+agrupan bajo un control `Filtros` cerrado por defecto, cuya descripción breve
+anticipa los criterios disponibles y cuyo chevron comunica el estado abierto o
+cerrado. Este patrón se usa en sesiones/asistencias, estudiantes, personas y
+pagos para que los resultados aparezcan antes sin eliminar capacidad de ajuste.
 
 ## Navegacion De Retorno
 Las pantallas internas priorizan un boton `Volver` con icono `bi-arrow-left`.

@@ -2,7 +2,7 @@
 {% block title %}Disciplinas{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
     <div>
       <h2 class="mb-0">Disciplinas</h2>
       <small class="text-muted">
@@ -13,7 +13,7 @@
       class="btn btn-success"
       href="{% url 'asistencias:disciplina_create' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
     >
-      <i class="bi bi-plus-circle"></i><span class="ms-1">Nueva disciplina</span>
+      <i class="bi bi-plus-circle"></i><span class="d-none d-md-inline ms-1">Nueva disciplina</span><span class="visually-hidden d-md-none">Nueva disciplina</span>
     </a>
   </div>
 

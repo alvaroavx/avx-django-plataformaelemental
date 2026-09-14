@@ -52,6 +52,12 @@ a { color: var(--prof-sessions); }
 }
 
 button, .btn, input, select, textarea, summary { min-height: 44px; }
+.profesor-body .btn:not(.btn-close) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
 .profesor-header {
   position: sticky;
   top: 0;

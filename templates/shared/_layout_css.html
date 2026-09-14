@@ -1,15 +1,47 @@
 <style>
   :root {
+    color-scheme: light;
     --ea-sidebar-bg: #111827;
     --ea-sidebar-text: #e5e7eb;
     --ea-sidebar-muted: #9ca3af;
     --ea-accent: #0f766e;
     --ea-surface: #f6f7f9;
+    --ea-panel: #ffffff;
+    --ea-panel-soft: #f8fafc;
+    --ea-text: #111827;
+    --ea-muted: #6b7280;
+    --ea-border: #e5e7eb;
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ea-sidebar-bg: #0b1220;
+    --ea-sidebar-text: #f3f4f6;
+    --ea-sidebar-muted: #b3bdcb;
+    --ea-accent: #5eead4;
+    --ea-surface: #111827;
+    --ea-panel: #202b3c;
+    --ea-panel-soft: #182438;
+    --ea-text: #f3f4f6;
+    --ea-muted: #b3bdcb;
+    --ea-border: #526077;
   }
 
   body.elemental-shell {
     min-height: 100vh;
     background: var(--ea-surface);
+    color: var(--ea-text);
+  }
+
+  body.elemental-shell .btn:not(.btn-close) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .min-w-0 {
+    min-width: 0 !important;
   }
 
   .elemental-layout {
@@ -221,12 +253,16 @@
     position: sticky;
     top: 0;
     z-index: 1020;
-    background: rgba(255, 255, 255, 0.96);
+    background: color-mix(in srgb, var(--ea-panel) 96%, transparent);
     backdrop-filter: blur(10px);
   }
 
   .elemental-context-summary {
     min-height: 48px;
+  }
+
+  .elemental-context-actions {
+    flex: 0 0 auto;
   }
 
   .elemental-context-toggle {
@@ -249,7 +285,7 @@
   }
 
   .elemental-footer {
-    color: #6b7280;
+    color: var(--ea-muted);
     font-size: 0.85rem;
   }
 
@@ -296,10 +332,10 @@
     flex-direction: column;
     justify-content: center;
     padding: 1rem;
-    color: #111827;
+    color: var(--ea-text);
     text-decoration: none;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--ea-panel);
+    border: 1px solid var(--ea-border);
     border-radius: 1rem;
   }
 
@@ -322,7 +358,7 @@
 
   .elemental-kpi-label {
     margin-top: 0.4rem;
-    color: #6b7280;
+    color: var(--ea-muted);
     font-size: 0.88rem;
     line-height: 1.25;
   }
@@ -349,13 +385,14 @@
   }
 
   .elemental-dashboard-panel {
-    border: 1px solid #e5e7eb;
+    background: var(--ea-panel);
+    border: 1px solid var(--ea-border);
     border-radius: 1rem;
     box-shadow: none;
   }
 
   .elemental-operational-list {
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--ea-border);
   }
 
   .elemental-operational-row {
@@ -364,13 +401,174 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 0;
-    color: #1f2937;
+    color: var(--ea-text);
     text-decoration: none;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--ea-border);
   }
 
   .elemental-operational-row:hover {
     color: #0f766e;
+  }
+
+  .elemental-today-session {
+    min-height: 116px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1rem;
+    color: var(--ea-text);
+    text-decoration: none;
+    background: var(--ea-panel-soft);
+    border: 1px solid var(--ea-border);
+    border-radius: 0.85rem;
+  }
+
+  .elemental-today-session:hover {
+    color: var(--ea-text);
+    border-color: var(--ea-accent);
+  }
+
+  .elemental-metric-card {
+    color: var(--ea-text);
+    border: 1px solid var(--ea-border);
+  }
+
+  .elemental-metric-card-success { background: #d1fae5; }
+  .elemental-metric-card-danger { background: #fee2e2; }
+  .elemental-metric-card-primary { background: #dbeafe; }
+  .elemental-metric-card-warning { background: #fef3c7; }
+  .elemental-metric-card-info { background: #cffafe; }
+
+  .elemental-table-panel {
+    background: var(--ea-panel);
+    border: 1px solid var(--ea-border);
+    border-radius: 0.75rem;
+  }
+
+  .elemental-calendar-head th,
+  .elemental-calendar-event {
+    background: var(--ea-panel);
+    color: var(--ea-text);
+  }
+
+  .elemental-calendar-outside {
+    background: var(--ea-panel-soft) !important;
+  }
+
+  .elemental-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .elemental-page-header {
+    gap: 0.75rem;
+  }
+
+  .elemental-filter-toggle-chevron {
+    transition: transform 0.18s ease;
+  }
+
+  .elemental-filter-toggle[aria-expanded="true"] .elemental-filter-toggle-chevron {
+    transform: rotate(180deg);
+  }
+
+  .elemental-page-header > :first-child,
+  .elemental-page-title {
+    min-width: 0;
+  }
+
+  .elemental-calendar-weeks {
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    border: 1px solid var(--ea-border);
+    border-radius: 0.9rem;
+    background: var(--ea-panel);
+  }
+
+  .elemental-calendar-week {
+    min-width: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .elemental-calendar-week-heading {
+    position: sticky;
+    left: 0;
+    padding: 0.75rem 1rem;
+    color: var(--ea-muted);
+    background: var(--ea-panel-soft);
+    border-bottom: 1px solid var(--ea-border);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .elemental-calendar-day {
+    display: grid;
+    grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr);
+    min-height: 82px;
+    border-bottom: 1px solid var(--ea-border);
+  }
+
+  .elemental-calendar-day:last-child {
+    border-bottom: 0;
+  }
+
+  .elemental-calendar-day-heading,
+  .elemental-calendar-day-events {
+    padding: 0.75rem;
+  }
+
+  .elemental-calendar-day-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border-right: 1px solid var(--ea-border);
+  }
+
+  .elemental-calendar-day-number {
+    color: var(--ea-muted);
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .elemental-calendar-day-events {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .elemental-calendar-mobile-event {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.65rem 0.75rem;
+    color: var(--ea-text);
+    text-decoration: none;
+    background: var(--ea-panel-soft);
+    border: 1px solid var(--ea-border);
+    border-radius: 0.65rem;
+  }
+
+  @media (max-width: 767.98px) {
+    .elemental-calendar-month-view {
+      display: none;
+    }
+
+    .elemental-calendar-month-view.elemental-calendar-month-mobile-visible {
+      display: block;
+    }
+
+    .elemental-calendar-month-mobile-visible .elemental-calendar {
+      min-width: 900px;
+    }
   }
 
   .elemental-date {
@@ -378,22 +576,22 @@
     flex: 0 0 42px;
     display: grid;
     text-align: center;
-    color: #4b5563;
+    color: var(--ea-muted);
     font-size: 0.72rem;
     line-height: 1;
     text-transform: uppercase;
   }
 
   .elemental-date strong {
-    color: #111827;
+    color: var(--ea-text);
     font-size: 1.2rem;
     line-height: 1.15;
   }
 
   .elemental-person-summary {
     padding: 1rem;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    background: var(--ea-panel-soft);
+    border: 1px solid var(--ea-border);
     border-radius: 0.9rem;
   }
 
@@ -406,8 +604,8 @@
   .elemental-person-metric {
     min-width: 0;
     padding: 0.7rem 0.8rem;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--ea-panel);
+    border: 1px solid var(--ea-border);
     border-radius: 0.7rem;
   }
 
@@ -420,7 +618,7 @@
   .elemental-person-recent-item + .elemental-person-recent-item {
     margin-top: 0.65rem;
     padding-top: 0.65rem;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--ea-border);
   }
 
   .elemental-breakable {
@@ -435,6 +633,115 @@
   }
 
   @media (max-width: 575.98px) {
+    .elemental-content > .mt-4 {
+      margin-top: 1rem !important;
+    }
+
+    .elemental-page-header {
+      align-items: flex-start !important;
+      margin-bottom: 0.75rem !important;
+    }
+
+    .elemental-page-header h1,
+    .elemental-page-header h2,
+    .elemental-page-title {
+      margin-bottom: 0;
+      font-size: 1.35rem;
+      line-height: 1.2;
+    }
+
+    .elemental-page-header .elemental-page-actions {
+      flex: 0 1 auto;
+    }
+
+    .elemental-page-actions {
+      max-width: 100%;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      overflow-x: auto;
+      padding: 0.1rem 0.05rem 0.35rem;
+      scrollbar-width: thin;
+    }
+
+    .elemental-page-actions > .btn {
+      min-width: 44px;
+      min-height: 44px;
+      flex: 0 0 auto !important;
+    }
+
+    .elemental-page-actions-equal {
+      width: 100%;
+      overflow: visible;
+    }
+
+    .elemental-page-actions-equal > .btn {
+      min-width: 0;
+      min-height: 58px;
+      flex: 1 1 0 !important;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.4rem 0.2rem;
+    }
+
+    .elemental-mobile-action-label {
+      max-width: 100%;
+      font-size: 0.7rem;
+      line-height: 1.05;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .elemental-filter-toggle {
+      min-height: 48px;
+      justify-content: flex-start !important;
+      padding-inline: 0.75rem;
+      white-space: normal;
+    }
+
+    .elemental-filter-toggle small {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .elemental-summary-metrics .card-body {
+      min-height: 104px;
+      padding: 0.75rem;
+    }
+
+    .elemental-mobile-kpi .card-body,
+    .elemental-metric-card .card-body {
+      min-height: 104px;
+      padding: 0.75rem;
+    }
+
+    .elemental-mobile-kpi .display-6,
+    .elemental-metric-card .display-6,
+    .elemental-metric-card .h3 {
+      margin-bottom: 0.25rem;
+      font-size: 1.55rem;
+      line-height: 1.1;
+    }
+
+    .elemental-summary-metrics .card-title {
+      margin-bottom: 0.35rem;
+      font-size: 0.78rem;
+      line-height: 1.2;
+    }
+
+    .elemental-summary-metrics .display-6 {
+      margin-bottom: 0;
+      font-size: 1.65rem;
+      line-height: 1;
+    }
+
+    .elemental-summary-actions .btn {
+      min-height: 44px;
+      padding: 0.45rem;
+      font-size: 1rem;
+    }
+
     .elemental-dashboard .btn,
     .elemental-dashboard .form-control {
       min-height: 44px;
@@ -452,8 +759,98 @@
   }
 
   :focus-visible {
-    outline: 3px solid #0f766e;
+    outline: 3px solid var(--ea-accent);
     outline-offset: 3px;
+  }
+
+  .elemental-theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  :root[data-theme="dark"] .text-muted {
+    color: var(--ea-muted) !important;
+  }
+
+  :root[data-theme="dark"] .card,
+  :root[data-theme="dark"] .card-header,
+  :root[data-theme="dark"] .card-footer,
+  :root[data-theme="dark"] .list-group-item,
+  :root[data-theme="dark"] .modal-content,
+  :root[data-theme="dark"] .table {
+    --bs-card-bg: var(--ea-panel);
+    --bs-card-border-color: var(--ea-border);
+    --bs-card-cap-bg: var(--ea-panel-soft);
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--ea-text);
+    --bs-table-border-color: var(--ea-border);
+    --bs-list-group-bg: var(--ea-panel);
+    --bs-list-group-color: var(--ea-text);
+    --bs-list-group-border-color: var(--ea-border);
+    color: var(--ea-text);
+    border-color: var(--ea-border);
+  }
+
+  :root[data-theme="dark"] .card.shadow-sm {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  :root[data-theme="dark"] .btn-outline-secondary {
+    --bs-btn-color: #d4dbe6;
+    --bs-btn-border-color: #8390a5;
+    --bs-btn-hover-bg: #526077;
+    --bs-btn-hover-border-color: #9aa7ba;
+    --bs-btn-hover-color: #fff;
+    background: rgba(131, 144, 165, 0.09);
+  }
+
+  :root[data-theme="dark"] .btn-outline-primary {
+    --bs-btn-color: #7db5ff;
+    --bs-btn-border-color: #4f9cff;
+    --bs-btn-hover-bg: #2767b8;
+    --bs-btn-hover-border-color: #7db5ff;
+    --bs-btn-hover-color: #fff;
+    background: rgba(79, 156, 255, 0.09);
+  }
+
+  :root[data-theme="dark"] .btn-outline-success {
+    --bs-btn-color: #62dfa3;
+    --bs-btn-border-color: #35b77d;
+    --bs-btn-hover-bg: #17724f;
+    --bs-btn-hover-border-color: #62dfa3;
+    --bs-btn-hover-color: #fff;
+    background: rgba(53, 183, 125, 0.09);
+  }
+
+  :root[data-theme="dark"] .btn:disabled,
+  :root[data-theme="dark"] .btn.disabled {
+    color: #9da9bb;
+    background: rgba(82, 96, 119, 0.16);
+    border-color: #66748a;
+    opacity: 0.78;
+  }
+
+  :root[data-theme="dark"] .elemental-metric-card-success { background: #123d31; border-color: #28735b; }
+  :root[data-theme="dark"] .elemental-metric-card-danger { background: #482328; border-color: #8d444c; }
+  :root[data-theme="dark"] .elemental-metric-card-primary { background: #182f52; border-color: #345d91; }
+  :root[data-theme="dark"] .elemental-metric-card-warning { background: #453b16; border-color: #8f7826; }
+  :root[data-theme="dark"] .elemental-metric-card-info { background: #153e46; border-color: #2b7480; }
+
+  :root[data-theme="dark"] .elemental-metric-card .text-muted {
+    color: #c4cedc !important;
+  }
+
+  :root[data-theme="dark"] .elemental-calendar td {
+    background: #202a38;
+  }
+
+  :root[data-theme="dark"] .elemental-calendar-event {
+    background: #2b3749;
+    border-color: #65738a !important;
+  }
+
+  :root[data-theme="dark"] .elemental-org-logo {
+    background: #fff;
   }
 
   .solicitudes-acceso .card {

@@ -3,14 +3,16 @@
 {% block title %}Organizaciones{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="elemental-page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
       <h2 class="mb-0">Organizaciones</h2>
       <small class="text-muted">Resumen del período {{ periodo_descripcion_vista }}.</small>
     </div>
-    <a class="btn btn-success" href="{% url 'personas:organizacion_create' %}?{{ request.GET.urlencode }}">
-      <i class="bi bi-building-add"></i><span class="ms-1">Nueva organizacion</span>
-    </a>
+    <div class="elemental-page-actions">
+      <a class="btn btn-success" href="{% url 'personas:organizacion_create' %}?{{ request.GET.urlencode }}">
+        <i class="bi bi-building-add"></i><span class="d-none d-md-inline ms-1">Nueva organización</span><span class="visually-hidden d-md-none">Nueva organización</span>
+      </a>
+    </div>
   </div>
 
   <div class="row g-3">

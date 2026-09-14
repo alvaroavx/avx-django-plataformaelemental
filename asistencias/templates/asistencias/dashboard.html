@@ -5,28 +5,28 @@
 {% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">Plataforma de Asistencias</h2>
   </div>
-  <div class="row">
-    <div class="col-md-4">
-      <div class="card text-bg-primary mb-3">
+  <div class="row g-2 g-md-3 elemental-summary-metrics">
+    <div class="col-4">
+      <div class="card text-bg-primary h-100">
         <div class="card-body">
           <h5 class="card-title">Asistencias de {{ nombre_mes }}</h5>
           <p class="display-6">{{ asistencias_mes }}</p>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card text-bg-success mb-3">
+    <div class="col-4">
+      <div class="card text-bg-success h-100">
         <div class="card-body">
           <h5 class="card-title">Estudiantes activos</h5>
           <p class="display-6">{{ estudiantes_activos_mes }}</p>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card text-bg-warning mb-3">
+    <div class="col-4">
+      <div class="card text-bg-warning h-100">
         <div class="card-body">
           <h5 class="card-title">Sesiones realizadas</h5>
           <p class="display-6">{{ sesiones_realizadas_mes }}</p>
@@ -35,18 +35,18 @@
     </div>
   </div>
 
-  <div class="row text-center mb-4">
-    <div class="col-md-4 mb-2">
+  <div class="row g-2 text-center my-3 elemental-summary-actions">
+    <div class="col-4">
       <a class="btn btn-lg btn-outline-success w-100" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-clipboard-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistencia</span>
       </a>
     </div>
-    <div class="col-md-4 mb-2">
+    <div class="col-4">
       <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Calendario</span>
       </a>
     </div>
-    <div class="col-md-4 mb-2">
+    <div class="col-4">
       <a class="btn btn-lg btn-outline-primary w-100" href="{% url 'asistencias:estudiantes_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
         <i class="bi bi-people"></i><span class="d-none d-md-inline ms-1">Estudiantes</span>
       </a>

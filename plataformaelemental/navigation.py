@@ -101,7 +101,6 @@ def build_navigation(request):
                 url_name="asistencias:dashboard",
                 active_prefixes=["/asistencias/"],
                 children=[
-                    _item(request, label="Hoy", icon="bi-sun", url_name="asistencias:sesiones_hoy"),
                     _item(request, label="Panel", icon="bi-grid", url_name="asistencias:dashboard"),
                     _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
                     _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),

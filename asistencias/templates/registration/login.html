@@ -12,6 +12,7 @@
       radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 32rem),
       radial-gradient(circle at bottom right, rgba(17, 24, 39, 0.12), transparent 28rem),
       #f7f7f5;
+    color: #172033;
   }
 
   .login-shell {
@@ -19,6 +20,7 @@
   }
 
   .login-card {
+    background: #fff;
     border: 1px solid rgba(17, 24, 39, 0.08);
     border-radius: 1.5rem;
     box-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
@@ -37,6 +39,51 @@
   .login-mark img {
     width: 136px;
     height: 136px;
+  }
+
+  :root[data-theme="dark"] .login-page {
+    color: #f3f6fa;
+    background:
+      radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 32rem),
+      radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.08), transparent 30rem),
+      #0b1220;
+  }
+
+  :root[data-theme="dark"] .login-card {
+    background: #172033;
+    border-color: rgba(203, 213, 225, 0.2);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  }
+
+  :root[data-theme="dark"] .login-mark {
+    background: #111827;
+    border: 1px solid rgba(203, 213, 225, 0.14);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  }
+
+  :root[data-theme="dark"] .login-google-button {
+    color: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  :root[data-theme="dark"] .login-google-button:hover,
+  :root[data-theme="dark"] .login-google-button:focus-visible {
+    color: #0f172a;
+    background: #f8fafc;
+    border-color: #f8fafc;
+  }
+
+  :root[data-theme="dark"] .login-submit {
+    color: #06201d;
+    background: #5eead4;
+    border-color: #5eead4;
+  }
+
+  :root[data-theme="dark"] .login-submit:hover,
+  :root[data-theme="dark"] .login-submit:focus-visible {
+    color: #021412;
+    background: #99f6e4;
+    border-color: #99f6e4;
   }
 </style>
 {% endblock %}
@@ -61,7 +108,7 @@
             <form method="post" action="{% url 'google_login_iniciar' %}" class="mb-3">
               {% csrf_token %}
               {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
-              <button class="btn btn-outline-dark w-100" type="submit">
+              <button class="btn btn-outline-dark login-google-button w-100" type="submit">
                 <i class="bi bi-google me-2" aria-hidden="true"></i><span>Continuar con Google</span>
               </button>
             </form>
@@ -95,7 +142,7 @@
               <div class="text-danger small">{{ error }}</div>
             {% endfor %}
           </div>
-          <button class="btn btn-dark w-100" type="submit">
+          <button class="btn btn-dark login-submit w-100" type="submit">
             <i class="bi bi-box-arrow-in-right"></i><span class="ms-1">{% if modo_emergencia %}Acceder como superusuario{% else %}Ingresar{% endif %}</span>
           </button>
         </form>

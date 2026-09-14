@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Count, Max, Sum
+from django.db.models import Case, Count, IntegerField, Max, Sum, Value, When
 from django.http import Http404
 from django.urls import reverse
 from django.utils import timezone
@@ -93,6 +93,7 @@ def _transacciones_periodo(request, organizaciones_ids):
 
 
 def _metricas_academicas(request, organizaciones_ids):
+    hoy = timezone.localdate()
     sesiones = _sesiones_periodo(request, organizaciones_ids)
     asistencias = _asistencias_periodo(request, organizaciones_ids)
     resumen = asistencias.aggregate(
@@ -100,16 +101,35 @@ def _metricas_academicas(request, organizaciones_ids):
         personas=Count("persona_id", distinct=True),
     )
     proximas = (
-        sesiones.filter(fecha__gte=timezone.localdate())
+        sesiones.filter(fecha__gte=hoy)
         .filter(estado__in=(SesionClase.Estado.PROGRAMADA, SesionClase.Estado.ABIERTA))
         .select_related("disciplina", "disciplina__organizacion", "bloque")
         .order_by("fecha", "bloque__hora_inicio", "pk")[:3]
+    )
+    sesiones_hoy = list(
+        SesionClase.objects.filter(
+            fecha=hoy,
+            disciplina__organizacion_id__in=organizaciones_ids,
+        )
+        .select_related("disciplina", "disciplina__organizacion", "bloque")
+        .prefetch_related("profesores")
+        .annotate(
+            asistencias_total=Count("asistencias", distinct=True),
+            sin_horario=Case(
+                When(bloque__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
+        )
+        .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
     )
     return {
         "sesiones_completadas": sesiones.filter(estado=SesionClase.Estado.COMPLETADA).count(),
         "registros_asistencia": resumen["registros"],
         "personas_con_asistencia": resumen["personas"],
         "proximas_sesiones": proximas,
+        "sesiones_hoy": sesiones_hoy,
+        "fecha_hoy": hoy,
     }
 
 

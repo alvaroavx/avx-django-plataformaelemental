@@ -2,22 +2,22 @@
 {% block title %}Asistencias{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mb-3">
+  <div class="elemental-page-actions elemental-page-actions-equal mb-3" aria-label="Acciones de asistencias">
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaSesionModal">
       <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
-      <span class="d-inline d-md-none ms-1">Nueva sesión</span>
+      <span class="elemental-mobile-action-label d-md-none">Sesión</span>
     </button>
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaPersonaModal">
       <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
-      <span class="d-inline d-md-none ms-1">Nueva persona</span>
+      <span class="elemental-mobile-action-label d-md-none">Persona</span>
     </button>
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#agregarAsistentesModal">
-      <i class="bi bi-people-plus"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-      <span class="d-inline d-md-none ms-1">Agregar asistentes</span>
+      <i class="bi bi-person-check"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
+      <span class="elemental-mobile-action-label d-md-none">Asistentes</span>
     </button>
     <a class="btn btn-outline-secondary flex-md-fill" href="{% url 'asistencias:export_asistencias_xlsx' %}?{{ request.GET.urlencode }}">
       <i class="bi bi-file-earmark-spreadsheet"></i><span class="d-none d-md-inline ms-1">Exportar Excel</span>
-      <span class="d-inline d-md-none ms-1">Exportar Excel</span>
+      <span class="elemental-mobile-action-label d-md-none">Excel</span>
     </a>
   </div>
 
@@ -38,6 +38,20 @@
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h3 class="mb-0">Sesiones registradas</h3>
       </div>
+      <button
+        class="btn btn-outline-secondary w-100 d-md-none mb-2 elemental-filter-toggle"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#filtros-sesiones"
+        aria-expanded="false"
+        aria-controls="filtros-sesiones"
+      >
+        <i class="bi bi-funnel" aria-hidden="true"></i>
+        <span>Filtros</span>
+        <small class="ms-1 text-muted">Disciplina, profesor y fecha</small>
+        <i class="bi bi-chevron-down ms-auto elemental-filter-toggle-chevron" aria-hidden="true"></i>
+      </button>
+      <div class="collapse d-md-block" id="filtros-sesiones">
       <div class="card mb-3">
         <div class="card-body">
           <div class="row g-2">
@@ -70,6 +84,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
       {% if sesiones %}
       <div class="table-responsive">

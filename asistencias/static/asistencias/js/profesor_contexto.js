@@ -10,7 +10,9 @@
     opcion.addEventListener('change', function () {
       if (!opcion.checked) return;
       raiz.dataset.theme = opcion.value;
-      localStorage.setItem('profesor-theme', opcion.value);
+      raiz.dataset.bsTheme = opcion.value;
+      localStorage.setItem('elemental-theme', opcion.value);
+      localStorage.removeItem('profesor-theme');
     });
   });
 

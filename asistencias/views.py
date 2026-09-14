@@ -710,6 +710,8 @@ def sesiones_list(request):
             }
         )
     semanas = []
+    semana_inicial = 0
+    hoy = timezone.localdate()
     for semana in semanas_raw:
         dias = []
         for dia in semana:
@@ -721,10 +723,13 @@ def sesiones_list(request):
                 }
             )
         semanas.append(dias)
+        if year == hoy.year and month == hoy.month and hoy in semana:
+            semana_inicial = len(semanas) - 1
     context.update(
         {
             "mostrar_calendario": True,
             "semanas": semanas,
+            "semana_inicial": semana_inicial,
             "mes_actual": inicio_mes,
             "sesiones_masivas_form": sesiones_masivas_form,
             "open_sesiones_masivas": open_sesiones_masivas,

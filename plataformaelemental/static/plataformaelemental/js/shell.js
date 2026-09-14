@@ -1,4 +1,41 @@
 (function () {
+  const themeStorageKey = "elemental-theme";
+  const themeButton = document.querySelector("[data-elemental-theme-toggle]");
+  const root = document.documentElement;
+
+  function applyTheme(theme, persist) {
+    const selected = theme === "dark" ? "dark" : "light";
+    root.dataset.theme = selected;
+    root.dataset.bsTheme = selected;
+    if (themeButton) {
+      const nextLabel = selected === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
+      themeButton.setAttribute("aria-label", nextLabel);
+      themeButton.title = nextLabel;
+      const label = themeButton.querySelector(".visually-hidden");
+      if (label) label.textContent = nextLabel;
+      const icon = themeButton.querySelector("i");
+      if (icon) {
+        icon.classList.toggle("bi-sun", selected === "dark");
+        icon.classList.toggle("bi-moon-stars", selected !== "dark");
+      }
+    }
+    if (persist) {
+      try {
+        window.localStorage.setItem(themeStorageKey, selected);
+        window.localStorage.removeItem("profesor-theme");
+      } catch (_error) {
+        // La preferencia no es esencial; el tema sigue activo durante la visita.
+      }
+    }
+  }
+
+  applyTheme(root.dataset.theme || "light", false);
+  if (themeButton) {
+    themeButton.addEventListener("click", function () {
+      applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
+    });
+  }
+
   const storageKey = "elemental-sidebar-collapsed";
   const body = document.body;
   const button = document.querySelector("[data-elemental-sidebar-toggle]");
