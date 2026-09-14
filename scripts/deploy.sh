@@ -135,6 +135,38 @@ backup_database() {
   echo "Backup PostgreSQL validado antes de migrar: $backup_file"
 }
 
+publish_static_files() {
+  local static_root expected_static_root
+
+  static_root="$(DJANGO_SETTINGS_MODULE=plataformaelemental.config python -c \
+    'from django.conf import settings; print(settings.STATIC_ROOT)')"
+  expected_static_root="$APP_DIR/plataformaelemental/staticfiles"
+
+  if [[ "$static_root" != "$expected_static_root" ]]; then
+    echo "STATIC_ROOT inesperado: $static_root" >&2
+    exit 1
+  fi
+
+  python manage.py collectstatic --noinput
+
+  # Nginx sirve STATIC_ROOT directamente y necesita atravesar directorios y
+  # leer archivos de todas las apps. collectstatic no corrige necesariamente
+  # modos restrictivos heredados de ejecuciones anteriores.
+  find "$static_root" -type d -exec chmod 755 {} +
+  find "$static_root" -type f -exec chmod 644 {} +
+
+  for required_static in \
+    "$static_root/asistencias/css/profesor.css" \
+    "$static_root/asistencias/js/profesor_contexto.js" \
+    "$static_root/admin/css/base.css" \
+    "$static_root/staticfiles.json"; do
+    if [[ ! -f "$required_static" || ! -r "$required_static" ]]; then
+      echo "Falta un estático obligatorio o no permite lectura: $required_static" >&2
+      exit 1
+    fi
+  done
+}
+
 if [[ ! -d "$VENV_DIR" ]] || [[ ! -x "$VENV_DIR/bin/python" ]]; then
   rm -rf "$VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -175,7 +207,7 @@ fi
 
 python manage.py migrate --check
 python manage.py clearsessions
-python manage.py collectstatic --noinput
+publish_static_files
 python manage.py check --deploy
 
 systemctl restart "$SERVICE_UNIT"

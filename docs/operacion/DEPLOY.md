@@ -267,7 +267,9 @@ flowchart TD
 5. la reparación histórica de Operación Profesor `0004b–0007` sigue bloqueada
    en este camino si está pendiente y requiere su runbook escalonado;
 6. finalmente ejecuta `collectstatic` con nombres versionados por contenido,
-   `check --deploy`, reinicia `systemd` y comprueba que quede activo.
+   normaliza todo `STATIC_ROOT` a directorios `0755` y archivos `0644`, verifica
+   los recursos mínimos de Admin y Profesor, ejecuta `check --deploy`, reinicia
+   `systemd` y comprueba que quede activo.
 
 ## Base De Datos En CI
 - El entorno `dev` usa PostgreSQL.
@@ -433,6 +435,9 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
   escritura de media ni restaurabilidad del backup.
 - El workflow automático no ejecuta el smoke. No existe rollback automático de
   migraciones ni restauración automática del dump.
+- Nginx sirve los estáticos de todas las apps desde el mismo `STATIC_ROOT`.
+  El deploy no selecciona apps: recolecta el repositorio completo y falla si no
+  quedan legibles los recursos base de Admin o los CSS/JS de Profesor.
 - El deploy valida el catálogo con `pg_restore --list`, pero no restaura el dump
   en una base aislada. Un respaldo no debe llamarse recuperable hasta probar una
   restauración completa fuera de la ventana de deploy.

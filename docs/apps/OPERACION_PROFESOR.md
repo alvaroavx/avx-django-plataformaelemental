@@ -7,7 +7,9 @@ Fecha de actualización: 2026-08-17
 > `profesor_contexto.js` cambian de URL cuando cambia su contenido. El pipeline
 > ejecuta toda la suite de `asistencias` y los 25 tests específicos de Profesor antes del
 > deploy; luego aplica migraciones rutinarias pendientes con respaldo previo y
-> recolecta los estáticos antes de reiniciar el servicio.
+> recolecta los estáticos antes de reiniciar el servicio. El deploy general
+> valida además que `profesor.css` y `profesor_contexto.js` existan y sean
+> legibles dentro del `STATIC_ROOT` compartido por todas las apps.
 
 ## Estado implementado
 

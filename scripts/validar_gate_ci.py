@@ -119,6 +119,11 @@ def main():
         "systemctl stop",
         "python manage.py migrate --noinput",
         "python manage.py collectstatic --noinput",
+        "publish_static_files",
+        'find "$static_root" -type d -exec chmod 755',
+        'find "$static_root" -type f -exec chmod 644',
+        '"$static_root/asistencias/css/profesor.css"',
+        '"$static_root/asistencias/js/profesor_contexto.js"',
         "ManifestStaticFilesStorage",
     ):
         origen = contenido if contrato_deploy == "ManifestStaticFilesStorage" else deploy_script

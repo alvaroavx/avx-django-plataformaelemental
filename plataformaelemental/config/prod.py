@@ -49,3 +49,8 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
     },
 }
+
+# Los archivos publicados por Django deben ser legibles por el servidor web,
+# aunque el usuario de deploy y el de Nginx pertenezcan a grupos distintos.
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
