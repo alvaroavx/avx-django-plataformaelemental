@@ -2,7 +2,7 @@ from django import forms
 
 from django.contrib.auth import get_user_model
 
-from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .models import Organizacion, Persona, Rol, SolicitudAcceso
 from .utils import normalizar_telefono, tiene_identidad_minima
 from .validators import formatear_rut_chileno
 

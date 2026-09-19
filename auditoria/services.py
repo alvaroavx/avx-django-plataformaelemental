@@ -10,7 +10,6 @@ from .models import AuditLog
 
 logger = logging.getLogger(__name__)
 
-CAMPO_SENSIBLE = object()
 CAMPOS_SENSIBLES_DEFAULT = {"rut", "email", "telefono"}
 
 

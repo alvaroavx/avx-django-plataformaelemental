@@ -400,7 +400,7 @@ class FinanzasAccessTests(TestCase):
             fecha_emision="2026-02-02",
             monto_total=15000,
         )
-        transaccion_2 = Transaction.objects.create(
+        Transaction.objects.create(
             organizacion=self.org,
             categoria=categoria_egreso,
             fecha="2026-02-03",
@@ -3366,7 +3366,6 @@ FUNCION LA TAREA MAS DIFICIL − FEBRERO − 2026                               
 
 class SprintDosReversaPagosTests(TestCase):
     def setUp(self):
-        User = get_user_model()
         self.organizacion = Organizacion.objects.create(
             nombre="Org Reversa Sprint 2",
             razon_social="Org Reversa Sprint 2 SpA",

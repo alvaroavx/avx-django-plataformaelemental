@@ -54,7 +54,6 @@ from .models import (
     AlumnoDisciplina,
     AsignacionProfesorDisciplina,
     Asistencia,
-    ClaseLiberada,
     Disciplina,
     SesionClase,
 )
@@ -70,7 +69,6 @@ from .services import (
     asegurar_asignaciones_profesores,
     asegurar_matricula_operativa,
     cambiar_estado_asistencia,
-    disciplinas_asignadas_profesor,
     liberar_clase,
     liberar_clase_profesor,
     organizaciones_profesor,
@@ -79,7 +77,7 @@ from .services import (
     revertir_clase_liberada,
     revertir_clase_liberada_profesor,
 )
-from .utils import ROLE_ADMIN, usuario_tiene_roles
+from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
 
 
@@ -145,15 +143,6 @@ def _url_con_filtros_extra(request, nombre_url, **extra_params):
         params[key] = value
     query = params.urlencode()
     return f"{url}?{query}" if query else url
-
-
-def _query_profesor(request, *, organizacion_id):
-    params = request.GET.copy()
-    for key in list(params):
-        if key not in {"periodo", "periodo_mes", "periodo_anio", "organizacion"}:
-            params.pop(key, None)
-    params["organizacion"] = str(organizacion_id)
-    return params.urlencode()
 
 
 def _rol_profesor_solicitado(request):

@@ -76,13 +76,6 @@ class Persona(models.Model):
     def nombre_completo(self) -> str:
         return f"{self.nombres} {self.apellidos}".strip()
 
-    @property
-    def roles_activos(self):
-        return self.roles.filter(activo=True).values_list("rol__codigo", flat=True)
-
-    def tiene_rol(self, codigo):
-        return codigo in self.roles.filter(activo=True).values_list("rol__codigo", flat=True)
-
     def clean(self):
         super().clean()
         rut = formatear_rut_chileno(self.rut)

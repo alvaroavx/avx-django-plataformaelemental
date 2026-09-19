@@ -6,12 +6,7 @@ from personas.permissions import (
     ACCION_REVERTIR_PAGO,
     ACCION_VER_FINANZAS,
     permiso_requerido,
-    usuario_tiene_permiso,
 )
-
-
-def usuario_es_admin_finanzas(user) -> bool:
-    return usuario_tiene_permiso(user, ACCION_OPERAR_PAGOS)
 
 
 finanzas_read_required = permiso_requerido(
@@ -37,7 +32,6 @@ exportar_finanzas_required = permiso_requerido(
     ACCION_EXPORTAR_DATOS,
     mensaje="Debes tener permiso de exportacion para descargar datos.",
 )
-admin_finanzas_required = pagos_required
 revertir_pago_required = permiso_requerido(
     ACCION_REVERTIR_PAGO,
     mensaje="Debes tener permiso administrativo para revertir pagos.",

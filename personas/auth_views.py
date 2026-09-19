@@ -80,8 +80,7 @@ class InicioGoogleView(OAuth2LoginView):
 
 
 class CallbackGoogleView(OAuth2CallbackView):
-    def dispatch(self, request, *args, **kwargs):
-        return super().dispatch(request, *args, **kwargs)
+    pass
 
 
 InicioGoogleView.redirect_field_name = "next"

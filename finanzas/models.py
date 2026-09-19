@@ -163,10 +163,6 @@ class DocumentoTributario(TimeStampedModel):
         return f"{self.get_tipo_documento_display()} #{self.folio}"
 
     @property
-    def archivo_principal(self):
-        return self.archivo_pdf or self.archivo_xml
-
-    @property
     def tiene_archivo_pdf(self) -> bool:
         return bool(self.archivo_pdf and self.archivo_pdf.name.lower().endswith(".pdf"))
 
@@ -453,6 +449,3 @@ class Transaction(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_tipo_display()} {self.monto} ({self.categoria})"
-
-
-Invoice = DocumentoTributario

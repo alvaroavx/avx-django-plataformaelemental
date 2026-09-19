@@ -10,7 +10,6 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.db import IntegrityError
-from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -585,7 +584,7 @@ def pagos_list(request):
                     messages.success(request, "Persona creada y asignada como estudiante.")
                     return _redirect_with_query(request, "finanzas:pagos_list")
         elif form.is_valid():
-            pago = crear_pago_operacional(pago=form.save(commit=False), usuario=request.user)
+            crear_pago_operacional(pago=form.save(commit=False), usuario=request.user)
             messages.success(request, "Pago registrado.")
             return redirect(
                 _url_with_query_without(
@@ -780,7 +779,6 @@ def pago_masivo(request):
     filas = []
     errores_filas = {}
     preview = False
-    resultado = None
     if request.method == "POST" and form.is_valid():
         filas, errores_filas = _filas_pago_masivo(request, form)
         preview = request.POST.get("accion") == "preview"
@@ -1586,5 +1584,3 @@ def export_libro_caja_csv(request):
     writer.writerow(LIBRO_CAJA_CSV_HEADERS)
     writer.writerows(filas_export_libro_caja(transacciones))
     return response
-
-# Create your views here.

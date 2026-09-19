@@ -11,8 +11,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection, connections, transaction
-from django.test import Client, RequestFactory, TestCase, TransactionTestCase, override_settings
+from django.db import connection, connections, transaction
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.contrib.sessions.middleware import SessionMiddleware
 

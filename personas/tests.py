@@ -31,7 +31,7 @@ from .auth_views import GoogleOAuth2AdapterElemental
 from .forms import PersonaCRMForm
 from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
 from .solicitudes_acceso import SESION_IDENTIDAD_PENDIENTE
-from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud
+from .resolucion_solicitudes import aprobar_solicitud
 
 
 TEST_PASSWORD = "not-a-real-test-password"
