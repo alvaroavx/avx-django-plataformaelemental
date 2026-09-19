@@ -5,26 +5,15 @@ from django.http import Http404
 from django.utils import timezone
 from django.utils.formats import date_format
 
+from plataformaelemental.context import MESES_PERIODO
+
 from .models import AsignacionProfesorDisciplina, Disciplina
 from .services.profesor import organizaciones_profesor, rol_profesor_activo
 
 
 ORGANIZACION_TODAS = "todos"
 PERIODO_TODOS = "todos"
-MESES = (
-    (1, "Enero"),
-    (2, "Febrero"),
-    (3, "Marzo"),
-    (4, "Abril"),
-    (5, "Mayo"),
-    (6, "Junio"),
-    (7, "Julio"),
-    (8, "Agosto"),
-    (9, "Septiembre"),
-    (10, "Octubre"),
-    (11, "Noviembre"),
-    (12, "Diciembre"),
-)
+MESES = tuple((int(valor), nombre) for valor, nombre in MESES_PERIODO if valor != "todos")
 
 
 def _resolver_periodo_profesor(request):

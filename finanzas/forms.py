@@ -4,10 +4,11 @@ from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS
 from django.db.models import Q
 from django.utils import timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from personas.models import Organizacion, Persona, PersonaRol
 
+from .documentos.parsers import _decimal as _texto_a_decimal_clp
 from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
 
 
@@ -419,17 +420,10 @@ class DocumentoTributarioForm(forms.ModelForm):
             return Decimal("0")
         if isinstance(value, Decimal):
             return value
-        raw = str(value).strip().replace("$", "").replace(" ", "")
-        if "," in raw:
-            raw = raw.replace(".", "").replace(",", ".")
-        elif "." in raw and raw.count(".") >= 1:
-            partes = raw.split(".")
-            if all(parte.isdigit() for parte in partes) and all(len(parte) == 3 for parte in partes[1:]):
-                raw = "".join(partes)
-        try:
-            return Decimal(raw)
-        except (InvalidOperation, ValueError):
+        monto = _texto_a_decimal_clp(value)
+        if monto is None:
             raise forms.ValidationError("Ingresa un monto valido.")
+        return monto
 
     def clean_monto_neto(self):
         return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_neto")))

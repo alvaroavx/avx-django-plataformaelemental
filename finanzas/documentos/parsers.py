@@ -46,21 +46,7 @@ def _find_all_descendants(element, name):
 
 
 def _decimal(value):
-    if value in (None, ""):
-        return None
-    raw = str(value).strip()
-    raw = raw.replace("$", "").replace(" ", "")
-    if "," in raw and "." in raw:
-        raw = raw.replace(".", "").replace(",", ".")
-    elif "," in raw:
-        raw = raw.replace(".", "").replace(",", ".")
-    try:
-        return Decimal(raw)
-    except (InvalidOperation, ValueError):
-        return None
-
-
-def _money_decimal(value):
+    """Convierte un monto textual (con separador de miles/decimales chileno u opcional) a Decimal."""
     if value in (None, ""):
         return None
     raw = str(value).strip()
@@ -476,16 +462,16 @@ class PdfFallbackParser(BaseTaxDocumentParser):
         )
         total_liquido_match = re.search(r"\bTotal:\s*([\d\.\,]+)", text, flags=re.IGNORECASE)
         if honorarios_match:
-            total_honorarios = _money_decimal(honorarios_match.group(1))
+            total_honorarios = _decimal(honorarios_match.group(1))
             normalized.set_field("montos", "neto", total_honorarios, "pdf", "high")
             normalized.set_field("montos", "iva", Decimal("0"), "inferred", "high")
             normalized.set_field("montos", "tasa_iva", Decimal("0"), "inferred", "high")
             normalized.set_field("montos", "total_bruto", total_honorarios, "pdf", "high")
         if retencion_match:
             normalized.set_field("montos", "porcentaje_retencion", _decimal(retencion_match.group(1)), "pdf", "high")
-            normalized.set_field("montos", "retencion_honorarios", _money_decimal(retencion_match.group(2)), "pdf", "high")
+            normalized.set_field("montos", "retencion_honorarios", _decimal(retencion_match.group(2)), "pdf", "high")
         if total_liquido_match:
-            normalized.set_field("montos", "total_liquido", _money_decimal(total_liquido_match.group(1)), "pdf", "high")
+            normalized.set_field("montos", "total_liquido", _decimal(total_liquido_match.group(1)), "pdf", "high")
 
         detalle_inicio = next(
             (idx for idx, line in enumerate(lines) if _fold_text(line).startswith("POR ATENCION PROFESIONAL")),
@@ -595,7 +581,7 @@ class PdfFallbackParser(BaseTaxDocumentParser):
                 if re.search(r"\$\s*[\d\.\,]+", line):
                     total_match = re.search(r"\$\s*([\d\.\,]+)", line)
                     if total_match:
-                        total_bruto = _money_decimal(total_match.group(1))
+                        total_bruto = _decimal(total_match.group(1))
                     idx += 1
                     break
                 if not glosa_partes and len(line.split()) <= 2 and "-" not in line and "(" not in line and ")" not in line and not any(char.isdigit() for char in line):
@@ -610,7 +596,7 @@ class PdfFallbackParser(BaseTaxDocumentParser):
                     break
                 iva_match = re.search(r"de:\s*\$\s*([\d\.\,]+)", line, flags=re.IGNORECASE)
                 if iva_match:
-                    monto_iva = _money_decimal(iva_match.group(1))
+                    monto_iva = _decimal(iva_match.group(1))
                     break
                 idx += 1
 
@@ -708,13 +694,13 @@ class PdfFallbackParser(BaseTaxDocumentParser):
             if len(rut_matches) > 1:
                 normalized.set_field("receptor", "rut", re.sub(r"\s+", "", rut_matches[1]), "pdf", "medium")
         if total_match:
-            normalized.set_field("montos", "total_bruto", _money_decimal(total_match.group(1)), "pdf", "medium")
+            normalized.set_field("montos", "total_bruto", _decimal(total_match.group(1)), "pdf", "medium")
         if exento_match:
-            normalized.set_field("montos", "exento", _money_decimal(exento_match.group(1)), "pdf", "medium")
+            normalized.set_field("montos", "exento", _decimal(exento_match.group(1)), "pdf", "medium")
         if neto_match:
-            normalized.set_field("montos", "neto", _money_decimal(neto_match.group(1)), "pdf", "medium")
+            normalized.set_field("montos", "neto", _decimal(neto_match.group(1)), "pdf", "medium")
         if iva_match:
-            normalized.set_field("montos", "iva", _money_decimal(iva_match.group(1)), "pdf", "medium")
+            normalized.set_field("montos", "iva", _decimal(iva_match.group(1)), "pdf", "medium")
 
         lines = [line.rstrip() for line in text.splitlines()]
         giro_index = next((idx for idx, line in enumerate(lines) if "GIRO:" in line.upper()), None)
@@ -785,8 +771,8 @@ class PdfFallbackParser(BaseTaxDocumentParser):
                         linea.set_field("numero_linea", 1, "pdf", "medium")
                         linea.set_field("descripcion", descripcion, "pdf", "medium")
                         linea.set_field("cantidad", _decimal(row_match.group(2)), "pdf", "medium")
-                        linea.set_field("precio_unitario", _money_decimal(row_match.group(3)), "pdf", "medium")
-                        linea.set_field("subtotal_linea", _money_decimal(row_match.group(4)), "pdf", "medium")
+                        linea.set_field("precio_unitario", _decimal(row_match.group(3)), "pdf", "medium")
+                        linea.set_field("subtotal_linea", _decimal(row_match.group(4)), "pdf", "medium")
                         normalized.lineas.append(linea)
                     break
 

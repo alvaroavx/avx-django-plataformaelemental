@@ -71,3 +71,16 @@ def estado_vinculo_google(*, provider, subject, usuario, bloquear=False):
     if cuenta_sub and cuenta_sub.user_id == usuario.pk:
         return COMPATIBLE
     return SIN_VINCULO
+
+
+def normalizar_email_google(valor):
+    return (valor or "").strip().lower()
+
+
+def email_verificado(sociallogin):
+    email_usuario = normalizar_email_google(getattr(sociallogin.user, "email", ""))
+    for direccion in sociallogin.email_addresses:
+        email = normalizar_email_google(direccion.email)
+        if email and email == email_usuario and direccion.verified:
+            return email
+    return ""

@@ -272,8 +272,6 @@ def texto_copiable_operativo_pago(pago):
 
 def enriquecer_pagos_para_listado(pagos):
     for pago in pagos:
-        if pago.revertido_en and hasattr(pago, "saldo_clases_calculado"):
-            pago.saldo_clases_calculado = 0
         pago.estado_fiscal_label = "Afecta" if pago.monto_iva else "Exenta"
         pago.estado_fiscal_badge_class = "text-bg-primary" if pago.monto_iva else "text-bg-secondary"
         pago.texto_copia = texto_copiable_operativo_pago(pago)
@@ -284,6 +282,8 @@ def enriquecer_pagos_para_listado(pagos):
 
 
 def calcular_saldo_clases_pago(pago, *, consumos_consumidos=None):
+    if pago.revertido_en:
+        return 0
     if consumos_consumidos is None:
         consumos_consumidos = pago.consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count()
     return pago.clases_asignadas - consumos_consumidos

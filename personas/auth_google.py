@@ -12,11 +12,14 @@ from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria
 from .solicitudes_acceso import guardar_identidad_pendiente, solicitud_canonica_por_identidad
 from .models import SolicitudAcceso
-from .identidades_google import COMPATIBLE, SIN_VINCULO, bloquear_identidad_google, bloquear_usuario_google, estado_vinculo_google
-
-
-def normalizar_email_google(valor):
-    return (valor or "").strip().lower()
+from .identidades_google import (
+    COMPATIBLE,
+    SIN_VINCULO,
+    bloquear_identidad_google,
+    bloquear_usuario_google,
+    email_verificado,
+    estado_vinculo_google,
+)
 
 
 class AdaptadorSocialGoogleElemental(DefaultSocialAccountAdapter):
@@ -45,7 +48,7 @@ class AdaptadorSocialGoogleElemental(DefaultSocialAccountAdapter):
                 self._solicitar_revision(request, sociallogin)
             return
 
-        email = self._email_verificado(sociallogin)
+        email = email_verificado(sociallogin)
         if not email:
             self._bloquear(request, "Google no entregó un correo verificado para esta cuenta.")
 
@@ -118,14 +121,6 @@ class AdaptadorSocialGoogleElemental(DefaultSocialAccountAdapter):
             exception=exception,
             extra_context=extra_context,
         )
-
-    def _email_verificado(self, sociallogin):
-        email_usuario = normalizar_email_google(getattr(sociallogin.user, "email", ""))
-        for email_address in sociallogin.email_addresses:
-            email = normalizar_email_google(email_address.email)
-            if email and email == email_usuario and email_address.verified:
-                return email
-        return ""
 
     def _limpiar_datos_sociales(self, sociallogin):
         sociallogin.account.extra_data = {}

@@ -1,4 +1,4 @@
-from django.db.models import CharField, Count, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models import CharField, Case, Count, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value, When
 from django.db.models.functions import Coalesce
 
 from asistencias.models import Asistencia
@@ -47,8 +47,12 @@ def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
             )
         )
         .annotate(
-            saldo_clases_calculado=ExpressionWrapper(
-                F("clases_asignadas") - F("clases_consumidas_calculadas"),
+            saldo_clases_calculado=Case(
+                When(revertido_en__isnull=False, then=Value(0)),
+                default=ExpressionWrapper(
+                    F("clases_asignadas") - F("clases_consumidas_calculadas"),
+                    output_field=IntegerField(),
+                ),
                 output_field=IntegerField(),
             )
         )
@@ -272,8 +276,12 @@ def pagos_export_queryset(request, *, organizacion=None):
             )
         )
         .annotate(
-            saldo_clases_calculado=ExpressionWrapper(
-                F("clases_asignadas") - F("clases_consumidas_calculadas"),
+            saldo_clases_calculado=Case(
+                When(revertido_en__isnull=False, then=Value(0)),
+                default=ExpressionWrapper(
+                    F("clases_asignadas") - F("clases_consumidas_calculadas"),
+                    output_field=IntegerField(),
+                ),
                 output_field=IntegerField(),
             )
         ),

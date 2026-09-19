@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -8,6 +7,8 @@ from django.utils import timezone
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria
 
+from .identidades_google import email_verificado as _email_verificado
+from .identidades_google import normalizar_email_google
 from .models import SolicitudAcceso
 
 
@@ -16,10 +17,6 @@ TTL_IDENTIDAD_PENDIENTE = timedelta(minutes=10)
 LIMITE_SOLICITUDES_POR_IDENTIDAD = 5
 VENTANA_RATE_LIMIT_SOLICITUDES = timedelta(hours=24)
 CAMPOS_IDENTIDAD_PENDIENTE = {"provider", "provider_subject", "email", "nombre", "expira_en"}
-
-
-def normalizar_email_google(valor):
-    return (valor or "").strip().lower()
 
 
 def guardar_identidad_pendiente(request, sociallogin):
@@ -112,15 +109,6 @@ def crear_o_recuperar_solicitud(request, identidad):
         return solicitud, False
     _auditar(solicitud, "Solicitud de acceso creada")
     return solicitud, True
-
-
-def _email_verificado(sociallogin):
-    email_usuario = normalizar_email_google(getattr(sociallogin.user, "email", ""))
-    for direccion in sociallogin.email_addresses:
-        email = normalizar_email_google(direccion.email)
-        if email and email == email_usuario and direccion.verified:
-            return email
-    return ""
 
 
 def _limpiar_identidad(request):

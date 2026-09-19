@@ -5,7 +5,7 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import CharField, Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404
@@ -16,9 +16,7 @@ from django.urls import reverse
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
-from asistencias.decorators import role_required
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from asistencias.utils import ROLE_ADMIN
 from finanzas.models import AttendanceConsumption, Payment
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
 from plataformaelemental.context import (
@@ -33,6 +31,7 @@ from plataformaelemental.context import (
 
 from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm, ResolverSolicitudAccesoForm
 from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .permissions import ACCION_ADMINISTRAR_PERSONAS, permiso_requerido
 from .search import filtrar_por_fragmentos
 from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
 from .solicitudes_acceso import crear_o_recuperar_solicitud, obtener_identidad_pendiente, solicitud_pendiente_o_ultima
@@ -329,6 +328,73 @@ def _guardar_persona_rol_desde_form(persona, rol_form):
     return persona_rol, created
 
 
+ACCIONES_ROL_PERSONA_COMPARTIDAS = {"agregar_rol", "guardar_configuracion_profesor", "toggle_rol"}
+
+
+def _procesar_accion_rol_persona(request, persona, organizacion, organizaciones_autorizadas, accion, *, redirect_url_name):
+    """Maneja agregar_rol/guardar_configuracion_profesor/toggle_rol.
+
+    Estas tres acciones son idénticas entre persona_detail y persona_edit; solo
+    cambia a qué vista se vuelve a redirigir. Retorna un HttpResponse si la
+    acción ya quedó resuelta (éxito o error temprano con redirect), o None si
+    debe seguir renderizando la misma página (por ejemplo, un formulario de rol
+    inválido que necesita mostrar sus errores).
+    """
+
+    def _redirect():
+        return redirect(_url_con_filtros(request, redirect_url_name, pk=persona.pk))
+
+    if accion == "agregar_rol":
+        rol_form = PersonaRolCRMForm(request.POST, prefix="rol", organizaciones=organizaciones_autorizadas)
+        if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
+            persona_rol_existente = PersonaRol.objects.filter(
+                persona=persona,
+                rol=rol_form.cleaned_data["rol"],
+                organizacion=rol_form.cleaned_data["organizacion"],
+            ).first()
+            antes = _snapshot_persona_rol(persona_rol_existente) if persona_rol_existente else None
+            persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form)
+            _auditar_persona_rol(request, persona_rol, created=created, antes=antes)
+            if not created and not persona_rol.activo:
+                messages.success(request, "Rol reactivado para la persona.")
+            elif created:
+                messages.success(request, "Rol agregado a la persona.")
+            elif persona_rol.rol.codigo == "PROFESOR":
+                messages.success(request, "Rol de profesor actualizado para la persona.")
+            else:
+                messages.info(request, "Ese rol ya estaba activo para la persona.")
+            return _redirect()
+        if rol_form.is_valid():
+            messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
+        else:
+            messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
+        return None
+
+    if accion == "guardar_configuracion_profesor":
+        persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
+        if persona_rol.rol.codigo != "PROFESOR":
+            messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
+            return _redirect()
+        valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
+        retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
+        antes = _snapshot_persona_rol(persona_rol)
+        persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
+        persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
+        persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
+        _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
+        messages.success(request, "Configuración de honorarios actualizada.")
+        return _redirect()
+
+    # accion == "toggle_rol"
+    persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
+    antes = _snapshot_persona_rol(persona_rol)
+    persona_rol.activo = not persona_rol.activo
+    persona_rol.save(update_fields=["activo"])
+    _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
+    messages.success(request, "Estado del rol actualizado.")
+    return _redirect()
+
+
 def _personas_queryset(organizacion=None):
     queryset = Persona.objects.select_related("user").prefetch_related(
         Prefetch(
@@ -438,7 +504,7 @@ def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=No
     )
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def dashboard(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
@@ -486,7 +552,7 @@ def dashboard(request):
     return render(request, "personas/dashboard.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def organizaciones_list(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
@@ -513,7 +579,7 @@ def organizaciones_list(request):
     return render(request, "personas/organizaciones_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def organizacion_detail(request, pk):
     context = _base_context(request)
     periodo = resolver_periodo(request)
@@ -536,7 +602,7 @@ def organizacion_detail(request, pk):
     return render(request, "personas/organizacion_detail.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def organizacion_create(request):
     context = _base_context(request)
     form = OrganizacionCRMForm(request.POST or None)
@@ -548,7 +614,7 @@ def organizacion_create(request):
     return render(request, "personas/organizacion_form.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def organizacion_edit(request, pk):
     context = _base_context(request)
     organizacion = get_object_or_404(organizaciones_visibles_para_usuario(request.user), pk=pk)
@@ -561,7 +627,7 @@ def organizacion_edit(request, pk):
     return render(request, "personas/organizacion_form.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def personas_list(request):
     context = _base_context(request)
     periodo = resolver_periodo(request)
@@ -644,7 +710,7 @@ def personas_list(request):
     return render(request, "personas/personas_list.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def persona_create(request):
     context = _base_context(request)
     organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
@@ -685,10 +751,9 @@ def persona_create(request):
     return render(request, "personas/persona_create.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def persona_detail(request, pk):
     context = _base_context(request)
-    periodo = resolver_periodo(request)
     organizacion = organizacion_desde_request(request)
     organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
     roles_visibles = PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre")
@@ -751,44 +816,13 @@ def persona_detail(request, pk):
             else:
                 messages.success(request, "Asistencia asociada al pago correctamente.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
-        if accion == "agregar_rol":
-            rol_form_post = PersonaRolCRMForm(request.POST, prefix="rol", organizaciones=organizaciones_autorizadas)
-            if rol_form_post.is_valid() and rol_form_post.cleaned_data.get("rol") and rol_form_post.cleaned_data.get("organizacion"):
-                persona_rol_existente = PersonaRol.objects.filter(
-                    persona=persona,
-                    rol=rol_form_post.cleaned_data["rol"],
-                    organizacion=rol_form_post.cleaned_data["organizacion"],
-                ).first()
-                antes = _snapshot_persona_rol(persona_rol_existente) if persona_rol_existente else None
-                persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form_post)
-                _auditar_persona_rol(request, persona_rol, created=created, antes=antes)
-                if not created and not persona_rol.activo:
-                    messages.success(request, "Rol reactivado para la persona.")
-                elif created:
-                    messages.success(request, "Rol agregado a la persona.")
-                elif persona_rol.rol.codigo == "PROFESOR":
-                    messages.success(request, "Rol de profesor actualizado para la persona.")
-                else:
-                    messages.info(request, "Ese rol ya estaba activo para la persona.")
-                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
-            elif rol_form_post.is_valid():
-                messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
-            else:
-                messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
-        elif accion == "guardar_configuracion_profesor":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
-            if persona_rol.rol.codigo != "PROFESOR":
-                messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
-                return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
-            valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
-            retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
-            antes = _snapshot_persona_rol(persona_rol)
-            persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
-            persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
-            persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
-            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
-            messages.success(request, "Configuración de honorarios actualizada.")
-            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
+        elif accion in ACCIONES_ROL_PERSONA_COMPARTIDAS:
+            respuesta = _procesar_accion_rol_persona(
+                request, persona, organizacion, organizaciones_autorizadas, accion,
+                redirect_url_name="personas:persona_detail",
+            )
+            if respuesta is not None:
+                return respuesta
         elif accion == "cambiar_estado_sesion":
             estado = request.POST.get("estado")
             if estado not in dict(SesionClase.Estado.choices):
@@ -818,14 +852,6 @@ def persona_detail(request, pk):
                 metadata={"sesion_id": sesion.pk, "profesor_id": persona.pk},
             )
             messages.success(request, "Estado de la sesión actualizado.")
-            return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
-        elif accion == "toggle_rol":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
-            antes = _snapshot_persona_rol(persona_rol)
-            persona_rol.activo = not persona_rol.activo
-            persona_rol.save(update_fields=["activo"])
-            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
-            messages.success(request, "Estado del rol actualizado.")
             return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona.pk))
     # La pre-carga está acotada al filtro efectivo. Esto evita exponer los
     # roles de otra organización cuando una Persona participa en más de una.
@@ -959,7 +985,7 @@ def persona_detail(request, pk):
     return render(request, "personas/persona_detail.html", context)
 
 
-@role_required(ROLE_ADMIN)
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def persona_edit(request, pk):
     context = _base_context(request)
     organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
@@ -1000,52 +1026,13 @@ def persona_edit(request, pk):
                 )
                 messages.success(request, "Perfil de persona actualizado.")
                 return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
-        elif accion == "agregar_rol":
-            rol_form = PersonaRolCRMForm(request.POST, prefix="rol", organizaciones=organizaciones_autorizadas)
-            if rol_form.is_valid() and rol_form.cleaned_data.get("rol") and rol_form.cleaned_data.get("organizacion"):
-                persona_rol_existente = PersonaRol.objects.filter(
-                    persona=persona,
-                    rol=rol_form.cleaned_data["rol"],
-                    organizacion=rol_form.cleaned_data["organizacion"],
-                ).first()
-                antes = _snapshot_persona_rol(persona_rol_existente) if persona_rol_existente else None
-                persona_rol, created = _guardar_persona_rol_desde_form(persona, rol_form)
-                _auditar_persona_rol(request, persona_rol, created=created, antes=antes)
-                if not created and not persona_rol.activo:
-                    messages.success(request, "Rol reactivado para la persona.")
-                elif created:
-                    messages.success(request, "Rol agregado a la persona.")
-                elif persona_rol.rol.codigo == "PROFESOR":
-                    messages.success(request, "Rol de profesor actualizado para la persona.")
-                else:
-                    messages.info(request, "Ese rol ya estaba activo para la persona.")
-                return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
-            elif rol_form.is_valid():
-                messages.warning(request, "Debes seleccionar un rol y una organizacion para agregar la asignacion.")
-            else:
-                messages.error(request, "No se pudo agregar el rol. Revisa rol y organizacion.")
-        elif accion == "guardar_configuracion_profesor":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
-            if persona_rol.rol.codigo != "PROFESOR":
-                messages.warning(request, "Solo los roles de profesor permiten configurar valor por clase.")
-                return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
-            valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
-            retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
-            antes = _snapshot_persona_rol(persona_rol)
-            persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
-            persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
-            persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
-            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
-            messages.success(request, "Configuración de honorarios actualizada.")
-            return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
-        elif accion == "toggle_rol":
-            persona_rol = get_object_or_404(PersonaRol, pk=request.POST.get("persona_rol_id"), persona=persona, organizacion=organizacion)
-            antes = _snapshot_persona_rol(persona_rol)
-            persona_rol.activo = not persona_rol.activo
-            persona_rol.save(update_fields=["activo"])
-            _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
-            messages.success(request, "Estado del rol actualizado.")
-            return redirect(_url_con_filtros(request, "personas:persona_edit", pk=persona.pk))
+        elif accion in ACCIONES_ROL_PERSONA_COMPARTIDAS:
+            respuesta = _procesar_accion_rol_persona(
+                request, persona, organizacion, organizaciones_autorizadas, accion,
+                redirect_url_name="personas:persona_edit",
+            )
+            if respuesta is not None:
+                return respuesta
 
     context.update({"form": form, "rol_form": rol_form, "persona_obj": persona, "roles_asignados": persona.roles.all()})
     return render(request, "personas/persona_edit.html", context)

@@ -5,6 +5,7 @@ from django.db.models import Count, F, Q
 from asistencias.models import ClaseLiberada
 
 from ..models import AttendanceConsumption, Payment
+from .imputacion import _misma_clave_periodo_mensual, _plan_vigente_para_fecha
 
 
 TIPOS_INCONSISTENCIA = (
@@ -18,20 +19,6 @@ TIPOS_INCONSISTENCIA = (
     "plan_fuera_vigencia",
     "estado_asistencia_incompatible",
 )
-
-
-def _mismo_periodo_mensual(fecha_a, fecha_b):
-    return fecha_a.year == fecha_b.year and fecha_a.month == fecha_b.month
-
-
-def _plan_cubre_fecha(pago, fecha):
-    if not pago.plan_id:
-        return True
-    if pago.plan.fecha_inicio and fecha < pago.plan.fecha_inicio:
-        return False
-    if pago.plan.fecha_fin and fecha > pago.plan.fecha_fin:
-        return False
-    return True
 
 
 def reconciliar_integridad_dominio():
@@ -98,7 +85,7 @@ def reconciliar_integridad_dominio():
             hallazgos["clase_liberada_consumiendo"].append(referencia)
         if consumo.pago_id and consumo.estado == AttendanceConsumption.Estado.CONSUMIDO:
             referencia_pago = {**referencia, "pago_id": consumo.pago_id}
-            if not _mismo_periodo_mensual(
+            if not _misma_clave_periodo_mensual(
                 consumo.pago.fecha_pago,
                 asistencia.sesion.fecha,
             ):
@@ -112,7 +99,7 @@ def reconciliar_integridad_dominio():
                 )
             if consumo.pago.revertido_en:
                 hallazgos["pago_revertido_incluido"].append(referencia_pago)
-            if not _plan_cubre_fecha(consumo.pago, asistencia.sesion.fecha):
+            if not _plan_vigente_para_fecha(consumo.pago, asistencia.sesion.fecha):
                 hallazgos["plan_fuera_vigencia"].append(referencia_pago)
 
         if asistencia.pk in liberaciones_activas:
