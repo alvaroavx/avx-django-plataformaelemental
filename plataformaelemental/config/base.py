@@ -88,6 +88,9 @@ TEMPLATES = [
                 "plataformaelemental.context.periodo_context",
                 "plataformaelemental.navigation.navigation_context",
             ],
+            "libraries": {
+                "formato": "plataformaelemental.templatetags.formato",
+            },
         },
     },
 ]

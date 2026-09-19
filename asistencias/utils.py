@@ -40,12 +40,7 @@ def usuario_tiene_roles(user, roles: list[str], *, organizacion=None) -> bool:
         normalizar_codigo_rol(codigo)
         for codigo in roles_qs.values_list("rol__codigo", flat=True)
     }
-    return bool(roles_usuario.intersection(roles_normalizados)) or PersonaRol.objects.filter(
-        persona=persona,
-        activo=True,
-        organizacion=organizacion,
-        rol__codigo__in=roles,
-    ).exists()
+    return bool(roles_usuario.intersection(roles_normalizados))
 
 
 def disciplinas_vigentes_qs(organizacion=None):

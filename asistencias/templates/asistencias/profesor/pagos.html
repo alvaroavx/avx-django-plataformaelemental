@@ -1,7 +1,8 @@
 {% extends "asistencias/profesor/base.html" %}
+{% load formato %}
 {% block content %}
 <header class="page-heading d-flex justify-content-between align-items-start gap-3">
-  <div><span class="eyebrow">Registro de ingresos</span><h1>Pagos</h1><p class="text-muted mb-0">{{ monto_total_label }}: <strong>${{ monto_total|floatformat:"0g" }}</strong></p></div>
+  <div><span class="eyebrow">Registro de ingresos</span><h1>Pagos</h1><p class="text-muted mb-0">{{ monto_total_label }}: <strong>{{ monto_total|clp }}</strong></p></div>
   {% if puede_operar_profesor %}<div class="d-flex flex-wrap gap-2"><a class="btn btn-payment" href="{% url 'profesor:pago_crear' %}?{{ profesor_query }}">Registrar pago</a><a class="btn btn-outline-profesor" href="{% url 'profesor:pago_masivo' %}?{{ profesor_query }}">Pago masivo</a></div>{% endif %}
 </header>
 {% if not contexto_mutable %}<div class="context-notice mb-3" role="status"><i class="bi bi-eye" aria-hidden="true"></i><div><strong>Historial de lectura</strong><div>{{ mensaje_contexto_accion }}</div></div></div>{% endif %}
@@ -15,7 +16,7 @@
         <div class="operational-row-meta">{% if organizacion_todas %}{{ pago.organizacion.nombre }} · {% endif %}{{ pago.disciplina.nombre }} · {{ pago.fecha_pago|date:"d/m/Y" }}</div>
         {% if pago.revertido_en %}<span class="status-text status-critical"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Pago revertido</span>{% elif pago.transaccion_id %}<span class="status-text status-payment"><i class="bi bi-check-circle" aria-hidden="true"></i>Registrado</span>{% else %}<span class="status-text status-critical"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>Sin vínculo contable</span>{% endif %}
       </div>
-      <div class="operational-row-amount">${{ pago.monto_total|floatformat:"0g" }}</div>
+      <div class="operational-row-amount">{{ pago.monto_total|clp }}</div>
       <a class="row-link" href="{% url 'profesor:pago_detalle' pago.pk %}?{{ profesor_query }}"><span class="visually-hidden">Ver pago de {{ pago.persona.nombre_completo }}</span></a>
     </article>
   {% empty %}<div class="empty-state"><i class="bi bi-receipt" aria-hidden="true"></i><span>Sin resultados para este período.</span></div>{% endfor %}
