@@ -100,7 +100,6 @@ Reglas:
 - Los enlaces deben arrastrar los filtros globales activos.
 - El objetivo es continuidad operativa, no navegacion aislada por app.
 - En mobile puede cambiar la disposicion visual, pero debe conservar la misma necesidad funcional.
-- `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
 - En el sidebar administrativo, los dominios son encabezados de agrupación y
   las páginas son los destinos navegables. `Panel` sigue siendo un destino
   explícito; el encabezado no combina la semántica de título y enlace.

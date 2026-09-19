@@ -237,7 +237,6 @@ erDiagram
 ### Soporte transversal
 - `AuditLog`: evento parcial de auditoría con usuario y organización opcionales.
 - `ApiAccessKey`: credencial hash conservada para la API mínima.
-- Los modelos de `monitor` siguen instalados, pero archivados y fuera del producto visible.
 
 ## Tablas Legacy
 
@@ -251,6 +250,16 @@ Estado actual:
 
 Regla:
 - No reintroducir modelos ni imports desde `database`.
+
+La app `monitor` fue retirada del producto activo de la misma forma.
+
+Estado actual:
+- No existe app `monitor` en `INSTALLED_APPS`.
+- No existen modelos, vistas, urls ni templates de `monitor` en el repositorio.
+- Las tablas `monitor_*` se retiraron en desarrollo con `python manage.py migrate monitor zero` antes de borrar el codigo; cada ambiente (incluida produccion) debe correr el mismo paso, con respaldo previo, antes o durante el despliegue que retira la app.
+
+Regla:
+- No reintroducir modelos ni imports desde `monitor`.
 
 ## Relaciones Criticas
 

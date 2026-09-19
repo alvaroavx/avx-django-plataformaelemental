@@ -37,10 +37,8 @@ Superficies activas:
 | `finanzas` | Activo | Planes, pagos, lotes, consumos/deuda, documentos, categorías y transacciones. |
 | `auditoria` | Activo | Registro best-effort de mutaciones sensibles. |
 | `api` | Activo y mínimo | Salud, estado, versión y usuario autenticado; no hay CRUD de dominio. |
-| `monitor` | Instalado pero archivado | Conserva modelos, migración y código; no tiene ruta raíz, navegación ni admin activo. |
 
-La app legacy `database` ya no existe. `monitor` no es parte del producto visible,
-pero todavía sí forma parte del runtime por estar en `INSTALLED_APPS`.
+Las apps legacy `database` y `monitor` ya no existen: ninguna de las dos forma parte del código, las migraciones ni `INSTALLED_APPS`.
 
 ## Stack y ejecución
 
@@ -139,12 +137,11 @@ Google activo y operativo en producción; este checkout no inspeccionó ese runt
 6. Resolver reglas en services/selectors; las views coordinan HTTP.
 7. Preservar datos productivos en migraciones y probar rollback/backup antes de cambios destructivos.
 8. Mantener autenticación Google detrás de flags; identidad no equivale a autorización.
-9. Mantener `monitor` archivado hasta auditar sus tablas productivas.
-10. Usar PostgreSQL; SQLite ya no es alternativa soportada ni configuración de fallback.
-11. Autorizar Operación Profesor mediante asignaciones explícitas de disciplina,
+9. Usar PostgreSQL; SQLite ya no es alternativa soportada ni configuración de fallback.
+10. Autorizar Operación Profesor mediante asignaciones explícitas de disciplina,
     sesión y alumno; el rol o la navegación por sí solos no conceden alcance.
-12. Crear pago y movimiento contable enlazado en una sola operación atómica.
-13. Tratar toda asignación o matrícula inferida desde historia como inactiva. Una
+11. Crear pago y movimiento contable enlazado en una sola operación atómica.
+12. Tratar toda asignación o matrícula inferida desde historia como inactiva. Una
     relación histórica solo se vuelve operativa con activación administrativa,
     actor, fecha de revisión y auditoría.
 
@@ -230,8 +227,6 @@ explícitamente PostgreSQL ni dependencias externas.
 
 - Las views principales siguen siendo grandes: Personas 1.047 líneas, Asistencias
   1.669 y Finanzas 1.563 en este corte.
-- `monitor` permanece instalado con código, modelos y tests omitidos; aumenta el
-  runtime y el costo de mantenimiento aunque no tenga URL activa.
 - La auditoría es parcial y best-effort; no es una fuente completa para reconstruir historia.
 - Dependencias visuales CDN introducen una dependencia externa no verificada para producción.
 - No existe coverage formal ni separación uniforme de tests por capas.
@@ -253,14 +248,14 @@ explícitamente PostgreSQL ni dependencias externas.
 ## Cosas por resolver, en orden de riesgo
 
 1. Cerrar y probar una sola política de `staff`, superusuario, rol y organización para Personas, Asistencias, Finanzas, archivos, exports y Admin.
-2. Auditar datos productivos en modo lectura: identidades, roles, pagos, consumos, clases liberadas, documentos y tablas `monitor_*`.
+2. Auditar datos productivos en modo lectura: identidades, roles, pagos, consumos, clases liberadas y documentos.
 3. Proteger operaciones de baja y corrección histórica; no ejecutar borrados ni recálculos globales sin preview, backup y rollback probado.
 4. Confirmar runtime productivo: commit, Python, PostgreSQL, flags, Nginx/media, unit, secrets y último backup restaurable.
 5. Revisar y retirar del HEAD los archivos reales de `data/` y `public/`; decidir si corresponde limpieza de historial.
 6. Alinear Python 3.12/3.13 entre CI, deploy y runtime, y hacer fallar cerrado la selección de entorno/configuración productiva.
 7. Repetir el ensayo de migraciones y la restauración sobre una copia protegida y
    reciente de producción; luego documentar RPO/RTO operativos reales.
-8. Decidir si `monitor` se exporta/elimina o se mantiene con dueño y tests activos.
+8. Correr `python manage.py migrate monitor zero` (con respaldo previo) en cada ambiente que aún tenga tablas `monitor_*`, ya que la app fue retirada del código sin ese paso ejecutado en producción.
 9. Conciliar pagos históricos sin transacción y definir el contramovimiento de
    reversas sin inventar ni duplicar caja.
 10. Extraer casos de uso desde views de manera incremental, sin cambiar contratos HTML/JSON innecesariamente.
@@ -291,5 +286,5 @@ durante la preparación. Detalle:
 - Que Google está operativo solo porque el código y las variables existen.
 - Que toda la plataforma es multi-organización segura mientras persista el bypass de staff.
 - Que un backup es recuperable sin haber ejecutado `pg_restore` en un entorno controlado.
-- Que la API, el healthcheck o `monitor` ofrecen observabilidad productiva completa.
+- Que la API o el healthcheck ofrecen observabilidad productiva completa.
 - Que los PDFs y archivos de carga versionados son ficticios o publicables sin revisión.

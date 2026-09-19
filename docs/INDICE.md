@@ -23,7 +23,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/arquitectura/MODELO_DATOS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/MODELO_DATOS.md): modelo relacional e integridad.
 - [docs/arquitectura/NAVEGACION_Y_CONTEXTO.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/NAVEGACION_Y_CONTEXTO.md): filtros globales y contexto compartido.
 - [docs/arquitectura/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PERMISOS_Y_ROLES.md): permisos y roles.
-- [docs/arquitectura/OBSERVABILIDAD.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/OBSERVABILIDAD.md): observabilidad futura y estado archivado de `monitor`.
+- [docs/arquitectura/OBSERVABILIDAD.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/OBSERVABILIDAD.md): observabilidad futura.
 
 ## ADR
 - [docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md): decision y gates de seguridad para autenticacion Google y solicitudes de acceso.
@@ -40,7 +40,6 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/apps/AUDITORIA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/AUDITORIA.md): trazabilidad operativa minima de acciones sensibles.
 - [docs/apps/ADMIN.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ADMIN.md): uso del Django Admin como soporte y diagnostico.
 - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md): decisiones de `api`.
-- [docs/apps/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/MONITOR.md): estado archivado de `monitor`.
 
 ## Proceso
 - [docs/proceso/DECISIONES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/DECISIONES.md): gobernanza documental y jerarquia de autoridad.
@@ -58,6 +57,3 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 
 - [Migraciones Operación Profesor 2026-08-10](evidencia/migraciones-operacion-profesor-20260810/RESULTADOS.md): SQL, medición sintética de locks, reporte histórico y restauración probada.
 - [Ensayo QA y transición de permisos](evidencia/migraciones-operacion-profesor-20260810/ENSAYO_QA_Y_TRANSICION.md): estado representativo, procedimiento de activación, pruebas omitidas, higiene y veredicto no-go.
-
-## Archivo
-- [docs/archivo/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/archivo/MONITOR.md): inventario y decision de archivo de `monitor`.

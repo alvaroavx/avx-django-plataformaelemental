@@ -24,7 +24,6 @@ Apps funcionales visibles:
 
 Componentes activos de soporte:
 - `auditoria`: trazabilidad parcial y best-effort de mutaciones sensibles.
-- `monitor`: instalado en el runtime, pero archivado/desactivado del producto visible; se conserva temporalmente por migraciones y posible data historica.
 
 Componentes de soporte:
 - `plataformaelemental`: configuracion del proyecto.
@@ -57,15 +56,13 @@ Detalle operativo:
   - finanzas/contabilidad: documentos tributarios, transacciones, categorias y reportes.
 - `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
 - `auditoria` registra eventos seleccionados, pero no es una bitacora completa ni bloquea una operacion si falla el log.
-- `monitor` no define core operacional y no forma parte de la navegacion/rutas activas de `Elemental Apps`.
-- La app legacy `database` fue retirada; las migraciones vigentes de `personas`, `asistencias` y `finanzas` crean sus tablas directamente.
+- Las apps legacy `database` y `monitor` fueron retiradas; las migraciones vigentes de `personas`, `asistencias` y `finanzas` crean sus tablas directamente.
 
 Detalle por app:
 - Asistencias: [docs/apps/ASISTENCIAS.md](../apps/ASISTENCIAS.md)
 - Personas: [docs/apps/PERSONAS.md](../apps/PERSONAS.md)
 - Finanzas: [docs/apps/FINANZAS.md](../apps/FINANZAS.md)
 - API: [docs/apps/API.md](../apps/API.md)
-- Monitor: [docs/apps/MONITOR.md](../apps/MONITOR.md)
 
 ## Reglas transversales minimas
 - Los modelos viven en su app duena.

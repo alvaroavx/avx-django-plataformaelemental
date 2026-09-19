@@ -5,14 +5,7 @@ Fecha de actualizacion: 2026-06-01
 ## Proposito
 Este documento define criterios futuros de observabilidad interna de Plataforma Elemental.
 
-La app `monitor` queda archivada/desactivada en v1.0. Si la observabilidad vuelve a crecer, debe hacerlo como decision explicita y sin transformarse en una segunda fuente de verdad.
-
-## Estado Actual
-- Existe app `monitor`, pero esta archivada.
-- `/monitor/` no esta registrado en URLs raiz.
-- Tiene modelos historicos propios y puede tener tablas `monitor_*`.
-- No aparece en navegacion principal.
-- Antes de quitarla de `INSTALLED_APPS`, auditar datos con `python manage.py auditar_monitor`.
+La app `monitor` (herramienta de observabilidad de un producto anterior, sin rutas ni navegacion activas) fue retirada del repositorio. Si la observabilidad vuelve a crecer, debe hacerlo como decision explicita y sin transformarse en una segunda fuente de verdad.
 
 ## Principio
 Una futura herramienta de observabilidad debe observar datos de apps duenias.
@@ -86,7 +79,7 @@ Regla futura:
 - Eventos de negocio criticos no deben depender solo de logs; deben quedar persistidos en modelos duenos cuando sean parte del dominio.
 
 ## Relacion Con Seguridad
-No exponer en `monitor`:
+No exponer en una futura herramienta de observabilidad:
 - secretos,
 - tokens,
 - API keys,

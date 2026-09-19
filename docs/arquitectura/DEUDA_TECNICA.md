@@ -99,9 +99,9 @@ Acción: verificar la política real del environment y diseñar healthcheck prof
 Estado: activa.
 
 No hay logs estructurados, alertas ni healthcheck de DB. `AuditLog` es parcial y
-best-effort. `monitor` está instalado, archivado y con tests HTML omitidos.
+best-effort.
 
-Acción: definir mínimo de producción; auditar tablas de monitor antes de retirarlo.
+Acción: definir mínimo de producción.
 
 ## Baja
 
@@ -114,6 +114,7 @@ Acción: definir mínimo de producción; auditar tablas de monitor antes de reti
 ## Resuelta
 
 - App legacy `database` retirada del runtime y grafo vigente.
+- App `monitor` (archivada, sin rutas activas) retirada del runtime, del codigo y de `INSTALLED_APPS`.
 - SQLite retirado de settings y del checkout local en este corte.
 - Inventario de reglas regenerado desde el código actual.
 - Transiciones ordinarias de asistencia recalculan idempotentemente su consumo.

@@ -108,25 +108,11 @@ Responsabilidad:
 No debe contener:
 - reglas de negocio nuevas que no existan en apps/services duenos.
 
-### Monitor / Observabilidad Interna
-Estado:
-- Archivado dentro de este producto. El codigo y las tablas potenciales siguen presentes.
-
-App duena:
-- `monitor`.
-
-Responsabilidad actual:
-- ninguna superficie activa; `/monitor/` no esta registrada.
-
-No debe duplicar:
-- modelos,
-- reglas financieras,
-- reglas academicas.
-
-Detalle:
-- [docs/arquitectura/OBSERVABILIDAD.md](OBSERVABILIDAD.md)
-
 ## Dominios Futuros
+
+### Observabilidad Interna
+Estado:
+- Futuro. La app `monitor` que exploraba esto fue retirada del repositorio; ver criterios en [docs/arquitectura/OBSERVABILIDAD.md](OBSERVABILIDAD.md) antes de reconstruir algo similar.
 
 ### Entrenamiento
 Estado:
@@ -190,12 +176,11 @@ Criterio de app:
 2. Mantener validado el retiro de `database` legacy en cambios futuros de migraciones.
 3. Completar separacion interna de `finanzas`.
 4. Formalizar permisos/roles antes de exponer mas escrituras.
-5. Auditar datos productivos de `monitor` y decidir retiro o proyecto separado.
-6. Evaluar nuevas apps solo cuando haya modelos persistentes claros.
+5. Evaluar nuevas apps solo cuando haya modelos persistentes claros.
 
 ## Anti-Patrones
 - Crear app nueva solo para una vista.
 - Agregar campos a `Persona` para resolver cada flujo futuro.
 - Mezclar cobranza, contabilidad y documentos tributarios en una misma view.
-- Hacer que `monitor` tenga modelos espejo.
+- Crear una app de observabilidad con modelos espejo de las apps duenas.
 - Implementar reglas de negocio directamente en templates.

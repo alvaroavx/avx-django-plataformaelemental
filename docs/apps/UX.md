@@ -41,7 +41,7 @@ usan cortes temporales diferentes para ese concepto. Profesor puro conserva su
 redirección a `/profesor/`.
 
 Si un usuario autenticado no tiene información operacional visible, se muestra
-un mensaje controlado y no un error. `Monitor` y `API` permanecen fuera del home.
+un mensaje controlado y no un error. `API` permanece fuera del home.
 
 ## Login
 El login usa una pantalla limpia y centrada con el nombre `Elemental Apps`.
@@ -218,5 +218,4 @@ El layout principal muestra footer discreto:
 - Existe auditoria transversal parcial para mutaciones seleccionadas; no cubre lecturas, exports ni todos los automatismos.
 - No se implementa backoffice/configuracion.
 - No se implementa rediseño profundo del Django Admin.
-- `monitor` queda archivado: no aparece en navegacion y `/monitor/` no esta registrado como ruta activa.
 - Algunas acciones secundarias conservan botones compactos existentes para evitar tocar demasiadas vistas antes de v1.0.

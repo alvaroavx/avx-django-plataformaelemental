@@ -49,10 +49,6 @@ Reglas funcionales vigentes:
 - trazabilidad parcial de mutaciones sensibles
 - revisión de solo lectura desde Django Admin
 
-### `monitor`
-- instalado por compatibilidad histórica
-- archivado, sin rutas ni navegación activas
-
 ## Arquitectura
 
 ### Stack

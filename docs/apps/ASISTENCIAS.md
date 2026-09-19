@@ -212,7 +212,7 @@ flowchart TD
 - Las asistencias deben poder verse junto con su estado financiero.
 - Los modelos propios de esta app viven en `asistencias.models`.
 - El menu superior de `asistencias` debe ofrecer cierre de sesion mediante POST a `accounts/logout/`, redirigiendo al login principal.
-- La navegacion principal vive en el sidebar global de `Elemental Apps`; `monitor` queda archivado y no forma parte de la navegacion activa v1.0.
+- La navegacion principal vive en el sidebar global de `Elemental Apps`.
 
 ## Decisiones funcionales vigentes
 - En Profesor, mes/año se transportan juntos o se usa `periodo=todos`; mezclar

@@ -31,7 +31,7 @@ Este documento explica como leer el repo antes de tocarlo.
 11. [docs/arquitectura/PERMISOS_Y_ROLES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PERMISOS_Y_ROLES.md)
     Roles, permisos y riesgos de acceso.
 12. [docs/arquitectura/OBSERVABILIDAD.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/OBSERVABILIDAD.md)
-    Criterios para `monitor`, indicadores y observabilidad interna.
+    Indicadores y observabilidad interna.
 13. [docs/proceso/TESTING.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/TESTING.md)
     Estrategia de pruebas por tipo de cambio.
 14. Documento local de la app que vayas a tocar:
@@ -39,7 +39,6 @@ Este documento explica como leer el repo antes de tocarlo.
     - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md)
     - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md)
     - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md)
-    - [docs/apps/MONITOR.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/MONITOR.md)
 15. [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md)
     Resumen humano y puesta en marcha.
 16. Documentos operativos si aplica:

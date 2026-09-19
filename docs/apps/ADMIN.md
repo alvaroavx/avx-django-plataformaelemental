@@ -58,14 +58,6 @@ El objetivo es revisar, no manipular payloads tributarios desde admin.
 
 La revision de logs se hace desde `Auditoria > Registros de auditoria`.
 
-## Monitor archivado
-
-`monitor` esta archivado y no forma parte activa de `Elemental Apps` v1.0.
-
-Se mantiene instalado temporalmente por compatibilidad con migraciones o datos historicos, pero sus modelos no se registran en Django Admin.
-
-No debe operarse como parte del producto principal.
-
 ## Limites conocidos
 
 - El admin no aplica la matriz organizacional de la UI principal.

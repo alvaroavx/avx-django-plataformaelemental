@@ -59,7 +59,6 @@ INSTALLED_APPS = [
     "asistencias.apps.AsistenciasConfig",
     "personas.apps.PersonasConfig",
     "finanzas.apps.FinanzasConfig",
-    "monitor.apps.MonitorConfig",
 ]
 
 MIDDLEWARE = [

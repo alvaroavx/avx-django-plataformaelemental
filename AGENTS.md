@@ -66,7 +66,6 @@ Un cambio se considera terminado solo si:
 - `asistencias` define operación de clases: Disciplina, BloqueHorario, SesionClase, Asistencia.
 - `cobranzas` es un dominio conceptual, por ahora implementado dentro de `finanzas/services/`, y maneja planes, pagos operacionales, deuda e imputación de clases.
 - `finanzas` maneja contabilidad: documentos tributarios, transacciones, categorías, reportes para contadora.
-- `monitor` es herramienta interna y no debe depender del core operacional.
 
 ## Reglas de dependencia
 - Ninguna app debe importar helpers desde `views.py` de otra app.
