@@ -18,7 +18,7 @@ from finanzas.services import confirmar_lote_pagos, crear_pago_operacional
 from personas.models import Persona
 from personas.search import filtrar_por_fragmentos
 
-from .models import AlumnoDisciplina, SesionClase
+from .models import AlumnoDisciplina, Asistencia, SesionClase
 from .profesor_contexto import (
     contexto_seleccion_profesor,
     exigir_contexto_mutable,
@@ -149,7 +149,24 @@ def inicio(request):
     ).first()
     if not proxima:
         proxima = sesiones.exclude(estado=SesionClase.Estado.CANCELADA).order_by("-fecha", "-pk").first()
-    alumnos = list(_alumnos_profesor(contexto)[:3])
+    asistencias = list(
+        filtrar_periodo(
+            Asistencia.objects.select_related(
+                "persona",
+                "sesion",
+                "sesion__disciplina",
+                "sesion__disciplina__organizacion",
+            ).filter(
+                sesion__disciplina__organizacion_id__in=contexto["organizacion_ids"],
+                sesion__disciplina_id__in=contexto["disciplina_ids"],
+                sesion__profesores=contexto["profesor"],
+            ),
+            "sesion__fecha",
+            contexto,
+        )
+        .distinct()
+        .order_by("-registrada_en", "-pk")[:3]
+    )
     pagos = list(
         filtrar_periodo(
             Payment.objects.select_related("persona", "disciplina", "disciplina__organizacion", "transaccion")
@@ -166,7 +183,7 @@ def inicio(request):
             "sesiones_hoy": sesiones_hoy,
             "proxima_sesion": proxima,
             "fecha_hoy": hoy,
-            "alumnos_resumen": alumnos,
+            "asistencias_resumen": asistencias,
             "pagos_resumen": pagos,
             "glosas": _glosas_profesor(contexto),
         }

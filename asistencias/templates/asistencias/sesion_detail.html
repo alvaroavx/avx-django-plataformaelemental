@@ -22,18 +22,80 @@
     background: var(--prof-payments, #0f766e);
     border-color: var(--prof-payments, #0f766e);
   }
-  .jornada-sesion .asistente-mobile { border-bottom: 1px solid var(--prof-border, #dbe3df); }
+  .jornada-sesion .sesion-mobile-commands {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) 44px 44px minmax(0, 1.1fr);
+    gap: .4rem;
+    align-items: stretch;
+  }
+  .jornada-sesion .sesion-mobile-commands--without-release {
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+  }
+  .jornada-sesion .sesion-mobile-commands .btn,
+  .jornada-sesion .sesion-mobile-commands .action-menu > summary {
+    min-height: 44px;
+  }
+  .jornada-sesion .sesion-command-icon {
+    display: grid;
+    place-items: center;
+    padding-inline: .25rem;
+  }
+  .jornada-sesion .sesion-command-release > summary {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: .35rem;
+    padding-inline: .5rem;
+    border: 1px solid var(--prof-critical, #b42318);
+    border-radius: var(--bs-border-radius, .375rem);
+    color: var(--prof-critical, #b42318);
+    background: var(--prof-surface, #fff);
+  }
+  .jornada-sesion .asistente-mobile {
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--prof-border, #dbe3df);
+  }
+  .jornada-sesion .asistente-mobile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .5rem;
+    margin-bottom: .55rem;
+  }
+  .jornada-sesion .asistente-mobile-header h3 { margin: 0; }
+  .jornada-sesion .asistente-mobile .action-menu > summary { width: 44px; min-height: 44px; }
+  .jornada-sesion .estado-rapido-segmentado { gap: 0; }
+  .jornada-sesion .estado-rapido-segmentado button {
+    padding-inline: .25rem;
+    border-radius: 0;
+  }
+  .jornada-sesion .estado-rapido-segmentado button + button { margin-left: -1px; }
+  .jornada-sesion .estado-rapido-segmentado button:first-child {
+    border-top-left-radius: var(--bs-border-radius, .375rem);
+    border-bottom-left-radius: var(--bs-border-radius, .375rem);
+  }
+  .jornada-sesion .estado-rapido-segmentado button:last-child {
+    border-top-right-radius: var(--bs-border-radius, .375rem);
+    border-bottom-right-radius: var(--bs-border-radius, .375rem);
+  }
+  .jornada-sesion [data-estado-status]:empty { display: none; }
+  .jornada-sesion .asistente-mobile-status:not(:empty) { margin-top: .45rem; }
   @media (max-width: 575.98px) {
     .jornada-sesion { margin-top: 0.25rem !important; }
     .jornada-sesion .sesion-actions { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
     .jornada-sesion .sesion-actions .btn { min-height: 44px; }
+  }
+  @media (max-width: 359.98px) {
+    .jornada-sesion .estado-rapido-segmentado .estado-rapido-label { display: none; }
+    .jornada-sesion .estado-rapido-segmentado button i { margin: 0 !important; }
   }
   @media (max-width: 260px) {
     .jornada-sesion .sesion-actions,
     .jornada-sesion .estado-rapido {
       grid-template-columns: 1fr;
     }
-    .jornada-sesion .asistente-mobile > .d-flex {
+    .jornada-sesion .asistente-mobile-header {
       flex-wrap: wrap;
     }
   }
@@ -43,11 +105,13 @@
 {% block content %}
 {% if es_jornada_profesora %}
 <div class="jornada-sesion">
-  <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+  <nav class="sesion-mobile-commands{% if sesion.estado == "cancelada" %} sesion-mobile-commands--without-release{% endif %} mb-3" aria-label="Navegación y acciones de la sesión">
     <a class="btn btn-outline-profesor" href="{{ back_url }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Mis clases</a>
+    {% if sesion_anterior %}<a class="btn btn-outline-profesor sesion-command-icon" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}?{{ profesor_query }}" aria-label="Sesión anterior" title="Anterior"><i class="bi bi-arrow-left" aria-hidden="true"></i></a>{% else %}<span class="btn btn-outline-profesor disabled sesion-command-icon" aria-disabled="true" aria-label="No hay sesión anterior" title="No hay sesión anterior"><i class="bi bi-arrow-left" aria-hidden="true"></i></span>{% endif %}
+    {% if sesion_siguiente %}<a class="btn btn-outline-profesor sesion-command-icon" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}?{{ profesor_query }}" aria-label="Sesión siguiente" title="Siguiente"><i class="bi bi-arrow-right" aria-hidden="true"></i></a>{% else %}<span class="btn btn-outline-profesor disabled sesion-command-icon" aria-disabled="true" aria-label="No hay sesión siguiente" title="No hay sesión siguiente"><i class="bi bi-arrow-right" aria-hidden="true"></i></span>{% endif %}
     {% if sesion.estado != "cancelada" %}
-    <details class="action-menu">
-      <summary class="icon-button" aria-label="Acciones de la sesión"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></summary>
+    <details class="action-menu sesion-command-release">
+      <summary aria-label="Liberar sesión"><i class="bi bi-unlock" aria-hidden="true"></i><span>Liberar</span></summary>
       <div class="action-menu-panel">
         <form method="post" action="{% url 'profesor:sesion_liberar' sesion.pk %}?{{ profesor_query }}" data-sensitive-form data-confirm="La sesión quedará cancelada y la acción será auditada. ¿Continuar?">
           {% csrf_token %}
@@ -58,11 +122,6 @@
       </div>
     </details>
     {% endif %}
-  </div>
-
-  <nav class="d-grid gap-2 mb-3" style="grid-template-columns:1fr 1fr" aria-label="Sesiones consecutivas autorizadas">
-    {% if sesion_anterior %}<a class="btn btn-outline-profesor jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_anterior.pk %}?{{ profesor_query }}"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Anterior</a>{% else %}<span class="btn btn-outline-profesor disabled" aria-disabled="true">Sin anterior</span>{% endif %}
-    {% if sesion_siguiente %}<a class="btn btn-outline-profesor jornada-touch" href="{% url 'asistencias:sesion_detail' sesion_siguiente.pk %}?{{ profesor_query }}">Siguiente<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></a>{% else %}<span class="btn btn-outline-profesor disabled" aria-disabled="true">Sin siguiente</span>{% endif %}
   </nav>
 
   <section class="task-surface mb-3" aria-labelledby="detalle-sesion-titulo">
@@ -99,9 +158,9 @@
     <div class="section-heading"><h2 id="listado-asistentes-titulo">Asistencia</h2></div>
     <div class="operational-list" id="asistentes-mobile">
       {% for item in asistencias %}
-      <article class="asistente-mobile py-3" data-asistencia-card="{{ item.pk }}">
-        <div class="d-flex justify-content-between gap-2 align-items-start mb-3">
-          <div><h3 class="h6 mb-1">{{ item.persona }}</h3><div class="small text-muted">Agregada a las {{ item.registrada_en|date:"H:i" }}</div>{% if item.clase_liberada_activa %}<span class="status-text status-session"><i class="bi bi-unlock" aria-hidden="true"></i>Clase liberada</span>{% endif %}</div>
+      <article class="asistente-mobile" data-asistencia-card="{{ item.pk }}">
+        <div class="asistente-mobile-header">
+          <div><h3 class="h6">{{ item.persona }}</h3>{% if item.clase_liberada_activa %}<span class="status-text status-session"><i class="bi bi-unlock" aria-hidden="true"></i>Clase liberada</span>{% endif %}</div>
           <details class="action-menu">
             <summary aria-label="Acciones de {{ item.persona }}"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></summary>
             <div class="action-menu-panel">
@@ -116,10 +175,10 @@
             </div>
           </details>
         </div>
-        <div class="estado-rapido" role="group" aria-label="Estado de asistencia de {{ item.persona }}" data-estado-control data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}?{{ profesor_query }}">
-          {% for value, label in item.Estado.choices %}<button class="btn btn-outline-profesor" type="button" data-estado="{{ value }}" aria-pressed="{% if value == item.estado %}true{% else %}false{% endif %}">{% if value == "presente" %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% elif value == "ausente" %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% else %}<i class="bi bi-file-earmark-check" aria-hidden="true"></i>{% endif %} {{ label }}</button>{% endfor %}
+        <div class="estado-rapido estado-rapido-segmentado" role="group" aria-label="Estado de asistencia de {{ item.persona }}" data-estado-control data-estado-url="{% url 'asistencias:sesion_asistencia_estado' sesion.pk item.pk %}?{{ profesor_query }}">
+          {% for value, label in item.Estado.choices %}<button class="btn btn-outline-profesor" type="button" data-estado="{{ value }}" aria-pressed="{% if value == item.estado %}true{% else %}false{% endif %}">{% if value == "presente" %}<i class="bi bi-check-circle" aria-hidden="true"></i>{% elif value == "ausente" %}<i class="bi bi-x-circle" aria-hidden="true"></i>{% else %}<i class="bi bi-file-earmark-check" aria-hidden="true"></i>{% endif %}<span class="estado-rapido-label"> {{ label }}</span></button>{% endfor %}
         </div>
-        <div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>
+        <div class="small asistente-mobile-status" role="status" aria-live="polite" data-estado-status></div>
       </article>
       {% empty %}<div class="empty-state" data-empty-mobile><i class="bi bi-person-check" aria-hidden="true"></i><span>Sin asistentes registrados.</span></div>{% endfor %}
     </div>
@@ -547,7 +606,7 @@
       var seleccionado = a.estado === estado[0] ? 'true' : 'false';
       return '<button class="btn btn-outline-profesor" type="button" data-estado="' + estado[0] +
         '" aria-pressed="' + seleccionado + '"><i class="bi ' + estado[1] +
-        '" aria-hidden="true"></i> ' + estado[2] + '</button>';
+        '" aria-hidden="true"></i><span class="estado-rapido-label"> ' + estado[2] + '</span></button>';
     }).join('');
   }
 
@@ -608,18 +667,17 @@
       var emptyMobile = mobileList.querySelector('[data-empty-mobile]');
       if (emptyMobile) emptyMobile.remove();
       var article = document.createElement('article');
-      article.className = 'asistente-mobile py-3';
+      article.className = 'asistente-mobile';
       article.setAttribute('data-asistencia-card', a.id);
       article.innerHTML =
-        '<div class="d-flex justify-content-between gap-2 align-items-start mb-3">' +
-          '<div><h3 class="h6 mb-1">' + esc(a.nombre) + '</h3>' +
-          '<div class="small text-muted">Agregada a las ' + esc(a.hora || '--:--') + '</div></div>' + accionesProfesor +
+        '<div class="asistente-mobile-header">' +
+          '<div><h3 class="h6">' + esc(a.nombre) + '</h3></div>' + accionesProfesor +
         '</div>' +
-        '<div class="estado-rapido" role="group" aria-label="Estado de asistencia de ' + esc(a.nombre) +
+        '<div class="estado-rapido estado-rapido-segmentado" role="group" aria-label="Estado de asistencia de ' + esc(a.nombre) +
           '" data-estado-control data-estado-url="' + esc(urlEstado(a.id)) + '">' +
           botonesEstado(a) +
         '</div>' +
-        '<div class="small mt-2" role="status" aria-live="polite" data-estado-status></div>';
+        '<div class="small asistente-mobile-status" role="status" aria-live="polite" data-estado-status></div>';
       mobileList.insertBefore(article, mobileList.firstChild);
     }
   }

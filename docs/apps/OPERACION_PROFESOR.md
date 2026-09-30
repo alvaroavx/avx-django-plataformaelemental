@@ -1,6 +1,6 @@
 # Operación Profesor
 
-Fecha de actualización: 2026-08-17
+Fecha de actualización: 2026-09-23
 
 > Nota de despliegue (2026-09-11): producción usa
 > `ManifestStaticFilesStorage`, por lo que `profesor.css` y
@@ -153,9 +153,20 @@ divergentes.
 - Barra inferior: Inicio, Mis clases, Alumnos y Pagos.
 - Cabecera compacta que abre una hoja inferior de contexto: organización,
   período y tema Claro/Oscuro persistido solo en `localStorage`.
-- Próxima sesión y acciones frecuentes antes que resúmenes.
+- En tema oscuro, campos y resultados de búsqueda mantienen el color de texto,
+  placeholder, foco y opción activa definidos por el sistema visual; el
+  componente Tom Select no conserva colores del tema claro.
+- Próxima sesión y acciones frecuentes antes que resúmenes. En el detalle, Mis
+  clases, sesión anterior, sesión siguiente y Liberar comparten una única fila;
+  las dos navegaciones consecutivas usan botones de icono con etiqueta accesible.
+- Inicio muestra las tres asistencias registradas más recientes del período y
+  organización activos, en vez de una muestra alfabética de alumnos; cada fila
+  conserva alumno, clase, fecha y estado, y lleva al detalle de la sesión.
 - Listas con divisores en lugar de una tarjeta por registro; menú `…` para
-  quitar asistente y liberar/revertir clase individual.
+  quitar asistente y liberar/revertir clase individual. Cada asistencia elimina
+  la hora en que fue agregada y agrupa sus tres estados de selección directa en
+  un único control segmentado, para reducir el desplazamiento sin ocultar una
+  acción frecuente.
 - Botones frecuentes y navegación inferior superan 44 px en la medición móvil.
 - Selector masivo incremental mantiene foco, usa `Enter`, chips y evita duplicados.
 - Formularios deshabilitan el envío mientras guardan cuando corresponde.

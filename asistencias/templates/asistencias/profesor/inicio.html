@@ -58,10 +58,10 @@
 {% endif %}
 {% endif %}
 
-<section aria-labelledby="alumnos-resumen">
-  <div class="section-heading"><h2 id="alumnos-resumen">Alumnos</h2><a href="{% url 'profesor:alumnos' %}?{{ profesor_query }}">Ver todos</a></div>
+<section aria-labelledby="asistencias-resumen">
+  <div class="section-heading"><h2 id="asistencias-resumen">Últimas asistencias</h2><a href="{% url 'profesor:sesiones' %}?{{ profesor_query }}">Ver sesiones</a></div>
   <div class="operational-list">
-    {% for alumno in alumnos_resumen %}<div class="operational-row"><span class="avatar-profesor avatar-student" aria-hidden="true">{{ alumno.nombres|first }}{{ alumno.apellidos|first }}</span><div class="operational-row-main"><div class="operational-row-title">{{ alumno.nombre_completo }}</div><div class="operational-row-meta">Estudiante activo</div></div></div>{% empty %}<div class="empty-state"><i class="bi bi-people" aria-hidden="true"></i><span>Sin alumnos activos en tus clases.</span></div>{% endfor %}
+    {% for asistencia in asistencias_resumen %}<div class="operational-row"><span class="avatar-profesor avatar-student" aria-hidden="true">{{ asistencia.persona.nombres|first }}{{ asistencia.persona.apellidos|first }}</span><div class="operational-row-main"><div class="operational-row-title">{{ asistencia.persona.nombre_completo }}</div><div class="operational-row-meta">{% if organizacion_todas %}{{ asistencia.sesion.disciplina.organizacion.nombre }} · {% endif %}{{ asistencia.sesion.disciplina.nombre }} · {{ asistencia.sesion.fecha|date:"d/m/Y" }} · {{ asistencia.get_estado_display }}</div></div>{% if puede_operar_profesor %}<a class="row-link" href="{% url 'asistencias:sesion_detail' asistencia.sesion.pk %}?{{ profesor_query }}"><span class="visually-hidden">Ver asistencia de {{ asistencia.persona.nombre_completo }}</span></a>{% endif %}</div>{% empty %}<div class="empty-state"><i class="bi bi-person-check" aria-hidden="true"></i><span>Sin asistencias en este período.</span></div>{% endfor %}
   </div>
 </section>
 

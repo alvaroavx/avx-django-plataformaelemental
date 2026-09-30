@@ -121,6 +121,37 @@ button, .btn, input, select, textarea, summary { min-height: 44px; }
   color: var(--prof-text);
 }
 .form-label { color: var(--prof-text); font-weight: 650; }
+.ts-wrapper .ts-control,
+.ts-wrapper.single .ts-control,
+.ts-wrapper.multi .ts-control {
+  border-color: var(--prof-border) !important;
+  background: var(--prof-surface) !important;
+  color: var(--prof-text) !important;
+}
+.ts-wrapper .ts-control > input,
+.ts-wrapper .ts-control > input:focus {
+  color: var(--prof-text) !important;
+}
+.ts-wrapper .ts-control > input::placeholder { color: var(--prof-muted) !important; opacity: 1; }
+.ts-wrapper.focus .ts-control {
+  border-color: var(--prof-focus) !important;
+  box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--prof-focus) 25%, transparent) !important;
+}
+.ts-wrapper .ts-dropdown {
+  border-color: var(--prof-border) !important;
+  background: var(--prof-surface) !important;
+  color: var(--prof-text) !important;
+}
+.ts-wrapper .ts-dropdown .option,
+.ts-wrapper .ts-dropdown .create,
+.ts-wrapper .ts-dropdown .no-results {
+  color: var(--prof-text) !important;
+}
+.ts-wrapper .ts-dropdown .active,
+.ts-wrapper .ts-dropdown .option:hover {
+  background: var(--prof-surface-soft) !important;
+  color: var(--prof-text) !important;
+}
 .theme-options { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 .theme-options input { position: absolute; opacity: 0; pointer-events: none; }
 .theme-options span {

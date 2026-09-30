@@ -6,7 +6,7 @@ from django.urls import reverse
 from personas.models import Persona, PersonaRol
 
 from . import test_operacion_profesor as fixtures
-from .models import AlumnoDisciplina
+from .models import AlumnoDisciplina, Asistencia
 from .profesor_forms import PagoMasivoProfesorForm, PagoProfesorForm
 
 
@@ -63,3 +63,37 @@ class ProfesorUXTests(TestCase):
         vacio = self.client.get(url.replace("agata", "inexistente"))
         self.assertContains(vacio, "Sin resultados")
         self.assertContains(vacio, "Limpiar búsqueda")
+
+    def test_inicio_muestra_las_asistencias_mas_recientes_en_vez_de_alumnos_alfabeticos(self):
+        sesion_anterior = self._crear_sesion(self.disciplina_a)
+        anterior = Asistencia.objects.create(sesion=sesion_anterior, persona=self.alumno_a)
+        alumna_reciente = Persona.objects.create(
+            nombres="Zoe Reciente",
+            apellidos="Inicio",
+            email="zoe.reciente.inicio@example.test",
+        )
+        PersonaRol.objects.create(
+            persona=alumna_reciente,
+            rol=self.rol_estudiante,
+            organizacion=self.org_a,
+            activo=True,
+        )
+        AlumnoDisciplina.objects.create(disciplina=self.disciplina_a, alumno=alumna_reciente)
+        sesion_reciente = self._crear_sesion(self.disciplina_a)
+        reciente = Asistencia.objects.create(
+            sesion=sesion_reciente,
+            persona=alumna_reciente,
+            estado=Asistencia.Estado.JUSTIFICADA,
+        )
+
+        response = self.client.get(reverse("profesor:inicio") + f"?organizacion={self.org_a.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [asistencia.pk for asistencia in response.context["asistencias_resumen"]],
+            [reciente.pk, anterior.pk],
+        )
+        self.assertContains(response, "Últimas asistencias")
+        self.assertContains(response, "Zoe Reciente")
+        self.assertContains(response, "Justificada")
+        self.assertNotContains(response, 'id="alumnos-resumen"', html=False)
