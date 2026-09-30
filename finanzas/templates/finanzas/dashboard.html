@@ -6,6 +6,9 @@
   <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0 finanzas-help-title">Panel financiero {% include "finanzas/_help_tooltip.html" %}</h2>
     <div class="elemental-page-actions justify-content-md-end" aria-label="Exportaciones financieras">
+      <a class="btn btn-sm btn-success finanzas-btn" href="{% url 'finanzas:preparar_mes' %}?{{ request.GET.urlencode }}" title="Preparar información mensual para Cuadratura">
+        <i class="bi bi-box-arrow-up-right"></i><span class="finanzas-btn-label">Preparar mes</span>
+      </a>
       <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:export_pagos_csv' %}?{{ request.GET.urlencode }}" title="Exportar pagos CSV">
         <i class="bi bi-download"></i><span class="finanzas-btn-label">Exportar pagos CSV</span>
       </a>

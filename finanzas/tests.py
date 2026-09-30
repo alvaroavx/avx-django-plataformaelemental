@@ -24,6 +24,7 @@ from finanzas.forms import DocumentoTributarioForm, PaymentForm, TransactionForm
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
 from finanzas.services.reconciliacion import reconciliar_integridad_dominio
 from finanzas.services.reversas import revertir_pago
+from finanzas.services.cuadratura_v1 import prepare_month
 from finanzas.services.pagos import (
     confirmar_lote_pagos,
     crear_persona_estudiante_desde_modal,
@@ -168,6 +169,37 @@ class FinanzasAccessTests(TestCase):
         self.client.force_login(self.user_admin)
         response = self.client.get(reverse("finanzas:dashboard"), {"organizacion": self.org.pk})
         self.assertEqual(response.status_code, 200)
+
+    def test_preparar_mes_exporta_operacion_y_pago_sin_mutar_registros(self):
+        estudiante = Persona.objects.create(nombres="Alumna", apellidos="Ficticia", email="alumna-ficticia@example.com")
+        PersonaRol.objects.create(persona=estudiante, rol=self.rol_estudiante, organizacion=self.org, activo=True)
+        categoria = Category.objects.create(nombre="Cobranza ficticia", tipo=Category.Tipo.INGRESO)
+        transaction = Transaction.objects.create(
+            organizacion=self.org, categoria=categoria, fecha=date(2026, 8, 28),
+            tipo=Transaction.Tipo.INGRESO, monto=Decimal("50000"), descripcion="Taller ficticio",
+        )
+        payment = Payment.objects.create(
+            persona=estudiante, organizacion=self.org, fecha_pago=date(2026, 9, 2),
+            aplica_iva=False, monto_referencia=Decimal("50000"), transaccion=transaction,
+        )
+        payload = prepare_month(organization=self.org, year=2026, month=9)
+        self.assertEqual((payload["summary"]["operations"], payload["summary"]["payments"], payload["summary"]["total_payments"]), (1, 1, 50000))
+        self.assertEqual(payload["operations"][0]["operation_date"], "2026-08-28")
+        self.assertEqual(payload["operations"][0]["service_period"], "2026-09")
+        self.client.force_login(self.user_finanzas)
+        params = {"organizacion": self.org.pk, "periodo_mes": 9, "periodo_anio": 2026}
+        self.assertContains(self.client.get(reverse("finanzas:preparar_mes"), params), "Descargar para Cuadratura")
+        response = self.client.get(reverse("finanzas:descargar_cuadratura"), params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Payment.objects.get(pk=payment.pk).transaccion_id, transaction.pk)
+
+    def test_preparar_mes_declara_pagos_no_elegibles(self):
+        estudiante = Persona.objects.create(nombres="Otra", apellidos="Ficticia", email="otra-ficticia@example.com")
+        PersonaRol.objects.create(persona=estudiante, rol=self.rol_estudiante, organizacion=self.org, activo=True)
+        Payment.objects.create(persona=estudiante, organizacion=self.org, fecha_pago=date(2026, 9, 3), aplica_iva=False, monto_referencia=Decimal("10000"))
+        payload = prepare_month(organization=self.org, year=2026, month=9)
+        self.assertEqual((payload["summary"]["operations"], payload["summary"]["pending"]), (0, 1))
+        self.assertIn("missing_linked_transaction", payload["pending_records"][0]["reasons"])
 
     def test_usuario_finanzas_accede_a_pagos_documentos_y_transacciones(self):
         self.client.force_login(self.user_finanzas)

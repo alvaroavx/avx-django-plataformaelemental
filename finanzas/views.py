@@ -80,6 +80,7 @@ from .forms_helpers import (
     url_with_query_without as _url_with_query_without,
 )
 from .models import Category, DocumentoTributario, LotePago, Payment, PaymentPlan, Transaction
+from .services.cuadratura_v1 import prepare_month, serialize_contract
 from personas.models import Persona
 from personas.search import filtrar_por_fragmentos
 from .selectors import (
@@ -1490,6 +1491,40 @@ def reporte_categorias(request):
     )
     context["ayuda_seccion"] = _ayuda_finanzas("reporte_categorias")
     return render(request, "finanzas/reporte_categorias.html", context)
+
+
+@exportar_finanzas_required
+def preparar_mes(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    context = _base_context(request)
+    context["preparacion"] = None
+    if organizacion and periodo["mes"] and periodo["anio"]:
+        context["preparacion"] = prepare_month(
+            organization=organizacion, year=periodo["anio"], month=periodo["mes"]
+        )
+    context["organizacion"] = organizacion
+    return render(request, "finanzas/preparar_mes.html", context)
+
+
+@exportar_finanzas_required
+def descargar_cuadratura(request):
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    if not organizacion or not periodo["mes"] or not periodo["anio"]:
+        return HttpResponse(
+            "Selecciona una organización, un mes y un año específicos.",
+            status=400,
+            content_type="text/plain; charset=utf-8",
+        )
+    payload = prepare_month(
+        organization=organizacion, year=periodo["anio"], month=periodo["mes"]
+    )
+    response = HttpResponse(serialize_contract(payload), content_type="application/json; charset=utf-8")
+    response["Content-Disposition"] = (
+        f'attachment; filename="elemental_cuadratura_{periodo["anio"]:04d}-{periodo["mes"]:02d}.json"'
+    )
+    return response
 
 
 @exportar_finanzas_required

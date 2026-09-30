@@ -1,0 +1,23 @@
+{% extends "finanzas/base_finanzas.html" %}{% load formato %}
+{% block title %}Preparar mes{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <div class="elemental-page-header mb-3"><div><div class="text-muted small text-uppercase">Elemental → Cuadratura</div><h2>Preparar mes</h2><p class="mb-0">Prepara información para revisión en Cuadratura. No emite boletas, no cierra el mes y no modifica deudas ni clases disponibles.</p></div></div>
+  {% if not organizacion or periodo_mes == 'todos' or periodo_anio == 'todos' %}
+    <div class="alert alert-warning" role="alert">Selecciona una organización, un mes y un año específicos en los filtros superiores.</div>
+  {% else %}
+    <div class="card shadow-sm mb-3"><div class="card-body">
+      <h3 class="h5">Revisión antes de descargar</h3>
+      <p>Criterio: pagos vigentes cuya <strong>fecha de pago</strong> corresponde a {{ periodo_descripcion_corta }}, usando America/Santiago.</p>
+      <div class="row g-3">
+        <div class="col-6 col-lg-3"><div class="small text-muted">Operaciones</div><strong>{{ preparacion.summary.operations }}</strong></div>
+        <div class="col-6 col-lg-3"><div class="small text-muted">Pagos</div><strong>{{ preparacion.summary.payments }}</strong></div>
+        <div class="col-6 col-lg-3"><div class="small text-muted">Total incluido</div><strong>{{ preparacion.summary.total_payments|clp }}</strong></div>
+        <div class="col-6 col-lg-3"><div class="small text-muted">Pendientes</div><strong>{{ preparacion.summary.pending }}</strong></div>
+      </div>
+    </div></div>
+    {% if preparacion.pending_records %}<div class="card mb-3"><div class="card-header">Registros excluidos o pendientes de aclaración</div><div class="card-body"><ul class="mb-0">{% for item in preparacion.pending_records %}<li><code>{{ item.external_id }}</code>: {{ item.reasons|join:", " }}</li>{% endfor %}</ul></div></div>{% endif %}
+    <a class="btn btn-primary" href="{% url 'finanzas:descargar_cuadratura' %}?{{ request.GET.urlencode }}"><i class="bi bi-download"></i> Descargar para Cuadratura</a>
+  {% endif %}
+</div>
+{% endblock %}

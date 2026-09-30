@@ -35,6 +35,7 @@ Componentes de soporte:
 - UI: Bootstrap 5, DataTables y Tom Select via CDN.
 - Zona horaria: `America/Santiago`.
 - Deploy: GitHub Actions + SSH + `systemd` + `gunicorn`.
+- Integración financiera inicial: exportación JSON versionada Elemental → Cuadratura. El archivo es transporte; la evolución a API conserva el mismo contrato y reglas de idempotencia.
 
 Detalle operativo:
 - Deploy y CI/CD: [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)

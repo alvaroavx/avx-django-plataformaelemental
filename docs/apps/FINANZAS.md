@@ -513,3 +513,12 @@ Motivo:
 - evita mantener endpoints "por si acaso"
 
 La salida contable/operacional vigente se hace por vistas HTML y exportaciones controladas por permisos.
+# Preparación mensual para Cuadratura
+
+El flujo `Finanzas → Preparar mes` selecciona por `Payment.fecha_pago` un mes exacto en `America/Santiago`. Exporta JSON `elemental-cuadratura-v1` sin mutar pagos, deudas, clases ni documentos.
+
+La operación exportable es la `Transaction` enlazada uno-a-uno al `Payment`. Se excluyen y declaran como pendientes pagos revertidos, históricos sin transacción, con documento tributario ya enlazado, con movimiento inválido o con montos CLP no enteros/inconsistentes. Los identificadores estables son `transaction:<pk>` y `payment:<pk>`; no dependen de nombres, fechas o montos.
+
+El período de selección, la fecha de operación, la fecha de pago y el período de servicio viajan separados. Como el modelo actual imputa clases al mes del pago, ese mes es el período de servicio verificable disponible; no se infiere otro período contractual.
+
+Contrato y ejemplo ficticio: [docs/contracts](../contracts/).
