@@ -81,17 +81,70 @@
   }
   .jornada-sesion [data-estado-status]:empty { display: none; }
   .jornada-sesion .asistente-mobile-status:not(:empty) { margin-top: .45rem; }
+  .asistencia-actions-inline {
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: .35rem;
+  }
+  .asistencia-actions-inline form { margin: 0; }
+  .asistencia-actions-inline .form-control { width: 9rem; }
+  #asistentes-tbody > tr > td {
+    vertical-align: middle;
+  }
+  #asistentes-tbody > tr > td:last-child {
+    width: 44px;
+  }
+  .asistencia-actions-trigger {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+    padding: .25rem;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+  .asistencia-actions-trigger:hover,
+  .asistencia-actions-trigger:focus-visible,
+  .asistencia-actions-trigger:active {
+    border-color: transparent;
+    background: var(--bs-secondary-bg, #e9ecef);
+  }
   @media (max-width: 575.98px) {
     .jornada-sesion { margin-top: 0.25rem !important; }
-    .jornada-sesion .sesion-actions { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
-    .jornada-sesion .sesion-actions .btn { min-height: 44px; }
+    .jornada-sesion .sesion-actionbar {
+      width: 100%;
+      display: flex !important;
+      flex-wrap: nowrap !important;
+      align-items: stretch !important;
+      gap: .5rem !important;
+    }
+    .jornada-sesion .sesion-actionbar > .sesion-actions,
+    .jornada-sesion .sesion-actionbar > .sesion-admin-actions,
+    .jornada-sesion .sesion-actionbar > .sesion-admin-actions > form {
+      display: contents !important;
+    }
+    .jornada-sesion .sesion-actionbar .btn {
+      min-width: 0;
+      min-height: 52px;
+      flex: 1 1 0;
+      display: inline-grid;
+      place-items: center;
+      padding: .5rem;
+      font-size: 1.05rem;
+    }
+    .jornada-sesion .sesion-actionbar .btn i {
+      margin: 0 !important;
+    }
   }
   @media (max-width: 359.98px) {
     .jornada-sesion .estado-rapido-segmentado .estado-rapido-label { display: none; }
     .jornada-sesion .estado-rapido-segmentado button i { margin: 0 !important; }
   }
   @media (max-width: 260px) {
-    .jornada-sesion .sesion-actions,
+    .jornada-sesion .sesion-actionbar,
     .jornada-sesion .estado-rapido {
       grid-template-columns: 1fr;
     }
@@ -186,34 +239,34 @@
 </div>
 {% else %}
 <div class="jornada-sesion mt-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="sesion-actionbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div class="d-flex gap-2 sesion-actions">
       <a class="btn btn-outline-secondary btn-sm jornada-touch" href="{{ back_url }}" title="Volver" aria-label="Volver">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
       </a>
       {% if puede_administrar_sesion %}
-        <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'asistencias:sesion_edit' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}" title="Editar sesión" aria-label="Editar sesión">
           <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar sesión</span>
         </a>
       {% endif %}
       {% if puede_administrar_sesion %}
-        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}" title="Ir a sesiones" aria-label="Ir a sesiones">
           <i class="bi bi-calendar3"></i><span class="d-none d-md-inline ms-1">Ir a sesiones</span>
         </a>
       {% else %}
-        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_hoy' %}{% if profesor_query %}?{{ profesor_query }}{% endif %}">
-          <i class="bi bi-sun"></i><span class="ms-1">Hoy</span>
+        <a class="btn btn-outline-primary btn-sm jornada-touch" href="{% url 'asistencias:sesiones_hoy' %}{% if profesor_query %}?{{ profesor_query }}{% endif %}" title="Sesiones de hoy" aria-label="Sesiones de hoy">
+          <i class="bi bi-sun"></i><span class="d-none d-md-inline ms-1">Hoy</span>
         </a>
       {% endif %}
     </div>
     {% if puede_administrar_sesion %}
-    <div class="d-flex gap-2">
-      <button class="btn btn-success btn-sm" type="button" title="Nueva persona" data-bs-toggle="modal" data-bs-target="#nuevaPersonaSesionModal">
+    <div class="sesion-admin-actions d-flex gap-2">
+      <button class="btn btn-success btn-sm" type="button" title="Nueva persona" aria-label="Nueva persona" data-bs-toggle="modal" data-bs-target="#nuevaPersonaSesionModal">
         <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
       </button>
       <form method="post" onsubmit="return window.confirm('Se eliminara la sesion y todas sus asistencias relacionadas. ¿Continuar?');">
         {% csrf_token %}
-        <button class="btn btn-danger btn-sm" name="eliminar_sesion" type="submit" title="Eliminar sesión">
+        <button class="btn btn-danger btn-sm" name="eliminar_sesion" type="submit" title="Eliminar sesión" aria-label="Eliminar sesión">
           <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Eliminar sesión</span>
         </button>
       </form>
@@ -320,10 +373,8 @@
         <thead>
           <tr>
             <th>Persona</th>
-            <th>Estado</th>
             <th>{% if puede_administrar_sesion %}Estado de pago{% else %}Observación{% endif %}</th>
-            <th>Hora</th>
-            <th class="text-end">Acciones</th>
+            <th class="text-end"><span class="d-none d-md-inline">Acciones</span><span class="visually-hidden d-md-none">Acciones</span></th>
           </tr>
         </thead>
         <tbody id="asistentes-tbody">
@@ -334,22 +385,6 @@
                 <a href="{% url 'personas:persona_detail' item.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.persona }}</a>
               {% else %}
                 {{ item.persona }}
-              {% endif %}
-            </td>
-            <td>
-              {% if puede_registrar_asistencia %}
-                <form method="post" class="d-flex gap-2 align-items-center">
-                  {% csrf_token %}
-                  <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
-                  <select name="estado_asistencia" class="form-select form-select-sm" aria-label="Estado de asistencia de {{ item.persona }}">
-                    {% for value, label in item.Estado.choices %}
-                      <option value="{{ value }}" {% if value == item.estado %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                  <button class="btn btn-sm btn-outline-primary" name="cambiar_estado_asistencia" type="submit">Guardar</button>
-                </form>
-              {% else %}
-                {{ item.get_estado_display }}
               {% endif %}
             </td>
             <td>
@@ -364,46 +399,56 @@
                 <span class="text-muted">Sin excepción</span>
               {% endif %}
             </td>
-            <td>{{ item.registrada_en|date:"H:i" }}</td>
             <td class="text-end">
-              {% if puede_liberar_clase %}
-                {% if item.clase_liberada_activa %}
-                  <form method="post" class="d-inline">
-                    {% csrf_token %}
-                    <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
-                    <button class="btn btn-sm btn-outline-warning" name="revertir_clase_liberada" type="submit">
-                      Revertir liberación
-                    </button>
-                  </form>
-                {% else %}
-                  <form method="post" class="d-inline-flex gap-1">
-                    {% csrf_token %}
-                    <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
-                    <label class="visually-hidden" for="motivo-liberacion-{{ item.pk }}">Motivo</label>
-                    <input
-                      id="motivo-liberacion-{{ item.pk }}"
-                      class="form-control form-control-sm"
-                      name="motivo_liberacion"
-                      required
-                      placeholder="Motivo"
-                    >
-                    <button class="btn btn-sm btn-outline-info" name="liberar_clase" type="submit">Liberar</button>
-                  </form>
-                {% endif %}
-              {% endif %}
-              {% if puede_quitar_asistente %}
-              <form method="post" class="d-inline" onsubmit="return window.confirm('Se eliminara este asistente de la sesión. ¿Continuar?');">
-                {% csrf_token %}
-                <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
-                <button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">
-                  <i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>
-                </button>
-              </form>
+              {% if puede_liberar_clase or puede_quitar_asistente %}
+                <button
+                  class="btn btn-sm btn-outline-secondary asistencia-actions-trigger d-md-none"
+                  type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#accionesAsistenteModal"
+                  data-asistencia-id="{{ item.pk }}"
+                  data-asistencia-nombre="{{ item.persona }}"
+                  data-clase-liberada="{{ item.clase_liberada_activa|yesno:'true,false' }}"
+                  aria-label="Acciones de {{ item.persona }}"
+                  title="Acciones"
+                ><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></button>
+                <div class="asistencia-actions-inline d-none d-md-inline-flex">
+                  {% if puede_liberar_clase %}
+                    {% if item.clase_liberada_activa %}
+                      <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                        <button class="btn btn-sm btn-outline-warning" name="revertir_clase_liberada" type="submit">
+                          <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Revertir liberación
+                        </button>
+                      </form>
+                    {% else %}
+                      <form method="post" class="d-inline-flex gap-1">
+                        {% csrf_token %}
+                        <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                        <label class="visually-hidden" for="motivo-liberacion-{{ item.pk }}">Motivo</label>
+                        <input id="motivo-liberacion-{{ item.pk }}" class="form-control form-control-sm" name="motivo_liberacion" required placeholder="Motivo">
+                        <button class="btn btn-sm btn-outline-info" name="liberar_clase" type="submit">
+                          <i class="bi bi-unlock" aria-hidden="true"></i> Liberar
+                        </button>
+                      </form>
+                    {% endif %}
+                  {% endif %}
+                  {% if puede_quitar_asistente %}
+                    <form method="post" onsubmit="return window.confirm('Se eliminará este asistente de la sesión. ¿Continuar?');">
+                      {% csrf_token %}
+                      <input type="hidden" name="asistencia_id" value="{{ item.pk }}">
+                      <button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">
+                        <i class="bi bi-trash" aria-hidden="true"></i> Eliminar
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
               {% endif %}
             </td>
           </tr>
           {% empty %}
-          <tr data-empty-row><td colspan="5" class="text-center text-muted">Sin asistentes.</td></tr>
+          <tr data-empty-row><td colspan="3" class="text-center text-muted">Sin asistentes.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -474,6 +519,45 @@
 {% endblock %}
 
 {% block modals %}
+{% if puede_liberar_clase or puede_quitar_asistente %}
+<div class="modal fade" id="accionesAsistenteModal" tabindex="-1" aria-labelledby="accionesAsistenteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title h5" id="accionesAsistenteModalLabel">Acciones del asistente</h2>
+          <div class="text-muted small" data-asistencia-modal-nombre></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body d-grid gap-3">
+        {% if puede_liberar_clase %}
+        <form method="post" data-asistencia-liberar-form>
+          {% csrf_token %}
+          <input type="hidden" name="asistencia_id" value="">
+          <div data-motivo-liberacion>
+            <label class="form-label" for="motivo-liberacion-modal">Motivo de liberación</label>
+            <textarea id="motivo-liberacion-modal" class="form-control mb-3" name="motivo_liberacion" rows="3" minlength="3" placeholder="Explica brevemente el motivo"></textarea>
+          </div>
+          <button class="btn btn-outline-info w-100" name="liberar_clase" type="submit" data-liberar-submit>
+            <i class="bi bi-unlock" aria-hidden="true"></i> <span>Liberar</span>
+          </button>
+        </form>
+        {% endif %}
+        {% if puede_quitar_asistente %}
+        <form method="post" data-asistencia-eliminar-form onsubmit="return window.confirm('Se eliminará este asistente de la sesión. ¿Continuar?');">
+          {% csrf_token %}
+          <input type="hidden" name="asistencia_id" value="">
+          <button class="btn btn-outline-danger w-100" name="eliminar_asistente" type="submit">
+            <i class="bi bi-trash" aria-hidden="true"></i> Eliminar
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% if puede_administrar_sesion %}
 <div class="modal fade" id="nuevaPersonaSesionModal" tabindex="-1" aria-labelledby="nuevaPersonaSesionModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -550,6 +634,7 @@
   var counterEl = document.getElementById('total-asistentes');
   var tbody = document.getElementById('asistentes-tbody');
   var mobileList = document.getElementById('asistentes-mobile');
+  var accionesModal = document.getElementById('accionesAsistenteModal');
 
   var FIN_CLASES = {
     consumido: 'success',
@@ -563,6 +648,10 @@
     var d = document.createElement('div');
     d.appendChild(document.createTextNode(String(str || '')));
     return d.innerHTML;
+  }
+
+  function escAttr(str) {
+    return esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function fetchJson(url, options) {
@@ -596,6 +685,28 @@
     return ESTADO_URL.replace('/0/estado/', '/' + asistenciaId + '/estado/');
   }
 
+  function accionesTabla(a) {
+    if (!PUEDE_LIBERAR && !PUEDE_QUITAR) return '';
+    var nombre = escAttr(a.nombre);
+    var id = escAttr(a.id);
+    var accionMovil = '<button class="btn btn-sm btn-outline-secondary asistencia-actions-trigger d-md-none" type="button" ' +
+      'data-bs-toggle="modal" data-bs-target="#accionesAsistenteModal" data-asistencia-id="' + id + '" ' +
+      'data-asistencia-nombre="' + nombre + '" data-clase-liberada="false" aria-label="Acciones de ' + nombre + '" title="Acciones">' +
+      '<i class="bi bi-three-dots-vertical" aria-hidden="true"></i></button>';
+    var liberar = PUEDE_LIBERAR
+      ? '<form method="post" class="d-inline-flex gap-1"><input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
+          '<input type="hidden" name="asistencia_id" value="' + id + '"><label class="visually-hidden" for="motivo-liberacion-' + id + '">Motivo</label>' +
+          '<input id="motivo-liberacion-' + id + '" class="form-control form-control-sm" name="motivo_liberacion" required placeholder="Motivo">' +
+          '<button class="btn btn-sm btn-outline-info" name="liberar_clase" type="submit"><i class="bi bi-unlock" aria-hidden="true"></i> Liberar</button></form>'
+      : '';
+    var eliminar = PUEDE_QUITAR
+      ? '<form method="post" onsubmit="return confirm(\'Se eliminará este asistente de la sesión. ¿Continuar?\')">' +
+          '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '"><input type="hidden" name="asistencia_id" value="' + id + '">' +
+          '<button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit"><i class="bi bi-trash" aria-hidden="true"></i> Eliminar</button></form>'
+      : '';
+    return accionMovil + '<div class="asistencia-actions-inline d-none d-md-inline-flex">' + liberar + eliminar + '</div>';
+  }
+
   function botonesEstado(a) {
     var estados = [
       ['presente', 'bi-check-circle', 'Presente'],
@@ -619,16 +730,6 @@
     var nombre = a.persona_url
       ? '<a href="' + esc(a.persona_url) + '">' + esc(a.nombre) + '</a>'
       : esc(a.nombre);
-    var accionQuitar = PUEDE_QUITAR
-      ? '<form method="post" class="d-inline" onsubmit="return confirm(\'Se eliminara este asistente de la sesión. ¿Continuar?\')">' +
-          '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(CSRF) + '">' +
-          '<input type="hidden" name="asistencia_id" value="' + esc(a.id) + '">' +
-          '<button class="btn btn-sm btn-outline-danger" name="eliminar_asistente" type="submit">' +
-            '<i class="bi bi-trash"></i><span class="d-none d-md-inline ms-1">Quitar</span>' +
-          '</button>' +
-        '</form>'
-      : '';
-
     var accionesProfesor = '';
     if (PUEDE_LIBERAR || PUEDE_QUITAR) {
       accionesProfesor = '<details class="action-menu"><summary aria-label="Acciones de ' + esc(a.nombre) + '">' +
@@ -656,10 +757,8 @@
       var tr = document.createElement('tr');
       tr.innerHTML =
         '<td>' + nombre + '</td>' +
-        '<td>' + esc(a.estado_label || a.estado || '') + '</td>' +
         '<td><span class="badge text-bg-' + esc(finClase) + '">' + esc(finLabel) + '</span></td>' +
-        '<td>' + esc(a.hora || '--:--') + '</td>' +
-        '<td class="text-end">' + accionQuitar + '</td>';
+        '<td class="text-end">' + accionesTabla(a) + '</td>';
       tbody.insertBefore(tr, tbody.firstChild);
     }
 
@@ -680,6 +779,36 @@
         '<div class="small asistente-mobile-status" role="status" aria-live="polite" data-estado-status></div>';
       mobileList.insertBefore(article, mobileList.firstChild);
     }
+  }
+
+  if (accionesModal) {
+    accionesModal.addEventListener('show.bs.modal', function (event) {
+      var trigger = event.relatedTarget;
+      if (!trigger) return;
+      var asistenciaId = trigger.getAttribute('data-asistencia-id') || '';
+      var nombre = trigger.getAttribute('data-asistencia-nombre') || '';
+      var liberada = trigger.getAttribute('data-clase-liberada') === 'true';
+      var nombreEl = accionesModal.querySelector('[data-asistencia-modal-nombre]');
+      if (nombreEl) nombreEl.textContent = nombre;
+      accionesModal.querySelectorAll('input[name="asistencia_id"]').forEach(function (input) {
+        input.value = asistenciaId;
+      });
+      var liberarForm = accionesModal.querySelector('[data-asistencia-liberar-form]');
+      if (liberarForm) {
+        var motivoContainer = liberarForm.querySelector('[data-motivo-liberacion]');
+        var motivo = liberarForm.querySelector('[name="motivo_liberacion"]');
+        var submit = liberarForm.querySelector('[data-liberar-submit]');
+        var icono = submit.querySelector('i');
+        var texto = submit.querySelector('span');
+        submit.name = liberada ? 'revertir_clase_liberada' : 'liberar_clase';
+        submit.className = liberada ? 'btn btn-outline-warning w-100' : 'btn btn-outline-info w-100';
+        icono.className = liberada ? 'bi bi-arrow-counterclockwise' : 'bi bi-unlock';
+        texto.textContent = liberada ? 'Revertir liberación' : 'Liberar';
+        motivoContainer.classList.toggle('d-none', liberada);
+        motivo.required = !liberada;
+        motivo.value = '';
+      }
+    });
   }
 
   function cambiarEstado(control, boton) {

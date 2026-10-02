@@ -137,7 +137,9 @@ las métricas agregadas administrativas.
 Al final del Panel administrativo se ubica `Seguimiento del período`, con deuda
 de clases, mayor asistencia y clases disponibles. Estos bloques reutilizan el
 mismo alcance académico, período y organización del Panel; no crean una nueva
-página ni amplían permisos.
+página ni amplían permisos. En responsive comienzan contraídos para reducir el
+desplazamiento vertical y pueden abrirse de forma independiente; en escritorio
+permanecen abiertos como tres superficies paralelas.
 
 Fuentes y semántica iniciales:
 

@@ -32,6 +32,10 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0004-mantenedores-en-configuracion.md](adr/0004-mantenedores-en-configuracion.md): separa la operación frecuente de los mantenedores y renombra Django Admin como Administración avanzada.
 - [docs/adr/0005-panel-transversal-y-personas.md](adr/0005-panel-transversal-y-personas.md): convierte la portada existente en Panel común por capacidades y retira el Panel separado de Personas.
 - [docs/adr/0006-menu-operativo-plano.md](adr/0006-menu-operativo-plano.md): aplana los accesos operativos, retira el panel de Sesiones y concentra su seguimiento estudiantil en el Panel principal.
+- [docs/adr/0007-botonera-iconos-detalle-sesion.md](adr/0007-botonera-iconos-detalle-sesion.md): prueba una botonera móvil de una fila, controles equivalentes e iconos accesibles en el detalle de sesión.
+- [docs/adr/0008-tabla-asistencia-movil-esencial.md](adr/0008-tabla-asistencia-movil-esencial.md): reduce provisionalmente la tabla móvil a persona, pago y acciones sin alterar todavía los estados del dominio.
+- [docs/adr/0009-acciones-asistencia-segun-viewport.md](adr/0009-acciones-asistencia-segun-viewport.md): reemplaza la prueba anterior, simplifica la tabla administrativa en todos los tamaños y concentra las acciones móviles en un modal.
+- [docs/adr/0010-seguimiento-panel-plegable-en-movil.md](adr/0010-seguimiento-panel-plegable-en-movil.md): mantiene visible el seguimiento estudiantil en escritorio y lo presenta plegado por defecto en responsive.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

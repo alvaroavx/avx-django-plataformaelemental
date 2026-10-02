@@ -1374,6 +1374,11 @@ class AsistenciasViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Nueva persona")
+        self.assertContains(response, 'class="sesion-actionbar', html=False)
+        self.assertContains(response, 'aria-label="Editar sesión"', html=False)
+        self.assertContains(response, 'aria-label="Ir a sesiones"', html=False)
+        self.assertContains(response, 'aria-label="Nueva persona"', html=False)
+        self.assertContains(response, 'aria-label="Eliminar sesión"', html=False)
         self.assertContains(response, 'data-bs-target="#nuevaPersonaSesionModal"', html=False)
         self.assertContains(response, "Agregar a esta sesión")
 
@@ -1672,6 +1677,14 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Estado de pago")
         self.assertContains(response, "Pagada")
+        self.assertNotContains(response, '<th class="d-none d-md-table-cell">Estado</th>', html=False)
+        self.assertNotContains(response, '<th class="d-none d-md-table-cell">Hora</th>', html=False)
+        self.assertNotContains(response, 'name="estado_asistencia"', html=False)
+        self.assertNotContains(response, 'name="cambiar_estado_asistencia"', html=False)
+        self.assertContains(response, 'data-bs-target="#accionesAsistenteModal"', html=False)
+        self.assertContains(response, 'class="bi bi-three-dots-vertical"', html=False)
+        self.assertContains(response, '<i class="bi bi-unlock" aria-hidden="true"></i> Liberar', html=False)
+        self.assertContains(response, '<i class="bi bi-trash" aria-hidden="true"></i> Eliminar', html=False)
 
     def test_sesion_detail_muestra_boton_editar_sesion_con_filtros(self):
         response = self.client.get(
@@ -1871,6 +1884,9 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "Estudiantes con deuda")
         self.assertContains(response, "Estudiantes con más asistencia")
         self.assertContains(response, "Alumnos con clases disponibles")
+        self.assertContains(response, "<details class=", count=3, html=False)
+        self.assertContains(response, 'class="elemental-followup-summary"', count=3, html=False)
+        self.assertContains(response, 'window.matchMedia("(min-width: 992px)")', html=False)
         self.assertNotContains(response, "Estudiantes sin asistencia")
         self.assertContains(response, "Luis Rojas")
         self.assertContains(response, "Ana Diaz")

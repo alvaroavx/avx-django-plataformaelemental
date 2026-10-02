@@ -3,6 +3,54 @@
 {% block title %}Panel · Elemental Apps{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+<style>
+  .elemental-followup-card {
+    overflow: hidden;
+  }
+  .elemental-followup-summary {
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: 1rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .elemental-followup-summary::-webkit-details-marker { display: none; }
+  .elemental-followup-summary:hover {
+    background: var(--bs-tertiary-bg);
+  }
+  .elemental-followup-summary:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--bs-primary) 30%, transparent);
+    outline-offset: -3px;
+  }
+  .elemental-followup-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    color: var(--bs-primary);
+    background: color-mix(in srgb, var(--bs-primary) 10%, transparent);
+    border-radius: 50%;
+  }
+  .elemental-followup-chevron {
+    margin-left: auto;
+    color: var(--bs-secondary-color);
+    transition: transform .2s ease;
+  }
+  .elemental-followup-card[open] .elemental-followup-chevron {
+    transform: rotate(180deg);
+  }
+  .elemental-followup-body {
+    border-top: 1px solid var(--bs-border-color);
+  }
+  @media (min-width: 992px) {
+    .elemental-followup-summary { cursor: default; }
+    .elemental-followup-summary:hover { background: transparent; }
+    .elemental-followup-chevron { display: none; }
+  }
+</style>
 {% endblock %}
 {% block content %}
 <div class="elemental-dashboard py-2 py-lg-3">
@@ -216,9 +264,13 @@
         </div>
         <div class="row g-3">
           <div class="col-lg-4">
-            <div class="card elemental-dashboard-panel h-100">
-              <div class="card-header">Estudiantes con deuda</div>
-              <div class="card-body table-responsive">
+            <details class="card elemental-dashboard-panel elemental-followup-card h-100" data-responsive-disclosure>
+              <summary class="elemental-followup-summary">
+                <span class="elemental-followup-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>
+                <span><span class="text-muted small text-uppercase fw-semibold d-block">Cobranza</span><span class="h5 mb-0 d-block">Estudiantes con deuda</span></span>
+                <i class="bi bi-chevron-down elemental-followup-chevron" aria-hidden="true"></i>
+              </summary>
+              <div class="card-body table-responsive elemental-followup-body">
                 <table class="table table-sm align-middle mb-0">
                   <thead><tr><th>Estudiante</th><th class="text-end">Clases</th></tr></thead>
                   <tbody>
@@ -230,12 +282,16 @@
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           </div>
           <div class="col-lg-4">
-            <div class="card elemental-dashboard-panel h-100">
-              <div class="card-header">Estudiantes con más asistencia</div>
-              <div class="card-body table-responsive">
+            <details class="card elemental-dashboard-panel elemental-followup-card h-100" data-responsive-disclosure>
+              <summary class="elemental-followup-summary">
+                <span class="elemental-followup-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span>
+                <span><span class="text-muted small text-uppercase fw-semibold d-block">Actividad</span><span class="h5 mb-0 d-block">Estudiantes con más asistencia</span></span>
+                <i class="bi bi-chevron-down elemental-followup-chevron" aria-hidden="true"></i>
+              </summary>
+              <div class="card-body table-responsive elemental-followup-body">
                 <table id="tabla-estudiantes-mas-asistencia" class="table table-sm align-middle mb-0">
                   <thead><tr><th>Estudiante</th><th class="text-end">Clases</th></tr></thead>
                   <tbody>
@@ -247,12 +303,16 @@
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           </div>
           <div class="col-lg-4">
-            <div class="card elemental-dashboard-panel h-100">
-              <div class="card-header">Alumnos con clases disponibles</div>
-              <div class="card-body table-responsive">
+            <details class="card elemental-dashboard-panel elemental-followup-card h-100" data-responsive-disclosure>
+              <summary class="elemental-followup-summary">
+                <span class="elemental-followup-icon"><i class="bi bi-ticket-perforated" aria-hidden="true"></i></span>
+                <span><span class="text-muted small text-uppercase fw-semibold d-block">Disponibilidad</span><span class="h5 mb-0 d-block">Alumnos con clases disponibles</span></span>
+                <i class="bi bi-chevron-down elemental-followup-chevron" aria-hidden="true"></i>
+              </summary>
+              <div class="card-body table-responsive elemental-followup-body">
                 <table class="table table-sm align-middle mb-0">
                   <thead><tr><th>Estudiante</th><th class="text-end">Saldo</th></tr></thead>
                   <tbody>
@@ -267,7 +327,7 @@
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           </div>
         </div>
       </section>
@@ -283,10 +343,26 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script>
   (function () {
+    const disclosures = Array.from(document.querySelectorAll("[data-responsive-disclosure]"));
+    const desktop = window.matchMedia("(min-width: 992px)");
+    const ajustarDisclosures = function (event) {
+      disclosures.forEach(function (disclosure) {
+        disclosure.open = event.matches;
+      });
+    };
+    ajustarDisclosures(desktop);
+    if (desktop.addEventListener) desktop.addEventListener("change", ajustarDisclosures);
+    else desktop.addListener(ajustarDisclosures);
+    disclosures.forEach(function (disclosure) {
+      disclosure.querySelector("summary").addEventListener("click", function (event) {
+        if (desktop.matches) event.preventDefault();
+      });
+    });
+
     if (!window.jQuery) return;
     const tabla = jQuery("#tabla-estudiantes-mas-asistencia");
     if (!tabla.length || !tabla.find("tbody tr[data-data-row]").length) return;
-    tabla.DataTable({
+    const datatable = tabla.DataTable({
       paging: true,
       pageLength: 10,
       lengthChange: false,
@@ -294,6 +370,11 @@
       info: false,
       order: [[1, "desc"]],
       language: window.ElementalBusqueda.datatablesLanguage,
+    });
+    disclosures.forEach(function (disclosure) {
+      disclosure.addEventListener("toggle", function () {
+        if (disclosure.open && disclosure.contains(tabla[0])) datatable.columns.adjust();
+      });
     });
   })();
 </script>

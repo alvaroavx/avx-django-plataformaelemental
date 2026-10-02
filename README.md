@@ -124,8 +124,16 @@ python manage.py migrate
 
 ### Levantar servidor local
 ```bash
+cd /home/alvax/Code/EspacioElementos/avx-django-plataformaelemental
+source .venv/bin/activate
+set -a
+source .env.dev
+set +a
 python manage.py runserver 127.0.0.1:8000
 ```
+
+`runserver` recarga automáticamente el proceso cuando detecta cambios en Python
+o en las plantillas durante el desarrollo local.
 
 Cuando se pruebe el acceso Google, `http://127.0.0.1:8000` es el origen local
 canónico. Google Cloud debe autorizar exactamente
