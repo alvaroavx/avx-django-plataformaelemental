@@ -131,13 +131,7 @@
       ],
       stateSave: true,
       dom: "<'row'<'col-12'f>>rt<'row'<'col-12 col-md-6'i><'col-12 col-md-6'p>>",
-      language: {
-        search: "Buscar",
-        lengthMenu: "Mostrar _MENU_",
-        info: "Mostrando _START_ a _END_ de _TOTAL_",
-        paginate: { previous: "Anterior", next: "Siguiente" },
-        zeroRecords: "Sin registros",
-      },
+      language: window.ElementalBusqueda.datatablesLanguage,
     });
     const buscador = document.getElementById("buscador-estudiantes");
     if (buscador) {

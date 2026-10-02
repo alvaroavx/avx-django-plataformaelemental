@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "plataformaelemental",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; source .env.dev; set +a; source .venv/bin/activate; python manage.py runserver 127.0.0.1:8000"
+      ],
+      "port": 8000,
+      "url": "http://127.0.0.1:8000"
+    }
+  ]
+}

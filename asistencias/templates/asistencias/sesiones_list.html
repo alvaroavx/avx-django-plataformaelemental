@@ -224,10 +224,8 @@
             <div class="row g-2">
               {% for checkbox in sesiones_masivas_form.dias_semana %}
                 <div class="col-6 col-md-3">
-                  <label class="form-check border rounded p-2 h-100">
-                    {{ checkbox.tag }}
-                    <span class="form-check-label">{{ checkbox.choice_label }}</span>
-                  </label>
+                  {{ checkbox.tag }}
+                  <label class="btn btn-outline-primary w-100 h-100" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
                 </div>
               {% endfor %}
             </div>
@@ -292,9 +290,14 @@
     });
 
     const initialWeek = Number.parseInt(weeks.dataset.initialWeek || "0", 10);
-    window.requestAnimationFrame(function () {
-      weeks.scrollTo({ left: weeks.clientWidth * initialWeek, behavior: "auto" });
-    });
+    function irASemanaActual() {
+      const semanaActual = weeks.children[initialWeek];
+      if (semanaActual) {
+        weeks.scrollTo({ left: semanaActual.offsetLeft, behavior: "auto" });
+      }
+    }
+    window.requestAnimationFrame(irASemanaActual);
+    window.addEventListener("load", irASemanaActual);
   });
 </script>
 {% endif %}

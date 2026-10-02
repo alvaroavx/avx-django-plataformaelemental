@@ -445,13 +445,7 @@
       pageLength: 20,
       order: [[2, "desc"]],
       stateSave: true,
-      language: {
-        search: "Buscar",
-        lengthMenu: "Mostrar _MENU_",
-        info: "Mostrando _START_ a _END_ de _TOTAL_",
-        paginate: { previous: "Anterior", next: "Siguiente" },
-        zeroRecords: "Sin registros",
-      },
+      language: window.ElementalBusqueda.datatablesLanguage,
     });
 
     const filtroDisciplina = document.getElementById("filtro-disciplina");

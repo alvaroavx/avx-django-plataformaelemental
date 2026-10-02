@@ -189,13 +189,7 @@
       pageLength: 20,
       order: [[0, "desc"]],
       stateSave: true,
-      language: {
-        search: "Buscar",
-        lengthMenu: "Mostrar _MENU_",
-        info: "Mostrando _START_ a _END_ de _TOTAL_",
-        paginate: { previous: "Anterior", next: "Siguiente" },
-        zeroRecords: "Sin registros",
-      },
+      language: window.ElementalBusqueda.datatablesLanguage,
       columnDefs: [
         { orderable: false, targets: 4 },
       ],

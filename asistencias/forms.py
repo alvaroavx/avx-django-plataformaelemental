@@ -64,7 +64,7 @@ class SesionesMasivasForm(forms.Form):
     dias_semana = forms.MultipleChoiceField(
         choices=BloqueHorario.Dia.choices,
         required=True,
-        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "btn-check"}),
         label="Dias de la semana",
     )
     max_sesiones = forms.IntegerField(

@@ -601,13 +601,7 @@
         columnDefs: [
           { orderable: false, targets: [9, 10] },
         ],
-        language: {
-          lengthMenu: "Mostrar _MENU_",
-          info: "Mostrando _START_ a _END_ de _TOTAL_",
-          paginate: { previous: "Anterior", next: "Siguiente" },
-          zeroRecords: "Sin registros",
-          emptyTable: "Sin registros",
-        },
+        language: window.ElementalBusqueda.datatablesLanguage,
       });
     }
 

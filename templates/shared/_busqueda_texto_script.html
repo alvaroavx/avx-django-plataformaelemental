@@ -26,10 +26,26 @@
       });
     };
 
+    const datatablesLanguage = {
+      search: "Buscar",
+      lengthMenu: "Mostrar _MENU_",
+      info: "Mostrando _START_ a _END_ de _TOTAL_",
+      infoEmpty: "Mostrando 0 a 0 de 0",
+      infoFiltered: "(filtrado de _MAX_ registros totales)",
+      zeroRecords: "Sin registros",
+      emptyTable: "Sin registros",
+      paginate: { previous: "Anterior", next: "Siguiente" },
+      aria: {
+        sortAscending: ": activar para ordenar ascendente",
+        sortDescending: ": activar para ordenar descendente",
+      },
+    };
+
     global.ElementalBusqueda = {
       normalizar: normalizar,
       registrarDataTables: registrarDataTables,
       conectarInputDataTable: conectarInputDataTable,
+      datatablesLanguage: datatablesLanguage,
     };
   })(window);
 </script>
