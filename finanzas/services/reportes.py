@@ -18,7 +18,6 @@ PAGOS_ALUMNOS_XLSX_HEADERS = [
     "Clases consumidas",
     "Saldo clases",
     "Estado",
-    "Documento tributario",
     "Numero comprobante",
     "Observacion",
 ]
@@ -30,7 +29,6 @@ TRANSACCIONES_XLSX_HEADERS = [
     "Categoria",
     "Descripcion/glosa",
     "Monto",
-    "Documento tributario asociado",
     "Msg",
 ]
 LIBRO_CAJA_CSV_HEADERS = [
@@ -41,7 +39,6 @@ LIBRO_CAJA_CSV_HEADERS = [
     "descripcion/glosa",
     "monto",
     "ingreso/egreso",
-    "documento tributario asociado",
     "Msg",
 ]
 
@@ -119,13 +116,6 @@ def _estado_operacional_pago(pago):
     return "Sobreconsumido"
 
 
-def _documento_resumen_pago(pago):
-    documento = pago.documento_tributario
-    if not documento:
-        return ""
-    return f"{documento.get_tipo_documento_display()} #{documento.folio}"
-
-
 def filas_export_pagos_alumnos_xlsx(pagos):
     for pago in pagos:
         clases_consumidas = (
@@ -146,7 +136,6 @@ def filas_export_pagos_alumnos_xlsx(pagos):
             clases_consumidas,
             saldo_clases,
             _estado_operacional_pago(pago),
-            _documento_resumen_pago(pago),
             pago.numero_comprobante,
             pago.observaciones,
         ]
@@ -162,18 +151,8 @@ def filas_export_transacciones_xlsx(transacciones):
             item.categoria.nombre,
             item.descripcion,
             item.monto,
-            documento_resumen_transaccion(item),
             msg_contable_transaccion(item),
         ]
-
-
-def documento_resumen_transaccion(transaccion):
-    documentos = list(transaccion.documentos_tributarios.all())
-    if not documentos:
-        return ""
-    return " | ".join(
-        f"{documento.get_tipo_documento_display()} #{documento.folio}" for documento in documentos
-    )
 
 
 def msg_contable_transaccion(transaccion):
@@ -181,9 +160,6 @@ def msg_contable_transaccion(transaccion):
     descripcion = (transaccion.descripcion or "").strip()
     if descripcion:
         partes.append(descripcion)
-    documento = documento_resumen_transaccion(transaccion)
-    if documento:
-        partes.append(documento)
     return " - ".join(partes)
 
 
@@ -197,7 +173,6 @@ def filas_export_libro_caja(transacciones):
             item.descripcion,
             item.monto,
             "ingreso" if item.tipo == Transaction.Tipo.INGRESO else "egreso",
-            documento_resumen_transaccion(item),
             msg_contable_transaccion(item),
         ]
 

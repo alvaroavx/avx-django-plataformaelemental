@@ -390,7 +390,6 @@ def dashboard(request):
         organizacion=organizacion,
     )
     context["agregar_pago_url"] = _url_dashboard_accion(request, "finanzas:pagos_list", open="registrar_pago")
-    context["agregar_documento_url"] = _url_dashboard_accion(request, "finanzas:documento_tributario_importar")
     context["agregar_transaccion_url"] = _url_dashboard_accion(
         request,
         "finanzas:transacciones_list",
@@ -504,7 +503,7 @@ def _contexto_pagos_list(request, *, form=None, edit_form=None, edit_pago=None, 
     if not edit_form and editar_pago_id:
         edit_pago = get_object_or_404(
             _queryset_en_organizacion_activa(
-                Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario"), request
+                Payment.objects.select_related("persona", "organizacion", "plan"), request
             ),
             revertido_en__isnull=True,
             pk=editar_pago_id,
@@ -633,7 +632,6 @@ def _pago_masivo_form(request, *, organizacion, data=None, initial=None):
         roles__activo=True,
     ).distinct().order_by("apellidos", "nombres") if organizacion else Persona.objects.none()
     planes = PaymentPlan.objects.filter(organizacion=organizacion, activo=True).order_by("-es_por_defecto", "nombre") if organizacion else PaymentPlan.objects.none()
-    documentos = DocumentoTributario.objects.filter(organizacion=organizacion).order_by("-fecha_emision", "-id") if organizacion else DocumentoTributario.objects.none()
     initial = dict(initial or {})
     if organizacion and data is None:
         plan_defecto = planes.filter(es_por_defecto=True).first()
@@ -647,7 +645,6 @@ def _pago_masivo_form(request, *, organizacion, data=None, initial=None):
         organizaciones=organizaciones,
         personas=personas,
         planes=planes,
-        documentos=documentos,
     )
 
 
@@ -665,10 +662,6 @@ def _filas_pago_masivo(request, form):
             "organizacion": organizacion.pk,
             "persona": persona_id,
             "plan": override.get("plan", comunes["plan"].pk if comunes.get("plan") else ""),
-            "documento_tributario": override.get(
-                "documento_tributario",
-                comunes["documento_tributario"].pk if comunes.get("documento_tributario") else "",
-            ),
             "fecha_pago": override.get("fecha_pago", comunes["fecha_pago"].isoformat()),
             "metodo_pago": override.get("metodo_pago", comunes["metodo_pago"]),
             "numero_comprobante": override.get("numero_comprobante", comunes.get("numero_comprobante", "")),
@@ -701,7 +694,6 @@ def _filas_pago_masivo(request, form):
             filas.append({
                 "persona_id": cleaned["persona"].pk,
                 "plan_id": cleaned["plan"].pk if cleaned.get("plan") else None,
-                "documento_tributario_id": cleaned["documento_tributario"].pk if cleaned.get("documento_tributario") else None,
                 "fecha_pago": cleaned["fecha_pago"],
                 "metodo_pago": cleaned["metodo_pago"],
                 "numero_comprobante": cleaned.get("numero_comprobante", ""),
@@ -711,7 +703,6 @@ def _filas_pago_masivo(request, form):
                 "observaciones": cleaned.get("observaciones", ""),
                 "persona": cleaned["persona"],
                 "plan": plan,
-                "documento_tributario": cleaned.get("documento_tributario"),
                 "monto_neto": monto_neto,
                 "monto_iva": monto_iva,
                 "monto_total": monto_total,
@@ -802,7 +793,6 @@ def pago_masivo(request):
         "errores_filas": errores_filas,
         "preview": preview,
         "plan_options": form.fields["plan"].queryset,
-        "documento_options": form.fields["documento_tributario"].queryset,
         "personas_iniciales": [
             {"id": persona.pk, "nombre": persona.nombre_completo}
             for persona in getattr(form, "personas_queryset", Persona.objects.none()).filter(
@@ -1332,9 +1322,6 @@ def transacciones_list(request):
     organizacion = organizacion_desde_request(request)
     periodo = resolver_periodo(request)
     trans_qs = transacciones_queryset(request, organizacion=organizacion)
-    sin_documento = request.GET.get("sin_documento") == "si"
-    if sin_documento:
-        trans_qs = trans_qs.filter(documentos_tributarios__isnull=True)
     resumen_transacciones_data = resumen_transacciones(trans_qs)
     total_ingresos = resumen_transacciones_data["total_ingresos"] or 0
     total_egresos = resumen_transacciones_data["total_egresos"] or 0
@@ -1361,8 +1348,6 @@ def transacciones_list(request):
         messages.success(request, "Transaccion registrada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
 
-    query_sin_documento = request.GET.copy()
-    query_sin_documento.pop("sin_documento", None)
     context.update(
         {
             "transacciones": trans_qs,
@@ -1372,8 +1357,6 @@ def transacciones_list(request):
             "total_egresos": total_egresos,
             "balance_transacciones": total_ingresos - total_egresos,
             "open_nueva_transaccion": request.GET.get("open") == "nueva_transaccion",
-            "sin_documento": sin_documento,
-            "query_sin_documento": query_sin_documento.urlencode(),
             "ayuda_seccion": _ayuda_finanzas("transacciones"),
         }
     )
@@ -1385,7 +1368,7 @@ def transaccion_detail(request, pk):
     context = _base_context(request)
     transaccion = get_object_or_404(
         _queryset_en_organizacion_activa(
-            Transaction.objects.select_related("organizacion", "categoria").prefetch_related("documentos_tributarios"),
+            Transaction.objects.select_related("organizacion", "categoria"),
             request,
         ),
         pk=pk,

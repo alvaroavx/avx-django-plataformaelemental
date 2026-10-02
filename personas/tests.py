@@ -840,25 +840,16 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertNotContains(response, "Perfil profesor")
         self.assertContains(response, "Resumen financiero del estudiante")
 
-    def test_dashboard_personas_anota_deuda_periodo(self):
-        sesion = SesionClase.objects.create(
-            disciplina=self.disciplina,
-            fecha="2026-03-20",
-            estado=SesionClase.Estado.COMPLETADA,
-        )
-        asistencia = Asistencia.objects.create(sesion=sesion, persona=self.estudiante)
-        AttendanceConsumption.objects.filter(asistencia=asistencia).update(
-            estado=AttendanceConsumption.Estado.DEUDA
-        )
-
+    def test_dashboard_personas_redirige_al_listado_con_filtros(self):
         response = self.client.get(
             reverse("personas:dashboard"),
             {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.org.pk},
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["personas_con_deuda_total"], 1)
-        self.assertEqual(list(response.context["personas_con_deuda"]), [self.estudiante])
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("personas:personas_list"), response.url)
+        self.assertIn("periodo_mes=3", response.url)
+        self.assertIn(f"organizacion={self.org.pk}", response.url)
 
     def test_persona_detail_estudiante_permite_asociar_pago_a_asistencia(self):
         sesion = SesionClase.objects.create(

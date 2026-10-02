@@ -48,6 +48,13 @@ Debe concentrar:
 - Las decisiones sobre una identidad Google se serializan con bloqueos transaccionales de PostgreSQL por `provider + provider_subject` y por `provider + User`. Lo usan tanto la resolución administrativa como el siguiente `SocialLogin` validado por django-allauth, porque una `SocialAccount` aún inexistente no se protege solo con `select_for_update`. El servicio de Personas no crea ni actualiza `SocialAccount`.
 
 ## Decisiones funcionales vigentes
+- La navegación de Personas entra directamente al listado. La antigua ruta
+  `/personas/` se conserva como redirección autorizada al listado para no romper
+  enlaces guardados; ya no renderiza una página Panel propia.
+- El total de personas registradas y los conteos de estudiantes/profesores con
+  rol activo viven en el Panel transversal junto a `Consulta de persona` y
+  respetan la organización y `ACCION_ADMINISTRAR_PERSONAS`. Los roles pueden
+  superponerse y no se presentan como partes que deban sumar el total.
 - Debe existir listado, detalle, creacion y edicion de organizaciones.
 - `Persona.identificador` fue reemplazado por `Persona.rut`; el valor se normaliza y guarda formateado como RUT chileno cuando se ingresa desde formularios CRM.
 - `Persona.email` mantiene una restriccion unica existente en base de datos; no se endurece ni se relaja en v1.0 sin auditoria previa.

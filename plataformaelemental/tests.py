@@ -119,12 +119,24 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Elemental Apps")
         self.assertContains(response, "Personas")
         self.assertContains(response, "Asistencias")
-        self.assertContains(response, "Finanzas")
+        self.assertContains(response, "Resumen financiero")
         self.assertNotContains(response, "Monitor")
         self.assertNotContains(response, "API")
         self.assertContains(response, "periodo_mes=2")
         self.assertContains(response, "periodo_anio=2026")
         self.assertContains(response, f"organizacion={self.organizacion.pk}")
+
+    def test_dashboard_general_muestra_metricas_en_una_fila_centrada(self):
+        self.client.force_login(self.user_admin)
+        response = self.client.get(
+            reverse("elemental_apps"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "elemental-kpi-row", html=False)
+        self.assertContains(response, 'class="col-3"', count=4, html=False)
+        self.assertContains(response, "data-fit-text", html=False)
 
     def test_dashboard_general_finanzas_no_ve_admin_ni_personas(self):
         self.client.force_login(self.user_finanzas)
@@ -134,8 +146,11 @@ class ElementalAppsUXTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Finanzas")
-        self.assertNotContains(response, "Admin")
+        self.assertContains(response, "Resumen financiero")
+        self.assertContains(response, "Configuración")
+        self.assertContains(response, "Planes")
+        self.assertContains(response, "Categorías")
+        self.assertNotContains(response, "Administración avanzada")
         self.assertNotContains(response, "Personas")
         self.assertNotContains(response, "Asistencias")
 
@@ -170,23 +185,51 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "solicitudes de acceso pendientes")
         self.assertContains(response, reverse("personas:solicitudes_acceso_list"))
 
-    def test_dashboard_general_profesor_redirige_a_operacion_acotada(self):
+    def test_dashboard_general_profesor_entra_al_panel_sin_datos_administrativos(self):
         self.client.force_login(self.user_profesor)
         response = self.client.get(reverse("elemental_apps"))
 
-        self.assertRedirects(response, reverse("profesor:inicio"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Panel")
+        self.assertContains(response, "Mi jornada de hoy")
+        self.assertContains(response, "Ir a mis clases")
+        self.assertNotContains(response, "Ingresos contables")
+        self.assertNotContains(response, "Consulta de persona")
+        self.assertNotContains(response, "Configuración")
 
-    def test_dashboard_general_staff_ve_admin(self):
+    def test_dashboard_general_staff_ve_administracion_avanzada(self):
         self.client.force_login(self.user_staff)
         response = self.client.get(reverse("elemental_apps"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Admin")
+        self.assertContains(response, "Administración avanzada")
+
+    def test_sidebar_agrupa_mantenedores_en_configuracion_al_final(self):
+        self.client.force_login(self.user_staff)
+        response = self.client.get(reverse("elemental_apps"))
+
+        self.assertEqual(response.status_code, 200)
+        navegacion = response.context["elemental_nav_items"]
+        self.assertEqual(navegacion[-1]["label"], "Configuración")
+        self.assertTrue(navegacion[-1]["collapsible"])
+        self.assertEqual(
+            [item["label"] for item in navegacion[-1]["children"]],
+            [
+                "Disciplinas",
+                "Planes",
+                "Categorías",
+                "Organizaciones",
+                "Administración avanzada",
+            ],
+        )
+        self.assertNotIn("Disciplinas", [item["label"] for item in navegacion[1]["children"]])
+        self.assertContains(response, 'class="elemental-nav-disclosure"', count=2, html=False)
+        self.assertNotContains(response, 'class="elemental-nav-disclosure" open', html=False)
 
     def test_sidebar_muestra_links_permitidos_y_preserva_filtros(self):
         self.client.force_login(self.user_admin)
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("asistencias:sesiones_list"),
             {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
         )
 
@@ -200,30 +243,31 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "data-elemental-theme-toggle", html=False)
         self.assertContains(response, 'localStorage.getItem("elemental-theme")', html=False)
 
-    def test_sidebar_usa_dominios_como_encabezados_y_marca_pagina_actual(self):
+    def test_sidebar_usa_enlaces_directos_y_marca_pagina_actual(self):
         self.client.force_login(self.user_admin)
 
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("asistencias:sesiones_list"),
             {"organizacion": self.organizacion.pk},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="elemental-nav-heading active"', html=False)
         self.assertContains(response, 'aria-current="page"', html=False)
-        self.assertContains(response, "Sesiones")
+        self.assertNotContains(response, ">Sesiones</span>", html=False)
+        self.assertNotContains(response, ">Finanzas</span>", html=False)
         self.assertContains(response, "data-elemental-sidebar-toggle", html=False)
         self.assertContains(response, "plataformaelemental/js/shell.js")
-        self.assertContains(response, "Resumen de operación")
+        self.assertContains(response, "Panel")
         self.assertContains(response, 'aria-label="Menú principal"', html=False)
         self.assertContains(response, 'aria-label="Cerrar menú"', html=False)
         self.assertNotContains(response, 'id="elementalSidebarLabel"', html=False)
         self.assertContains(response, reverse("asistencias:sesiones_list"))
         self.assertContains(response, reverse("finanzas:pagos_list"))
-        sesiones_nav = next(
-            item for item in response.context["elemental_nav_items"] if item["label"] == "Sesiones"
-        )
-        self.assertNotIn("Hoy", [item["label"] for item in sesiones_nav["children"]])
+        enlaces = [item["label"] for item in response.context["elemental_nav_items"]]
+        self.assertIn("Calendario", enlaces)
+        self.assertIn("Resumen financiero", enlaces)
+        self.assertNotIn("Sesiones", enlaces)
+        self.assertNotIn("Finanzas", enlaces)
 
     def test_dashboard_general_calcula_metricas_con_semantica_explicita(self):
         estudiante = Persona.objects.create(
@@ -286,6 +330,9 @@ class ElementalAppsUXTests(TestCase):
         self.assertEqual(response.context["dashboard_academico"]["personas_con_asistencia"], 1)
         self.assertEqual(response.context["dashboard_financiero"]["clases_en_deuda"], 1)
         self.assertEqual(response.context["dashboard_financiero"]["ingresos_contables"], 25000)
+        self.assertEqual(response.context["dashboard_personas"]["total"], 4)
+        self.assertEqual(response.context["dashboard_personas"]["estudiantes"], 1)
+        self.assertEqual(response.context["dashboard_personas"]["profesores"], 1)
         self.assertContains(response, "Personas con asistencia registrada")
         self.assertContains(response, "Ingresos contables")
 
@@ -454,7 +501,7 @@ class ElementalAppsUXTests(TestCase):
         self.assertIsNone(response.context["consulta_persona"]["persona"]["resumen_actual"])
         self.assertContains(response, "Selecciona una organización para calcular un saldo de clases comparable.")
 
-    def test_proximas_sesiones_excluye_completadas(self):
+    def test_panel_muestra_jornada_sin_proximas_sesiones(self):
         hoy = timezone.localdate()
         disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Agenda")
         completada = SesionClase.objects.create(
@@ -478,13 +525,12 @@ class ElementalAppsUXTests(TestCase):
             },
         )
 
-        proximas = list(response.context["dashboard_academico"]["proximas_sesiones"])
-        self.assertIn(programada, proximas)
-        self.assertNotIn(completada, proximas)
-        sesiones_hoy = response.context["dashboard_academico"]["sesiones_hoy"]
+        self.assertNotIn("proximas_sesiones", response.context["dashboard_academico"])
+        sesiones_hoy = response.context["jornada_hoy"]["sesiones"]
         self.assertIn(programada, sesiones_hoy)
         self.assertIn(completada, sesiones_hoy)
         self.assertContains(response, "Jornada de hoy")
+        self.assertNotContains(response, "Próximas sesiones del período")
 
     def test_topbar_muestra_logo_de_organizacion_seleccionada(self):
         self.organizacion.logo = "organizaciones/logos/org-ux.png"
@@ -533,7 +579,7 @@ class ElementalAppsUXTests(TestCase):
         urls = [
             reverse("elemental_apps"),
             reverse("finanzas:dashboard"),
-            reverse("asistencias:dashboard"),
+            reverse("asistencias:sesiones_list"),
             reverse("asistencias:estudiantes_list"),
         ]
         for url in urls:

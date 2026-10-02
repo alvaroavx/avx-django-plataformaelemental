@@ -100,9 +100,9 @@ Reglas:
 - Los enlaces deben arrastrar los filtros globales activos.
 - El objetivo es continuidad operativa, no navegacion aislada por app.
 - En mobile puede cambiar la disposicion visual, pero debe conservar la misma necesidad funcional.
-- En el sidebar administrativo, los dominios son encabezados de agrupación y
-  las páginas son los destinos navegables. `Panel` sigue siendo un destino
-  explícito; el encabezado no combina la semántica de título y enlace.
+- En el sidebar administrativo, `Panel` es el primer destino transversal y las
+  páginas operativas son enlaces directos del mismo nivel. No existen
+  encabezados agrupadores para Sesiones ni Finanzas.
 - La página exacta usa `aria-current="page"`; el dominio activo aporta contexto
   visual, pero no reemplaza esa identificación.
 - En desktop, el sidebar se puede contraer a un rail de accesos primarios. La
@@ -110,11 +110,13 @@ Reglas:
   conserva nombre accesible, `aria-expanded`, objetivo de 44 px y disponibilidad
   durante el desplazamiento. El rail conserva nombres accesibles, ubicación de
   dominio y badges operacionales.
-- El dominio dueño de la operación académica se rotula `Sesiones` en la
-  navegación; `asistencias` permanece como nombre técnico de app, rutas y
-  modelos.
+- `asistencias` permanece como nombre técnico de app, rutas y modelos, aunque la
+  navegación expone directamente Calendario, Asistencias, Estudiantes y
+  Profesores. La URL raíz histórica de la app redirige al Calendario.
+- `Configuración` es el último grupo, inicia colapsado salvo cuando una de sus
+  rutas está activa y reúne los mantenedores autorizados sin cambiar permisos.
 
-## Dashboard General
+## Panel general
 
 La ruta `/` compone bloques de lectura mediante
 `plataformaelemental.dashboard`. Cada bloque determina primero las organizaciones
@@ -125,6 +127,17 @@ Los roles organizacionales no reciben agregados ni enlaces operativos cuando el
 contexto está en `Todas`: las vistas de destino exigen una organización concreta
 y la portada no elige una silenciosamente. Staff y superusuarios conservan el
 agregado global porque sus decoradores permiten ese alcance.
+
+Una profesora sin capacidades administrativas también entra a `/`, pero su
+composición se limita a las sesiones de hoy devueltas por
+`sesiones_visibles_para_usuario`: rol Profesor activo, asignación operativa y
+presencia explícita en la sesión. Este acceso no amplía sus alcances ni reutiliza
+las métricas agregadas administrativas.
+
+Al final del Panel administrativo se ubica `Seguimiento del período`, con deuda
+de clases, mayor asistencia y clases disponibles. Estos bloques reutilizan el
+mismo alcance académico, período y organización del Panel; no crean una nueva
+página ni amplían permisos.
 
 Fuentes y semántica iniciales:
 

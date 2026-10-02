@@ -740,6 +740,8 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, 'class="bi bi-person-check"', html=False)
         self.assertContains(response, 'id="filtros-sesiones"', html=False)
         self.assertContains(response, 'aria-expanded="false"', html=False)
+        self.assertContains(response, 'class="collapse" id="filtros-sesiones"', html=False)
+        self.assertNotContains(response, 'class="collapse d-md-block" id="filtros-sesiones"', html=False)
         disciplinas = list(response.context["disciplinas"])
         profesores = list(response.context["profesores"])
         self.assertIn(self.disciplina, disciplinas)
@@ -1764,7 +1766,7 @@ class AsistenciasViewTests(TestCase):
         Asistencia.objects.create(sesion=sesion_extra, persona=otro_estudiante)
 
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("elemental_apps"),
             {"periodo_mes": 2, "periodo_anio": 2026},
         )
 
@@ -1772,7 +1774,7 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.context["estudiantes_activos_mes"], 2)
 
     def test_menu_superior_permite_cerrar_sesion(self):
-        response = self.client.get(reverse("asistencias:dashboard"))
+        response = self.client.get(reverse("elemental_apps"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Cerrar sesión")
@@ -1782,6 +1784,17 @@ class AsistenciasViewTests(TestCase):
 
         self.assertEqual(logout_response.status_code, 302)
         self.assertEqual(logout_response.url, "/accounts/login/")
+
+    def test_antiguo_panel_de_sesiones_redirige_al_calendario_con_filtros(self):
+        response = self.client.get(
+            reverse("asistencias:dashboard"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("asistencias:sesiones_list")))
+        self.assertIn("periodo_mes=2", response.url)
+        self.assertIn(f"organizacion={self.organizacion.pk}", response.url)
 
     def test_dashboard_sesiones_realizadas_cuenta_solo_completadas_del_mes(self):
         SesionClase.objects.create(
@@ -1796,7 +1809,7 @@ class AsistenciasViewTests(TestCase):
         )
 
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("elemental_apps"),
             {"periodo_mes": 2, "periodo_anio": 2026},
         )
 
@@ -1850,7 +1863,7 @@ class AsistenciasViewTests(TestCase):
         consumo_luis.save(update_fields=["estado", "pago", "actualizado_en"])
 
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("elemental_apps"),
             {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
         )
 
@@ -1875,7 +1888,7 @@ class AsistenciasViewTests(TestCase):
 
     def test_dashboard_mas_asistencia_sin_datos_no_usa_colspan_para_datatables(self):
         response = self.client.get(
-            reverse("asistencias:dashboard"),
+            reverse("elemental_apps"),
             {"periodo_mes": 5, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
         )
 

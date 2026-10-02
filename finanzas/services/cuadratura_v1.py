@@ -25,7 +25,7 @@ def prepare_month(*, organization, year, month):
             fecha_pago__year=year,
             fecha_pago__month=month,
         )
-        .select_related("persona", "plan", "disciplina", "transaccion", "documento_tributario")
+        .select_related("persona", "plan", "disciplina", "transaccion")
         .order_by("id")
     )
     operations, pending = [], []
@@ -38,8 +38,6 @@ def prepare_month(*, organization, year, month):
             reasons.append("missing_linked_transaction")
         elif transaction.organizacion_id != organization.id or transaction.tipo != Transaction.Tipo.INGRESO:
             reasons.append("invalid_linked_transaction")
-        if payment.documento_tributario_id:
-            reasons.append("tax_document_already_linked")
         try:
             amounts = {
                 "net": _clp(payment.monto_neto),

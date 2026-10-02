@@ -275,8 +275,15 @@ flowchart TD
 - En `asistencias/calendario/`, si el filtro global no representa un mes y año unicos, la vista debe degradar de calendario mensual a listado simple de sesiones para no simular un mes inexistente.
 - En `asistencias/calendario/`, se pueden crear sesiones masivas para el mes seleccionado indicando disciplina, dias de la semana, profesores opcionales y un maximo opcional de sesiones. Las fechas duplicadas para la misma disciplina se omiten.
 - `asistencias/sesiones/` queda como redireccion compatible hacia `asistencias/calendario/`; los detalles de sesion siguen viviendo en `asistencias/sesiones/<id>/`.
-- En el panel de `asistencias`, la seccion `Seguimiento de estudiantes` debe mostrarse en tablas y contener: todos los estudiantes con deuda por cantidad de clases, estudiantes con mas asistencia ordenados de mayor a menor con paginacion de 10 filas, y alumnos con clases disponibles en el periodo. No debe incluir el bloque `estudiantes sin asistencia`.
-- En el panel de `asistencias`, las tablas que usen DataTables deben inicializarse solo cuando tengan filas reales de datos; los estados vacios deben mantener la cantidad real de columnas y no usar una unica fila con `colspan` dentro de la tabla inicializada.
+- El panel propio de `asistencias` fue retirado. Su URL histórica redirige al
+  calendario conservando el querystring activo.
+- La sección `Seguimiento del período` vive al final del Panel principal y
+  contiene: estudiantes con deuda por cantidad de clases, estudiantes con más
+  asistencia ordenados de mayor a menor con paginación de 10 filas, y alumnos
+  con clases disponibles en el período. No incluye `estudiantes sin asistencia`.
+- Las tablas que usen DataTables deben inicializarse solo cuando tengan filas
+  reales; los estados vacíos mantienen la cantidad real de columnas y no usan
+  una única fila con `colspan` dentro de la tabla inicializada.
 - El resumen de profesor se consulta desde `personas/<id>/` y debe usar la configuracion de `PersonaRol` del rol `PROFESOR` para esa organizacion; el calculo base sigue siendo `asistencias del periodo x valor_clase`, sin hardcodear configuraciones en vistas de `asistencias`.
 
 ## Estado financiero en Disciplina

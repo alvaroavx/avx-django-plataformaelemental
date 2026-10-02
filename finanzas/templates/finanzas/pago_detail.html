@@ -63,10 +63,6 @@
               <div>{{ pago.plan|default:"-" }}</div>
             </div>
             <div class="col-md-4">
-              <div class="small text-muted">Documento tributario</div>
-              <div>{{ pago.documento_tributario|default:"-" }}</div>
-            </div>
-            <div class="col-md-4">
               <div class="small text-muted">Clases asignadas</div>
               <div>{{ pago.clases_asignadas }}</div>
             </div>
@@ -132,38 +128,7 @@
           </div>
           {% endif %}
 
-          {% if pago.documento_tributario %}
-          <div class="mb-3">
-            <div class="fw-semibold">Documento tributario asociado</div>
-            <div class="small">{{ pago.documento_tributario.get_tipo_documento_display }} #{{ pago.documento_tributario.folio }}</div>
-            <div class="small">Fecha: {{ pago.documento_tributario.fecha_emision|date:"d/m/Y" }}</div>
-            <div class="small">Emisor: {{ pago.documento_tributario.nombre_emisor|default:"-" }}</div>
-            <div class="small">Receptor: {{ pago.documento_tributario.nombre_receptor|default:"-" }}</div>
-            <div class="small">Total: {{ pago.documento_tributario.monto_total|clp }}</div>
-            <div class="d-flex gap-2 mt-2">
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_detail' pago.documento_tributario.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" title="Ver documento">
-                <i class="bi bi-file-earmark-text"></i><span class="finanzas-btn-label">Ver documento</span>
-              </a>
-              {% if pago.documento_tributario.archivo_pdf %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'pdf' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="PDF">
-                <i class="bi bi-file-earmark-pdf"></i><span class="finanzas-btn-label">PDF</span>
-              </a>
-              {% endif %}
-              {% if pago.documento_tributario.archivo_xml %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{% url 'finanzas:documento_tributario_archivo' pago.documento_tributario.pk 'xml' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" target="_blank" title="XML">
-                <i class="bi bi-filetype-xml"></i><span class="finanzas-btn-label">XML</span>
-              </a>
-              {% endif %}
-              {% if pago.documento_tributario.enlace_sii %}
-              <a class="btn btn-sm btn-outline-secondary finanzas-btn" href="{{ pago.documento_tributario.enlace_sii }}" target="_blank" title="Ver en SII">
-                <i class="bi bi-box-arrow-up-right"></i><span class="finanzas-btn-label">SII</span>
-              </a>
-              {% endif %}
-            </div>
-          </div>
-          {% endif %}
-
-          {% if not pago.plan and not pago.documento_tributario and not consumos %}
+          {% if not pago.plan and not consumos %}
           <div class="text-muted">No hay relaciones adicionales para este pago.</div>
           {% endif %}
         </div>

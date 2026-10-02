@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  {% if puede_operar_pagos or puede_operar_documentos or puede_operar_transacciones %}
+  {% if puede_operar_pagos or puede_operar_transacciones %}
   <div class="card shadow-sm mb-3">
     <div class="card-body">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
@@ -42,11 +42,6 @@
           {% if puede_operar_pagos %}
             <a class="btn btn-success finanzas-btn" href="{{ agregar_pago_url }}" title="Agregar pago">
               <i class="bi bi-cash-coin"></i><span class="finanzas-btn-label">Agregar pago</span>
-            </a>
-          {% endif %}
-          {% if puede_operar_documentos %}
-            <a class="btn btn-outline-primary finanzas-btn" href="{{ agregar_documento_url }}" title="Agregar documento">
-              <i class="bi bi-file-earmark-text"></i><span class="finanzas-btn-label">Agregar documento</span>
             </a>
           {% endif %}
           {% if puede_operar_transacciones %}
@@ -85,15 +80,6 @@
           <div class="card-title text-muted small text-uppercase">Saldo neto</div>
           <div class="display-6">{{ saldo_contable|clp }}</div>
           <div class="small">{{ total_transacciones }} transacciones</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="card elemental-metric-card elemental-metric-card-warning shadow-sm">
-        <div class="card-body">
-          <div class="card-title text-muted small text-uppercase">Documentos</div>
-          <div class="display-6">{{ total_documentos_periodo }}</div>
-          <div class="small">{{ documentos_con_transaccion }} asociados a transacciones</div>
         </div>
       </div>
     </div>
@@ -142,19 +128,7 @@
     <div class="card-header">Alertas de cierre mensual</div>
     <div class="card-body">
       <div class="row g-3">
-        <div class="col-md-3">
-          <div class="small text-muted">Transacciones sin documento</div>
-          <strong>{{ transacciones_sin_documento }}</strong>
-        </div>
-        <div class="col-md-3">
-          <div class="small text-muted">Transacciones con documento fuera de periodo</div>
-          <strong>{{ transacciones_con_documento_fuera_periodo }}</strong>
-        </div>
-        <div class="col-md-3">
-          <div class="small text-muted">Pagos con documento fuera de periodo</div>
-          <strong>{{ pagos_con_documento_fuera_periodo }}</strong>
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <div class="small text-muted">Pagos no contables automaticamente</div>
           <strong>{{ pagos_operacionales_no_contables }}</strong>
         </div>

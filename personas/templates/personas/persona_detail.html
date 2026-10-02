@@ -289,33 +289,6 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">Documentos tributarios relacionados</div>
-          <div class="card-body table-responsive">
-            {% if documentos_tributarios %}
-            <table class="table table-sm mb-0">
-              <thead><tr><th>Fecha</th><th>Tipo</th><th>Folio</th><th>Total</th><th></th></tr></thead>
-              <tbody>
-                {% for item in documentos_tributarios %}
-                <tr>
-                  <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
-                  <td>{{ item.get_tipo_documento_display }}</td>
-                  <td>{{ item.folio }}</td>
-                  <td>{{ item.monto_total|clp }}</td>
-                  <td class="text-end">
-                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'finanzas:documento_tributario_detail' item.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                      Ver documento
-                    </a>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% else %}
-            <div class="text-muted">Sin documentos tributarios relacionados en el periodo.</div>
-            {% endif %}
-          </div>
-        </div>
       </section>
       {% endif %}
 

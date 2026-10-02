@@ -30,7 +30,18 @@ def _url(request, view_name):
     return f"{reverse(view_name)}{_query_filtros(request)}"
 
 
-def _item(request, *, label, icon, url_name=None, url=None, children=None, active_prefixes=None, badge=None):
+def _item(
+    request,
+    *,
+    label,
+    icon,
+    url_name=None,
+    url=None,
+    children=None,
+    active_prefixes=None,
+    badge=None,
+    collapsible=False,
+):
     href = url or (_url(request, url_name) if url_name else "#")
     path = request.path
     active = any(path.startswith(prefix) for prefix in (active_prefixes or []))
@@ -43,6 +54,7 @@ def _item(request, *, label, icon, url_name=None, url=None, children=None, activ
         "active": active,
         "current": current,
         "badge": badge,
+        "collapsible": collapsible,
     }
 
 
@@ -84,30 +96,32 @@ def build_navigation(request):
     items = [
         _item(
             request,
-            label="Resumen de operación",
+            label="Panel",
             icon="bi-grid",
             url_name="elemental_apps",
             active_prefixes=["/"],
         )
     ]
     items[0]["active"] = request.path == "/"
+    configuracion = []
 
     if can_asistencias:
-        items.append(
+        disciplinas_path = reverse("asistencias:disciplinas_list")
+        items.extend(
+            [
+                _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
+                _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),
+                _item(request, label="Estudiantes", icon="bi-people", url_name="asistencias:estudiantes_list"),
+                _item(request, label="Profesores", icon="bi-person-workspace", url_name="asistencias:profesores_list"),
+            ]
+        )
+        configuracion.append(
             _item(
                 request,
-                label="Sesiones",
-                icon="bi-clipboard-check",
-                url_name="asistencias:dashboard",
-                active_prefixes=["/asistencias/"],
-                children=[
-                    _item(request, label="Panel", icon="bi-grid", url_name="asistencias:dashboard"),
-                    _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
-                    _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),
-                    _item(request, label="Estudiantes", icon="bi-people", url_name="asistencias:estudiantes_list"),
-                    _item(request, label="Profesores", icon="bi-person-workspace", url_name="asistencias:profesores_list"),
-                    _item(request, label="Disciplinas", icon="bi-tags", url_name="asistencias:disciplinas_list"),
-                ],
+                label="Disciplinas",
+                icon="bi-tags",
+                url_name="asistencias:disciplinas_list",
+                active_prefixes=[disciplinas_path],
             )
         )
     elif can_jornada:
@@ -122,86 +136,108 @@ def build_navigation(request):
         )
 
     if can_finanzas:
-        items.append(
-            _item(
-                request,
-                label="Finanzas",
-                icon="bi-cash-coin",
-                url_name="finanzas:dashboard",
-                active_prefixes=["/finanzas/"],
-                children=[
-                    _item(request, label="Panel", icon="bi-grid", url_name="finanzas:dashboard"),
-                    _item(request, label="Pagos", icon="bi-cash-stack", url_name="finanzas:pagos_list"),
-                    _item(
-                        request,
-                        label="Documentos",
-                        icon="bi-file-earmark-text",
-                        url_name="finanzas:documentos_tributarios_list",
-                    ),
-                    _item(
-                        request,
-                        label="Transacciones",
-                        icon="bi-arrow-left-right",
-                        url_name="finanzas:transacciones_list",
-                    ),
-                    _item(request, label="Planes", icon="bi-card-list", url_name="finanzas:planes_list"),
-                    _item(request, label="Categorias", icon="bi-folder2-open", url_name="finanzas:categorias_list"),
-                ],
-            )
+        planes_path = reverse("finanzas:planes_list")
+        categorias_path = reverse("finanzas:categorias_list")
+        items.extend(
+            [
+                _item(request, label="Resumen financiero", icon="bi-cash-coin", url_name="finanzas:dashboard"),
+                _item(request, label="Pagos", icon="bi-cash-stack", url_name="finanzas:pagos_list"),
+                _item(
+                    request,
+                    label="Transacciones",
+                    icon="bi-arrow-left-right",
+                    url_name="finanzas:transacciones_list",
+                ),
+            ]
+        )
+        configuracion.extend(
+            [
+                _item(
+                    request,
+                    label="Planes",
+                    icon="bi-card-list",
+                    url_name="finanzas:planes_list",
+                    active_prefixes=[planes_path],
+                ),
+                _item(
+                    request,
+                    label="Categorías",
+                    icon="bi-folder2-open",
+                    url_name="finanzas:categorias_list",
+                    active_prefixes=[categorias_path],
+                ),
+            ]
         )
 
     if can_personas or can_gestionar_solicitudes:
-        hijos_personas = []
         if can_personas:
-            hijos_personas.extend(
-                [
-                    _item(request, label="Panel", icon="bi-grid", url_name="personas:dashboard"),
-                    _item(request, label="Personas", icon="bi-people", url_name="personas:personas_list"),
-                    _item(
-                        request,
-                        label="Organizaciones",
-                        icon="bi-building",
-                        url_name="personas:organizaciones_list",
-                    ),
-                ]
+            configuracion.append(
+                _item(
+                    request,
+                    label="Organizaciones",
+                    icon="bi-building",
+                    url_name="personas:organizaciones_list",
+                    active_prefixes=[reverse("personas:organizaciones_list")],
+                )
             )
         if can_gestionar_solicitudes:
-            hijos_personas.append(
+            configuracion.append(
                 _item(
                     request,
                     label="Solicitudes de acceso",
                     icon="bi-person-lock",
                     url_name="personas:solicitudes_acceso_list",
+                    active_prefixes=[reverse("personas:solicitudes_acceso_list")],
                     badge=pendientes_solicitudes or None,
                 )
             )
-        items.append(
-            _item(
-                request,
-                label="Personas",
-                icon="bi-people",
-                url_name="personas:dashboard" if can_personas else "personas:solicitudes_acceso_list",
-                active_prefixes=["/personas/"],
-                children=hijos_personas,
+        if can_personas:
+            items.append(
+                _item(
+                    request,
+                    label="Personas",
+                    icon="bi-people",
+                    url_name="personas:personas_list",
+                    active_prefixes=["/personas/"],
+                )
             )
-        )
 
     if user.is_staff or user.is_superuser:
-        items.append(
+        configuracion.append(
             _item(
                 request,
-                label="Admin",
+                label="Administración avanzada",
                 icon="bi-shield-lock",
                 url="/admin/",
                 active_prefixes=["/admin/"],
             )
         )
 
+    if configuracion:
+        item_configuracion = _item(
+            request,
+            label="Configuración",
+            icon="bi-gear",
+            url=configuracion[0]["url"],
+            children=configuracion,
+            collapsible=True,
+        )
+        item_configuracion["active"] = any(child["active"] or child["current"] for child in configuracion)
+        if item_configuracion["active"]:
+            for item in items:
+                if item["label"] == "Personas":
+                    item["active"] = False
+        items.append(item_configuracion)
+
     return items
 
 
 def build_dashboard_cards(request):
-    return [item for item in build_navigation(request) if item["label"] not in {"Resumen de operación"}]
+    return [
+        item
+        for item in build_navigation(request)
+        if item["label"] not in {"Panel", "Configuración"}
+    ]
 
 
 def navigation_context(request):

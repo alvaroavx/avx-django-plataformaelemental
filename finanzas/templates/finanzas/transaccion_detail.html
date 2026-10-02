@@ -25,20 +25,6 @@
           <div class="mb-3"><span class="small text-muted d-block">Tipo</span><strong>{{ transaccion.get_tipo_display }}</strong></div>
           <div class="mb-3"><span class="small text-muted d-block">Fecha</span><strong>{{ transaccion.fecha|date:"d/m/Y" }}</strong></div>
           <div class="mb-3"><span class="small text-muted d-block">Monto</span><strong>{{ transaccion.monto|clp }}</strong></div>
-          <div class="mb-3">
-            <span class="small text-muted d-block">Documentos tributarios asociados</span>
-            {% if transaccion.documentos_tributarios.all %}
-              {% for documento in transaccion.documentos_tributarios.all %}
-                <div>
-                  <a href="{% url 'finanzas:documento_tributario_detail' documento.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}">
-                    {{ documento.get_tipo_documento_display }} #{{ documento.folio }}
-                  </a>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="text-muted">Sin documentos asociados.</div>
-            {% endif %}
-          </div>
           <div><span class="small text-muted d-block">Descripcion</span><div>{{ transaccion.descripcion|default:"-" }}</div></div>
         </div>
       </div>
@@ -78,7 +64,7 @@
               </div>
             {% endif %}
           {% else %}
-            <div class="text-muted">Esta transaccion no tiene documento adjunto.</div>
+            <div class="text-muted">Esta transacción no tiene un respaldo adjunto.</div>
           {% endif %}
         </div>
       </div>

@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-09-11
+Fecha de actualizacion: 2026-10-02
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -11,8 +11,8 @@ La UX v1.0 prioriza:
 - continuidad de filtros globales
 - accesos visibles segun permisos existentes
 
-## Home Oficial
-La ruta `/` muestra un resumen operacional transversal, no un catálogo de apps
+## Panel oficial
+La ruta `/` se presenta como `Panel` y muestra una lectura operacional transversal, no un catálogo de apps
 ni una réplica de los paneles especializados.
 
 La primera entrega incluye, según permisos y organizaciones visibles:
@@ -21,8 +21,8 @@ La primera entrega incluye, según permisos y organizaciones visibles:
 - clases en deuda desde `AttendanceConsumption.DEUDA`;
 - ingresos contables desde `Transaction.INGRESO`;
 - incidencias calculables con enlace al flujo resolutivo;
-- hasta tres sesiones futuras no canceladas;
 - consulta acotada de persona para administradores de Personas.
+- total de personas registradas y conteos de estudiantes y profesores con rol activo, sin asumir que ambos conteos suman el total.
 
 Los cuatro indicadores principales no enlazan a índices genéricos. Cada uno abre
 un detalle paginado construido desde el mismo queryset que produce su cifra:
@@ -32,13 +32,26 @@ un detalle paginado construido desde el mismo queryset que produce su cifra:
 - clases en deuda muestra cada consumo que permanece en deuda;
 - ingresos contables muestra las transacciones de ingreso cuya suma produce el total.
 
-El detalle conserva período, organización y permisos, explicita la definición
-del indicador y permite volver al resumen sin perder el contexto.
+En responsive, los cuatro indicadores permanecen en una sola fila de cuatro
+columnas. Valor y etiqueta se centran dentro de cada tarjeta; en pantallas
+estrechas se reduce tipografía y espaciado sin ocultar ni abreviar el significado
+de las métricas. Los montos monetarios no se parten entre signo y cifra: su texto
+se ajusta al ancho real de la tarjeta y reduce su tamaño solo cuando es necesario.
 
-La consulta conserva período y organización. Distingue pagos operacionales de
+El detalle conserva período, organización y permisos, explicita la definición
+del indicador y permite volver al Panel sin perder el contexto.
+
+El módulo `Personas` agrupa el total y los conteos por rol junto a la consulta,
+porque las cifras contextualizan esa acción sin competir con los cuatro KPI del
+período. La consulta conserva período y organización. Distingue pagos operacionales de
 ingresos contables y no muestra todavía saldo de clases: las superficies actuales
-usan cortes temporales diferentes para ese concepto. Profesor puro conserva su
-redirección a `/profesor/`.
+usan cortes temporales diferentes para ese concepto.
+
+Una profesora pura entra a este mismo Panel y ve exclusivamente `Mi jornada de
+hoy`, construida desde sus sesiones y asignaciones autorizadas. No recibe KPI
+globales, cifras financieras, resumen o búsqueda de personas, alertas
+administrativas ni Configuración. La app Profesor continúa existiendo como flujo
+operativo y el Panel enlaza `Ir a mis clases`; retirarla queda fuera de esta decisión.
 
 Si un usuario autenticado no tiene información operacional visible, se muestra
 un mensaje controlado y no un error. `API` permanece fuera del home.
@@ -75,13 +88,30 @@ Desktop:
 - dominios visibles como encabezados no clickeables
 - páginas autorizadas siempre visibles bajo cada dominio
 - página actual marcada visualmente y mediante `aria-current="page"`
-- el dominio académico se presenta como `Sesiones`; no cambia las URLs ni el
-  nombre técnico de la app `asistencias`
+- Calendario, Asistencias, Estudiantes y Profesores son accesos directos con el
+  mismo nivel y tratamiento visual que Personas
 
 Mobile:
 - boton hamburguesa
 - sidebar como offcanvas Bootstrap
 - el contenido mantiene prioridad de pantalla
+
+La navegación separa el trabajo frecuente de los mantenedores. `Configuración`
+es siempre el último grupo disponible y reúne, según permisos, Disciplinas,
+Planes, Categorías, Organizaciones, Solicitudes de acceso y `Administración
+avanzada` (Django Admin). Estas rutas conservan sus permisos originales y no se
+repiten en Sesiones, Finanzas ni Personas.
+
+`Configuración` inicia colapsada y se abre mediante un control nativo operable
+con mouse, teclado y toque. Cuando la ruta activa pertenece al grupo, inicia
+abierta para conservar orientación. `Personas` es un enlace directo al listado;
+ya no contiene una página `Panel` propia.
+
+Los títulos agrupadores `Sesiones` y `Finanzas` se retiraron del sidebar. Sus
+destinos operativos son enlaces directos; el panel financiero se conserva como
+`Resumen financiero` y el antiguo panel de Sesiones se redirige al Calendario.
+Los filtros locales de Sesiones registradas y Personas inician cerrados en
+desktop y mobile, pero mantienen un botón visible y accesible para abrirlos.
 
 La navegacion se construye desde `plataformaelemental.navigation`, no desde templates individuales.
 
@@ -122,14 +152,17 @@ mantener texto y borde reconocibles en reposo; el hover no puede ser la única
 forma de descubrir una acción. Las variantes de métricas conservan su familia
 de color, pero elevan contraste de fondo, borde y texto.
 
-## Resumen de operación y jornada diaria
+## Panel y jornada diaria
 
-El Resumen de operación incorpora las sesiones de la fecha actual visibles para
+El Panel incorpora las sesiones de la fecha actual visibles para
 el usuario, con organización, horario, profesores, estado y asistentes. La
 selección global de organización limita también esta sección. El acceso `Hoy`
 se retira del menú administrativo para evitar dos puntos de entrada a la misma
 información; la ruta `/asistencias/hoy/` se conserva porque sigue siendo la
 jornada operativa de la aplicación de profesores.
+
+`Próximas sesiones del período` no forma parte del Panel: duplicaba el calendario
+y alejaba las acciones prioritarias y la consulta de personas.
 
 ## Calendario responsive
 

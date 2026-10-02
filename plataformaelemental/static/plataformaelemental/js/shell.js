@@ -36,6 +36,36 @@
     });
   }
 
+  const fittedTexts = document.querySelectorAll("[data-fit-text]");
+
+  function fitText(element) {
+    element.style.removeProperty("font-size");
+    const maximumSize = Number.parseFloat(window.getComputedStyle(element).fontSize);
+    const minimumSize = 9;
+    let currentSize = maximumSize;
+
+    while (element.scrollWidth > element.clientWidth && currentSize > minimumSize) {
+      currentSize = Math.max(minimumSize, currentSize - 0.5);
+      element.style.fontSize = `${currentSize}px`;
+    }
+  }
+
+  if (fittedTexts.length) {
+    window.requestAnimationFrame(function () {
+      fittedTexts.forEach(fitText);
+    });
+    if ("ResizeObserver" in window) {
+      const fitObserver = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          fitText(entry.target);
+        });
+      });
+      fittedTexts.forEach(function (element) {
+        fitObserver.observe(element);
+      });
+    }
+  }
+
   const storageKey = "elemental-sidebar-collapsed";
   const body = document.body;
   const button = document.querySelector("[data-elemental-sidebar-toggle]");

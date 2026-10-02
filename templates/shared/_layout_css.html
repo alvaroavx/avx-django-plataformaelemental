@@ -194,6 +194,47 @@
     padding-right: 3rem;
   }
 
+  @media (max-width: 991.98px) {
+    #elementalSidebar {
+      --bs-offcanvas-width: min(92vw, 460px);
+    }
+
+    #elementalSidebar .offcanvas-body > .p-3 {
+      padding: 1rem 1.25rem 1.5rem !important;
+    }
+
+    #elementalSidebar nav {
+      gap: 0.35rem !important;
+    }
+
+    #elementalSidebar .elemental-nav-link,
+    #elementalSidebar .elemental-nav-heading,
+    #elementalSidebar .elemental-nav-child {
+      width: 100%;
+      min-height: 56px;
+      padding: 0.85rem 1.15rem;
+      gap: 0.9rem;
+      border-radius: 1rem;
+    }
+
+    #elementalSidebar .elemental-nav-link {
+      font-size: 1.05rem;
+    }
+
+    #elementalSidebar .elemental-nav-link > i,
+    #elementalSidebar .elemental-nav-child > i {
+      width: 1.4rem;
+      flex: 0 0 1.4rem;
+      font-size: 1.2rem;
+      text-align: center;
+    }
+
+    #elementalSidebar .elemental-nav-heading {
+      margin-top: 0.2rem;
+      font-size: 0.78rem;
+    }
+  }
+
   .elemental-nav-link {
     color: var(--ea-sidebar-text);
     text-decoration: none;
@@ -220,6 +261,35 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  summary.elemental-nav-heading {
+    width: 100%;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  summary.elemental-nav-heading::-webkit-details-marker {
+    display: none;
+  }
+
+  summary.elemental-nav-heading:hover,
+  summary.elemental-nav-heading:focus-visible {
+    color: #fff;
+  }
+
+  summary.elemental-nav-heading:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: -2px;
+    border-radius: 0.7rem;
+  }
+
+  .elemental-nav-chevron {
+    transition: transform 0.15s ease;
+  }
+
+  .elemental-nav-disclosure[open] .elemental-nav-chevron {
+    transform: rotate(180deg);
   }
 
   .elemental-nav-heading.active {
@@ -330,7 +400,9 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
+    text-align: center;
     padding: 1rem;
     color: var(--ea-text);
     text-decoration: none;
@@ -353,7 +425,10 @@
   }
 
   .elemental-kpi-money {
+    width: 100%;
     font-size: clamp(1.3rem, 2.4vw, 2rem);
+    letter-spacing: -0.035em;
+    white-space: nowrap;
   }
 
   .elemental-kpi-label {
@@ -361,6 +436,27 @@
     color: var(--ea-muted);
     font-size: 0.88rem;
     line-height: 1.25;
+  }
+
+  @media (max-width: 575.98px) {
+    .elemental-kpi-row {
+      --bs-gutter-x: 0.5rem;
+    }
+
+    .elemental-kpi {
+      min-height: 104px;
+      padding: 0.7rem 0.3rem;
+    }
+
+    .elemental-kpi-value,
+    .elemental-kpi-money {
+      font-size: clamp(1rem, 4.8vw, 1.4rem);
+    }
+
+    .elemental-kpi-label {
+      font-size: clamp(0.63rem, 2.7vw, 0.78rem);
+      overflow-wrap: anywhere;
+    }
   }
 
   .elemental-detail-total {
@@ -593,6 +689,61 @@
     background: var(--ea-panel-soft);
     border: 1px solid var(--ea-border);
     border-radius: 0.9rem;
+  }
+
+  .elemental-people-overview {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 1fr;
+    align-items: stretch;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--ea-panel) 88%, var(--ea-border));
+    border: 1px solid var(--ea-border);
+    border-radius: 0.9rem;
+  }
+
+  .elemental-people-overview > div {
+    min-width: 0;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    padding: 0.85rem 0.5rem;
+    text-align: center;
+  }
+
+  .elemental-people-overview > div + div {
+    border-left: 1px solid var(--ea-border);
+  }
+
+  .elemental-people-overview strong {
+    color: var(--ea-text);
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .elemental-people-overview span {
+    margin-top: 0.35rem;
+    color: var(--ea-muted);
+    font-size: 0.78rem;
+  }
+
+  .elemental-people-total strong {
+    font-size: 1.75rem;
+  }
+
+  @media (max-width: 359.98px) {
+    .elemental-people-overview {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .elemental-people-total {
+      grid-column: 1 / -1;
+      border-bottom: 1px solid var(--ea-border);
+    }
+
+    .elemental-people-overview > div:nth-child(2) {
+      border-left: 0;
+    }
   }
 
   .elemental-person-metrics {

@@ -121,7 +121,6 @@ class PaymentForm(forms.ModelForm):
             "organizacion",
             "persona",
             "plan",
-            "documento_tributario",
             "fecha_pago",
             "metodo_pago",
             "numero_comprobante",
@@ -205,15 +204,6 @@ class PaymentForm(forms.ModelForm):
                 plan_org = organizaciones_qs.filter(pk=organizacion_id).first()
                 if plan_org is not None:
                     self.initial["aplica_iva"] = not plan_org.es_exenta_iva
-        documentos_qs = _documentos_para_asociacion(
-            organizacion=organizacion,
-            periodo_mes=periodo_mes,
-            periodo_anio=periodo_anio,
-            documentos_actuales=[self.instance.documento_tributario_id] if self.instance.pk else None,
-        )
-        self.fields["documento_tributario"].queryset = documentos_qs
-        self.fields["documento_tributario"].label = "Documento tributario"
-        self.fields["documento_tributario"].help_text = "Asocia el documento emitido al cliente si ya fue cargado."
 
     def clean_persona(self):
         persona = self.cleaned_data["persona"]
@@ -242,23 +232,6 @@ class PaymentForm(forms.ModelForm):
         organizacion = cleaned.get("organizacion")
         if plan and organizacion and plan.organizacion_id != organizacion.id:
             self.add_error("plan", "El plan seleccionado no pertenece a la organizacion indicada.")
-        documento_tributario = cleaned.get("documento_tributario")
-        if documento_tributario and organizacion and documento_tributario.organizacion_id != organizacion.id:
-            self.add_error(
-                "documento_tributario",
-                "El documento tributario seleccionado no pertenece a la organizacion indicada.",
-            )
-        if documento_tributario and _documento_fuera_periodo(
-            documento_tributario,
-            periodo_mes=self.periodo_mes,
-            periodo_anio=self.periodo_anio,
-        ):
-            es_documento_actual = self.instance.pk and self.instance.documento_tributario_id == documento_tributario.pk
-            if not es_documento_actual:
-                self.add_error(
-                    "documento_tributario",
-                    "El documento tributario seleccionado no pertenece al periodo filtrado.",
-                )
         return cleaned
 
 
@@ -266,7 +239,6 @@ class PagoMasivoForm(forms.Form):
     organizacion = forms.ModelChoiceField(queryset=Organizacion.objects.none(), required=True)
     fecha_pago = forms.DateField(widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}))
     plan = forms.ModelChoiceField(queryset=PaymentPlan.objects.none(), required=False)
-    documento_tributario = forms.ModelChoiceField(queryset=DocumentoTributario.objects.none(), required=False)
     metodo_pago = forms.ChoiceField(choices=Payment.Metodo.choices)
     numero_comprobante = forms.CharField(required=False)
     aplica_iva = forms.BooleanField(required=False, initial=True)
@@ -278,11 +250,10 @@ class PagoMasivoForm(forms.Form):
     filas_json = forms.CharField(widget=forms.HiddenInput, required=False)
     clave_idempotencia = forms.CharField(widget=forms.HiddenInput)
 
-    def __init__(self, *args, organizaciones=None, personas=None, planes=None, documentos=None, **kwargs):
+    def __init__(self, *args, organizaciones=None, personas=None, planes=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["organizacion"].queryset = organizaciones or Organizacion.objects.none()
         self.fields["plan"].queryset = planes or PaymentPlan.objects.none()
-        self.fields["documento_tributario"].queryset = documentos or DocumentoTributario.objects.none()
         self.personas_queryset = personas or Persona.objects.none()
 
     def clean_personas_seleccionadas(self):
@@ -323,11 +294,8 @@ class PagoMasivoForm(forms.Form):
             cleaned["numero_comprobante"] = ""
         organizacion = cleaned.get("organizacion")
         plan = cleaned.get("plan")
-        documento = cleaned.get("documento_tributario")
         if plan and organizacion and plan.organizacion_id != organizacion.pk:
             self.add_error("plan", "El plan no pertenece a la organización seleccionada.")
-        if documento and organizacion and documento.organizacion_id != organizacion.pk:
-            self.add_error("documento_tributario", "El documento no pertenece a la organización seleccionada.")
         return cleaned
 
 
@@ -464,15 +432,6 @@ class CategoryForm(forms.ModelForm):
         fields = ["nombre", "tipo", "activa"]
 
 
-class DocumentoTributarioMultipleChoiceField(forms.ModelMultipleChoiceField):
-    def label_from_instance(self, obj):
-        extracto = (obj.observaciones or "").strip().replace("\n", " ")
-        if len(extracto) > 80:
-            extracto = f"{extracto[:77].rstrip()}..."
-        base = f"{obj.get_tipo_documento_display()} #{obj.folio}"
-        return f"{base} - {extracto}" if extracto else base
-
-
 class TransactionForm(forms.ModelForm):
     tipo = forms.CharField(required=False, widget=forms.HiddenInput())
 
@@ -485,13 +444,11 @@ class TransactionForm(forms.ModelForm):
             "tipo",
             "monto",
             "descripcion",
-            "documentos_tributarios",
             "archivo",
         ]
         widgets = {
             "fecha": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "descripcion": forms.Textarea(attrs={"rows": 2}),
-            "documentos_tributarios": forms.SelectMultiple(attrs={"size": 6}),
         }
 
     def __init__(self, *args, periodo_mes=None, periodo_anio=None, organizacion=None, **kwargs):
@@ -499,30 +456,9 @@ class TransactionForm(forms.ModelForm):
         self.periodo_anio = periodo_anio
         self.organizacion_filtro = organizacion
         super().__init__(*args, **kwargs)
-        documentos_actuales = []
-        if self.instance.pk:
-            documentos_actuales = list(self.instance.documentos_tributarios.values_list("pk", flat=True))
-        queryset_documentos = _documentos_para_asociacion(
-            organizacion=organizacion,
-            periodo_mes=periodo_mes,
-            periodo_anio=periodo_anio,
-            documentos_actuales=documentos_actuales,
-        )
-        self.documentos_actuales_ids = set(documentos_actuales)
-        self.fields["documentos_tributarios"] = DocumentoTributarioMultipleChoiceField(
-            queryset=queryset_documentos,
-            required=False,
-            widget=forms.SelectMultiple(attrs={"size": 6}),
-            help_text="Asocia uno o mas documentos tributarios relacionados con este movimiento.",
-        )
-        if self.is_bound:
-            self.fields["documentos_tributarios"].widget.choices = self.fields["documentos_tributarios"].choices
-        elif self.instance.pk:
+        if not self.is_bound and self.instance.pk:
             self.initial["tipo"] = self.instance.categoria.tipo if self.instance.categoria_id else self.instance.tipo
         self.fields["tipo"].initial = self.initial.get("tipo", "")
-        self.fields["documentos_tributarios"].help_text = (
-            "Asocia uno o mas documentos tributarios relacionados con este movimiento."
-        )
         self.fields["archivo"].label = "Respaldo del movimiento"
         self.fields["archivo"].help_text = "Adjunta cartola, comprobante de transferencia u otro respaldo de caja."
 
@@ -531,21 +467,6 @@ class TransactionForm(forms.ModelForm):
         categoria = cleaned.get("categoria")
         if categoria:
             cleaned["tipo"] = categoria.tipo
-        organizacion = cleaned.get("organizacion")
-        for documento in cleaned.get("documentos_tributarios") or []:
-            if organizacion and documento.organizacion_id != organizacion.id:
-                self.add_error(
-                    "documentos_tributarios",
-                    "Todos los documentos tributarios deben pertenecer a la misma organizacion de la transaccion.",
-                )
-                break
-            if _documento_fuera_periodo(documento, periodo_mes=self.periodo_mes, periodo_anio=self.periodo_anio):
-                if documento.pk not in self.documentos_actuales_ids:
-                    self.add_error(
-                        "documentos_tributarios",
-                        "Todos los documentos tributarios nuevos deben pertenecer al periodo filtrado.",
-                    )
-                    break
         return cleaned
 
 

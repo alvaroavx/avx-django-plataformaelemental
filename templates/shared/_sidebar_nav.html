@@ -9,23 +9,31 @@
   <nav class="d-flex flex-column gap-1" aria-label="Navegación principal">
     {% for item in elemental_nav_items %}
       {% if item.children %}
-        <div class="elemental-nav-heading {% if item.active %}active{% endif %}">
-          <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
-        </div>
         <a class="elemental-nav-collapsed-link {% if item.active %}active{% endif %}" href="{{ item.url }}" title="{{ item.label }}" {% if item.active %}aria-current="location"{% endif %}>
           <i class="bi {{ item.icon }}" aria-hidden="true"></i><span class="visually-hidden">{{ item.label }}</span>
           {% for child in item.children %}
             {% if child.badge %}<span class="elemental-nav-rail-badge" aria-label="{{ child.badge }} solicitudes pendientes">{{ child.badge }}</span>{% endif %}
           {% endfor %}
         </a>
+        {% if item.collapsible %}
+          <details class="elemental-nav-disclosure" {% if item.active %}open{% endif %}>
+            <summary class="elemental-nav-heading {% if item.active %}active{% endif %}">
+              <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span><i class="bi bi-chevron-down elemental-nav-chevron ms-auto" aria-hidden="true"></i>
+            </summary>
+        {% else %}
+          <div class="elemental-nav-heading {% if item.active %}active{% endif %}">
+            <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
+          </div>
+        {% endif %}
         <div class="d-flex flex-column mb-2" role="group" aria-label="{{ item.label }}">
           {% for child in item.children %}
-            <a class="elemental-nav-child {% if child.current %}active{% endif %}" href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>
+            <a class="elemental-nav-child {% if child.current or child.active %}active{% endif %}" href="{{ child.url }}" {% if child.current %}aria-current="page"{% elif child.active %}aria-current="location"{% endif %}>
               <i class="bi {{ child.icon }}" aria-hidden="true"></i><span>{{ child.label }}</span>
               {% if child.badge %}<span class="badge rounded-pill text-bg-warning ms-auto" aria-label="{{ child.badge }} solicitudes pendientes">{{ child.badge }}</span>{% endif %}
             </a>
           {% endfor %}
         </div>
+        {% if item.collapsible %}</details>{% endif %}
       {% else %}
         <a class="elemental-nav-link {% if item.active %}active{% endif %}" href="{{ item.url }}" title="{{ item.label }}" aria-label="{{ item.label }}" {% if item.current %}aria-current="page"{% elif item.active %}aria-current="location"{% endif %}>
           <i class="bi {{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>

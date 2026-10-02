@@ -124,8 +124,16 @@ python manage.py migrate
 
 ### Levantar servidor local
 ```bash
-python manage.py runserver
+python manage.py runserver 127.0.0.1:8000
 ```
+
+Cuando se pruebe el acceso Google, `http://127.0.0.1:8000` es el origen local
+canónico. Google Cloud debe autorizar exactamente
+`http://127.0.0.1:8000/accounts/google/login/callback/`; cambiar host o puerto
+genera `redirect_uri_mismatch`. Después de cambiar el origen hay que iniciar un
+flujo OAuth nuevo: recargar una página de error conserva el callback anterior.
+La decisión y el diagnóstico están registrados en
+[`docs/adr/0003-origen-local-canonico-oauth.md`](docs/adr/0003-origen-local-canonico-oauth.md).
 
 ## Uso operativo básico
 

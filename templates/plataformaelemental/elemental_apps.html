@@ -1,27 +1,30 @@
 {% extends "asistencias/base_app.html" %}
 {% load formato %}
-{% block title %}Inicio · Elemental Apps{% endblock %}
+{% block title %}Panel · Elemental Apps{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css">
+{% endblock %}
 {% block content %}
 <div class="elemental-dashboard py-2 py-lg-3">
   <header class="mb-4">
     <div class="text-muted small text-uppercase fw-semibold">Inicio</div>
-    <h1 class="h2 mb-1">Resumen de operación</h1>
+    <h1 class="h2 mb-1">Panel</h1>
     <p class="text-muted mb-0">Lo que ocurrió y lo que requiere atención en {{ periodo_descripcion }}.</p>
   </header>
 
-  {% if dashboard_academico or dashboard_financiero or consulta_persona or dashboard_alertas %}
+  {% if dashboard_academico or dashboard_financiero or dashboard_personas or consulta_persona or dashboard_alertas or jornada_hoy %}
     {% if dashboard_academico or dashboard_financiero %}
       <section aria-labelledby="resumen-periodo-titulo" class="mb-4">
       <h2 class="visually-hidden" id="resumen-periodo-titulo">Resumen del período</h2>
-      <div class="row g-2 g-lg-3">
+      <div class="row g-2 g-lg-3 elemental-kpi-row">
         {% if dashboard_academico %}
-          <div class="col-6 col-xl-3">
+          <div class="col-3">
             <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'sesiones-completadas' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_academico.sesiones_completadas }}</span>
               <span class="elemental-kpi-label">Sesiones completadas</span>
             </a>
           </div>
-          <div class="col-6 col-xl-3">
+          <div class="col-3">
             <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'personas-con-asistencia' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_academico.personas_con_asistencia }}</span>
               <span class="elemental-kpi-label">Personas con asistencia registrada</span>
@@ -29,15 +32,15 @@
           </div>
         {% endif %}
         {% if dashboard_financiero %}
-          <div class="col-6 col-xl-3">
+          <div class="col-3">
             <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'clases-en-deuda' %}?{{ dashboard_query_global }}">
               <span class="elemental-kpi-value">{{ dashboard_financiero.clases_en_deuda }}</span>
               <span class="elemental-kpi-label">Clases en deuda</span>
             </a>
           </div>
-          <div class="col-6 col-xl-3">
+          <div class="col-3">
             <a class="elemental-kpi" href="{% url 'elemental_apps_detalle_metrica' 'ingresos-contables' %}?{{ dashboard_query_global }}">
-              <span class="elemental-kpi-value elemental-kpi-money">{{ dashboard_financiero.ingresos_contables|clp }}</span>
+              <span class="elemental-kpi-value elemental-kpi-money" data-fit-text>{{ dashboard_financiero.ingresos_contables|clp }}</span>
               <span class="elemental-kpi-label">Ingresos contables</span>
             </a>
           </div>
@@ -46,27 +49,27 @@
       </section>
     {% endif %}
 
-    {% if dashboard_academico %}
+    {% if jornada_hoy %}
       <section class="card elemental-dashboard-panel mb-3" aria-labelledby="jornada-hoy-titulo">
         <div class="card-body p-3 p-lg-4">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>
-              <div class="text-muted small text-uppercase fw-semibold">Jornada de hoy</div>
-              <h2 class="h4 mb-0" id="jornada-hoy-titulo">{{ dashboard_academico.fecha_hoy|date:'l d \d\e F'|capfirst }}</h2>
+              <div class="text-muted small text-uppercase fw-semibold">{% if jornada_hoy.modo_profesor %}Mi jornada de hoy{% else %}Jornada de hoy{% endif %}</div>
+              <h2 class="h4 mb-0" id="jornada-hoy-titulo">{{ jornada_hoy.fecha_hoy|date:'l d \d\e F'|capfirst }}</h2>
             </div>
-            <a class="btn btn-sm btn-outline-primary" href="{% url 'asistencias:asistencias_list' %}?{{ dashboard_query_global }}">Gestionar sesiones</a>
+            <a class="btn btn-sm btn-outline-primary" href="{{ jornada_hoy.gestion_url }}">{% if jornada_hoy.modo_profesor %}Ir a mis clases{% else %}Gestionar sesiones{% endif %}</a>
           </div>
-          {% if dashboard_academico.sesiones_hoy %}
+          {% if jornada_hoy.sesiones %}
             <div class="row g-2">
-              {% for sesion in dashboard_academico.sesiones_hoy %}
+              {% for sesion in jornada_hoy.sesiones %}
                 <div class="col-md-6 col-xl-4">
-                  <a class="elemental-today-session" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ dashboard_query_global }}">
+                  <a class="elemental-today-session" href="{{ sesion.panel_url }}">
                     <span class="d-flex justify-content-between gap-2">
                       <strong>{{ sesion.disciplina.nombre }}</strong>
                       <span class="badge text-bg-{% if sesion.estado == 'completada' %}success{% elif sesion.estado == 'cancelada' %}secondary{% elif sesion.estado == 'abierta' %}warning{% else %}info{% endif %}">{{ sesion.get_estado_display }}</span>
                     </span>
                     <span class="small text-muted">{{ sesion.disciplina.organizacion.nombre }} · {% if sesion.bloque %}{{ sesion.bloque.hora_inicio|time:'H:i' }}–{{ sesion.bloque.hora_fin|time:'H:i' }}{% else %}Horario pendiente{% endif %}</span>
-                    <span class="small">{% for profesor in sesion.profesores.all %}{{ profesor }}{% if not forloop.last %}, {% endif %}{% empty %}Sin profesor asignado{% endfor %} · {{ sesion.asistencias_total }} asistentes</span>
+                    <span class="small">{% for profesor in sesion.profesores.all %}{{ profesor }}{% if not forloop.last %}, {% endif %}{% empty %}Sin profesor asignado{% endfor %} · {{ sesion.asistentes_panel }} asistentes</span>
                   </a>
                 </div>
               {% endfor %}
@@ -79,7 +82,8 @@
     {% endif %}
 
     <div class="row g-3 align-items-start">
-      <div class="{% if consulta_persona.persona %}col-12{% else %}col-xl-7{% endif %} order-1">
+      {% if dashboard_academico or dashboard_financiero or dashboard_alertas %}
+      <div class="{% if consulta_persona.persona %}col-12{% elif consulta_persona %}col-xl-7{% else %}col-12{% endif %} order-1">
         <section class="card elemental-dashboard-panel" aria-labelledby="atencion-titulo">
           <div class="card-body p-3 p-lg-4">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -105,13 +109,24 @@
           </div>
         </section>
       </div>
+      {% endif %}
 
       {% if consulta_persona %}
         <div class="{% if consulta_persona.persona %}col-12{% else %}col-xl-5{% endif %} order-2">
           <section class="card elemental-dashboard-panel" aria-labelledby="consulta-titulo" id="consulta-persona">
             <div class="card-body p-3 p-lg-4">
-              <div class="text-muted small text-uppercase fw-semibold">Respuesta rápida</div>
-              <h2 class="h4 mb-1" id="consulta-titulo">Consulta de persona</h2>
+              <div class="text-muted small text-uppercase fw-semibold">Personas</div>
+              <h2 class="h4 mb-3">Personas registradas</h2>
+              {% if dashboard_personas %}
+                <div class="elemental-people-overview mb-3" aria-label="Resumen de personas">
+                  <div class="elemental-people-total"><strong>{{ dashboard_personas.total }}</strong><span>Total</span></div>
+                  <div><strong>{{ dashboard_personas.estudiantes }}</strong><span>Estudiantes</span></div>
+                  <div><strong>{{ dashboard_personas.profesores }}</strong><span>Profesores</span></div>
+                </div>
+                <p class="small text-muted mb-3">Los roles pueden superponerse: una persona puede ser estudiante y profesora.</p>
+              {% endif %}
+              <hr class="my-3">
+              <h3 class="h5 mb-1" id="consulta-titulo">Consulta de persona</h3>
               <p class="small text-muted">Los resultados respetan el período, la organización y tus permisos.</p>
               <form method="get" role="search" class="mb-3" action="#consulta-persona">
                 {% for key, value in request.GET.items %}
@@ -191,34 +206,99 @@
         </div>
       {% endif %}
 
-      {% if dashboard_academico %}
-        <div class="col-xl-7 order-3">
-          <section class="card elemental-dashboard-panel" aria-labelledby="proximas-titulo">
-            <div class="card-body p-3 p-lg-4">
-              <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                <h2 class="h4 mb-0" id="proximas-titulo">Próximas sesiones del período</h2>
-                <a class="elemental-dashboard-action small" href="{% url 'asistencias:sesiones_list' %}?{{ dashboard_query_global }}">Ver calendario</a>
-              </div>
-              {% if dashboard_academico.proximas_sesiones %}
-                <div class="elemental-operational-list">
-                  {% for sesion in dashboard_academico.proximas_sesiones %}
-                    <a class="elemental-operational-row" href="{% url 'asistencias:sesion_detail' sesion.pk %}?{{ dashboard_query_global }}">
-                      <span class="elemental-date"><strong>{{ sesion.fecha|date:'d' }}</strong>{{ sesion.fecha|date:'M' }}<span class="visually-hidden"> de {{ sesion.fecha|date:'Y' }}</span></span>
-                      <span><strong class="d-block">{{ sesion.disciplina.nombre }}</strong><small class="text-muted">{{ sesion.disciplina.organizacion.nombre }} · {% if sesion.bloque %}{{ sesion.bloque.hora_inicio|time:'H:i' }}{% else %}Horario pendiente{% endif %}</small></span>
-                      <i class="bi bi-arrow-right ms-auto" aria-hidden="true"></i>
-                    </a>
-                  {% endfor %}
-                </div>
-              {% else %}
-                <p class="mb-0 text-muted">No hay sesiones próximas en el período seleccionado.</p>
-              {% endif %}
-            </div>
-          </section>
-        </div>
-      {% endif %}
     </div>
+
+    {% if estudiantes_con_deuda or estudiantes_con_mas_asistencia or estudiantes_con_clases_restantes or dashboard_academico %}
+      <section class="mt-4" aria-labelledby="seguimiento-estudiantes-titulo">
+        <div class="mb-3">
+          <div class="text-muted small text-uppercase fw-semibold">Estudiantes</div>
+          <h2 class="h4 mb-0" id="seguimiento-estudiantes-titulo">Seguimiento del período</h2>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="card elemental-dashboard-panel h-100">
+              <div class="card-header">Estudiantes con deuda</div>
+              <div class="card-body table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Estudiante</th><th class="text-end">Clases</th></tr></thead>
+                  <tbody>
+                    {% for persona in estudiantes_con_deuda %}
+                      <tr><td><a href="{% url 'personas:persona_detail' persona.pk %}?{{ dashboard_query_global }}">{{ persona }}</a></td><td class="text-end">{{ persona.clases_deuda }}</td></tr>
+                    {% empty %}
+                      <tr><td colspan="2" class="text-muted">Sin deuda en el período.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="card elemental-dashboard-panel h-100">
+              <div class="card-header">Estudiantes con más asistencia</div>
+              <div class="card-body table-responsive">
+                <table id="tabla-estudiantes-mas-asistencia" class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Estudiante</th><th class="text-end">Clases</th></tr></thead>
+                  <tbody>
+                    {% for persona in estudiantes_con_mas_asistencia %}
+                      <tr data-data-row="true"><td><a href="{% url 'personas:persona_detail' persona.pk %}?{{ dashboard_query_global }}">{{ persona }}</a></td><td class="text-end">{{ persona.total_asistencias_mes }}</td></tr>
+                    {% empty %}
+                      <tr data-empty-row="true"><td class="text-muted">Sin asistencias registradas.</td><td class="text-end text-muted">-</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="card elemental-dashboard-panel h-100">
+              <div class="card-header">Alumnos con clases disponibles</div>
+              <div class="card-body table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Estudiante</th><th class="text-end">Saldo</th></tr></thead>
+                  <tbody>
+                    {% for item in estudiantes_con_clases_restantes %}
+                      <tr>
+                        <td><a href="{% url 'personas:persona_detail' item.persona.pk %}?{{ dashboard_query_global }}">{{ item.persona }}</a><div class="small text-muted">{{ item.clases_pagadas }} pagadas · {{ item.clases_consumidas }} usadas</div></td>
+                        <td class="text-end">{{ item.saldo_clases }}</td>
+                      </tr>
+                    {% empty %}
+                      <tr><td colspan="2" class="text-muted">Sin clases disponibles en el período.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    {% endif %}
   {% else %}
     <div class="alert alert-light border">Tu usuario no tiene información operacional visible en este contexto. Revisa la organización seleccionada o solicita acceso a un administrador.</div>
   {% endif %}
 </div>
+{% endblock %}
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  (function () {
+    if (!window.jQuery) return;
+    const tabla = jQuery("#tabla-estudiantes-mas-asistencia");
+    if (!tabla.length || !tabla.find("tbody tr[data-data-row]").length) return;
+    tabla.DataTable({
+      paging: true,
+      pageLength: 10,
+      lengthChange: false,
+      searching: false,
+      info: false,
+      order: [[1, "desc"]],
+      language: {
+        paginate: { previous: "Anterior", next: "Siguiente" },
+        zeroRecords: "Sin registros",
+        emptyTable: "Sin registros",
+      },
+    });
+  })();
+</script>
 {% endblock %}

@@ -506,50 +506,7 @@ def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=No
 
 @permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def dashboard(request):
-    context = _base_context(request)
-    periodo = resolver_periodo(request)
-    organizacion = organizacion_desde_request(request)
-
-    personas_qs = _annotate_personas_resumen(
-        _personas_queryset(organizacion),
-        mes=periodo["mes"],
-        anio=periodo["anio"],
-        organizacion=organizacion,
-    )
-    pagos_qs = aplicar_periodo(
-        Payment.objects.filter(revertido_en__isnull=True),
-        "fecha_pago",
-        request=request,
-    )
-    consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
-    asistencias_qs = aplicar_periodo(Asistencia.objects.all(), "sesion__fecha", request=request)
-    if organizacion:
-        pagos_qs = pagos_qs.filter(organizacion=organizacion)
-        consumos_qs = consumos_qs.filter(asistencia__sesion__disciplina__organizacion=organizacion)
-        asistencias_qs = asistencias_qs.filter(sesion__disciplina__organizacion=organizacion)
-
-    context.update(
-        {
-            "total_personas": personas_qs.count(),
-            "personas_activas": personas_qs.filter(activo=True).count(),
-            "personas_con_usuario": personas_qs.filter(user__isnull=False).count(),
-            "estudiantes_total": personas_qs.filter(roles__activo=True, roles__rol__codigo="ESTUDIANTE").distinct().count(),
-            "profesores_total": personas_qs.filter(roles__activo=True, roles__rol__codigo="PROFESOR").distinct().count(),
-            "personas_con_deuda_total": personas_qs.filter(deuda_periodo__gt=0).count(),
-            "personas_con_asistencia": asistencias_qs.values("persona_id").distinct().count(),
-            "pagos_registrados": pagos_qs.count(),
-            "monto_pagado_total": pagos_qs.aggregate(total=Sum("monto_total")).get("total") or 0,
-            "deuda_total_clases": consumos_qs.filter(estado=AttendanceConsumption.Estado.DEUDA).count(),
-            "personas_con_deuda": personas_qs.filter(deuda_periodo__gt=0).order_by("-deuda_periodo", "apellidos", "nombres")[:8],
-            "personas_sin_contacto": personas_qs.filter(
-                Q(email__isnull=True) | Q(email=""),
-                Q(telefono=""),
-            ).order_by("apellidos", "nombres")[:8],
-            "personas_nuevas": personas_qs.order_by("-creado_en")[:8],
-            "pagos_recientes": pagos_qs.select_related("persona", "organizacion").order_by("-fecha_pago", "-id")[:8],
-        }
-    )
-    return render(request, "personas/dashboard.html", context)
+    return redirect(_url_con_filtros(request, "personas:personas_list"))
 
 
 @permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
@@ -774,7 +731,7 @@ def persona_detail(request, pk):
             ),
             Prefetch(
                 "pagos_financieros",
-                queryset=Payment.objects.select_related("organizacion", "plan", "documento_tributario").order_by("-fecha_pago", "-id"),
+                queryset=Payment.objects.select_related("organizacion", "plan").order_by("-fecha_pago", "-id"),
             ),
             Prefetch(
                 "consumos_asistencia",
@@ -881,7 +838,6 @@ def persona_detail(request, pk):
     es_estudiante = "ESTUDIANTE" in roles_codigos
     es_profesor = "PROFESOR" in roles_codigos
     pagos_vigentes = pagos.filter(revertido_en__isnull=True)
-    documentos_tributarios = [pago.documento_tributario for pago in pagos if pago.documento_tributario_id]
     finanzas_resumen = resumen_financiero_estudiante(persona, organizacion) if es_estudiante else None
     if es_estudiante:
         pagos_asociables_periodo = list(
@@ -922,7 +878,7 @@ def persona_detail(request, pk):
             else:
                 asistencia.estado_financiero_label = "Sin consumo"
                 asistencia.estado_financiero_clase = "light"
-    mostrar_bloque_estudiante = es_estudiante or asistencias.exists() or pagos.exists() or consumos.exists() or bool(documentos_tributarios)
+    mostrar_bloque_estudiante = es_estudiante or asistencias.exists() or pagos.exists() or consumos.exists()
     mostrar_bloque_profesor = es_profesor or sesiones_profesor.exists()
     sesiones_profesor_total = sesiones_profesor.count()
     sesiones_profesor_completadas = sesiones_profesor.filter(estado=SesionClase.Estado.COMPLETADA).count()
@@ -960,7 +916,6 @@ def persona_detail(request, pk):
             "pagos": pagos,
             "consumos": consumos,
             "sesiones_profesor": sesiones_profesor,
-            "documentos_tributarios": documentos_tributarios,
             "finanzas_resumen": finanzas_resumen,
             "monto_pagado": pagos_vigentes.aggregate(total=Sum("monto_total")).get("total") or 0,
             "consumos_consumidos": consumos.filter(estado=AttendanceConsumption.Estado.CONSUMIDO).count(),

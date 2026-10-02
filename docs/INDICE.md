@@ -28,6 +28,10 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 ## ADR
 - [docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/adr/0001-autenticacion-google-y-solicitudes-acceso.md): decision y gates de seguridad para autenticacion Google y solicitudes de acceso.
 - [docs/adr/0002-release-defensivo-asistencias-0005.md](adr/0002-release-defensivo-asistencias-0005.md): rutas, preflight y recuperación forward-only de la reparación defensiva `asistencias.0005`.
+- [docs/adr/0003-origen-local-canonico-oauth.md](adr/0003-origen-local-canonico-oauth.md): fija `127.0.0.1:8000` como origen local canónico para evitar callbacks Google obsoletos o no autorizados.
+- [docs/adr/0004-mantenedores-en-configuracion.md](adr/0004-mantenedores-en-configuracion.md): separa la operación frecuente de los mantenedores y renombra Django Admin como Administración avanzada.
+- [docs/adr/0005-panel-transversal-y-personas.md](adr/0005-panel-transversal-y-personas.md): convierte la portada existente en Panel común por capacidades y retira el Panel separado de Personas.
+- [docs/adr/0006-menu-operativo-plano.md](adr/0006-menu-operativo-plano.md): aplana los accesos operativos, retira el panel de Sesiones y concentra su seguimiento estudiantil en el Panel principal.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

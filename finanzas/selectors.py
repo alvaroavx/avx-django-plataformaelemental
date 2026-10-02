@@ -206,32 +206,11 @@ def resumen_dashboard(pagos_qs, transacciones_qs, documentos_qs, consumos_qs, *,
     categorias_totales = (
         transacciones_qs.values("categoria__nombre", "categoria__tipo").annotate(total=Sum("monto")).order_by("-total")
     )
-    transacciones_sin_documento = (
-        transacciones_qs.annotate(documentos_total=Count("documentos_tributarios", distinct=True))
-        .filter(documentos_total=0)
-        .count()
-    )
-    filtro_documento_fuera_periodo = _filtro_fuera_periodo_documento("documentos_tributarios__", mes=mes, anio=anio)
-    transacciones_con_documento_fuera_periodo = (
-        transacciones_qs.filter(filtro_documento_fuera_periodo).distinct().count()
-        if filtro_documento_fuera_periodo
-        else 0
-    )
-    pagos_con_documento_fuera_periodo = (
-        pagos_qs.filter(documento_tributario__isnull=False)
-        .filter(_filtro_fuera_periodo_documento("documento_tributario__", mes=mes, anio=anio))
-        .distinct()
-        .count()
-        if _filtro_fuera_periodo_documento("documento_tributario__", mes=mes, anio=anio)
-        else 0
-    )
     return {
         "ingresos_contables": ingresos_transacciones,
         "egresos_contables": egresos_transacciones,
         "saldo_contable": ingresos_transacciones - egresos_transacciones,
         "total_transacciones": transacciones_qs.count(),
-        "total_documentos_periodo": documentos_qs.count(),
-        "documentos_con_transaccion": documentos_qs.filter(transacciones_asociadas__isnull=False).distinct().count(),
         "pagos_operacionales_monto": pagos_operacionales_monto,
         "total_pagos_operacionales": pagos_qs.count(),
         "clases_pagadas": clases_pagadas,
@@ -239,9 +218,6 @@ def resumen_dashboard(pagos_qs, transacciones_qs, documentos_qs, consumos_qs, *,
         "deuda_clases": deuda_clases,
         "iva_debito": iva_debito,
         "categorias_totales": categorias_totales,
-        "transacciones_sin_documento": transacciones_sin_documento,
-        "transacciones_con_documento_fuera_periodo": transacciones_con_documento_fuera_periodo,
-        "pagos_con_documento_fuera_periodo": pagos_con_documento_fuera_periodo,
         "pagos_operacionales_no_contables": pagos_qs.count(),
     }
 
