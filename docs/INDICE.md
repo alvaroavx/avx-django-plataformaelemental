@@ -38,6 +38,8 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0010-seguimiento-panel-plegable-en-movil.md](adr/0010-seguimiento-panel-plegable-en-movil.md): mantiene visible el seguimiento estudiantil en escritorio y lo presenta plegado por defecto en responsive.
 - [docs/adr/0011-borrador-correo-cierre-profesores.md](adr/0011-borrador-correo-cierre-profesores.md): define el borrador individual de cierre, su cálculo, agrupación por disciplina y límites operativos.
 - [docs/adr/0012-botones-con-icono-y-texto.md](adr/0012-botones-con-icono-y-texto.md): fija la anatomía `[icono] [texto]`, su separación estructural y la copia operable de borradores incompletos.
+- [docs/adr/0013-lenguaje-visual-panel-en-vistas-operativas.md](adr/0013-lenguaje-visual-panel-en-vistas-operativas.md): extiende la gramática visual del Panel a Calendario, Asistencias, Estudiantes y Profesores sin reducir su densidad operacional.
+- [docs/adr/0014-asistencias-cards-en-mobile.md](adr/0014-asistencias-cards-en-mobile.md): reemplaza el scroll horizontal de sesiones registradas por cards completas y filtrables en mobile.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

@@ -751,6 +751,42 @@ class AsistenciasViewTests(TestCase):
         self.assertNotIn(profesor_inactivo, profesores)
         self.assertNotIn(profesor_otra_org, profesores)
 
+    def test_asistencias_list_mobile_renderiza_cards_completas_y_mantiene_tabla_desktop(self):
+        profesor = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Mobile",
+            email="paula.mobile@example.com",
+        )
+        rol_profesor = Rol.objects.get_or_create(nombre="Profesor", codigo="PROFESOR")[0]
+        PersonaRol.objects.create(
+            persona=profesor,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.sesion.profesores.add(profesor)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+
+        response = self.client.get(
+            reverse("asistencias:asistencias_list"),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="elemental-session-cards d-md-none"', html=False)
+        self.assertContains(response, f'data-session-card-id="{self.sesion.pk}"', html=False)
+        self.assertContains(response, f'data-session-row-id="{self.sesion.pk}"', html=False)
+        self.assertContains(response, "Paula Mobile")
+        self.assertContains(response, self.estudiante.nombre_completo)
+        self.assertContains(response, "Ver sesión")
+        self.assertContains(
+            response,
+            'class="table-responsive elemental-table-panel d-none d-md-block"',
+            html=False,
+        )
+        self.assertContains(response, 'id="filtro-texto-sesiones"', html=False)
+        self.assertContains(response, 'dt.on("draw", sincronizarCards)', html=False)
+
     def test_agregar_asistentes_desde_sesion_detail(self):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
         response = self.client.post(

@@ -1,18 +1,22 @@
 {% extends "asistencias/base_app.html" %}
 {% block title %}Calendario{% endblock %}
 {% block content %}
-<div class="mt-4">
-  <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
-    <h2>
+<div class="mt-4 elemental-section-page">
+  <div class="elemental-page-header elemental-section-header d-flex justify-content-between align-items-start">
+    <div>
+      <div class="elemental-eyebrow">Operación</div>
+      <h2 class="elemental-page-title">
       {% if mostrar_calendario %}
-        Calendario - {{ mes_actual|date:"F Y" }}
+        Calendario · {{ mes_actual|date:"F Y" }}
       {% else %}
-        Calendario - {{ periodo_descripcion_vista }}
+        Calendario · {{ periodo_descripcion_vista }}
       {% endif %}
-    </h2>
+      </h2>
+      <p class="elemental-section-lead">Consulta las sesiones del período y abre cada jornada para revisar su asistencia.</p>
+    </div>
     <div class="elemental-page-actions justify-content-md-end" aria-label="Acciones del calendario">
       <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
-        <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
+        <span class="elemental-button-content"><i class="bi bi-calendar-plus" aria-hidden="true"></i><span class="d-none d-md-inline">Nueva sesión</span></span>
       </a>
       <button
         class="btn btn-success"
@@ -21,7 +25,7 @@
         data-bs-target="#sesionesMasivasModal"
         {% if not mostrar_calendario %}disabled{% endif %}
       >
-        <i class="bi bi-calendar-week"></i><span class="d-none d-md-inline ms-1">Sesiones masivas</span>
+        <span class="elemental-button-content"><i class="bi bi-calendar-week" aria-hidden="true"></i><span class="d-none d-md-inline">Sesiones masivas</span></span>
       </button>
     </div>
   </div>
@@ -33,8 +37,7 @@
   {% if mostrar_calendario %}
     <div class="d-md-none mb-3">
       <button class="btn btn-outline-primary w-100" type="button" data-calendar-view-toggle aria-pressed="false">
-        <i class="bi bi-calendar3" aria-hidden="true"></i>
-        <span data-calendar-view-label>Ver mes</span>
+        <span class="elemental-button-content"><i class="bi bi-calendar3" aria-hidden="true"></i><span data-calendar-view-label>Ver mes</span></span>
       </button>
     </div>
 
@@ -80,7 +83,7 @@
       </div>
     </div>
 
-    <div class="table-responsive elemental-calendar-month-view" data-calendar-month-view>
+    <div class="table-responsive elemental-calendar-month-view elemental-table-panel" data-calendar-month-view>
       <table class="table table-bordered align-middle elemental-calendar">
         <thead class="elemental-calendar-head">
           <tr>

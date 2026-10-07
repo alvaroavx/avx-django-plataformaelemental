@@ -494,6 +494,37 @@
     box-shadow: none;
   }
 
+  .elemental-section-page {
+    padding-bottom: 2rem;
+  }
+
+  .elemental-section-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .elemental-eyebrow {
+    margin-bottom: 0.2rem;
+    color: var(--ea-muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .elemental-section-lead {
+    max-width: 62rem;
+    margin: 0.3rem 0 0;
+    color: var(--ea-muted);
+    font-size: 0.95rem;
+  }
+
+  .elemental-surface {
+    background: var(--ea-panel);
+    border: 1px solid var(--ea-border);
+    border-radius: 1rem;
+    box-shadow: none;
+  }
+
   .elemental-operational-list {
     border-top: 1px solid var(--ea-border);
   }
@@ -533,26 +564,102 @@
   }
 
   .elemental-metric-card {
+    position: relative;
+    overflow: hidden;
     color: var(--ea-text);
     border: 1px solid var(--ea-border);
+    border-radius: 1rem;
+    box-shadow: none;
   }
 
-  .elemental-metric-card-success { background: #d1fae5; }
-  .elemental-metric-card-danger { background: #fee2e2; }
-  .elemental-metric-card-primary { background: #dbeafe; }
-  .elemental-metric-card-warning { background: #fef3c7; }
-  .elemental-metric-card-info { background: #cffafe; }
+  .elemental-metric-card::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    content: "";
+    background: var(--elemental-metric-accent, var(--ea-accent));
+  }
+
+  .elemental-metric-card .display-6 {
+    margin-top: 0.25rem;
+    font-size: clamp(1.65rem, 3vw, 2.25rem);
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .elemental-metric-card-success { --elemental-metric-accent: #198754; background: color-mix(in srgb, var(--ea-panel) 92%, #d1fae5); }
+  .elemental-metric-card-danger { --elemental-metric-accent: #dc3545; background: color-mix(in srgb, var(--ea-panel) 92%, #fee2e2); }
+  .elemental-metric-card-primary { --elemental-metric-accent: #2563eb; background: color-mix(in srgb, var(--ea-panel) 92%, #dbeafe); }
+  .elemental-metric-card-warning { --elemental-metric-accent: #d97706; background: color-mix(in srgb, var(--ea-panel) 92%, #fef3c7); }
+  .elemental-metric-card-info { --elemental-metric-accent: #0891b2; background: color-mix(in srgb, var(--ea-panel) 92%, #cffafe); }
 
   .elemental-table-panel {
+    overflow: auto;
     background: var(--ea-panel);
     border: 1px solid var(--ea-border);
-    border-radius: 0.75rem;
+    border-radius: 1rem;
   }
+
+  .elemental-table-panel > .table,
+  .elemental-table-panel .dataTable {
+    margin-bottom: 0;
+  }
+
+  .elemental-table-panel .table > thead > tr > th {
+    padding: 0.8rem 0.75rem;
+    color: var(--ea-muted);
+    background: var(--ea-panel-soft);
+    border-bottom: 1px solid var(--ea-border);
+    font-size: 0.75rem;
+    font-weight: 750;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .elemental-table-panel .table > tbody > tr > td {
+    padding: 0.8rem 0.75rem;
+    border-color: var(--ea-border);
+    vertical-align: middle;
+  }
+
+  .elemental-table-panel .table > tbody > tr:last-child > td {
+    border-bottom: 0;
+  }
+
+  .elemental-table-panel .table > tbody > tr:hover > td {
+    background: color-mix(in srgb, var(--ea-panel) 92%, var(--ea-accent));
+  }
+
+  .elemental-session-cards { display: grid; gap: 0.85rem; }
+  .elemental-session-card { overflow: hidden; background: var(--ea-panel); border: 1px solid var(--ea-border); border-radius: 1rem; }
+  .elemental-session-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 0.9rem 1rem; background: var(--ea-panel-soft); border-bottom: 1px solid var(--ea-border); }
+  .elemental-session-card-details { display: grid; gap: 0.75rem; margin: 0; padding: 1rem; }
+  .elemental-session-card-details > div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.75rem; }
+  .elemental-session-card-details dt { color: var(--ea-muted); font-size: 0.75rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
+  .elemental-session-card-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+  .elemental-session-card-attendance { padding: 0 1rem 1rem; }
+  .elemental-session-total { min-width: 1.75rem; height: 1.75rem; display: inline-grid; place-items: center; padding-inline: 0.4rem; color: var(--ea-text); background: var(--ea-panel-soft); border: 1px solid var(--ea-border); border-radius: 999px; font-size: 0.8rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .elemental-session-card-actions { display: grid; grid-template-columns: auto auto minmax(7.5rem, 1fr); gap: 0.5rem; padding: 0.85rem 1rem; background: var(--ea-panel-soft); border-top: 1px solid var(--ea-border); }
+  .elemental-session-card-actions .btn, .elemental-session-card-actions .form-select { min-height: 44px; }
+  .elemental-session-state-form { min-width: 0; }
+  .elemental-session-cards-empty { grid-column: 1 / -1; }
+  @media (max-width: 419.98px) { .elemental-session-card-actions { grid-template-columns: 1fr 1fr; } .elemental-session-state-form { grid-column: 1 / -1; } }
 
   .elemental-calendar-head th,
   .elemental-calendar-event {
     background: var(--ea-panel);
     color: var(--ea-text);
+  }
+
+  .elemental-calendar {
+    margin-bottom: 0;
+  }
+
+  .elemental-calendar-event {
+    border-color: var(--ea-border) !important;
+    border-radius: 0.75rem !important;
   }
 
   .elemental-calendar-outside {
@@ -580,6 +687,14 @@
   .elemental-page-header > :first-child,
   .elemental-page-title {
     min-width: 0;
+  }
+
+  .elemental-page-title {
+    margin-bottom: 0;
+    font-size: clamp(1.65rem, 3vw, 2rem);
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
   }
 
   .elemental-calendar-weeks {
@@ -994,11 +1109,11 @@
     opacity: 0.78;
   }
 
-  :root[data-theme="dark"] .elemental-metric-card-success { background: #123d31; border-color: #28735b; }
-  :root[data-theme="dark"] .elemental-metric-card-danger { background: #482328; border-color: #8d444c; }
-  :root[data-theme="dark"] .elemental-metric-card-primary { background: #182f52; border-color: #345d91; }
-  :root[data-theme="dark"] .elemental-metric-card-warning { background: #453b16; border-color: #8f7826; }
-  :root[data-theme="dark"] .elemental-metric-card-info { background: #153e46; border-color: #2b7480; }
+  :root[data-theme="dark"] .elemental-metric-card-success { background: color-mix(in srgb, var(--ea-panel) 86%, #123d31); border-color: var(--ea-border); }
+  :root[data-theme="dark"] .elemental-metric-card-danger { background: color-mix(in srgb, var(--ea-panel) 86%, #482328); border-color: var(--ea-border); }
+  :root[data-theme="dark"] .elemental-metric-card-primary { background: color-mix(in srgb, var(--ea-panel) 86%, #182f52); border-color: var(--ea-border); }
+  :root[data-theme="dark"] .elemental-metric-card-warning { background: color-mix(in srgb, var(--ea-panel) 86%, #453b16); border-color: var(--ea-border); }
+  :root[data-theme="dark"] .elemental-metric-card-info { background: color-mix(in srgb, var(--ea-panel) 86%, #153e46); border-color: var(--ea-border); }
 
   :root[data-theme="dark"] .elemental-metric-card .text-muted {
     color: #c4cedc !important;

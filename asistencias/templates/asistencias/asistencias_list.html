@@ -1,24 +1,24 @@
 {% extends "asistencias/base_app.html" %}
 {% block title %}Asistencias{% endblock %}
 {% block content %}
-<div class="mt-4">
-  <h3 class="mb-3">Sesiones registradas</h3>
+<div class="mt-4 elemental-section-page">
+  <header class="elemental-section-header">
+    <div class="elemental-eyebrow">Operación</div>
+    <h2 class="elemental-page-title">Asistencias</h2>
+    <p class="elemental-section-lead">Administra sesiones, incorpora personas y revisa la asistencia registrada en el período.</p>
+  </header>
   <div class="elemental-page-actions elemental-page-actions-equal mb-3" aria-label="Acciones de asistencias">
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaSesionModal">
-      <i class="bi bi-calendar-plus"></i><span class="d-none d-md-inline ms-1">Nueva sesión</span>
-      <span class="elemental-mobile-action-label d-md-none">Sesión</span>
+      <span class="elemental-button-content"><i class="bi bi-calendar-plus" aria-hidden="true"></i><span class="d-none d-md-inline">Nueva sesión</span><span class="elemental-mobile-action-label d-md-none">Sesión</span></span>
     </button>
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#nuevaPersonaModal">
-      <i class="bi bi-person-plus"></i><span class="d-none d-md-inline ms-1">Nueva persona</span>
-      <span class="elemental-mobile-action-label d-md-none">Persona</span>
+      <span class="elemental-button-content"><i class="bi bi-person-plus" aria-hidden="true"></i><span class="d-none d-md-inline">Nueva persona</span><span class="elemental-mobile-action-label d-md-none">Persona</span></span>
     </button>
     <button class="btn btn-outline-success flex-md-fill" type="button" data-bs-toggle="modal" data-bs-target="#agregarAsistentesModal">
-      <i class="bi bi-person-check"></i><span class="d-none d-md-inline ms-1">Agregar asistentes</span>
-      <span class="elemental-mobile-action-label d-md-none">Asistentes</span>
+      <span class="elemental-button-content"><i class="bi bi-person-check" aria-hidden="true"></i><span class="d-none d-md-inline">Agregar asistentes</span><span class="elemental-mobile-action-label d-md-none">Asistentes</span></span>
     </button>
     <a class="btn btn-outline-secondary flex-md-fill" href="{% url 'asistencias:export_asistencias_xlsx' %}?{{ request.GET.urlencode }}">
-      <i class="bi bi-file-earmark-spreadsheet"></i><span class="d-none d-md-inline ms-1">Exportar Excel</span>
-      <span class="elemental-mobile-action-label d-md-none">Excel</span>
+      <span class="elemental-button-content"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i><span class="d-none d-md-inline">Exportar Excel</span><span class="elemental-mobile-action-label d-md-none">Excel</span></span>
     </a>
   </div>
 
@@ -29,7 +29,7 @@
       <div class="fw-semibold">{{ sesion_seleccionada.disciplina }} - {{ sesion_seleccionada.fecha }}</div>
     </div>
     <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-      <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar selección</span>
+      <span class="elemental-button-content"><i class="bi bi-x-circle" aria-hidden="true"></i><span class="d-none d-md-inline">Limpiar selección</span></span>
     </a>
   </div>
   {% endif %}
@@ -44,14 +44,17 @@
         aria-expanded="false"
         aria-controls="filtros-sesiones"
       >
-        <i class="bi bi-funnel" aria-hidden="true"></i>
-        <span>Filtros</span>
+        <span class="elemental-button-content"><i class="bi bi-funnel" aria-hidden="true"></i><span>Filtros</span></span>
         <i class="bi bi-chevron-down ms-auto elemental-filter-toggle-chevron" aria-hidden="true"></i>
       </button>
       <div class="collapse" id="filtros-sesiones">
-      <div class="card mb-3">
+      <div class="card elemental-surface mb-3">
         <div class="card-body">
           <div class="row g-2 align-items-end">
+            <div class="col-12">
+              <label class="form-label" for="filtro-texto-sesiones">Buscar</label>
+              <input id="filtro-texto-sesiones" class="form-control" type="search" placeholder="Disciplina, profesor, asistente o estado">
+            </div>
             <div class="col-12 col-md-3 text-center text-md-start">
               <label class="form-label">Disciplina</label>
               <select id="filtro-disciplina" class="form-select">
@@ -76,7 +79,7 @@
             </div>
             <div class="col-12 col-md-3 d-flex justify-content-center justify-content-md-start">
               <button id="limpiar-filtros" class="btn btn-outline-secondary btn-sm" type="button">
-                <i class="bi bi-x-circle"></i><span class="ms-1">Limpiar filtros</span>
+                <span class="elemental-button-content"><i class="bi bi-x-circle" aria-hidden="true"></i><span>Limpiar filtros</span></span>
               </button>
             </div>
           </div>
@@ -84,7 +87,42 @@
       </div>
       </div>
       {% if sesiones %}
-      <div class="table-responsive">
+      <div class="elemental-session-cards d-md-none" data-session-cards>
+        {% for item in sesiones %}
+        <article class="elemental-session-card" data-session-card-id="{{ item.sesion.pk }}">
+          <div class="elemental-session-card-header">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="badge {{ item.sesion.disciplina.badge_class }}">{{ item.sesion.disciplina }}</span>
+              <span class="badge text-bg-light">{{ item.sesion.disciplina.organizacion.nombre }}</span>
+            </div>
+            {% if item.sesion.estado == "programada" %}<span class="badge text-bg-info">Programada</span>{% elif item.sesion.estado == "completada" %}<span class="badge text-bg-success">Completada</span>{% else %}<span class="badge text-bg-secondary">Cancelada</span>{% endif %}
+          </div>
+          <dl class="elemental-session-card-details">
+            <div><dt>Fecha</dt><dd>{{ item.sesion.fecha|date:"d/m/Y" }}</dd></div>
+            <div><dt>Profesores</dt><dd>{% for profe in item.sesion.profesores.all %}{{ profe }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-muted">Sin profesor</span>{% endfor %}</dd></div>
+          </dl>
+          <div class="elemental-session-card-attendance">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2"><h3 class="h6 mb-0">Asistentes</h3><span class="elemental-session-total">{{ item.total_asistentes }}</span></div>
+            <div class="d-flex flex-wrap gap-1">
+              {% for asistencia in item.asistentes %}
+                <a class="badge {{ asistencia.badge_finanzas_class }} text-decoration-none" href="{% url 'personas:persona_detail' asistencia.persona.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}" title="{{ asistencia.badge_finanzas_label }}">{{ asistencia.persona }}</a>
+              {% empty %}<span class="text-muted small">Sin asistentes.</span>{% endfor %}
+            </div>
+          </div>
+          <div class="elemental-session-card-actions">
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}"><span class="elemental-button-content"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver sesión</span></span></a>
+            <a class="btn btn-sm btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&sesion_id={{ item.sesion.pk }}&open=agregar_asistentes"><span class="elemental-button-content"><i class="bi bi-person-plus" aria-hidden="true"></i><span>Asistentes</span></span></a>
+            <form method="post" class="elemental-session-state-form">
+              {% csrf_token %}<input type="hidden" name="sesion_id" value="{{ item.sesion.pk }}"><input type="hidden" name="cambiar_estado" value="1">
+              <label class="visually-hidden" for="estado-sesion-mobile-{{ item.sesion.pk }}">Estado de {{ item.sesion.disciplina }}</label>
+              <select id="estado-sesion-mobile-{{ item.sesion.pk }}" name="estado" class="form-select form-select-sm" onchange="this.form.submit()">{% for value, label in item.sesion.Estado.choices %}<option value="{{ value }}" {% if value == item.sesion.estado %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </form>
+          </div>
+        </article>
+        {% endfor %}
+        <div class="elemental-session-cards-empty alert alert-light border text-muted mb-0" data-session-cards-empty hidden>No hay sesiones que coincidan con los filtros.</div>
+      </div>
+      <div class="table-responsive elemental-table-panel d-none d-md-block">
         <table id="tabla-sesiones" class="table table-sm">
           <thead>
             <tr>
@@ -99,7 +137,7 @@
           </thead>
           <tbody>
             {% for item in sesiones %}
-            <tr>
+            <tr data-session-row-id="{{ item.sesion.pk }}">
               <td>
                 <span class="badge {{ item.sesion.disciplina.badge_class }}">{{ item.sesion.disciplina }}</span>
                 <span class="badge text-bg-secondary ms-1">{{ item.sesion.disciplina.organizacion.nombre }}</span>
@@ -445,15 +483,33 @@
       pageLength: 20,
       order: [[2, "desc"]],
       stateSave: true,
+      dom: "rt<'row'<'col-12 col-md-6'i><'col-12 col-md-6'p>>",
       language: window.ElementalBusqueda.datatablesLanguage,
     });
 
     const filtroDisciplina = document.getElementById("filtro-disciplina");
     const filtroProfesor = document.getElementById("filtro-profesor");
     const filtroFecha = document.getElementById("filtro-fecha");
+    const filtroTexto = document.getElementById("filtro-texto-sesiones");
     const limpiarFiltros = document.getElementById("limpiar-filtros");
-    const inputBuscar = table.closest(".dataTables_wrapper").querySelector(".dataTables_filter input");
-    window.ElementalBusqueda.conectarInputDataTable(dt, inputBuscar);
+    const cardsContainer = document.querySelector("[data-session-cards]");
+    const cardsEmpty = document.querySelector("[data-session-cards-empty]");
+    if (filtroTexto) filtroTexto.value = dt.search() || "";
+    window.ElementalBusqueda.conectarInputDataTable(dt, filtroTexto);
+
+    const sincronizarCards = function () {
+      if (!cardsContainer) return;
+      const visibleIds = Array.from(dt.rows({search: "applied", order: "applied"}).nodes()).map((row) => row.dataset.sessionRowId);
+      const visibleSet = new Set(visibleIds);
+      cardsContainer.querySelectorAll("[data-session-card-id]").forEach((card) => { card.hidden = !visibleSet.has(card.dataset.sessionCardId); });
+      visibleIds.forEach((id) => {
+        const card = cardsContainer.querySelector(`[data-session-card-id="${id}"]`);
+        if (card) cardsContainer.insertBefore(card, cardsEmpty);
+      });
+      if (cardsEmpty) cardsEmpty.hidden = visibleIds.length !== 0;
+    };
+    dt.on("draw", sincronizarCards);
+    sincronizarCards();
 
     if (filtroDisciplina) {
       filtroDisciplina.value = dt.column(0).search() || "";
@@ -489,9 +545,13 @@
         if (filtroDisciplina) filtroDisciplina.value = "";
         if (filtroProfesor) filtroProfesor.value = "";
         if (filtroFecha) filtroFecha.value = "";
-        dt.columns().search("").draw();
+        if (filtroTexto) filtroTexto.value = "";
+        dt.search("").columns().search("").draw();
       });
     }
+    window.addEventListener("resize", function () {
+      if (window.matchMedia("(min-width: 768px)").matches) dt.columns.adjust();
+    });
   })();
   (function () {
     if (!window.bootstrap) return;

@@ -2,15 +2,17 @@
 {% load formato %}
 {% block title %}Estudiantes{% endblock %}
 {% block content %}
-<div class="mt-4">
-  <div class="elemental-page-header d-flex justify-content-between align-items-center mb-3">
-    <h2>Estudiantes</h2>
-  </div>
+<div class="mt-4 elemental-section-page">
+  <header class="elemental-section-header">
+    <div class="elemental-eyebrow">Personas</div>
+    <h2 class="elemental-page-title">Estudiantes</h2>
+    <p class="elemental-section-lead">Revisa actividad, clases disponibles, pagos y situaciones que requieren seguimiento.</p>
+  </header>
   <button class="btn btn-outline-secondary w-100 d-md-none mb-2 elemental-filter-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#filtros-estudiantes" aria-expanded="false" aria-controls="filtros-estudiantes">
-    <i class="bi bi-funnel" aria-hidden="true"></i><span>Filtros</span><small class="ms-1 text-muted">Búsqueda y actividad</small><i class="bi bi-chevron-down ms-auto elemental-filter-toggle-chevron" aria-hidden="true"></i>
+    <span class="elemental-button-content"><i class="bi bi-funnel" aria-hidden="true"></i><span>Filtros</span></span><small class="ms-1 text-muted">Búsqueda y actividad</small><i class="bi bi-chevron-down ms-auto elemental-filter-toggle-chevron" aria-hidden="true"></i>
   </button>
   <div class="collapse d-md-block" id="filtros-estudiantes">
-  <div class="card mb-3">
+  <div class="card elemental-surface mb-3">
     <div class="card-body">
       <div id="buscador-estudiantes" class="mb-3"></div>
       <div class="row g-2">
@@ -24,7 +26,7 @@
         </div>
         <div class="col-md-4 d-flex align-items-end">
           <button id="limpiar-filtros-estudiantes" class="btn btn-outline-secondary btn-sm" type="button">
-            <i class="bi bi-x-circle"></i><span class="d-none d-md-inline ms-1">Limpiar filtros</span>
+            <span class="elemental-button-content"><i class="bi bi-x-circle" aria-hidden="true"></i><span class="d-none d-md-inline">Limpiar filtros</span></span>
           </button>
         </div>
       </div>
@@ -32,7 +34,7 @@
   </div>
   </div>
 
-  <div class="table-responsive">
+  <div class="table-responsive elemental-table-panel">
     <table id="tabla-estudiantes" class="table table-sm">
       <thead>
         <tr>
@@ -85,19 +87,19 @@
           <td class="text-nowrap">
             <div class="btn-group btn-group-sm">
               <a class="btn btn-outline-secondary" href="{{ item.perfil_url }}" title="Ver perfil">
-                <i class="bi bi-person"></i><span class="d-none d-xl-inline ms-1">Perfil</span>
+                <span class="elemental-button-content"><i class="bi bi-person" aria-hidden="true"></i><span class="d-none d-xl-inline">Perfil</span></span>
               </a>
               <a class="btn btn-outline-secondary" href="{{ item.asistencias_url }}" title="Ver asistencia">
-                <i class="bi bi-calendar-check"></i><span class="d-none d-xl-inline ms-1">Asistencia</span>
+                <span class="elemental-button-content"><i class="bi bi-calendar-check" aria-hidden="true"></i><span class="d-none d-xl-inline">Asistencia</span></span>
               </a>
               {% if puede_ver_finanzas %}
                 <a class="btn btn-outline-secondary" href="{{ item.perfil_url }}#perfil-estudiante" title="Ver estado financiero">
-                  <i class="bi bi-wallet2"></i><span class="d-none d-xl-inline ms-1">Estado</span>
+                  <span class="elemental-button-content"><i class="bi bi-wallet2" aria-hidden="true"></i><span class="d-none d-xl-inline">Estado</span></span>
                 </a>
               {% endif %}
               {% if puede_operar_pagos %}
                 <a class="btn btn-outline-success" href="{{ item.registrar_pago_url }}" title="Registrar pago">
-                  <i class="bi bi-cash-coin"></i><span class="d-none d-xl-inline ms-1">Pago</span>
+                  <span class="elemental-button-content"><i class="bi bi-cash-coin" aria-hidden="true"></i><span class="d-none d-xl-inline">Pago</span></span>
                 </a>
               {% endif %}
             </div>

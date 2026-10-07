@@ -56,6 +56,12 @@ operativo y el Panel enlaza `Ir a mis clases`; retirarla queda fuera de esta dec
 Si un usuario autenticado no tiene información operacional visible, se muestra
 un mensaje controlado y no un error. `API` permanece fuera del home.
 
+El lenguaje del Panel funciona como gramática visual para Calendario,
+Asistencias, Estudiantes y Profesores: encabezado contextual, superficies de un
+radio común, bordes suaves, tablas de cabecera secundaria y color reservado para
+estados o acciones. Estas páginas conservan su densidad y componentes propios;
+la regla unifica jerarquía y acabado, no fuerza composiciones idénticas.
+
 ## Login
 El login usa una pantalla limpia y centrada con el nombre `Elemental Apps`.
 

@@ -183,6 +183,8 @@ flowchart TD
 ```
 
 ## Reglas vigentes
+- Calendario, Asistencias, Estudiantes y Profesores comparten la gramática visual del Panel: encabezado contextual, superficies y tablas con bordes suaves, radios consistentes y color reservado para estados o acciones. Cada vista conserva su densidad y comportamiento responsive propio según [ADR 0013](../adr/0013-lenguaje-visual-panel-en-vistas-operativas.md).
+- En mobile, el listado de sesiones registradas de Asistencias usa cards verticales completas en lugar de tabla con desplazamiento horizontal. Conserva filtros y acciones; la tabla permanece como presentación de escritorio según [ADR 0014](../adr/0014-asistencias-cards-en-mobile.md).
 - Los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben arrastrarse en toda la app.
 - En modo Profesor, `organizacion` es obligatorio para toda pantalla operativa.
   Puede ser un ID autorizado o `todos`; este último agrega solo organizaciones
