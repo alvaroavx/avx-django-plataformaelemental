@@ -1,0 +1,154 @@
+{% extends "asistencias/base_app.html" %}
+{% load formato %}
+{% block title %}Correo de cierre · {{ profesor_obj }}{% endblock %}
+{% block content %}
+<div class="mt-4 mx-auto" style="max-width: 920px;">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+      <div class="text-uppercase text-muted small fw-semibold">Cierre mensual</div>
+      <h2 class="elemental-page-title mb-1">Correo para {{ profesor_obj }}</h2>
+      <p class="text-muted mb-0">{{ organizacion_obj.nombre }} · {{ borrador.periodo }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ volver_url }}"><span class="elemental-button-content"><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Volver</span></span></a>
+  </div>
+
+  <div class="alert alert-info" role="note">
+    Este borrador no envía el correo, no registra la transferencia y no emite la boleta. Solo prepara el texto para copiarlo.
+  </div>
+
+  {% if borrador.faltantes %}
+  <div class="alert alert-warning" role="alert">
+    <div class="fw-semibold">Completa estos datos antes de copiar:</div>
+    <ul class="mb-0 mt-1">
+      {% for faltante in borrador.faltantes %}<li>{{ faltante }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <section class="card mb-3">
+    <div class="card-body">
+      <label class="form-label fw-semibold" for="correo-asunto">Asunto</label>
+      <div class="input-group">
+        <input id="correo-asunto" class="form-control" type="text" value="{{ borrador.asunto }}" readonly>
+        <button class="btn btn-outline-primary" type="button" data-copy-subject>
+          <span class="elemental-button-content"><i class="bi bi-copy" aria-hidden="true"></i><span>Copiar asunto</span></span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="fw-semibold">Cuerpo del correo</span>
+      <button class="btn btn-primary" type="button" data-copy-body>
+        <span class="elemental-button-content"><i class="bi bi-copy" aria-hidden="true"></i><span>Copiar cuerpo</span></span>
+      </button>
+    </div>
+    <div class="card-body">
+      <div id="correo-cuerpo-formato">
+        <p>Hola {{ profesor_obj.nombres }},</p>
+        <p>Muchas gracias por las clases realizadas durante el mes. Adjunto el comprobante de transferencia y, para transparencia, te comparto el detalle de asistencia considerado para el pago.</p>
+
+        {% for grupo in borrador.grupos %}
+        <h3 class="h5 mt-4">{{ grupo.disciplina.nombre }}</h3>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Fecha</th><th>Estado</th><th>Asistencia</th></tr></thead>
+            <tbody>
+              {% for sesion in grupo.sesiones %}
+              <tr>
+                <td class="text-nowrap">{{ sesion.fecha|date:"d/m/Y" }}</td>
+                <td>{% if sesion.cancelada %}<span class="badge text-bg-secondary">Cancelada</span>{% else %}{{ sesion.estado }}{% endif %}</td>
+                <td>
+                  {% for asistente in sesion.asistentes %}{{ asistente.nombre_completo }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-muted">Sin asistentes</span>{% endfor %}
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="3" class="text-muted">Sin sesiones</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% empty %}
+        <p class="text-muted">No hay sesiones asociadas a este profesor en el período.</p>
+        {% endfor %}
+
+        <h3 class="h5 mt-4">Detalle del pago</h3>
+        <ul>
+          <li>Asistencias: {{ borrador.total_asistencias }}</li>
+          <li>Valor por asistencia: {% if borrador.valor_clase is not None %}{{ borrador.valor_clase|clp }}{% else %}Sin informar{% endif %}</li>
+          <li>Monto bruto de la boleta: {% if borrador.pago_bruto is not None %}{{ borrador.pago_bruto|clp }}{% else %}Sin calcular{% endif %}</li>
+          <li>Retención SII: {% if borrador.retencion_monto is not None %}{{ borrador.retencion_porcentaje }}% ({{ borrador.retencion_monto|clp }}){% else %}Sin calcular{% endif %}</li>
+          <li>Monto líquido transferido: {% if borrador.pago_neto is not None %}{{ borrador.pago_neto|clp }}{% else %}Sin calcular{% endif %}</li>
+        </ul>
+
+        <h3 class="h5 mt-4">Datos para emitir la boleta de honorarios</h3>
+        <ul>
+          <li>Fecha: {{ borrador.fecha_boleta|date:"d/m/Y" }}</li>
+          <li>Razón social: {{ organizacion_obj.razon_social|default:"Sin informar" }}</li>
+          <li>RUT: {{ organizacion_obj.rut|default:"Sin informar" }}</li>
+          <li>Dirección: {{ organizacion_obj.direccion|default:"Sin informar" }}, {{ organizacion_obj.comuna|default:"Sin informar" }}, {{ organizacion_obj.region|default:"Sin informar" }}</li>
+          <li>Prestación: Clases de {% for grupo in borrador.grupos %}{{ grupo.disciplina.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}Sin disciplinas{% endfor %} durante {{ borrador.periodo }}</li>
+          <li>La organización receptora retiene el porcentaje indicado.</li>
+        </ul>
+
+        <p>Muchas gracias por tu trabajo.</p>
+        <p>{{ organizacion_obj.nombre }}</p>
+      </div>
+      <textarea id="correo-cuerpo-plano" class="visually-hidden" tabindex="-1" aria-hidden="true">{{ borrador.cuerpo_plano }}</textarea>
+      <div class="small text-success mt-3" data-copy-status role="status" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(() => {
+  const status = document.querySelector('[data-copy-status]');
+  const announce = (message) => { if (status) status.textContent = message; };
+  const copyText = async (text, source) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    source.classList.remove('visually-hidden');
+    source.focus();
+    source.select();
+    const copied = document.execCommand('copy');
+    source.classList.add('visually-hidden');
+    if (!copied) throw new Error('copy-failed');
+  };
+  document.querySelector('[data-copy-subject]')?.addEventListener('click', async () => {
+    const subject = document.querySelector('#correo-asunto');
+    try {
+      await copyText(subject.value, subject);
+      announce('Asunto copiado.');
+    } catch (_) {
+      subject.focus();
+      subject.select();
+      announce('El asunto quedó seleccionado para que puedas copiarlo manualmente.');
+    }
+  });
+  document.querySelector('[data-copy-body]')?.addEventListener('click', async () => {
+    const plainSource = document.querySelector('#correo-cuerpo-plano');
+    const plain = plainSource.value;
+    const html = document.querySelector('#correo-cuerpo-formato').innerHTML;
+    try {
+      if (window.ClipboardItem && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plain], {type: 'text/plain'}),
+          'text/html': new Blob([html], {type: 'text/html'})
+        })]);
+      } else {
+        await copyText(plain, plainSource);
+      }
+      announce('Cuerpo del correo copiado.');
+    } catch (_) {
+      plainSource.classList.remove('visually-hidden');
+      plainSource.removeAttribute('aria-hidden');
+      plainSource.focus();
+      plainSource.select();
+      announce('El texto quedó seleccionado para que puedas copiarlo manualmente.');
+    }
+  });
+})();
+</script>
+{% endblock %}

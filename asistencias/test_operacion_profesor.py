@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from auditoria.models import AuditLog
-from finanzas.models import Category, LotePago, Payment, PaymentPlan, Transaction
+from finanzas.models import LotePago, Payment, PaymentPlan, Transaction
 from finanzas.services import confirmar_lote_pagos
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 

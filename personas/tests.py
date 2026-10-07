@@ -760,11 +760,15 @@ class PersonasOrganizacionesTests(TestCase):
                 "telefono_contacto": "123",
                 "sitio_web": "",
                 "direccion": "Direccion 123",
+                "comuna": "Santiago",
+                "region": "Metropolitana",
             },
         )
 
         self.assertEqual(response.status_code, 302)
         nueva = Organizacion.objects.get(nombre="Org Nueva")
+        self.assertEqual(nueva.comuna, "Santiago")
+        self.assertEqual(nueva.region, "Metropolitana")
         self.assertEqual(
             response.url,
             f"{reverse('personas:organizacion_detail', kwargs={'pk': nueva.pk})}?{query}",

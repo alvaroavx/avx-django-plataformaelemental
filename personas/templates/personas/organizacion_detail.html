@@ -24,7 +24,9 @@
           <div class="mb-2"><span class="text-muted d-block">Email</span><strong>{{ organizacion_obj.email_contacto|default:"-" }}</strong></div>
           <div class="mb-2"><span class="text-muted d-block">Telefono</span><strong>{{ organizacion_obj.telefono_contacto|default:"-" }}</strong></div>
           <div class="mb-2"><span class="text-muted d-block">Sitio web</span><strong>{{ organizacion_obj.sitio_web|default:"-" }}</strong></div>
-          <div class="mb-2"><span class="text-muted d-block">Direccion</span><strong>{{ organizacion_obj.direccion|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Dirección tributaria</span><strong>{{ organizacion_obj.direccion|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Comuna</span><strong>{{ organizacion_obj.comuna|default:"-" }}</strong></div>
+          <div class="mb-2"><span class="text-muted d-block">Región</span><strong>{{ organizacion_obj.region|default:"-" }}</strong></div>
           <div><span class="text-muted d-block">IVA</span><strong>{% if organizacion_obj.es_exenta_iva %}Exenta{% else %}Afecta{% endif %}</strong></div>
         </div>
       </div>

@@ -1681,6 +1681,7 @@ class AsistenciasViewTests(TestCase):
         self.assertNotContains(response, '<th class="d-none d-md-table-cell">Hora</th>', html=False)
         self.assertNotContains(response, 'name="estado_asistencia"', html=False)
         self.assertNotContains(response, 'name="cambiar_estado_asistencia"', html=False)
+        self.assertNotContains(response, 'id="asistentes-mobile"', html=False)
         self.assertContains(response, 'data-bs-target="#accionesAsistenteModal"', html=False)
         self.assertContains(response, 'class="bi bi-three-dots-vertical"', html=False)
         self.assertContains(response, '<i class="bi bi-unlock" aria-hidden="true"></i> Liberar', html=False)
@@ -1858,8 +1859,8 @@ class AsistenciasViewTests(TestCase):
             fecha="2026-02-27",
             estado=SesionClase.Estado.COMPLETADA,
         )
-        asistencia_ana_1 = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
-        asistencia_ana_2 = Asistencia.objects.create(sesion=sesion_dos, persona=self.estudiante)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        Asistencia.objects.create(sesion=sesion_dos, persona=self.estudiante)
         asistencia_luis = Asistencia.objects.create(sesion=self.sesion, persona=otro_estudiante)
         Payment.objects.create(
             persona=tercer_estudiante,
@@ -2067,12 +2068,12 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "disciplina-badge-cafe")
 
     def test_disciplinas_list_ordena_activas_primero_y_luego_alfabetico(self):
-        disciplina_activa = Disciplina.objects.create(
+        Disciplina.objects.create(
             organizacion=self.organizacion,
             nombre="Zumba",
             activa=True,
         )
-        disciplina_inactiva = Disciplina.objects.create(
+        Disciplina.objects.create(
             organizacion=self.organizacion,
             nombre="Acrobacia",
             activa=False,
@@ -2250,7 +2251,7 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "Laura Torres")
         self.assertNotContains(response, "Pedro Silva")
 
-    def test_profesores_list_oculta_profesor_con_solo_sesiones_canceladas(self):
+    def test_profesores_list_muestra_profesor_con_sesion_cancelada_para_el_correo(self):
         rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
         profesor = Persona.objects.create(
             nombres="Mario",
@@ -2276,7 +2277,8 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Mario Cancelado")
+        self.assertContains(response, "Mario Cancelado")
+        self.assertContains(response, "Preparar correo")
 
     def test_profesores_list_muestra_cards_resumen_del_periodo(self):
         profesor = Persona.objects.create(
@@ -2393,6 +2395,92 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, f'<span class="badge text-bg-light ms-1">{self.organizacion.nombre}</span>', html=False)
         self.assertNotContains(response, "<th>Organización</th>", html=False)
 
+    def test_correo_cierre_separa_disciplinas_y_calcula_pago_individual(self):
+        self.organizacion.razon_social = "Org Test SPA"
+        self.organizacion.direccion = "Calle Ficticia 123"
+        self.organizacion.comuna = "Santiago"
+        self.organizacion.region = "Metropolitana"
+        self.organizacion.save()
+        profesor = Persona.objects.create(
+            nombres="Elena",
+            apellidos="Profesora",
+            email="elena.cierre@example.com",
+        )
+        rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        PersonaRol.objects.create(
+            persona=profesor,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+            valor_clase=Decimal("10000"),
+            retencion_sii=Decimal("15.25"),
+        )
+        lira = Disciplina.objects.create(organizacion=self.organizacion, nombre="Lira")
+        sesiones = [
+            SesionClase.objects.create(
+                disciplina=self.disciplina,
+                fecha="2026-02-05",
+                estado=SesionClase.Estado.COMPLETADA,
+            ),
+            SesionClase.objects.create(
+                disciplina=lira,
+                fecha="2026-02-12",
+                estado=SesionClase.Estado.COMPLETADA,
+            ),
+            SesionClase.objects.create(
+                disciplina=lira,
+                fecha="2026-02-19",
+                estado=SesionClase.Estado.CANCELADA,
+            ),
+        ]
+        for sesion in sesiones:
+            sesion.profesores.add(profesor)
+        Asistencia.objects.create(sesion=sesiones[0], persona=self.estudiante)
+        Asistencia.objects.create(sesion=sesiones[1], persona=self.estudiante)
+
+        response = self.client.get(
+            reverse("asistencias:profesor_correo_cierre", kwargs={"pk": profesor.pk}),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        borrador = response.context["borrador"]
+        self.assertEqual(borrador["asunto"], "Flexibilidad febrero 2026")
+        self.assertEqual([grupo["disciplina"].nombre for grupo in borrador["grupos"]], ["Flexibilidad", "Lira"])
+        self.assertEqual(borrador["total_asistencias"], 2)
+        self.assertEqual(borrador["pago_bruto"], Decimal("20000"))
+        self.assertEqual(borrador["retencion_monto"], Decimal("3050.00"))
+        self.assertEqual(borrador["pago_neto"], Decimal("16950.00"))
+        self.assertTrue(borrador["puede_copiar"])
+        self.assertContains(response, "Sin asistentes")
+        self.assertContains(response, "Cancelada")
+
+    def test_correo_cierre_exige_datos_tributarios_configurados(self):
+        profesor = Persona.objects.create(
+            nombres="Paula",
+            apellidos="Incompleta",
+            email="paula.incompleta@example.com",
+        )
+        rol_profesor = Rol.objects.create(nombre="Profesor", codigo="PROFESOR")
+        PersonaRol.objects.create(
+            persona=profesor,
+            rol=rol_profesor,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        self.sesion.profesores.add(profesor)
+
+        response = self.client.get(
+            reverse("asistencias:profesor_correo_cierre", kwargs={"pk": profesor.pk}),
+            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["borrador"]["puede_copiar"])
+        self.assertContains(response, "Completa estos datos antes de copiar")
+        self.assertContains(response, "data-copy-body", html=False)
+        self.assertNotContains(response, "data-copy-body disabled", html=False)
+
     def test_asistencias_list_colorea_asistentes_por_estado_financiero(self):
         rol_estudiante = Rol.objects.get(codigo="ESTUDIANTE")
         estudiante_pagado = Persona.objects.create(
@@ -2427,8 +2515,8 @@ class AsistenciasViewTests(TestCase):
             clases_asignadas=1,
         )
 
-        asistencia_deuda = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
-        asistencia_pagada = Asistencia.objects.create(sesion=self.sesion, persona=estudiante_pagado)
+        Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
+        Asistencia.objects.create(sesion=self.sesion, persona=estudiante_pagado)
         asistencia_liberada = Asistencia.objects.create(sesion=self.sesion, persona=estudiante_liberado)
         consumo_liberado = AttendanceConsumption.objects.get(asistencia=asistencia_liberada)
         consumo_liberado.estado = AttendanceConsumption.Estado.PENDIENTE
@@ -3514,6 +3602,8 @@ class SprintTresJornadaMovilTests(TestCase):
         self.assertNotContains(response, reverse("personas:persona_detail", args=[self.estudiante.pk]))
         self.assertContains(response, "Clase liberada")
         self.assertNotContains(response, "Motivo administrativo reservado")
+        self.assertContains(response, 'id="asistentes-mobile"', html=False)
+        self.assertNotContains(response, 'id="accionesAsistenteModal"', html=False)
         self.assertContains(response, "data-estado-control")
         self.assertContains(response, 'aria-live="polite"', html=False)
         self.assertContains(response, 'aria-pressed="true"', html=False)

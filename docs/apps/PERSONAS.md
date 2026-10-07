@@ -56,6 +56,7 @@ Debe concentrar:
   respetan la organización y `ACCION_ADMINISTRAR_PERSONAS`. Los roles pueden
   superponerse y no se presentan como partes que deban sumar el total.
 - Debe existir listado, detalle, creacion y edicion de organizaciones.
+- `Organizacion` conserva los datos del receptor usados en borradores de honorarios: razón social, RUT, dirección, comuna y región. No se fijan valores tributarios en código; si faltan, el consumidor debe pedir revisión explícita.
 - `Persona.identificador` fue reemplazado por `Persona.rut`; el valor se normaliza y guarda formateado como RUT chileno cuando se ingresa desde formularios CRM.
 - `Persona.email` mantiene una restriccion unica existente en base de datos; no se endurece ni se relaja en v1.0 sin auditoria previa.
 - `Persona.rut` se valida como unico global en formularios y validacion de modelo cuando existe, pero no se agrego constraint de base de datos hasta auditar y corregir datos productivos existentes.

@@ -22,6 +22,8 @@ class Organizacion(models.Model):
     telefono_contacto = models.CharField(max_length=50, blank=True)
     sitio_web = models.URLField(blank=True)
     direccion = models.CharField(max_length=255, blank=True)
+    comuna = models.CharField(max_length=120, blank=True)
+    region = models.CharField(max_length=120, blank=True)
     creada_en = models.DateTimeField(auto_now_add=True)
     actualizada_en = models.DateTimeField(auto_now=True)
 

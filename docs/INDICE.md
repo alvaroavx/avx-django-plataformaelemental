@@ -36,6 +36,8 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0008-tabla-asistencia-movil-esencial.md](adr/0008-tabla-asistencia-movil-esencial.md): reduce provisionalmente la tabla móvil a persona, pago y acciones sin alterar todavía los estados del dominio.
 - [docs/adr/0009-acciones-asistencia-segun-viewport.md](adr/0009-acciones-asistencia-segun-viewport.md): reemplaza la prueba anterior, simplifica la tabla administrativa en todos los tamaños y concentra las acciones móviles en un modal.
 - [docs/adr/0010-seguimiento-panel-plegable-en-movil.md](adr/0010-seguimiento-panel-plegable-en-movil.md): mantiene visible el seguimiento estudiantil en escritorio y lo presenta plegado por defecto en responsive.
+- [docs/adr/0011-borrador-correo-cierre-profesores.md](adr/0011-borrador-correo-cierre-profesores.md): define el borrador individual de cierre, su cálculo, agrupación por disciplina y límites operativos.
+- [docs/adr/0012-botones-con-icono-y-texto.md](adr/0012-botones-con-icono-y-texto.md): fija la anatomía `[icono] [texto]`, su separación estructural y la copia operable de borradores incompletos.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

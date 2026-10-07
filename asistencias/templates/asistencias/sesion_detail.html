@@ -454,7 +454,8 @@
       </table>
       </div>
 
-      <div class="d-grid gap-3{% if puede_administrar_sesion %} d-none{% else %} d-md-none{% endif %}" id="asistentes-mobile">
+      {% if not puede_administrar_sesion %}
+      <div class="d-grid gap-3 d-md-none" id="asistentes-mobile">
         {% for item in asistencias %}
           <article class="asistente-mobile p-3" data-asistencia-card="{{ item.pk }}">
             <div class="d-flex justify-content-between gap-2 align-items-start mb-3">
@@ -466,8 +467,6 @@
                 <span class="badge text-bg-info">
                   <i class="bi bi-info-circle" aria-hidden="true"></i> Clase liberada
                 </span>
-              {% elif puede_administrar_sesion %}
-                <span class="badge text-bg-{{ item.estado_financiero_clase }}">{{ item.estado_financiero_label }}</span>
               {% endif %}
             </div>
 
@@ -512,6 +511,7 @@
           <div class="text-center text-muted py-4" data-empty-mobile>Sin asistentes.</div>
         {% endfor %}
       </div>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -519,6 +519,7 @@
 {% endblock %}
 
 {% block modals %}
+{% if puede_administrar_sesion %}
 {% if puede_liberar_clase or puede_quitar_asistente %}
 <div class="modal fade" id="accionesAsistenteModal" tabindex="-1" aria-labelledby="accionesAsistenteModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -557,6 +558,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endif %}
 {% if puede_administrar_sesion %}
 <div class="modal fade" id="nuevaPersonaSesionModal" tabindex="-1" aria-labelledby="nuevaPersonaSesionModalLabel" aria-hidden="true">
@@ -626,7 +628,6 @@
   var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
   var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
   var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}{% if profesor_query %}?{{ profesor_query|escapejs }}{% endif %}";
-  var PUEDE_ADMINISTRAR = {{ puede_administrar_sesion|yesno:"true,false" }};
   var PUEDE_QUITAR = {{ puede_quitar_asistente|yesno:"true,false" }};
   var PUEDE_LIBERAR = {{ puede_liberar_clase|yesno:"true,false" }};
   var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';

@@ -5,7 +5,7 @@ from django.utils.formats import date_format
 
 from django.core.exceptions import PermissionDenied
 
-from personas.models import Organizacion, PersonaRol
+from personas.models import Organizacion
 
 
 def organizaciones_visibles_para_usuario(user, *, permitir_staff_global=True):

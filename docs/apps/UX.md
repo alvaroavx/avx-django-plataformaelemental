@@ -202,6 +202,7 @@ Regla:
 Desde v1.0 se usa `Panel` para vistas principales. `Dashboard` queda reservado solo para nombres internos de rutas/views cuando cambiarlo podria romper compatibilidad.
 
 ## Acciones En Formularios
+- Todo botón o enlace de acción que combine icono y texto usa la anatomía `[icono] [texto]` mediante `.elemental-button-content`; la separación se implementa con `gap` y no con espacios de texto o márgenes particulares. Los botones que muestran solo icono conservan un nombre accesible independiente.
 - El boton `Agregar` de roles en detalle y edicion de Persona usa el componente solido de Bootstrap, conserva foco visible y tiene una altura minima de 44 px.
 - En mobile, el formulario apila sus campos y la accion ocupa el ancho disponible sin provocar desplazamiento horizontal a 320 px.
 

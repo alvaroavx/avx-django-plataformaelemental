@@ -26,4 +26,5 @@ urlpatterns = [
     path("export/asistencias.xlsx", views.export_asistencias_xlsx, name="export_asistencias_xlsx"),
     path("estudiantes/", views.estudiantes_list, name="estudiantes_list"),
     path("profesores/", views.profesores_list, name="profesores_list"),
+    path("profesores/<int:pk>/correo-cierre/", views.profesor_correo_cierre, name="profesor_correo_cierre"),
 ]

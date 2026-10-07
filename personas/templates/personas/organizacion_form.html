@@ -17,8 +17,10 @@
           <div class="col-md-4"><label class="form-label">RUT</label>{{ form.rut }}{% if form.rut.errors %}<div class="text-danger small">{{ form.rut.errors|join:", " }}</div>{% endif %}</div>
           <div class="col-md-4"><label class="form-label">Email contacto</label>{{ form.email_contacto }}{% if form.email_contacto.errors %}<div class="text-danger small">{{ form.email_contacto.errors|join:", " }}</div>{% endif %}</div>
           <div class="col-md-4"><label class="form-label">Telefono contacto</label>{{ form.telefono_contacto }}{% if form.telefono_contacto.errors %}<div class="text-danger small">{{ form.telefono_contacto.errors|join:", " }}</div>{% endif %}</div>
-          <div class="col-md-6"><label class="form-label">Sitio web</label>{{ form.sitio_web }}{% if form.sitio_web.errors %}<div class="text-danger small">{{ form.sitio_web.errors|join:", " }}</div>{% endif %}</div>
-          <div class="col-md-6"><label class="form-label">Direccion</label>{{ form.direccion }}{% if form.direccion.errors %}<div class="text-danger small">{{ form.direccion.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-4"><label class="form-label">Sitio web</label>{{ form.sitio_web }}{% if form.sitio_web.errors %}<div class="text-danger small">{{ form.sitio_web.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-8"><label class="form-label">Dirección tributaria</label>{{ form.direccion }}{% if form.direccion.errors %}<div class="text-danger small">{{ form.direccion.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Comuna</label>{{ form.comuna }}{% if form.comuna.errors %}<div class="text-danger small">{{ form.comuna.errors|join:", " }}</div>{% endif %}</div>
+          <div class="col-md-6"><label class="form-label">Región</label>{{ form.region }}{% if form.region.errors %}<div class="text-danger small">{{ form.region.errors|join:", " }}</div>{% endif %}</div>
           <div class="col-12">
             <div class="form-check">
               {{ form.es_exenta_iva }}

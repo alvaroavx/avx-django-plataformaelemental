@@ -34,7 +34,9 @@
               <div><strong>Email:</strong> {{ item.organizacion.email_contacto|default:"-" }}</div>
               <div><strong>Telefono:</strong> {{ item.organizacion.telefono_contacto|default:"-" }}</div>
               <div><strong>Sitio web:</strong> {{ item.organizacion.sitio_web|default:"-" }}</div>
-              <div><strong>Direccion:</strong> {{ item.organizacion.direccion|default:"-" }}</div>
+              <div><strong>Dirección:</strong> {{ item.organizacion.direccion|default:"-" }}</div>
+              <div><strong>Comuna:</strong> {{ item.organizacion.comuna|default:"-" }}</div>
+              <div><strong>Región:</strong> {{ item.organizacion.region|default:"-" }}</div>
             </div>
             <div class="row g-2 small mb-3">
               <div class="col-6"><div class="border rounded p-2 h-100"><span class="text-muted d-block">Personas activas</span><strong>{{ item.metricas.personas_activas }}</strong></div></div>

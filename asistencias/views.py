@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -16,7 +16,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
-from finanzas.models import AttendanceConsumption, Payment
+from finanzas.models import AttendanceConsumption
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.search import filtrar_por_fragmentos
 from personas.permissions import (
@@ -65,6 +65,7 @@ from .selectors import (
     sesiones_visibles_para_usuario,
 )
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
+from .services.correos_cierre import construir_borrador_correo_profesor
 from .services import (
     asegurar_asignaciones_profesores,
     asegurar_matricula_operativa,
@@ -702,14 +703,14 @@ def profesores_list(request):
             )
             alumnos_unicos_mes = asistencias_qs.values("persona_id").distinct().count()
             asistencias_mes = asistencias_qs.count()
-            sesiones_activas_qs = SesionClase.objects.filter(
+            sesiones_periodo_qs = SesionClase.objects.filter(
                 **filtros_periodo("fecha", request=request),
                 profesores=profesor,
                 disciplina__organizacion=organizacion,
-            ).exclude(estado=SesionClase.Estado.CANCELADA)
-            if not asistencias_mes and not sesiones_activas_qs.exists():
+            )
+            if not asistencias_mes and not sesiones_periodo_qs.exists():
                 continue
-            sesiones_mes = sesiones_activas_qs.filter(estado=SesionClase.Estado.COMPLETADA).distinct().count()
+            sesiones_mes = sesiones_periodo_qs.filter(estado=SesionClase.Estado.COMPLETADA).distinct().count()
             disciplinas_qs = Disciplina.objects.filter(
                 sesiones__profesores=profesor,
                 organizacion=organizacion,
@@ -757,7 +758,45 @@ def profesores_list(request):
     }
     context["profesores"] = profesores_data
     context["resumen_profesores"] = resumen_profesores
+    periodo = resolver_periodo(request)
+    context["correo_cierre_disponible"] = bool(periodo["mes"] is not None and periodo["anio"] is not None)
     return render(request, "asistencias/profesores_list.html", context)
+
+
+@role_required(ROLE_ADMIN, permitir_staff_global=False)
+def profesor_correo_cierre(request, pk):
+    """Vista previa copiable del correo mensual de un profesor."""
+    context = nav_context(request, permitir_staff_global=False)
+    organizacion = organizacion_desde_request(request)
+    periodo = resolver_periodo(request)
+    if not organizacion or periodo["mes"] is None or periodo["anio"] is None:
+        messages.warning(request, "Selecciona una organización, un mes y un año para preparar el correo.")
+        return redirect(_url_con_filtros(request, "asistencias:profesores_list"))
+
+    profesor = get_object_or_404(Persona, pk=pk, activo=True)
+    rol_profesor = get_object_or_404(
+        PersonaRol.objects.select_related("rol", "organizacion"),
+        persona=profesor,
+        organizacion=organizacion,
+        rol__codigo="PROFESOR",
+        activo=True,
+    )
+    borrador = construir_borrador_correo_profesor(
+        profesor=profesor,
+        organizacion=organizacion,
+        rol_profesor=rol_profesor,
+        mes=periodo["mes"],
+        anio=periodo["anio"],
+    )
+    context.update(
+        {
+            "profesor_obj": profesor,
+            "organizacion_obj": organizacion,
+            "borrador": borrador,
+            "volver_url": _url_con_filtros(request, "asistencias:profesores_list"),
+        }
+    )
+    return render(request, "asistencias/profesor_correo_cierre.html", context)
 
 
 @role_required(ROLE_ADMIN, permitir_staff_global=False)

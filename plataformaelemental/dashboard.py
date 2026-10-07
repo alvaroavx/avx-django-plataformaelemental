@@ -403,9 +403,6 @@ def _consulta_persona(request, organizaciones_ids, organizacion):
     pagos = aplicar_periodo(
         Payment.objects.filter(persona=persona, revertido_en__isnull=True), "fecha_pago", request=request
     ).filter(organizacion_id__in=organizaciones_ids)
-    consumos = aplicar_periodo(
-        AttendanceConsumption.objects.filter(persona=persona), "clase_fecha", request=request
-    ).filter(asistencia__sesion__disciplina__organizacion_id__in=organizaciones_ids)
     periodo = resolver_periodo(request)
     resumen_periodo = resumen_financiero_estudiante_periodo(
         persona,

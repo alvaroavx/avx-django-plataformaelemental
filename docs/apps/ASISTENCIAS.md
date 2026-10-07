@@ -229,6 +229,7 @@ flowchart TD
 - La vista de profesores muestra solo profesores con asistencias o sesiones activas en el periodo.
 - La vista de profesores debe mostrar cards resumen del periodo con alumnos unicos, sesiones realizadas, asistencias del mes y profesores activos, respetando la organizacion seleccionada.
 - La tabla de profesores debe mostrar la organizacion como badge junto al nombre, no como columna independiente, y debe incluir pago bruto, retencion SII en monto y pago neto calculados desde `PersonaRol.valor_clase` y `PersonaRol.retencion_sii` de esa organizacion.
+- La tabla de profesores ofrece un borrador mensual individual por fila cuando mes y año están definidos. El borrador conserva el cálculo vigente, separa la asistencia por disciplina e incluye sesiones canceladas y sesiones sin asistentes; no envía correos ni registra pagos. La selección estable de una sola disciplina para el asunto y los datos requeridos están definidos en [ADR 0011](../adr/0011-borrador-correo-cierre-profesores.md).
 - El filtro local de organizacion bajo el titulo de profesores fue eliminado; se usa solo el filtro superior global.
 - En detalle de sesion, el nombre del profesor enlaza al perfil consolidado en `personas/<id>/`.
 - La app `asistencias` no mantiene vista propia `asistencias/personas/<id>/`; todos los enlaces a personas deben dirigir a `personas/<id>/` preservando filtros globales.

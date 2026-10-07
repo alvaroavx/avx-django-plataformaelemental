@@ -19,6 +19,8 @@ class OrganizacionCRMForm(forms.ModelForm):
             "telefono_contacto",
             "sitio_web",
             "direccion",
+            "comuna",
+            "region",
         ]
         widgets = {
             "direccion": forms.Textarea(attrs={"rows": 2}),
