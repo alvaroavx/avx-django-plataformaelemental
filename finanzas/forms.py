@@ -1,37 +1,12 @@
 import json
 
 from django import forms
-from django.core.exceptions import NON_FIELD_ERRORS
 from django.db.models import Q
 from django.utils import timezone
-from decimal import Decimal
 
 from personas.models import Organizacion, Persona, PersonaRol
 
-from .documentos.parsers import _decimal as _texto_a_decimal_clp
-from .models import Category, DocumentoTributario, Payment, PaymentPlan, Transaction
-
-
-def _documentos_para_asociacion(*, organizacion=None, periodo_mes=None, periodo_anio=None, documentos_actuales=None):
-    queryset = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
-    if organizacion is not None:
-        queryset = queryset.filter(organizacion=organizacion)
-    if periodo_anio is not None:
-        queryset = queryset.filter(fecha_emision__year=periodo_anio)
-    if periodo_mes is not None:
-        queryset = queryset.filter(fecha_emision__month=periodo_mes)
-    documentos_actuales = [pk for pk in (documentos_actuales or []) if pk]
-    if documentos_actuales:
-        queryset = DocumentoTributario.objects.filter(Q(pk__in=queryset.values("pk")) | Q(pk__in=documentos_actuales))
-    return queryset.order_by("-fecha_emision", "-id")
-
-
-def _documento_fuera_periodo(documento, *, periodo_mes=None, periodo_anio=None):
-    if periodo_anio is not None and documento.fecha_emision.year != periodo_anio:
-        return True
-    if periodo_mes is not None and documento.fecha_emision.month != periodo_mes:
-        return True
-    return False
+from .models import Category, Payment, PaymentPlan, Transaction
 
 
 class PersonaOrganizacionSelect(forms.Select):
@@ -313,119 +288,6 @@ class ReversaPagoForm(forms.Form):
     )
 
 
-class DocumentoTributarioForm(forms.ModelForm):
-    monto_neto = forms.CharField(required=False)
-    monto_exento = forms.CharField(required=False)
-    monto_iva = forms.CharField(required=False)
-    retencion_monto = forms.CharField(required=False)
-    monto_total = forms.CharField(required=False)
-
-    class Meta:
-        model = DocumentoTributario
-        fields = [
-            "organizacion",
-            "tipo_documento",
-            "fuente",
-            "folio",
-            "fecha_emision",
-            "nombre_emisor",
-            "rut_emisor",
-            "nombre_receptor",
-            "rut_receptor",
-            "monto_neto",
-            "monto_exento",
-            "iva_tasa",
-            "monto_iva",
-            "retencion_tasa",
-            "retencion_monto",
-            "monto_total",
-            "documento_relacionado",
-            "persona_relacionada",
-            "organizacion_relacionada",
-            "archivo_pdf",
-            "archivo_xml",
-            "enlace_sii",
-            "metadata_extra",
-            "observaciones",
-        ]
-        widgets = {
-            "fecha_emision": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
-            "metadata_extra": forms.Textarea(attrs={"rows": 2}),
-            "observaciones": forms.Textarea(attrs={"rows": 2}),
-        }
-        error_messages = {
-            NON_FIELD_ERRORS: {
-                "unique_together": (
-                    "Ya existe un documento tributario con ese tipo, folio y RUT emisor dentro de la organizacion."
-                ),
-            }
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["documento_relacionado"].queryset = DocumentoTributario.objects.order_by("-fecha_emision", "-id")
-        self.fields["documento_relacionado"].label = "Documento relacionado"
-        self.fields["documento_relacionado"].help_text = (
-            "Permite vincular, por ejemplo, una boleta de honorarios con una factura o documento origen."
-        )
-        self.fields["persona_relacionada"].queryset = Persona.objects.order_by("apellidos", "nombres")
-        self.fields["persona_relacionada"].label = "Persona asociada"
-        self.fields["persona_relacionada"].help_text = (
-            "Opcional. Vincula la contraparte del documento a una persona existente por RUT o seleccion manual."
-        )
-        self.fields["organizacion_relacionada"].queryset = Organizacion.objects.order_by("nombre")
-        self.fields["organizacion_relacionada"].label = "Organizacion asociada"
-        self.fields["organizacion_relacionada"].help_text = (
-            "Opcional. Usa esta asociacion cuando la contraparte del documento sea una organizacion y no una persona."
-        )
-        self.fields["archivo_pdf"].label = "PDF del documento"
-        self.fields["archivo_xml"].label = "XML del documento"
-        self.fields["metadata_extra"].help_text = "Uso opcional para datos adicionales importados desde SII."
-
-    @staticmethod
-    def _normalizar_monto_tributario(value):
-        if value in (None, ""):
-            return Decimal("0")
-        if isinstance(value, Decimal):
-            return value
-        monto = _texto_a_decimal_clp(value)
-        if monto is None:
-            raise forms.ValidationError("Ingresa un monto valido.")
-        return monto
-
-    def clean_monto_neto(self):
-        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_neto")))
-
-    def clean_monto_exento(self):
-        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_exento")))
-
-    def clean_monto_iva(self):
-        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_iva")))
-
-    def clean_retencion_monto(self):
-        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("retencion_monto")))
-
-    def clean_monto_total(self):
-        return self._normalizar_monto_tributario(self.data.get(self.add_prefix("monto_total")))
-
-    def clean(self):
-        cleaned = super().clean()
-        persona_relacionada = cleaned.get("persona_relacionada")
-        organizacion_relacionada = cleaned.get("organizacion_relacionada")
-        organizacion = cleaned.get("organizacion")
-        if persona_relacionada and organizacion_relacionada:
-            self.add_error(
-                "organizacion_relacionada",
-                "Selecciona una persona o una organizacion asociada, pero no ambas al mismo tiempo.",
-            )
-        if organizacion and organizacion_relacionada and organizacion_relacionada.pk == organizacion.pk:
-            self.add_error(
-                "organizacion_relacionada",
-                "La organizacion asociada debe representar la contraparte, no la misma organizacion duena del documento.",
-            )
-        return cleaned
-
-
 class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
@@ -468,22 +330,3 @@ class TransactionForm(forms.ModelForm):
         if categoria:
             cleaned["tipo"] = categoria.tipo
         return cleaned
-
-
-class DocumentoTributarioImportUploadForm(forms.Form):
-    archivo = forms.FileField(required=False, label="Archivo tributario")
-
-    def clean(self):
-        cleaned = super().clean()
-        if not cleaned.get("archivo"):
-            raise forms.ValidationError("Debes subir un archivo XML o PDF.")
-        return cleaned
-
-
-class DocumentoTributarioImportConfirmForm(forms.Form):
-    token_importacion = forms.CharField(widget=forms.HiddenInput())
-    guardar_pago_sugerido = forms.BooleanField(
-        required=False,
-        initial=False,
-        label="Guardar tambien el pago sugerido",
-    )

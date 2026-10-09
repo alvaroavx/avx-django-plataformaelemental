@@ -19,7 +19,7 @@ La plataforma opera como un monolito Django modular.
 Apps funcionales visibles:
 - `asistencias`: operacion academica diaria.
 - `personas`: identidad, CRM, roles y organizaciones.
-- `finanzas`: cobranza operacional, documentos tributarios, transacciones y reportes.
+- `finanzas`: cobranza operacional, transacciones y reportes.
 - `api`: endpoints minimos de salud, estado, version y usuario autenticado.
 
 Componentes activos de soporte:
@@ -52,9 +52,9 @@ Detalle operativo:
 - `personas` define identidad: `Persona`, `Organizacion`, `Rol`, `PersonaRol`.
 - `asistencias` define operacion de clases: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`.
 - `asistencias` define además el alcance operativo explícito profesor–disciplina y alumno–disciplina del espacio `/profesor/`.
-- `finanzas` contiene dos subdominios internos:
-  - cobranza operacional: planes, pagos, deuda, saldo e imputacion contra asistencias.
-  - finanzas/contabilidad: documentos tributarios, transacciones, categorias y reportes.
+- `finanzas` contiene cobranza operacional, planes, pagos, deuda, saldo,
+  imputación contra asistencias, transacciones de caja, categorías y reportes.
+- Cuadratura es dueña de documentos fiscales, conciliación y cierres contables.
 - `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
 - `auditoria` registra eventos seleccionados, pero no es una bitacora completa ni bloquea una operacion si falla el log.
 - Las apps legacy `database` y `monitor` fueron retiradas; las migraciones vigentes de `personas`, `asistencias` y `finanzas` crean sus tablas directamente.
@@ -79,15 +79,14 @@ Detalle de navegacion y contexto global:
 - [docs/arquitectura/NAVEGACION_Y_CONTEXTO.md](NAVEGACION_Y_CONTEXTO.md)
 
 ## Estado financiero conceptual
-`Payment`, `Transaction` y `DocumentoTributario` son entidades separadas. Los
+`Payment` y `Transaction` son entidades separadas. Los
 pagos confirmados desde los flujos vigentes crean y enlazan una `Transaction`
 uno-a-uno; los pagos históricos anteriores pueden conservar vínculo nulo.
 
 Regla ejecutiva:
 - Un pago operacional responde si una persona pago clases.
 - Una transaccion responde que movimiento de dinero existio.
-- Un documento tributario responde que respaldo fiscal existe.
-- Pueden asociarse, pero no deben colapsarse en una sola entidad.
+- Elemental no almacena ni administra respaldos fiscales; esa capacidad pertenece a Cuadratura.
 
 Detalle financiero:
 - [docs/apps/FINANZAS.md](../apps/FINANZAS.md)

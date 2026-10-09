@@ -21,7 +21,6 @@ En Asistencias, solo `superuser` de Django conserva acceso total operativo. `is_
 | Ver finanzas | si | si | no | si |
 | Crear/editar pagos | si | si | no | no |
 | Crear/editar transacciones | si | si | no | no |
-| Crear/editar documentos tributarios | si | si | no | no |
 | Exportar datos | si | si | no | no |
 | Editar asistencias | si | no | no | no |
 | Administrar personas | si | no | no | no |
@@ -29,13 +28,13 @@ En Asistencias, solo `superuser` de Django conserva acceso total operativo. `is_
 
 ## Pago masivo y detalle de Disciplina
 
-El pago masivo exige `operar_pagos` en la organización real del lote. La organización activa solo filtra navegación; personas, planes, documentos, lotes y pagos se resuelven mediante querysets autorizados y se vuelven a validar al confirmar. La búsqueda incremental recibe una organización como filtro de navegación, pero el servidor comprueba que el usuario tenga permiso para esa organización y no devuelve personas ajenas.
+El pago masivo exige `operar_pagos` en la organización real del lote. La organización activa solo filtra navegación; personas, planes, lotes y pagos se resuelven mediante querysets autorizados y se vuelven a validar al confirmar. La búsqueda incremental recibe una organización como filtro de navegación, pero el servidor comprueba que el usuario tenga permiso para esa organización y no devuelve personas ajenas.
 
 Un lote ajeno o inexistente no se entrega. La clave de idempotencia se comprueba antes de crear o reutilizar pagos y la autorización se evalúa también al consultar el resultado. El detalle de Disciplina exige autorización administrativa sobre la disciplina y sus enlaces al perfil no amplían ese permiso.
 
 ## Decisiones
 - Las vistas de `finanzas` permiten lectura a `admin`, `finanzas` y `solo_lectura`.
-- Cualquier `POST` financiero requiere rol operativo especifico: pagos, transacciones o documentos.
+- Cualquier `POST` financiero requiere rol operativo especifico: pagos o transacciones.
 - Los exports existentes quedan protegidos por permiso de exportacion, aunque los exports v1.0 definitivos se implementen despues.
 - El rol `profesor` no accede a finanzas completa.
 - Si hay filtro de organizacion activo, el rol debe existir activo en esa organizacion.

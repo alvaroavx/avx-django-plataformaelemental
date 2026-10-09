@@ -1,6 +1,5 @@
 from personas.permissions import (
     ACCION_EXPORTAR_DATOS,
-    ACCION_OPERAR_DOCUMENTOS,
     ACCION_OPERAR_PAGOS,
     ACCION_OPERAR_TRANSACCIONES,
     ACCION_REVERTIR_PAGO,
@@ -17,11 +16,6 @@ pagos_required = permiso_requerido(
     ACCION_OPERAR_PAGOS,
     accion_lectura=ACCION_VER_FINANZAS,
     mensaje="Debes tener permiso de pagos para modificar finanzas.",
-)
-documentos_required = permiso_requerido(
-    ACCION_OPERAR_DOCUMENTOS,
-    accion_lectura=ACCION_VER_FINANZAS,
-    mensaje="Debes tener permiso de documentos tributarios para modificar finanzas.",
 )
 transacciones_required = permiso_requerido(
     ACCION_OPERAR_TRANSACCIONES,

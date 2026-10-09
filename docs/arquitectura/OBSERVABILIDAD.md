@@ -20,7 +20,7 @@ No debe:
 Fuentes duenias:
 - `personas`: personas, organizaciones, roles.
 - `asistencias`: sesiones, asistencias, disciplinas.
-- `finanzas`: pagos, deuda, documentos, transacciones.
+- `finanzas`: pagos, deuda y transacciones.
 - `api`: uso externo, autenticacion y salud de endpoints cuando exista instrumentacion.
 
 Regla:
@@ -41,10 +41,7 @@ Regla:
 - pagos del periodo,
 - asistencias pendientes de imputacion.
 
-### Finanzas / contabilidad
-- documentos tributarios sin contraparte,
-- documentos sin transaccion asociada,
-- transacciones sin documento cuando corresponda,
+### Finanzas / caja
 - egresos/ingresos por categoria.
 
 ### Sistema
@@ -84,7 +81,6 @@ No exponer en una futura herramienta de observabilidad:
 - tokens,
 - API keys,
 - detalles sensibles de usuarios,
-- archivos tributarios completos sin control de acceso.
 
 ## Deuda
 - Falta definir indicadores minimos de produccion.

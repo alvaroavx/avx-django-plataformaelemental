@@ -95,7 +95,6 @@ erDiagram
         int persona_id FK
         int organizacion_id FK
         int plan_id FK
-        int documento_tributario_id FK
         int disciplina_id FK
         int transaccion_id FK,UK
         date fecha_pago
@@ -122,14 +121,6 @@ erDiagram
         string motivo
         datetime liberada_en
         datetime revertida_en
-    }
-    DOCUMENTO_TRIBUTARIO {
-        int id PK
-        int organizacion_id FK
-        int persona_relacionada_id FK
-        int organizacion_relacionada_id FK
-        string folio
-        string rut_emisor
     }
     TRANSACTION {
         int id PK
@@ -191,16 +182,9 @@ erDiagram
     ASISTENCIA ||--o| CLASE_LIBERADA : exceptua
     PERSONA ||--o{ ATTENDANCE_CONSUMPTION : acumula
 
-    ORGANIZACION ||--o{ DOCUMENTO_TRIBUTARIO : registra
-    PERSONA ||--o{ DOCUMENTO_TRIBUTARIO : contraparte_persona
-    ORGANIZACION ||--o{ DOCUMENTO_TRIBUTARIO : contraparte_organizacion
-    DOCUMENTO_TRIBUTARIO ||--o{ DOCUMENTO_TRIBUTARIO : relacionado
-    DOCUMENTO_TRIBUTARIO ||--o{ PAYMENT : respalda
-
     ORGANIZACION ||--o{ TRANSACTION : registra
     CATEGORY ||--o{ TRANSACTION : clasifica
     TRANSACTION ||--o| PAYMENT : movimiento_de
-    TRANSACTION }o--o{ DOCUMENTO_TRIBUTARIO : respalda
     ORGANIZACION ||--o{ AUDIT_LOG : contextualiza
 ```
 
@@ -225,14 +209,13 @@ erDiagram
 
 ### Finanzas
 - `PaymentPlan`: plan comercial por organizacion, con clases y precio.
-- `Payment`: pago operacional asociado a persona, organización, disciplina, plan,
-  transacción uno-a-uno y opcionalmente documento tributario.
+- `Payment`: pago operacional asociado a persona, organización, disciplina, plan
+  y transacción uno-a-uno.
 - `LotePago`: identidad auditable e idempotente de una confirmación masiva; pagos históricos/individuales pueden no tener lote.
 - `Payment` conserva motivo, autor y fecha cuando se revierte; una reversa no elimina el registro.
 - `AttendanceConsumption`: imputacion financiera de una asistencia contra un pago o deuda.
-- `DocumentoTributario`: snapshot fiscal con folio, emisor, receptor, montos, archivos, metadata y contraparte opcional.
 - `Category`: categoria contable para transacciones.
-- `Transaction`: movimiento financiero de ingreso o egreso, asociado a categoria, organizacion y documentos tributarios opcionales.
+- `Transaction`: movimiento financiero de ingreso o egreso, asociado a categoría y organización.
 
 ### Soporte transversal
 - `AuditLog`: evento parcial de auditoría con usuario y organización opcionales.
@@ -281,13 +264,6 @@ Regla:
 - `AttendanceConsumption.pago` puede ser `NULL` si la asistencia esta pendiente o como deuda.
 - Una asistencia solo puede tener un consumo financiero.
 
-### Documentos tributarios
-- `DocumentoTributario.organizacion` representa la organizacion bajo la cual se registra el documento.
-- `DocumentoTributario.persona_relacionada` y `DocumentoTributario.organizacion_relacionada` representan contraparte interna opcional.
-- `DocumentoTributario.documento_relacionado` permite notas u otros documentos vinculados.
-- `Payment.documento_tributario` permite respaldar un pago operacional.
-- `Transaction.documentos_tributarios` permite asociar uno o mas respaldos tributarios a un movimiento.
-
 ## Reglas De Integridad
 
 ### Preservacion de datos productivos
@@ -305,11 +281,10 @@ Regla:
 - `Disciplina` es unica por `organizacion + nombre + nivel`.
 - `Asistencia` es unica por `sesion + persona`.
 - `PaymentPlan` es unico por `organizacion + nombre`.
-- `DocumentoTributario` es unico por `organizacion + tipo_documento + folio + rut_emisor`.
 
 ### Cascadas
 - El intento de eliminar una `Organizacion` puede borrar roles, disciplinas,
-  bloques, planes, pagos, documentos y transacciones, pero puede ser bloqueado
+  bloques, planes, pagos y transacciones, pero puede ser bloqueado
   por `ClaseLiberada.organizacion` o `LotePago.organizacion` con `PROTECT`.
 - Si se elimina una `Persona`, se eliminan sus roles, asistencias y consumos por
   `CASCADE`, salvo que un `Payment.persona` la proteja.
@@ -328,28 +303,22 @@ Regla:
 - `BloqueHorario.disciplina` queda en `NULL` si se elimina la disciplina.
 - `SesionClase.bloque` queda en `NULL` si se elimina el bloque horario.
 - `Payment.plan` queda en `NULL` si se elimina el plan.
-- `Payment.documento_tributario` queda en `NULL` si se elimina el documento.
 - `AttendanceConsumption.pago` queda en `NULL` si se elimina el pago.
 - `Payment.lote` queda en `NULL` si se elimina el lote, aunque la organización del lote está protegida.
-- `DocumentoTributario.documento_relacionado` queda en `NULL` si se elimina el documento padre.
-- `DocumentoTributario.persona_relacionada` queda en `NULL` si se elimina la persona relacionada.
-- `DocumentoTributario.organizacion_relacionada` queda en `NULL` si se elimina la organizacion relacionada.
 
 ## Datos Que Se Duplican A Proposito
 
-- `DocumentoTributario` guarda nombres, RUT, montos y metadata como snapshot fiscal aunque exista `Persona` u `Organizacion`.
 - `Payment` guarda montos neto, IVA y total calculados al momento del pago.
 - `AttendanceConsumption` guarda `persona` y `clase_fecha` aunque esos datos tambien se puedan derivar desde `Asistencia`; esto facilita consultas de deuda/saldo por periodo.
 
 Regla:
-- La duplicacion es aceptable cuando conserva historia fiscal u operacional.
+- La duplicacion es aceptable cuando conserva historia operacional.
 - Si un dato duplicado se usa como fuente de verdad mutable, debe existir una regla explicita y test.
 
 ## Deuda Tecnica De Modelo
 
-- `DocumentoTributario` permite `persona_relacionada` y `organizacion_relacionada`; debe mantenerse la regla de no asociar ambas a la vez desde formularios/servicios.
-- `Payment`, `Transaction` y `DocumentoTributario` estan relacionados, pero todavia no existe una entidad superior de conciliacion.
-- La frontera entre cobranza operacional y contabilidad vive dentro de `finanzas`; debe seguir separandose con selectors/services antes de crecer mas.
+- La conciliación y documentación fiscal quedan fuera de Elemental y pertenecen a Cuadratura.
+- La frontera entre cobranza operacional y transacciones de caja vive dentro de `finanzas`; debe seguir separándose con selectors/services antes de crecer más.
 - Algunas reglas de integridad aun dependen de services/forms en vez de constraints de base de datos.
 
 ## Antes De Tocar Modelos
@@ -359,4 +328,4 @@ Checklist minimo:
 - Revisar el `.md` de la app duena.
 - Revisar migraciones existentes y validar que no introduzcan dependencias legacy.
 - Ejecutar `python manage.py makemigrations --check --dry-run`.
-- Ejecutar tests relevantes, especialmente si cambia `Payment`, `AttendanceConsumption`, `Asistencia`, `PersonaRol` o `DocumentoTributario`.
+- Ejecutar tests relevantes, especialmente si cambia `Payment`, `AttendanceConsumption`, `Asistencia` o `PersonaRol`.

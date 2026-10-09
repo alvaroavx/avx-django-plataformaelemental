@@ -839,7 +839,6 @@ class PagoMasivoProfesorIntegrityTests(TestCase):
                 "persona_id": alumno.pk,
                 "disciplina_id": self.disciplina.pk,
                 "plan_id": self.plan.pk,
-                "documento_tributario_id": None,
                 "fecha_pago": timezone.localdate(),
                 "metodo_pago": Payment.Metodo.EFECTIVO,
                 "monto_referencia": Decimal("10000"),

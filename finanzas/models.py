@@ -86,87 +86,6 @@ class PaymentPlan(TimeStampedModel):
         return neto, iva, total
 
 
-class DocumentoTributario(TimeStampedModel):
-    class TipoDocumento(models.TextChoices):
-        FACTURA_AFECTA = "factura_afecta", "Factura afecta"
-        FACTURA_EXENTA = "factura_exenta", "Factura exenta"
-        BOLETA_VENTA_AFECTA = "boleta_venta_afecta", "Boleta de venta afecta"
-        BOLETA_VENTA_EXENTA = "boleta_venta_exenta", "Boleta de venta exenta"
-        BOLETA_HONORARIOS = "boleta_honorarios", "Boleta de honorarios"
-        NOTA_CREDITO = "nota_credito", "Nota de credito"
-        NOTA_DEBITO = "nota_debito", "Nota de debito"
-        OTRO = "otro", "Otro"
-
-    class Fuente(models.TextChoices):
-        MANUAL = "manual", "Carga manual"
-        SII = "sii", "Importado desde SII"
-
-    organizacion = models.ForeignKey(
-        "personas.Organizacion",
-        on_delete=models.CASCADE,
-        related_name="documentos_tributarios",
-    )
-    tipo_documento = models.CharField(
-        max_length=40,
-        choices=TipoDocumento.choices,
-        default=TipoDocumento.FACTURA_AFECTA,
-    )
-    fuente = models.CharField(max_length=20, choices=Fuente.choices, default=Fuente.MANUAL)
-    folio = models.CharField(max_length=100)
-    fecha_emision = models.DateField(default=timezone.localdate)
-    nombre_emisor = models.CharField(max_length=255, blank=True)
-    rut_emisor = models.CharField(max_length=20, blank=True)
-    nombre_receptor = models.CharField(max_length=255, blank=True)
-    rut_receptor = models.CharField(max_length=20, blank=True)
-    monto_neto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    monto_exento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    iva_tasa = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("19.00"))
-    monto_iva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    retencion_tasa = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    retencion_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    documento_relacionado = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        related_name="documentos_hijos",
-        null=True,
-        blank=True,
-    )
-    persona_relacionada = models.ForeignKey(
-        "personas.Persona",
-        on_delete=models.SET_NULL,
-        related_name="documentos_tributarios_relacionados",
-        null=True,
-        blank=True,
-    )
-    organizacion_relacionada = models.ForeignKey(
-        "personas.Organizacion",
-        on_delete=models.SET_NULL,
-        related_name="documentos_tributarios_relacionados",
-        null=True,
-        blank=True,
-    )
-    archivo_pdf = models.FileField(upload_to="finanzas/documentos/pdf/", null=True, blank=True)
-    archivo_xml = models.FileField(upload_to="finanzas/documentos/xml/", null=True, blank=True)
-    enlace_sii = models.URLField(blank=True)
-    metadata_extra = models.JSONField(default=dict, blank=True)
-    observaciones = models.TextField(blank=True)
-
-    class Meta:
-        verbose_name = "Documento tributario"
-        verbose_name_plural = "Documentos tributarios"
-        ordering = ["-fecha_emision", "-id"]
-        db_table = "finanzas_invoice"
-        unique_together = ("organizacion", "tipo_documento", "folio", "rut_emisor")
-
-    def __str__(self) -> str:
-        return f"{self.get_tipo_documento_display()} #{self.folio}"
-
-    @property
-    def tiene_archivo_pdf(self) -> bool:
-        return bool(self.archivo_pdf and self.archivo_pdf.name.lower().endswith(".pdf"))
-
-
 class Category(TimeStampedModel):
     class Tipo(models.TextChoices):
         INGRESO = "ingreso", "Ingreso"
@@ -247,13 +166,6 @@ class Payment(TimeStampedModel):
         "asistencias.Disciplina",
         on_delete=models.PROTECT,
         related_name="pagos_operacionales",
-        null=True,
-        blank=True,
-    )
-    documento_tributario = models.ForeignKey(
-        DocumentoTributario,
-        on_delete=models.SET_NULL,
-        related_name="pagos_asociados",
         null=True,
         blank=True,
     )
@@ -431,12 +343,6 @@ class Transaction(TimeStampedModel):
         blank=True,
         related_name="transacciones_financieras_creadas",
     )
-    documentos_tributarios = models.ManyToManyField(
-        DocumentoTributario,
-        related_name="transacciones_asociadas",
-        blank=True,
-    )
-
     class Meta:
         verbose_name = "Transaccion"
         verbose_name_plural = "Transacciones"

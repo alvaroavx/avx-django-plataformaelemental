@@ -5,7 +5,7 @@ from asistencias.models import Asistencia
 from plataformaelemental.context import aplicar_periodo, filtros_periodo
 from personas.search import filtrar_por_fragmentos
 
-from .models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from .models import AttendanceConsumption, Category, Payment, PaymentPlan, Transaction
 
 
 def planes_queryset(organizacion=None):
@@ -38,7 +38,7 @@ def _subquery_disciplina_principal(*, mes=None, anio=None):
 def pagos_queryset(request, *, organizacion=None, mes=None, anio=None):
     disciplina_principal_historica = _subquery_disciplina_principal(mes=mes, anio=anio)
     queryset = (
-        Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario")
+        Payment.objects.select_related("persona", "organizacion", "plan")
         .annotate(
             clases_consumidas_calculadas=Count(
                 "consumos",
@@ -95,7 +95,7 @@ def resumen_pagos(queryset):
 
 
 def pago_detail_queryset():
-    return Payment.objects.select_related("persona", "organizacion", "plan", "documento_tributario").prefetch_related(
+    return Payment.objects.select_related("persona", "organizacion", "plan").prefetch_related(
         Prefetch(
             "consumos",
             queryset=AttendanceConsumption.objects.select_related(
@@ -106,43 +106,8 @@ def pago_detail_queryset():
     )
 
 
-def documentos_tributarios_queryset(request, *, organizacion=None):
-    queryset = DocumentoTributario.objects.select_related(
-        "organizacion",
-        "documento_relacionado",
-        "persona_relacionada",
-        "organizacion_relacionada",
-    ).annotate(
-        pagos_asociados_total=Count(
-            "pagos_asociados",
-            filter=Q(pagos_asociados__revertido_en__isnull=True),
-            distinct=True,
-        ),
-        transacciones_asociadas_total=Count("transacciones_asociadas", distinct=True),
-    )
-    queryset = aplicar_periodo(queryset, "fecha_emision", request=request)
-    if organizacion:
-        queryset = queryset.filter(organizacion=organizacion)
-    return queryset.order_by("-fecha_emision", "-id")
-
-
-def resumen_documentos_tributarios(queryset):
-    return queryset.aggregate(
-        total_documentos=Count("id"),
-        monto_total_documentos=Sum("monto_total"),
-        monto_total_iva=Sum("monto_iva"),
-        monto_total_retencion=Sum("retencion_monto"),
-        total_pagos_asociados=Sum("pagos_asociados_total"),
-        total_transacciones_asociadas=Sum("transacciones_asociadas_total"),
-    )
-
-
 def transacciones_queryset(request, *, organizacion=None):
-    queryset = (
-        Transaction.objects.select_related("organizacion", "categoria")
-        .prefetch_related("documentos_tributarios")
-        .order_by("-fecha", "-id")
-    )
+    queryset = Transaction.objects.select_related("organizacion", "categoria").order_by("-fecha", "-id")
     queryset = aplicar_periodo(queryset, "fecha", request=request)
     if organizacion:
         queryset = queryset.filter(organizacion=organizacion)
@@ -164,30 +129,19 @@ def dashboard_querysets(request, *, organizacion=None):
         request=request,
     )
     transacciones_qs = aplicar_periodo(
-        Transaction.objects.select_related("categoria", "organizacion").prefetch_related("documentos_tributarios"),
+        Transaction.objects.select_related("categoria", "organizacion"),
         "fecha",
         request=request,
     )
-    documentos_qs = aplicar_periodo(DocumentoTributario.objects.all(), "fecha_emision", request=request)
     consumos_qs = aplicar_periodo(AttendanceConsumption.objects.all(), "clase_fecha", request=request)
     if organizacion:
         pagos_qs = pagos_qs.filter(organizacion=organizacion)
         transacciones_qs = transacciones_qs.filter(organizacion=organizacion)
-        documentos_qs = documentos_qs.filter(organizacion=organizacion)
         consumos_qs = consumos_qs.filter(asistencia__sesion__disciplina__organizacion=organizacion)
-    return pagos_qs, transacciones_qs, documentos_qs, consumos_qs
+    return pagos_qs, transacciones_qs, consumos_qs
 
 
-def _filtro_fuera_periodo_documento(prefix, *, mes=None, anio=None):
-    filtros = Q()
-    if anio is not None:
-        filtros |= ~Q(**{f"{prefix}fecha_emision__year": anio})
-    if mes is not None:
-        filtros |= ~Q(**{f"{prefix}fecha_emision__month": mes})
-    return filtros
-
-
-def resumen_dashboard(pagos_qs, transacciones_qs, documentos_qs, consumos_qs, *, mes=None, anio=None):
+def resumen_dashboard(pagos_qs, transacciones_qs, consumos_qs, *, mes=None, anio=None):
     ingresos_transacciones = (
         transacciones_qs.filter(tipo=Transaction.Tipo.INGRESO).aggregate(total=Sum("monto")).get("total") or 0
     )
@@ -242,7 +196,6 @@ def pagos_export_queryset(request, *, organizacion=None):
             "persona",
             "organizacion",
             "plan",
-            "documento_tributario",
         )
         .annotate(
             clases_consumidas_calculadas=Count(
@@ -271,7 +224,7 @@ def pagos_export_queryset(request, *, organizacion=None):
 
 def transacciones_export_queryset(request, *, organizacion=None):
     queryset = aplicar_periodo(
-        Transaction.objects.select_related("categoria", "organizacion").prefetch_related("documentos_tributarios"),
+        Transaction.objects.select_related("categoria", "organizacion"),
         "fecha",
         request=request,
     )
@@ -282,7 +235,7 @@ def transacciones_export_queryset(request, *, organizacion=None):
 
 def libro_caja_queryset(request, *, organizacion=None):
     queryset = aplicar_periodo(
-        Transaction.objects.select_related("categoria", "organizacion").prefetch_related("documentos_tributarios"),
+        Transaction.objects.select_related("categoria", "organizacion"),
         "fecha",
         request=request,
     )

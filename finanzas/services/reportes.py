@@ -47,7 +47,6 @@ def armar_dashboard_financiero(
     *,
     pagos_qs,
     transacciones_qs,
-    documentos_qs,
     consumos_qs,
     periodo_descripcion,
     organizacion,
@@ -58,7 +57,6 @@ def armar_dashboard_financiero(
         **resumen_dashboard(
             pagos_qs,
             transacciones_qs,
-            documentos_qs,
             consumos_qs,
             mes=mes,
             anio=anio,

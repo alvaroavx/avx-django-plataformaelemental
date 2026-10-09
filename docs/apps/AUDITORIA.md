@@ -55,7 +55,7 @@ Para esos campos se guarda solo:
 }
 ```
 
-En finanzas se permiten ids, montos y fechas. No se guardan adjuntos, XML, PDFs, payloads tributarios completos ni snapshots gigantes.
+En finanzas se permiten ids, montos y fechas. No se guardan adjuntos fiscales ni snapshots gigantes.
 
 ## Flujos auditados
 
@@ -82,10 +82,7 @@ Finanzas:
 - Crear y editar pagos.
 - Revertir pagos, incluyendo actor, fecha, motivo y consumos recalculados.
 - Crear persona rapida desde pagos.
-- Crear, editar, importar y eliminar documentos tributarios.
-- Crear pago sugerido al confirmar importacion tributaria.
 - Crear, editar y eliminar transacciones.
-- Asociaciones de documento a pago/transaccion cuando ocurren por los formularios auditados.
 - Confirmación de lotes de pagos masivos y cada `Payment` creado, con UUID del lote, usuario, organización, cantidad, monto total, ids técnicos y origen `pago_masivo`.
 
 ## Fuera de alcance v1.0
@@ -98,7 +95,6 @@ No se audita:
 - Monitor archivado.
 - Signals de finanzas.
 - Imputacion automatica de consumos.
-- Parse preview de documentos tributarios.
 - Cambios derivados automaticos que no sean accion directa del usuario.
 
 ## Revision

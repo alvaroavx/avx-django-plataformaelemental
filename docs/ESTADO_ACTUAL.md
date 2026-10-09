@@ -1,5 +1,15 @@
 # Estado actual de Plataforma Elemental
 
+## Actualización de alcance — 2026-10-08
+
+Se retiró la capacidad de comprobantes fiscales de Elemental. La migración
+`finanzas.0013` elimina la tabla `finanzas_invoice`, la FK desde pagos y la
+tabla intermedia M2M desde transacciones. También se retiraron cinco PDFs
+versionados de `public/`. La migración está creada, pero no se ha aplicado aquí
+ni en producción. El usuario confirmó que no hay información productiva de esa
+capacidad; esta afirmación no se verificó consultando producción. Los objetos
+eliminados y los PDFs continúan en el historial Git.
+
 Fecha de corte: 2026-08-10
 Código base auditado: `origin/main` en `d4a4e48`; la funcionalidad está cerrada
 en `c47ce8225b3221b28a00baf9a4d2909e154c3b30` y el empaquetado operativo vive
@@ -25,7 +35,7 @@ tests vigentes. El documento dueño de cada dominio conserva el detalle.
 
 Plataforma Elemental es un monolito modular Django 5.2.9 con UI HTML renderizada
 en servidor. Gestiona identidad y organizaciones, operación de clases, cobranza
-por clases, documentación tributaria, movimientos contables básicos y auditoría
+por clases, movimientos de caja básicos y auditoría
 operativa. PostgreSQL es el único motor configurado en desarrollo y producción.
 
 Superficies activas:
@@ -34,7 +44,7 @@ Superficies activas:
 | --- | --- | --- |
 | `personas` | Activo | Personas, organizaciones, roles, cuentas Google y solicitudes de acceso. |
 | `asistencias` | Activo | Disciplinas, asignaciones, sesiones, asistencia, panel profesor y excepciones de cobro. |
-| `finanzas` | Activo | Planes, pagos, lotes, consumos/deuda, documentos, categorías y transacciones. |
+| `finanzas` | Activo | Planes, pagos, lotes, consumos/deuda, categorías y transacciones. |
 | `auditoria` | Activo | Registro best-effort de mutaciones sensibles. |
 | `api` | Activo y mínimo | Salud, estado, versión y usuario autenticado; no hay CRUD de dominio. |
 
@@ -106,13 +116,12 @@ Google activo y operativo en producción; este checkout no inspeccionó ese runt
 - Pagos revertidos conservan registro y recalculan consumos.
 - Todos los estados académicos ordinarios consumen derecho o generan deuda; una clase liberada queda pendiente.
 
-### Finanzas y documentos
+### Finanzas
 
-- `DocumentoTributario` es snapshot fiscal y admite carga manual o asistida XML/PDF.
-- Parser XML y fallback PDF con texto; no hay OCR.
-- `Transaction` registra ingreso/egreso contable y puede asociar documentos.
+- `Transaction` registra ingreso/egreso de caja.
 - `Category` clasifica transacciones y hoy es global, no por organización.
-- `Payment`, `Transaction` y `DocumentoTributario` son entidades distintas.
+- `Payment` y `Transaction` son entidades distintas y pueden enlazarse uno a uno.
+- La documentación fiscal y la conciliación pertenecen a Cuadratura.
 - Un pago nuevo genera una transacción uno-a-uno; pagos históricos anteriores a
   la migración pueden conservar `transaccion=NULL` y requieren conciliación real,
   no un backfill que invente movimientos.
@@ -132,7 +141,7 @@ Google activo y operativo en producción; este checkout no inspeccionó ese runt
 1. Mantener el monolito modular y los modelos en su app dueña.
 2. Mantener cobranza y contabilidad como subdominios distintos dentro de `finanzas`.
 3. No abrir API de datos sin un consumidor y contrato de autorización concretos.
-4. Mantener `Payment`, `Transaction` y `DocumentoTributario` separados.
+4. Mantener `Payment` y `Transaction` separados, con documentación fiscal en Cuadratura.
 5. Mantener filtros globales de periodo y organización en la navegación HTML.
 6. Resolver reglas en services/selectors; las views coordinan HTTP.
 7. Preservar datos productivos en migraciones y probar rollback/backup antes de cambios destructivos.
@@ -235,11 +244,7 @@ explícitamente PostgreSQL ni dependencias externas.
 
 - El SQLite local ignorado y sus referencias comentadas eran residuos de la migración
   y se retiraron en este cambio. La auditoría larga de SQLite queda solo como evidencia histórica.
-- `data/` contiene dos cargas de alumnos versionadas y `public/` cinco PDFs tributarios
-  con nombres aparentemente reales. No hay referencias de runtime ni tests a esos archivos.
-  Deben tratarse como posible información personal/tributaria, no como fixtures seguras.
-- Esos archivos no se eliminaron automáticamente porque primero debe confirmarse si son
-  evidencia necesaria. Quitarlos del HEAD tampoco los elimina del historial Git.
+- `data/` contiene dos cargas de alumnos versionadas que no son fixtures seguras.
 - `reporte.md` en raíz describe una rama de julio y se conserva solo con aviso histórico.
 - `plataformaelemental/settings/base.py` es un placeholder legacy y
   `plataformaelemental/settings.py` un wrapper de compatibilidad; retirarlos requiere

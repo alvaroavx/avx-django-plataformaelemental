@@ -186,6 +186,9 @@ python manage.py showmigrations --plan >/dev/null
 if python manage.py migrate --check; then
   echo "No hay migraciones pendientes."
 else
+  echo "Plan de migraciones pendientes para este release:"
+  python manage.py migrate --plan
+
   if python manage.py showmigrations asistencias --list \
     | grep -Eq '^\[ \].*(0004b_reparar_precondiciones_0005|0005_reparar_schema_0004_aplicada_precommit_v2|0006_merge_0004b_y_0005|0007_reconciliar_relaciones_activas)'; then
     echo "La reparación histórica de Operación Profesor sigue pendiente; use el runbook escalonado." >&2

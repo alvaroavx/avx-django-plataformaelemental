@@ -18,7 +18,7 @@ cada fila para un mes, año y organización concretos.
 
 - Se genera un borrador por profesor, organización y período.
 - El sistema no envía correos, no adjunta comprobantes, no registra la
-  transferencia y no emite documentos tributarios.
+  transferencia y no emite comprobantes fiscales.
 - La remuneración mantiene la regla vigente: asistencias registradas del período
   multiplicadas por `PersonaRol.valor_clase`; retención y líquido se calculan con
   `PersonaRol.retencion_sii`.

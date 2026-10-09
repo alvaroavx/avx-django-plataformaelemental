@@ -113,6 +113,7 @@ def main():
     deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
     for contrato_deploy in (
         "python manage.py migrate --check",
+        "python manage.py migrate --plan",
         "backup_database",
         "pg_dump",
         "pg_restore --list",

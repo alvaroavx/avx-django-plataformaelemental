@@ -366,7 +366,6 @@ Permitido:
 
 No permitido:
 - calcular IVA
-- parsear documentos tributarios
 - clasificar transacciones
 - modificar pagos directamente desde templates
 - depender de helpers internos de `finanzas.views` o `personas.views`

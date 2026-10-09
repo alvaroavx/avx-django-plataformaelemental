@@ -515,7 +515,6 @@ def _filas_lote_profesor(contexto, datos):
                 "persona": persona,
                 "disciplina_id": disciplina.pk,
                 "plan_id": datos["plan"].pk if datos.get("plan") else None,
-                "documento_tributario_id": None,
                 "fecha_pago": datos["fecha_pago"],
                 "metodo_pago": datos["metodo_pago"],
                 "numero_comprobante": datos.get("numero_comprobante", ""),

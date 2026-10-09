@@ -19,25 +19,19 @@ def ayuda_finanzas(clave):
             "titulo": "Que ves aqui",
             "texto": (
                 "Este tablero mezcla pagos de alumnos con transacciones de caja del periodo filtrado. "
-                "Sirve para revisar ingresos, egresos y balance general sin reemplazar tu contabilidad tributaria."
+                "Sirve para revisar ingresos, egresos y balance general de la operación."
             ),
         },
         "planes": {
             "titulo": "Que es un plan",
             "texto": (
-                "Un plan define clases y precio para cobrar a estudiantes. No representa un documento tributario ni un movimiento bancario."
+                "Un plan define clases y precio para cobrar a estudiantes. No representa por sí solo un movimiento de caja."
             ),
         },
         "pagos": {
             "titulo": "Que registrar aqui",
             "texto": (
-                "Un pago representa lo que un estudiante paga por sus clases. Puedes asociarlo manualmente al documento tributario emitido al cliente."
-            ),
-        },
-        "documentos": {
-            "titulo": "Que registrar aqui",
-            "texto": (
-                "Aqui se guardan documentos tributarios extraidos del SII o cargados manualmente: facturas, boletas de venta, boletas de honorarios y otros."
+                "Un pago representa lo que un estudiante paga por sus clases y mantiene su consumo y saldo operacional."
             ),
         },
         "categorias": {
@@ -56,7 +50,7 @@ def ayuda_finanzas(clave):
         "reporte_categorias": {
             "titulo": "Como leer este reporte",
             "texto": (
-                "Este consolidado agrupa transacciones por categoria dentro del periodo filtrado. Te sirve para analizar caja, no para reemplazar libros tributarios."
+                "Este consolidado agrupa transacciones por categoría dentro del período filtrado para analizar caja."
             ),
         },
     }
@@ -108,13 +102,6 @@ def url_pago_edit_sin_edicion(request, pago_id):
         "finanzas:pago_edit",
         remove_params=["editar_pago"],
         pk=pago_id,
-    )
-
-
-def agregar_error_conflicto_documento(form):
-    form.add_error(
-        None,
-        "No se pudo guardar el documento por un conflicto de unicidad. Revisa organizacion, tipo, folio y RUT emisor.",
     )
 
 

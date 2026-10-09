@@ -35,7 +35,7 @@ python manage.py makemigrations --check --dry-run
 ## Si Toca Finanzas O Cobranza
 - Revisar [docs/apps/FINANZAS.md](../apps/FINANZAS.md).
 - Confirmar si el cambio pertenece a cobranza operacional o finanzas/contabilidad.
-- No mezclar parsing tributario con imputacion de pagos.
+- Mantener la conciliación y documentos fiscales fuera del flujo de imputación de pagos.
 - Si toca deuda, saldo, pagos, consumos o imputacion, agregar o ajustar test de regla.
 - Mantener queries puras en selectors y reglas de negocio en services.
 

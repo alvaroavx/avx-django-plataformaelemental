@@ -1,7 +1,5 @@
 from django.contrib import admin
-from django.db.models import Count
-
-from .models import AttendanceConsumption, Category, DocumentoTributario, LotePago, Payment, PaymentPlan, Transaction
+from .models import AttendanceConsumption, Category, LotePago, Payment, PaymentPlan, Transaction
 
 
 @admin.register(LotePago)
@@ -32,7 +30,6 @@ class PaymentAdmin(admin.ModelAdmin):
         "transaccion",
         "registrado_por",
         "revertido_en",
-        "documento_tributario",
         "creado_en",
     )
     list_filter = ("organizacion", "metodo_pago", "aplica_iva", ("fecha_pago", admin.DateFieldListFilter), ("creado_en", admin.DateFieldListFilter))
@@ -40,7 +37,6 @@ class PaymentAdmin(admin.ModelAdmin):
         "persona__nombres",
         "persona__apellidos",
         "persona__rut",
-        "documento_tributario__folio",
         "numero_comprobante",
     )
     readonly_fields = (
@@ -56,31 +52,7 @@ class PaymentAdmin(admin.ModelAdmin):
         "creado_en",
         "actualizado_en",
     )
-    list_select_related = ("persona", "organizacion", "documento_tributario", "plan", "disciplina", "transaccion")
-    actions = None
-
-
-@admin.register(DocumentoTributario)
-class DocumentoTributarioAdmin(admin.ModelAdmin):
-    list_display = (
-        "fecha_emision",
-        "tipo_documento",
-        "folio",
-        "nombre_emisor",
-        "nombre_receptor",
-        "monto_total",
-        "organizacion",
-        "fuente",
-    )
-    list_filter = (
-        "organizacion",
-        "tipo_documento",
-        "fuente",
-        ("fecha_emision", admin.DateFieldListFilter),
-    )
-    search_fields = ("folio", "nombre_emisor", "nombre_receptor", "rut_emisor", "rut_receptor")
-    readonly_fields = ("archivo_pdf", "archivo_xml", "metadata_extra", "creado_en", "actualizado_en")
-    list_select_related = ("organizacion", "documento_relacionado", "persona_relacionada", "organizacion_relacionada")
+    list_select_related = ("persona", "organizacion", "plan", "disciplina", "transaccion")
     actions = None
 
 
@@ -100,22 +72,12 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("fecha", "tipo", "categoria", "monto", "organizacion", "descripcion_corta", "documentos_count")
+    list_display = ("fecha", "tipo", "categoria", "monto", "organizacion", "descripcion_corta")
     list_filter = ("organizacion", "tipo", "categoria", ("fecha", admin.DateFieldListFilter))
-    search_fields = ("descripcion", "documentos_tributarios__folio")
+    search_fields = ("descripcion",)
     list_select_related = ("organizacion", "categoria")
     actions = None
-
-    def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        return queryset.select_related("organizacion", "categoria").annotate(
-            documentos_count_admin=Count("documentos_tributarios", distinct=True)
-        )
 
     @admin.display(description="Descripcion")
     def descripcion_corta(self, obj):
         return (obj.descripcion[:80] + "...") if len(obj.descripcion) > 80 else obj.descripcion
-
-    @admin.display(description="Documentos", ordering="documentos_count_admin")
-    def documentos_count(self, obj):
-        return obj.documentos_count_admin

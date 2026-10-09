@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase
 
 from api.models import ApiAccessKey
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from finanzas.models import AttendanceConsumption, Category, DocumentoTributario, Payment, PaymentPlan, Transaction
+from finanzas.models import AttendanceConsumption, Category, Payment, PaymentPlan, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
 
@@ -41,7 +41,6 @@ class PostgreSQLDatabaseConnectionTests(APITestCase):
             Asistencia,
             PaymentPlan,
             Payment,
-            DocumentoTributario,
             AttendanceConsumption,
             Category,
             Transaction,
@@ -114,26 +113,10 @@ class CrossAppPostgreSQLModelTests(APITestCase):
             precio=Decimal("40000.00"),
             precio_incluye_iva=True,
         )
-        self.documento = DocumentoTributario.objects.create(
-            organizacion=self.organizacion,
-            tipo_documento=DocumentoTributario.TipoDocumento.BOLETA_VENTA_AFECTA,
-            folio="PG-1",
-            fecha_emision="2026-05-04",
-            nombre_emisor="Org PostgreSQL SpA",
-            rut_emisor=self.organizacion.rut,
-            nombre_receptor=self.estudiante.nombre_completo,
-            rut_receptor=self.estudiante.rut,
-            monto_neto=Decimal("33613.45"),
-            monto_iva=Decimal("6386.55"),
-            monto_total=Decimal("40000.00"),
-            persona_relacionada=self.estudiante,
-            metadata_extra={"origen": "test-postgresql", "items": ["clase"]},
-        )
         self.pago = Payment.objects.create(
             persona=self.estudiante,
             organizacion=self.organizacion,
             plan=self.plan,
-            documento_tributario=self.documento,
             fecha_pago="2026-05-04",
             monto_referencia=Decimal("40000.00"),
         )
@@ -147,7 +130,6 @@ class CrossAppPostgreSQLModelTests(APITestCase):
             monto=Decimal("40000.00"),
             descripcion="Pago validado en PostgreSQL",
         )
-        self.transaccion.documentos_tributarios.set([self.documento])
         self.api_key, self.api_key_plana = ApiAccessKey.crear_con_clave(nombre="postgresql-integracion")
 
     def test_relaciones_transversales_persisten_y_consultan_correctamente(self):
@@ -156,16 +138,15 @@ class CrossAppPostgreSQLModelTests(APITestCase):
             .prefetch_related("profesores", "asistencias__persona")
             .get(pk=self.sesion.pk)
         )
-        pago = Payment.objects.select_related("persona", "plan", "documento_tributario").get(pk=self.pago.pk)
-        transaccion = Transaction.objects.prefetch_related("documentos_tributarios").get(pk=self.transaccion.pk)
+        pago = Payment.objects.select_related("persona", "plan").get(pk=self.pago.pk)
+        transaccion = Transaction.objects.get(pk=self.transaccion.pk)
 
         self.assertEqual(sesion.disciplina.organizacion, self.organizacion)
         self.assertEqual(list(sesion.profesores.all()), [self.profesor])
         self.assertEqual(sesion.asistencias.get().persona, self.estudiante)
         self.assertEqual(pago.clases_consumidas, 1)
         self.assertEqual(pago.saldo_clases, 3)
-        self.assertEqual(pago.documento_tributario.metadata_extra["origen"], "test-postgresql")
-        self.assertEqual(list(transaccion.documentos_tributarios.all()), [self.documento])
+        self.assertEqual(transaccion.descripcion, "Pago validado en PostgreSQL")
         self.assertEqual(self.rol_profesor_asignado.valor_clase_normalizado, Decimal("15000.00"))
         self.assertEqual(ApiAccessKey.desde_clave_plana(self.api_key_plana), self.api_key)
 
@@ -186,13 +167,6 @@ class CrossAppPostgreSQLModelTests(APITestCase):
                 nombre=self.plan.nombre,
                 precio=Decimal("10000.00"),
             ),
-            lambda: DocumentoTributario.objects.create(
-                organizacion=self.organizacion,
-                tipo_documento=self.documento.tipo_documento,
-                folio=self.documento.folio,
-                rut_emisor=self.documento.rut_emisor,
-                monto_total=Decimal("1.00"),
-            ),
             lambda: AttendanceConsumption.objects.create(
                 asistencia=self.asistencia,
                 persona=self.estudiante,
@@ -212,20 +186,13 @@ class CrossAppPostgreSQLModelTests(APITestCase):
                         duplicate_factory()
 
     def test_delete_cascade_y_set_null_se_comportan_entre_apps(self):
-        documento_id = self.documento.pk
         asistencia_id = self.asistencia.pk
 
         self.pago.delete()
         self.consumo.refresh_from_db()
         self.assertIsNone(self.consumo.pago_id)
-        self.assertTrue(DocumentoTributario.objects.filter(pk=documento_id).exists())
-
         self.asistencia.delete()
         self.assertFalse(AttendanceConsumption.objects.filter(asistencia_id=asistencia_id).exists())
-
-        self.documento.delete()
-        self.transaccion.refresh_from_db()
-        self.assertEqual(self.transaccion.documentos_tributarios.count(), 0)
 
 
 class ApiMinimaTests(APITestCase):
@@ -285,7 +252,6 @@ class ApiMinimaTests(APITestCase):
             "/api/v1/personas/personas/",
             "/api/v1/asistencias/sesiones/",
             "/api/v1/finanzas/pagos/",
-            "/api/v1/finanzas/documentos-tributarios/",
             "/api/v1/finanzas/transacciones/",
         ]
 

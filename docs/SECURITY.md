@@ -13,7 +13,7 @@ Esto incluye:
 - secretos Django
 - archivos `.env` reales
 - dumps o backups con datos sensibles
-- listados de personas, documentos tributarios o archivos reales usados como fixtures informales
+- listados de personas o archivos reales usados como fixtures informales
 
 ## Tests
 Los tests deben ser reproducibles localmente sin depender de variables de entorno secretas.

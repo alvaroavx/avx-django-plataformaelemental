@@ -6,7 +6,7 @@ Fecha de actualizacion: 2026-08-09
 La app `api` queda reducida a una superficie minima operativa para `Elemental Apps`.
 
 Decision:
-- No exponer datos personales, asistencias, pagos, documentos tributarios ni transacciones por API mientras no exista consumidor real.
+- No exponer datos personales, asistencias, pagos ni transacciones por API mientras no exista consumidor real.
 - Mantener endpoints de salud/version para operacion.
 - Mantener `GET /api/me/` como check minimo de autenticacion.
 - Conservar `ApiAccessKey` temporalmente por compatibilidad historica, pero sin endpoints de datos activos que la usen.
@@ -61,7 +61,6 @@ Quedan desactivados por reduccion de superficie y mantenimiento:
 - `/api/v1/asistencias/*`
 - `/api/v1/finanzas/*`
 - endpoints de pagos
-- endpoints de documentos tributarios
 - endpoints de transacciones
 
 Estos endpoints deben responder `404` al no estar registrados en `api.urls`.

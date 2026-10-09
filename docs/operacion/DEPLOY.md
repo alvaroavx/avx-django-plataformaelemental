@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-08-18
+Fecha de actualizacion: 2026-10-08
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -9,15 +9,16 @@ Este documento describe el CI/CD minimo del proyecto:
   si falla un check, Ruff o una prueba;
 - CI rechaza cambios de modelos sin migración y detecta archivos bajo
   `*/migrations/*.py` en el rango del push;
-- un push sin cambios de esquema despliega automáticamente tras CI verde; un push
-  con migraciones deja `deploy` omitido;
+- un push con o sin migraciones despliega automáticamente tras CI verde;
 - el servidor verifica un checkout limpio y cambia al hash probado en modo
   detached, sin `git reset --hard origin/main`;
-- el deploy genérico instala dependencias, recopila estáticos y reinicia
-  `systemd`; nunca ejecuta migraciones.
+- cuando hay migraciones pendientes, el deploy muestra el plan, detiene el
+  servicio, crea y valida un backup PostgreSQL, y ejecuta `migrate --noinput`
+  antes de publicar estáticos y reiniciar `systemd`.
 
-Toda migración, incluida la reparación defensiva de `asistencias.0005`, usa un
-release escalonado y no el deploy automático. Su procedimiento exacto está en
+Las migraciones rutinarias, incluida `finanzas.0013`, usan este flujo. La
+reparación histórica de `asistencias.0005` y sus migraciones dependientes usan un
+release escalonado. Su procedimiento exacto está en
 [MIGRACIONES_OPERACION_PROFESOR.md](MIGRACIONES_OPERACION_PROFESOR.md).
 
 La reparación de `asistencias.0005` usa exclusivamente
@@ -302,6 +303,10 @@ flowchart TD
 - crea virtualenv si no existe
 - instala dependencias
 - ejecuta `python manage.py makemigrations --check --dry-run`
+- si hay migraciones pendientes, muestra `migrate --plan`, valida
+  `DEPLOY_BACKUP_DIR`, detiene `systemd`, genera un dump PostgreSQL custom,
+  verifica el catálogo y checksum y ejecuta `python manage.py migrate --noinput`
+- comprueba que no queden migraciones pendientes antes de reiniciar
 - ejecuta `python manage.py clearsessions`
 - ejecuta `python manage.py collectstatic --noinput`
 - ejecuta `python manage.py check --deploy`

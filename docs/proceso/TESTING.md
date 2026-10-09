@@ -143,23 +143,11 @@ Regla:
 ### Finanzas / contabilidad
 Debe cubrir:
 - montos neto, IVA, exento, retencion y total,
-- asociacion opcional con documentos tributarios,
 - exportaciones CSV con headers estables,
 - reportes sobre el mismo universo filtrado que la vista.
 
 Regla:
 - No basta con testear que renderiza la vista; se debe testear la regla o selector/service que calcula.
-
-### Documentos tributarios
-Debe cubrir:
-- deteccion de duplicados operativos,
-- parseo de XML/PDF soportado,
-- normalizacion de montos CLP,
-- sugerencia de contraparte por RUT,
-- error legible ante conflictos de unicidad.
-
-Regla:
-- Los PDFs/XML de ejemplo deben mantenerse como fixtures o archivos de prueba controlados cuando sean necesarios.
 
 ### Asistencias
 Debe cubrir:
@@ -246,5 +234,4 @@ En ese caso se debe:
 ## Deuda De Testing
 - Falta separar tests por capas de forma mas clara: selectors, services, views y API.
 - Falta una convencion de fixtures/factories compartidas.
-- Falta documentar datos de prueba para documentos tributarios complejos.
 - Falta coverage formal; por ahora se prioriza proteger reglas criticas.

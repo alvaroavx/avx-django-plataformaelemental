@@ -6,15 +6,14 @@ Hoy el proyecto integra:
 - operación académica diaria
 - CRM de personas, roles y organizaciones
 - pagos y consumo de clases
-- documentos tributarios opcionales
 - transacciones de caja
 - API minima de salud/estado/version
 
 ## Estado actual
 
 Reglas funcionales vigentes:
-- la plataforma debe funcionar aunque no existan documentos tributarios
-- `Payment`, `Transaction` y `DocumentoTributario` son entidades separadas
+- `Payment` y `Transaction` son entidades separadas y pueden enlazarse uno a uno
+- la documentación fiscal y contable pertenece a Cuadratura, no a Plataforma Elemental
 - los filtros globales `periodo_mes`, `periodo_anio` y `organizacion` deben mantenerse en toda la navegación HTML
 - los modelos viven en su app dueña; la app legacy `database/` fue retirada del producto activo y del grafo vigente de migraciones
 
@@ -35,8 +34,6 @@ Reglas funcionales vigentes:
 ### `finanzas`
 - planes
 - pagos
-- documentos tributarios
-- carga asistida XML/PDF para documentos tributarios
 - transacciones
 - categorías y reportes
 
@@ -64,7 +61,7 @@ Reglas funcionales vigentes:
 - `plataformaelemental/`: configuración del proyecto Django
 - `asistencias/`: dominio académico
 - `personas/`: personas, roles y organizaciones
-- `finanzas/`: pagos, documentos tributarios y caja
+- `finanzas/`: pagos, consumo de clases y caja
 - `api/`: API minima de salud/estado/version
 - `docs/`: documentación viva
 - `data/`: cargas y soporte de datos
@@ -72,7 +69,7 @@ Reglas funcionales vigentes:
 ### Ownership de modelos
 - `personas.models`: `Organizacion`, `Persona`, `Rol`, `PersonaRol`
 - `asistencias.models`: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`
-- `finanzas.models`: `PaymentPlan`, `Payment`, `DocumentoTributario`, `AttendanceConsumption`, `Transaction`, `Category`
+- `finanzas.models`: `PaymentPlan`, `Payment`, `AttendanceConsumption`, `Transaction`, `Category`
 
 ## Rutas principales
 
@@ -158,31 +155,10 @@ La decisión y el diagnóstico están registrados en
 3. Consumir clases contra asistencias del mismo mes y año.
 4. Revisar saldo, deudas y resúmenes.
 
-### Flujo tributario
-1. Registrar un documento tributario manualmente o por carga asistida.
-2. Revisar y corregir los campos precargados.
-3. Confirmar el guardado final.
-4. Asociarlo a pagos o transacciones si corresponde.
-
-## Carga asistida de documentos tributarios
-
-Estado actual:
-- XML-first
-- soporte base para DTE XML clásico
-- soporte base para boleta de honorarios XML
-- parser PDF fallback
-- revisión humana antes del guardado
-- visor inline del archivo cargado en la pantalla de revisión
-
-Reglas:
-- si hay XML y PDF, prevalece XML
-- si hay solo PDF, el resultado depende de que el archivo tenga texto seleccionable
-- subir un archivo no guarda automáticamente el registro final
-
 ## API minima
 
 Estado v1.0:
-- No se exponen personas, asistencias, pagos, documentos tributarios ni transacciones por API.
+- No se exponen personas, asistencias, pagos ni transacciones por API.
 - `GET /api/health/`, `GET /api/status/` y `GET /api/version/` son publicos.
 - `GET /api/me/` requiere usuario autenticado y devuelve payload minimo.
 - `ApiAccessKey` se conserva temporalmente por compatibilidad historica, pero no hay endpoints de datos activos que la usen.

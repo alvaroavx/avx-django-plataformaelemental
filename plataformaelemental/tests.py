@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from auditoria.models import AuditLog
-from finanzas.models import AttendanceConsumption, Category, DocumentoTributario, Payment, Transaction
+from finanzas.models import AttendanceConsumption, Category, Payment, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
 
 
@@ -616,21 +616,9 @@ class DjangoAdminSupportTests(TestCase):
         self.disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Admin Disciplina")
         self.sesion = SesionClase.objects.create(disciplina=self.disciplina, fecha="2026-05-01")
         self.asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.persona)
-        self.documento = DocumentoTributario.objects.create(
-            organizacion=self.organizacion,
-            tipo_documento=DocumentoTributario.TipoDocumento.FACTURA_AFECTA,
-            folio="ADM-1",
-            fecha_emision="2026-05-01",
-            nombre_emisor="Emisor Admin",
-            rut_emisor="11.111.111-1",
-            nombre_receptor="Receptor Admin",
-            rut_receptor="22.222.222-2",
-            monto_total=10000,
-        )
         self.pago = Payment.objects.create(
             persona=self.persona,
             organizacion=self.organizacion,
-            documento_tributario=self.documento,
             fecha_pago="2026-05-01",
             metodo_pago=Payment.Metodo.EFECTIVO,
             aplica_iva=False,
@@ -646,7 +634,6 @@ class DjangoAdminSupportTests(TestCase):
             monto=10000,
             descripcion="Transaccion admin",
         )
-        self.transaccion.documentos_tributarios.add(self.documento)
         self.audit_log = AuditLog.objects.create(
             usuario=self.superuser,
             accion=AuditLog.ACCION_CREAR,
@@ -668,7 +655,6 @@ class DjangoAdminSupportTests(TestCase):
             "admin:asistencias_asistencia_changelist",
             "admin:finanzas_payment_changelist",
             "admin:finanzas_transaction_changelist",
-            "admin:finanzas_documentotributario_changelist",
             "admin:auditoria_auditlog_changelist",
         ]
 
@@ -694,7 +680,6 @@ class DjangoAdminSupportTests(TestCase):
             "admin:asistencias_asistencia_changelist",
             "admin:finanzas_payment_changelist",
             "admin:finanzas_transaction_changelist",
-            "admin:finanzas_documentotributario_changelist",
             "admin:auditoria_auditlog_changelist",
         ]
 
@@ -707,7 +692,6 @@ class DjangoAdminSupportTests(TestCase):
         casos = [
             ("admin:personas_persona_changelist", "Soporte"),
             ("admin:finanzas_payment_changelist", "Soporte"),
-            ("admin:finanzas_documentotributario_changelist", "ADM-1"),
         ]
 
         for admin_name, query in casos:

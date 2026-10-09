@@ -46,8 +46,7 @@ Acción segura: auditoría read-only del servidor y simulacro de `pg_restore`.
 
 Estado: activa.
 
-`data/` contiene cargas de alumnos y `public/` PDFs tributarios no referenciados
-por runtime/tests. Sus nombres parecen reales; no deben asumirse fixtures.
+`data/` contiene cargas de alumnos que no deben asumirse fixtures sintéticas.
 
 Acción segura: confirmar dueño/retención, retirar del HEAD si corresponde y decidir
 si la exposición justifica limpiar historial. No copiar contenido a documentación.

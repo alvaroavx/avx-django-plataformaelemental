@@ -16,38 +16,6 @@ urlpatterns = [
     path("pagos/<int:pk>/", views.pago_detail, name="pago_detail"),
     path("pagos/<int:pk>/editar/", views.pago_edit, name="pago_edit"),
     path("pagos/<int:pk>/revertir/", views.pago_revertir, name="pago_revertir"),
-    path("documentos-tributarios/", views.documentos_tributarios_list, name="documentos_tributarios_list"),
-    path(
-        "documentos-tributarios/importar/",
-        views.documento_tributario_importar,
-        name="documento_tributario_importar",
-    ),
-    path(
-        "documentos-tributarios/importar/parse-preview/",
-        views.documento_tributario_parse_preview,
-        name="documento_tributario_parse_preview",
-    ),
-    path(
-        "documentos-tributarios/importar/archivo/<str:token>/<str:tipo_archivo>/",
-        views.documento_tributario_importacion_archivo,
-        name="documento_tributario_importacion_archivo",
-    ),
-    path("documentos-tributarios/<int:pk>/", views.documento_tributario_detail, name="documento_tributario_detail"),
-    path(
-        "documentos-tributarios/<int:pk>/archivo/<str:tipo_archivo>/",
-        views.documento_tributario_archivo,
-        name="documento_tributario_archivo",
-    ),
-    path(
-        "documentos-tributarios/<int:pk>/editar/",
-        views.documento_tributario_edit,
-        name="documento_tributario_edit",
-    ),
-    path(
-        "documentos-tributarios/<int:pk>/eliminar/",
-        views.documento_tributario_delete,
-        name="documento_tributario_delete",
-    ),
     path("categorias/", views.categorias_list, name="categorias_list"),
     path("categorias/<int:pk>/editar/", views.categoria_edit, name="categoria_edit"),
     path("categorias/<int:pk>/eliminar/", views.categoria_delete, name="categoria_delete"),

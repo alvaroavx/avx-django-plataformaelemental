@@ -9,7 +9,6 @@ from personas.models import Persona, PersonaRol, Rol
 from ..models import (
     AttendanceConsumption,
     Category,
-    DocumentoTributario,
     LotePago,
     Payment,
     PaymentPlan,
@@ -132,14 +131,7 @@ def _resolver_fila_pago(*, fila, organizacion_id):
         plan = PaymentPlan.objects.filter(pk=fila["plan_id"], organizacion_id=organizacion_id, activo=True).first()
         if not plan:
             raise ValidationError("El plan seleccionado no pertenece a la organización o no está activo.")
-    documento = None
-    if fila.get("documento_tributario_id"):
-        documento = DocumentoTributario.objects.filter(
-            pk=fila["documento_tributario_id"], organizacion_id=organizacion_id
-        ).first()
-        if not documento:
-            raise ValidationError("El documento seleccionado no pertenece a la organización.")
-    return persona, plan, documento
+    return persona, plan
 
 
 @transaction.atomic
@@ -171,7 +163,7 @@ def confirmar_lote_pagos(
             if fila["persona_id"] in personas_vistas:
                 raise ValidationError("Una persona no puede repetirse dentro del lote.")
             personas_vistas.add(fila["persona_id"])
-            persona, plan, documento = _resolver_fila_pago(fila=fila, organizacion_id=organizacion_id)
+            persona, plan = _resolver_fila_pago(fila=fila, organizacion_id=organizacion_id)
             disciplina = None
             if fila.get("disciplina_id"):
                 from asistencias.models import Disciplina
@@ -188,7 +180,6 @@ def confirmar_lote_pagos(
                 organizacion_id=organizacion_id,
                 plan=plan,
                 disciplina=disciplina,
-                documento_tributario=documento,
                 fecha_pago=fila["fecha_pago"],
                 metodo_pago=fila["metodo_pago"],
                 numero_comprobante=fila.get("numero_comprobante", ""),

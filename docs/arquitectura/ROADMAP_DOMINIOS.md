@@ -52,7 +52,6 @@ Responsabilidad:
 
 No debe absorber:
 - calculo contable,
-- parsing tributario,
 - reglas de cobranza implementadas directamente en views/templates.
 
 ### Cobranza Operacional
@@ -81,7 +80,6 @@ App duena:
 - `finanzas`.
 
 Responsabilidad:
-- documentos tributarios,
 - transacciones,
 - categorias,
 - reportes para contadora,
@@ -147,7 +145,6 @@ Posible responsabilidad:
 Relacion probable:
 - evoluciona desde `finanzas`,
 - puede requerir separar cobranza operacional de contabilidad,
-- no debe mezclarse con parsing tributario dentro de views.
 
 Criterio de app:
 - Mantener dentro de `finanzas` hasta que existan reglas contables propias y estables.
@@ -181,6 +178,6 @@ Criterio de app:
 ## Anti-Patrones
 - Crear app nueva solo para una vista.
 - Agregar campos a `Persona` para resolver cada flujo futuro.
-- Mezclar cobranza, contabilidad y documentos tributarios en una misma view.
+- Mezclar cobranza, caja y conciliación contable en una misma view.
 - Crear una app de observabilidad con modelos espejo de las apps duenas.
 - Implementar reglas de negocio directamente en templates.

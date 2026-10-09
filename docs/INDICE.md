@@ -40,6 +40,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0012-botones-con-icono-y-texto.md](adr/0012-botones-con-icono-y-texto.md): fija la anatomía `[icono] [texto]`, su separación estructural y la copia operable de borradores incompletos.
 - [docs/adr/0013-lenguaje-visual-panel-en-vistas-operativas.md](adr/0013-lenguaje-visual-panel-en-vistas-operativas.md): extiende la gramática visual del Panel a Calendario, Asistencias, Estudiantes y Profesores sin reducir su densidad operacional.
 - [docs/adr/0014-asistencias-cards-en-mobile.md](adr/0014-asistencias-cards-en-mobile.md): reemplaza el scroll horizontal de sesiones registradas por cards completas y filtrables en mobile.
+- [docs/adr/0015-cuadratura-duena-documentacion-fiscal.md](adr/0015-cuadratura-duena-documentacion-fiscal.md): retira de Elemental la documentación fiscal y fija su propiedad en Cuadratura.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

@@ -71,7 +71,7 @@ Debe concentrar:
 - Las metricas por persona del listado se calculan para el periodo/organizacion activos y se evalúan solo sobre la pagina visible.
 - El queryset base se filtra y pagina antes de calcular metricas correlacionadas. Solo el filtro explicito de deuda puede calcular esa metrica antes de paginar porque la necesita para definir el universo.
 - Si la organizacion esta en `Todas`, el listado sigue siendo paginado para evitar una carga inicial masiva.
-- El detalle de persona muestra pagos, consumos y documentos tributarios relacionados sin duplicar archivos.
+- El detalle de persona muestra pagos y consumos relacionados.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.
 - En `personas/<id>/`, el bloque `Perfil estudiante` debe permitir asociar pagos disponibles a asistencias presentes, respetando periodo, organizacion, saldo del pago y las validaciones de `finanzas`.
 - La configuracion de honorarios de un profesor no debe hardcodearse ni vivir en organizacion global: `valor por clase` y `retencion SII` deben guardarse en `PersonaRol` para el rol `PROFESOR`, porque dependen de la combinacion persona + organizacion.
@@ -82,7 +82,7 @@ Debe concentrar:
 
 ## Relacion con otras apps
 - `asistencias` usa perfiles operativos y flujos rapidos.
-- `finanzas` mantiene la logica de cobros, documentos y caja.
+- `finanzas` mantiene la logica de cobros y caja.
 - `personas` conecta ambas vistas desde una perspectiva administrativa.
 - El criterio transversal de roles y permisos vive en `docs/arquitectura/PERMISOS_Y_ROLES.md`.
 
@@ -92,12 +92,11 @@ Debe concentrar:
 Permitido:
 - consultar resumen academico
 - consultar resumen de cobranza
-- mostrar pagos, consumos y documentos relacionados
+- mostrar pagos y consumos relacionados
 
 No permitido:
 - implementar reglas de imputacion
 - calcular deuda directamente en views/templates
-- editar documentos tributarios desde perfiles
 - importar helpers privados desde otras apps
 
 ## API

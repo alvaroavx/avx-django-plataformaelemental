@@ -46,15 +46,12 @@ los documentos dueños de cada app.
 | Pago masivo revalida todas las filas, es atómico e idempotente. | `finanzas/services/pagos.py`, `finanzas/views.py` |
 | Todo pago nuevo confirmado por el servicio crea una transacción contable uno-a-uno; pagos históricos pueden carecer de vínculo. | `finanzas/models.py`, `finanzas/services/pagos.py` |
 
-## Documentos y contabilidad
+## Movimientos de caja
 
 | Regla | Implementación principal |
 | --- | --- |
-| Documento es único por organización + tipo + folio + RUT emisor. | `finanzas/models.py:DocumentoTributario` |
-| Documento guarda snapshot fiscal y contraparte opcional. | `finanzas/models.py`, `finanzas/forms.py` |
-| Subir documento primero produce preview; el guardado final requiere confirmación. | `finanzas/documentos/`, `finanzas/views.py` |
 | Transaction toma ingreso/egreso desde la categoría y alimenta libro de caja. | `finanzas/forms.py`, `finanzas/selectors.py`, `finanzas/services/reportes.py` |
-| Payment, Transaction y DocumentoTributario no son intercambiables. | `finanzas/models.py`, `docs/apps/FINANZAS.md` |
+| Payment y Transaction no son intercambiables y pueden enlazarse uno a uno. | `finanzas/models.py`, `docs/apps/FINANZAS.md` |
 
 ## Auditoría y API
 
