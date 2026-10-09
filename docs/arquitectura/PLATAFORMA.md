@@ -51,7 +51,7 @@ Detalle operativo:
 ## Fronteras de dominio
 - `personas` define identidad: `Persona`, `Organizacion`, `Rol`, `PersonaRol`.
 - `asistencias` define operacion de clases: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`.
-- `asistencias` define además el alcance operativo explícito profesor–disciplina y alumno–disciplina del espacio `/profesor/`.
+- `asistencias` mantiene las asignaciones profesor–disciplina y alumno–disciplina para la operación administrativa; el portal dedicado `/profesor/` fue retirado. El rol y perfil de profesor siguen vigentes.
 - `finanzas` contiene cobranza operacional, planes, pagos, deuda, saldo,
   imputación contra asistencias, transacciones de caja, categorías y reportes.
 - Cuadratura es dueña de documentos fiscales, conciliación y cierres contables.

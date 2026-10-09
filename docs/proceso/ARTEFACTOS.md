@@ -76,6 +76,12 @@ npm run test:mermaid
 
 ### Operación Profesor E2E
 
+> **Retirado 2026-10-08:** el portal dedicado de profesores se eliminó por
+> [ADR 0016](../adr/0016-retira-portal-profesor-conserva-dominio.md). Los
+> runners y resultados que siguen referenciados se conservan como archivo
+> histórico; no se ejecutan como gate vigente ni deben usarse para probar la
+> interfaz actual. El comando npm fue retirado.
+
 - `scripts/e2e/profesor_operacion.js`: sucesor parametrizado de los recorridos
   creados para el sprint Operación Profesor. Ejecuta navegación móvil, captura
   pantallas, comprueba gates y genera `resultado.json`.
@@ -258,12 +264,11 @@ confirmación solo dentro de su DOM aislado.
   Comprueba los códigos HTTP públicos y delega la autorización Profesor al
   comando Django. Lee parámetros desde el `DEPLOY_ENV_FILE` local del servidor;
   no recibe contraseñas ni IDs productivos desde el repositorio.
-- `asistencias/management/commands/verificar_smoke_profesor.py`: usa una cuenta
-  existente y dos organizaciones parametrizadas para verificar `200` autorizado
-  y `404` ajeno. Sustituye temporalmente el backend de sesión por cookies
-  firmadas para no dejar una fila de sesión en producción.
-- Uso posible: mantener estos tres artefactos como gate común para futuros
-  releases. El smoke no sustituye el E2E Google ni una prueba de restauración.
+- El comando `verificar_smoke_profesor` se retiró el 2026-10-08 junto con el
+  portal que probaba. El smoke vigente conserva solo las comprobaciones públicas
+  de portada y login. Este archivo registra el cambio; los resultados anteriores
+  no se borran.
+- El smoke no sustituye el E2E Google ni una prueba de restauración.
 - Evidencia sanitizada de esta revisión:
   `docs/evidencia/gate-ci-deploy-20260811/RESULTADOS.md`.
 

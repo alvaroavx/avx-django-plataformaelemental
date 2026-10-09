@@ -156,8 +156,6 @@ publish_static_files() {
   find "$static_root" -type f -exec chmod 644 {} +
 
   for required_static in \
-    "$static_root/asistencias/css/profesor.css" \
-    "$static_root/asistencias/js/profesor_contexto.js" \
     "$static_root/admin/css/base.css" \
     "$static_root/staticfiles.json"; do
     if [[ ! -f "$required_static" || ! -r "$required_static" ]]; then

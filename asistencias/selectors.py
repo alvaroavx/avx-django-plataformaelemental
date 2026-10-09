@@ -37,23 +37,12 @@ def sesiones_visibles_para_usuario(user):
         "rol__codigo",
     )
     organizaciones_administradas = set()
-    organizaciones_profesora = set()
     for organizacion_id, codigo in roles:
         codigo_normalizado = normalizar_codigo_rol(codigo)
         if codigo_normalizado in {"admin", "staff_asistencia"}:
             organizaciones_administradas.add(organizacion_id)
-        elif codigo_normalizado == "profesor":
-            organizaciones_profesora.add(organizacion_id)
 
     filtro = Q(disciplina__organizacion_id__in=organizaciones_administradas)
-    disciplinas_operativas = AsignacionProfesorDisciplina.objects.operativas().filter(
-        profesor=persona,
-        disciplina__organizacion_id__in=organizaciones_profesora,
-    ).values("disciplina_id")
-    filtro |= Q(
-        disciplina_id__in=disciplinas_operativas,
-        profesores=persona,
-    )
     return sesiones.filter(filtro).distinct()
 
 

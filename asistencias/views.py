@@ -22,7 +22,6 @@ from personas.search import filtrar_por_fragmentos
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
-    ACCION_EDITAR_ASISTENCIAS,
     ACCION_EXPORTAR_DATOS,
     ACCION_LIBERAR_CLASE,
     ACCION_OPERAR_PAGOS,
@@ -57,7 +56,6 @@ from .models import (
     Disciplina,
     SesionClase,
 )
-from .profesor_contexto import resolver_contexto_profesor
 from .selectors import (
     estudiantes_financieros_disciplina,
     asistencias_export_queryset,
@@ -71,12 +69,7 @@ from .services import (
     asegurar_matricula_operativa,
     cambiar_estado_asistencia,
     liberar_clase,
-    liberar_clase_profesor,
-    organizaciones_profesor,
-    quitar_asistente_profesor,
-    rol_profesor_activo,
     revertir_clase_liberada,
-    revertir_clase_liberada_profesor,
 )
 from .utils import ROLE_ADMIN
 from .utils import disciplinas_vigentes_qs, profesores_vigentes_qs
@@ -144,13 +137,6 @@ def _url_con_filtros_extra(request, nombre_url, **extra_params):
         params[key] = value
     query = params.urlencode()
     return f"{url}?{query}" if query else url
-
-
-def _rol_profesor_solicitado(request):
-    return rol_profesor_activo(
-        request.user,
-        organizacion_id=request.GET.get("organizacion"),
-    )
 
 
 @permiso_requerido(ACCION_EXPORTAR_DATOS, permitir_staff_global=False)
@@ -257,25 +243,6 @@ def _reactivar_estudiante_para_asistencia(persona, organizacion):
     ).update(activo=True)
 
 
-def _usuario_es_profesor_asignado(user, sesion):
-    persona = getattr(user, "persona", None)
-    if not persona:
-        return False
-    return (
-        sesion.profesores.filter(pk=persona.pk).exists()
-        and AsignacionProfesorDisciplina.objects.operativas().filter(
-            profesor=persona,
-            disciplina=sesion.disciplina,
-        ).exists()
-        and usuario_tiene_permiso(
-            user,
-            ACCION_VER_SESION,
-            organizacion=sesion.disciplina.organizacion,
-            permitir_staff_global=False,
-        )
-    )
-
-
 def _usuario_puede_administrar_sesion(user, sesion):
     return usuario_tiene_permiso(
         user,
@@ -286,25 +253,16 @@ def _usuario_puede_administrar_sesion(user, sesion):
 
 
 def _usuario_puede_registrar_asistencia(user, sesion):
-    if _usuario_puede_administrar_sesion(user, sesion):
-        return True
-    return _usuario_es_profesor_asignado(user, sesion) and usuario_tiene_permiso(
-        user,
-        ACCION_EDITAR_ASISTENCIAS,
-        organizacion=sesion.disciplina.organizacion,
-        permitir_staff_global=False,
-    )
+    return _usuario_puede_administrar_sesion(user, sesion)
 
 
 def _usuario_puede_liberar_clase(user, sesion):
-    if usuario_tiene_permiso(
+    return usuario_tiene_permiso(
         user,
         ACCION_LIBERAR_CLASE,
         organizacion=sesion.disciplina.organizacion,
         permitir_staff_global=False,
-    ):
-        return True
-    return _usuario_es_profesor_asignado(user, sesion)
+    )
 
 
 def _json_error(codigo, mensaje, *, status=400):
@@ -346,10 +304,6 @@ def _verificar_acceso_sesion_json(request, pk):
     sesion = _sesion_para_endpoint_json(pk)
     if not sesion or not _usuario_puede_registrar_asistencia(user, sesion):
         return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
-    if not _usuario_puede_administrar_sesion(user, sesion):
-        rol = _rol_profesor_solicitado(request)
-        if not rol or rol.organizacion_id != sesion.disciplina.organizacion_id:
-            return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
     return sesion, None
 
 
@@ -412,24 +366,9 @@ def sesiones_hoy(request):
     hoy = timezone.localdate()
     ahora = timezone.localtime()
     sesiones_qs = sesiones_visibles_para_usuario(request.user)
-    contexto_profesor = None
     organizacion_solicitada = None
     if not request.user.is_superuser:
-        organizacion_raw = (request.GET.get("organizacion") or "").strip().lower()
-        rol_profesor = _rol_profesor_solicitado(request)
-        modo_profesor = bool(rol_profesor) or (
-            organizacion_raw == "todos"
-            and organizaciones_profesor(request.user).exists()
-        )
-        if modo_profesor:
-            contexto_profesor = resolver_contexto_profesor(request)
-            organizacion_solicitada = contexto_profesor["organizacion_activa"]
-            sesiones_qs = sesiones_qs.filter(
-                disciplina__organizacion_id__in=contexto_profesor["organizacion_ids"],
-                disciplina_id__in=contexto_profesor["disciplina_ids"],
-                profesores=contexto_profesor["profesor"],
-            )
-        elif request.GET.get("organizacion"):
+        if request.GET.get("organizacion"):
             try:
                 organizacion_solicitada = Organizacion.objects.filter(
                     pk=request.GET.get("organizacion")
@@ -489,18 +428,12 @@ def sesiones_hoy(request):
             sesion.momento_clase = "info"
             sesion.momento_icono = "bi-calendar-event"
 
-    context = contexto_profesor or nav_context(request, permitir_staff_global=False)
+    context = nav_context(request, permitir_staff_global=False)
     context.update(
         {
             "hide_periodo": True,
             "fecha_hoy": hoy,
             "sesiones": sesiones,
-            "profesor_mode": bool(contexto_profesor),
-            "base_template": (
-                "asistencias/profesor/base.html"
-                if contexto_profesor
-                else "asistencias/base_app.html"
-            ),
         }
     )
     return render(request, "asistencias/sesiones_hoy.html", context)
@@ -1248,16 +1181,6 @@ def sesion_detail(request, pk):
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
-    profesor_query = ""
-    contexto_profesor = None
-    if puede_registrar and not puede_administrar:
-        rol_profesor = _rol_profesor_solicitado(request)
-        if not rol_profesor or rol_profesor.organizacion_id != sesion.disciplina.organizacion_id:
-            raise Http404
-        contexto_profesor = resolver_contexto_profesor(request)
-        if contexto_profesor["organizacion_todas"]:
-            raise Http404
-        profesor_query = contexto_profesor["profesor_query"]
     estudiantes_qs = _estudiantes_sesion_para_usuario(request.user, sesion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
     persona_form = PersonaRapidaForm()
@@ -1358,24 +1281,16 @@ def sesion_detail(request, pk):
                 raise PermissionDenied("No tienes permisos para quitar asistentes de esta sesión.")
             asistencia = get_object_or_404(Asistencia, pk=request.POST.get("asistencia_id"), sesion=sesion)
             persona_nombre = str(asistencia.persona)
-            if puede_administrar:
-                registrar_auditoria(
-                    usuario=request.user,
-                    accion=AuditLog.ACCION_ELIMINAR,
-                    dominio="asistencias",
-                    objeto=asistencia,
-                    organizacion=sesion.disciplina.organizacion,
-                    resumen="Asistente eliminado de sesión",
-                    metadata=_metadata_asistencia(asistencia),
-                )
-                asistencia.delete()
-            else:
-                quitar_asistente_profesor(
-                    user=request.user,
-                    organizacion_id=sesion.disciplina.organizacion_id,
-                    sesion=sesion,
-                    asistencia=asistencia,
-                )
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_ELIMINAR,
+                dominio="asistencias",
+                objeto=asistencia,
+                organizacion=sesion.disciplina.organizacion,
+                resumen="Asistente eliminado de sesión",
+                metadata=_metadata_asistencia(asistencia),
+            )
+            asistencia.delete()
             messages.success(request, f"Asistente quitado de la sesión: {persona_nombre}.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "cambiar_estado" in request.POST:
@@ -1428,20 +1343,11 @@ def sesion_detail(request, pk):
                 sesion=sesion,
             )
             try:
-                if puede_administrar:
-                    liberar_clase(
-                        asistencia=asistencia,
-                        motivo=request.POST.get("motivo_liberacion"),
-                        usuario=request.user,
-                    )
-                else:
-                    liberar_clase_profesor(
-                        user=request.user,
-                        organizacion_id=sesion.disciplina.organizacion_id,
-                        sesion=sesion,
-                        asistencia=asistencia,
-                        motivo=request.POST.get("motivo_liberacion"),
-                    )
+                liberar_clase(
+                    asistencia=asistencia,
+                    motivo=request.POST.get("motivo_liberacion"),
+                    usuario=request.user,
+                )
             except ValidationError as exc:
                 messages.error(request, exc.messages[0])
             else:
@@ -1456,18 +1362,10 @@ def sesion_detail(request, pk):
                 sesion=sesion,
             )
             try:
-                if puede_administrar:
-                    revertir_clase_liberada(
-                        asistencia=asistencia,
-                        usuario=request.user,
-                    )
-                else:
-                    revertir_clase_liberada_profesor(
-                        user=request.user,
-                        organizacion_id=sesion.disciplina.organizacion_id,
-                        sesion=sesion,
-                        asistencia=asistencia,
-                    )
+                revertir_clase_liberada(
+                    asistencia=asistencia,
+                    usuario=request.user,
+                )
             except ValidationError as exc:
                 messages.error(request, exc.messages[0])
             else:
@@ -1554,20 +1452,6 @@ def sesion_detail(request, pk):
             asistencia.estado_financiero_clase = "light"
     asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
     hay_alumnos_elegibles = estudiantes_qs.exclude(pk__in=asistentes_ids).exists()
-    sesion_anterior = None
-    sesion_siguiente = None
-    if puede_registrar and not puede_administrar:
-        alcance = sesiones_visibles_para_usuario(request.user).filter(
-            disciplina__organizacion_id=sesion.disciplina.organizacion_id,
-        )
-        sesion_anterior = alcance.filter(
-            Q(fecha__lt=sesion.fecha) | Q(fecha=sesion.fecha, pk__lt=sesion.pk)
-        ).order_by("-fecha", "-pk").first()
-        sesion_siguiente = alcance.filter(
-            Q(fecha__gt=sesion.fecha) | Q(fecha=sesion.fecha, pk__gt=sesion.pk)
-        ).order_by("fecha", "pk").first()
-    if contexto_profesor:
-        context.update(contexto_profesor)
     context.update(
         {
             "sesion": sesion,
@@ -1582,22 +1466,8 @@ def sesion_detail(request, pk):
             "puede_registrar_asistencia": puede_registrar,
             "puede_liberar_clase": puede_liberar,
             "puede_quitar_asistente": puede_registrar,
-            "es_jornada_profesora": puede_registrar and not puede_administrar,
-            "profesor_mode": puede_registrar and not puede_administrar,
-            "profesor_query": profesor_query,
-            "base_template": (
-                "asistencias/profesor/base.html"
-                if puede_registrar and not puede_administrar
-                else "asistencias/base_app.html"
-            ),
-            "sesion_anterior": sesion_anterior,
-            "sesion_siguiente": sesion_siguiente,
-            "back_url": (
-                f"{reverse('profesor:sesiones')}?{profesor_query}"
-                if puede_registrar and not puede_administrar
-                else request.META.get("HTTP_REFERER")
-                or _url_con_filtros(request, "asistencias:sesiones_list")
-            ),
+            "back_url": request.META.get("HTTP_REFERER")
+            or _url_con_filtros(request, "asistencias:sesiones_list"),
         }
     )
     return render(request, "asistencias/sesion_detail.html", context)

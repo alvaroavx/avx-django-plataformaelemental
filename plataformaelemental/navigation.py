@@ -8,7 +8,6 @@ from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
     ACCION_VER_FINANZAS,
-    ACCION_VER_SESION,
     usuario_tiene_permiso,
 )
 
@@ -78,9 +77,6 @@ def build_navigation(request):
     can_asistencias = contexto_operable and usuario_tiene_permiso(
         user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion
     )
-    can_jornada = contexto_operable and usuario_tiene_permiso(
-        user, ACCION_VER_SESION, organizacion=organizacion
-    )
     can_finanzas = contexto_operable and usuario_tiene_permiso(
         user, ACCION_VER_FINANZAS, organizacion=organizacion
     )
@@ -124,17 +120,6 @@ def build_navigation(request):
                 active_prefixes=[disciplinas_path],
             )
         )
-    elif can_jornada:
-        items.append(
-            _item(
-                request,
-                label="Operación profesor",
-                icon="bi-person-workspace",
-                url_name="profesor:inicio",
-                active_prefixes=["/profesor/", "/asistencias/hoy/", "/asistencias/sesiones/"],
-            )
-        )
-
     if can_finanzas:
         planes_path = reverse("finanzas:planes_list")
         categorias_path = reverse("finanzas:categorias_list")

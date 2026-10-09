@@ -1,6 +1,8 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-09-11
+Fecha de actualizacion: 2026-10-08
+
+> El portal dedicado `/profesor/` fue retirado por [ADR 0016](../adr/0016-retira-portal-profesor-conserva-dominio.md). Se mantienen el rol y perfil de profesor, asignaciones a disciplinas/sesiones, su administración diaria y los reportes que dependen de esos datos. Las secciones históricas que describen la experiencia del portal no son contratos vigentes.
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.

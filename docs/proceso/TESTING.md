@@ -63,18 +63,10 @@ Para enlaces locales de documentación:
 npm run test:docs-links
 ```
 
-Para reutilizar el recorrido móvil parametrizado de Operación Profesor:
-
-```bash
-export ELEMENTAL_E2E_USERNAME='usuario-sintetico'
-export ELEMENTAL_E2E_PASSWORD='clave-no-versionada'
-npm run test:e2e:profesor
-```
-
-La convención, variables y evidencia se mantienen en
-[docs/proceso/ARTEFACTOS.md](ARTEFACTOS.md). El runner es de solo lectura salvo
-que se habilite explícitamente `ELEMENTAL_E2E_MUTACIONES=1` sobre desarrollo o
-QA con datos sintéticos.
+Los E2E del portal dedicado de profesores están retirados junto con esa
+interfaz. Sus resultados se conservan como evidencia histórica, no como prueba
+de aceptación de la aplicación actual. La lista de artefactos históricos está
+en [docs/proceso/ARTEFACTOS.md](ARTEFACTOS.md).
 
 ## Ronda funcional Profesor 2026-08-16
 

@@ -66,15 +66,15 @@ Uso:
 Reglas:
 - Para seleccion operativa, profesor vigente equivale a `Persona.activo=True` y `PersonaRol.activo=True` con rol `PROFESOR`.
 - `valor_clase` y `retencion_sii` viven en `PersonaRol`, porque dependen de persona + organizacion.
-- El espacio `/profesor/` exige además `AsignacionProfesorDisciplina` para cada
-  clase y `SesionClase.profesores` para una sesión concreta.
-- Ver/agregar alumnos y registrar pagos exige `AlumnoDisciplina` operativa en una
-  disciplina asignada. Un rol profesor de la misma organización no basta.
+- El rol `PROFESOR` identifica a la persona, permite mantener sus asignaciones y
+  mostrar su perfil/reportes, pero ya no autoriza un portal operativo propio.
+- La administración de clases, sesiones y asistencias requiere los permisos
+  administrativos vigentes; el perfil o una asignación docente no los amplían.
 - Operativa significa activa y explícita, o histórica con actor y fecha de
   revisión administrativa. Ninguna relación inferida desde sesiones o
   asistencias concede permisos actuales por sí sola.
-- El profesor no recibe `ACCION_VER_FINANZAS`; sus pagos se resuelven en vistas
-  propias con queryset por disciplina y matrícula, sin abrir finanzas globales.
+- El profesor no recibe `ACCION_VER_FINANZAS`. Pagos y cálculos relacionados se
+  consultan desde los flujos administrativos autorizados.
 
 ## Acceso HTML
 Estado actual:

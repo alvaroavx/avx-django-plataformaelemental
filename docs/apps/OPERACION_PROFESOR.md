@@ -1,6 +1,15 @@
-# Operación Profesor
+# Histórico: Operación Profesor
 
-Fecha de actualización: 2026-09-23
+Fecha de actualización: 2026-10-08
+
+> **Retirado.** Por [ADR 0016](../adr/0016-retira-portal-profesor-conserva-dominio.md),
+> Elemental ya no ofrece el portal `/profesor/` ni sus vistas dedicadas. Este
+> documento y la evidencia enlazada abajo se conservan solo como registro
+> histórico; no son especificación vigente, guía de uso ni gate de deploy.
+> El rol `PROFESOR`, los perfiles, asignaciones a disciplinas/sesiones, la
+> administración de profesores y los reportes financieros asociados continúan
+> vigentes en sus apps correspondientes. No se ha decidido construir un portal
+> sustituto.
 
 > Nota de despliegue (2026-09-11): producción usa
 > `ManifestStaticFilesStorage`, por lo que `profesor.css` y

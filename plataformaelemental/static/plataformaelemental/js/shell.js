@@ -22,7 +22,6 @@
     if (persist) {
       try {
         window.localStorage.setItem(themeStorageKey, selected);
-        window.localStorage.removeItem("profesor-theme");
       } catch (_error) {
         // La preferencia no es esencial; el tema sigue activo durante la visita.
       }

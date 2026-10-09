@@ -66,5 +66,4 @@ urlpatterns += [
     path("asistencias/", include("asistencias.urls")),
     path("personas/", include("personas.urls")),
     path("finanzas/", include("finanzas.urls")),
-    path("profesor/", include("asistencias.profesor_urls")),
 ]

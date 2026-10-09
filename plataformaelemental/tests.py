@@ -191,8 +191,9 @@ class ElementalAppsUXTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Panel")
-        self.assertContains(response, "Mi jornada de hoy")
-        self.assertContains(response, "Ir a mis clases")
+        self.assertNotContains(response, "Mi jornada de hoy")
+        self.assertNotContains(response, "Ir a mis clases")
+        self.assertNotContains(response, "/profesor/")
         self.assertNotContains(response, "Ingresos contables")
         self.assertNotContains(response, "Consulta de persona")
         self.assertNotContains(response, "Configuración")
@@ -333,6 +334,7 @@ class ElementalAppsUXTests(TestCase):
         self.assertEqual(response.context["dashboard_personas"]["total"], 4)
         self.assertEqual(response.context["dashboard_personas"]["estudiantes"], 1)
         self.assertEqual(response.context["dashboard_personas"]["profesores"], 1)
+
         self.assertContains(response, "Personas con asistencia registrada")
         self.assertContains(response, "Ingresos contables")
 
@@ -374,6 +376,20 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(
             response,
             reverse("elemental_apps_detalle_metrica", args=["sesiones-completadas"]),
+        )
+
+    def test_portal_profesor_retirado_y_rol_profesor_conservado(self):
+        self.client.force_login(self.user_profesor)
+
+        response = self.client.get("/profesor/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(
+            PersonaRol.objects.filter(
+                persona=self.persona_profesor,
+                rol__codigo="PROFESOR",
+                activo=True,
+            ).exists()
         )
 
     def test_detalle_metrica_rechaza_tipo_desconocido_y_permiso_ajeno(self):

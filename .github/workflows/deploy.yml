@@ -75,9 +75,6 @@ jobs:
       - name: Run complete domain test suite
         run: python manage.py test asistencias finanzas personas
 
-      - name: Run Profesor application tests explicitly
-        run: python manage.py test asistencias.test_profesor_ux asistencias.test_operacion_profesor
-
       - name: Resolve tested release commit
         id: release
         run: |

@@ -8,7 +8,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from asistencias.models import Asistencia, SesionClase
-from asistencias.selectors import sesiones_visibles_para_usuario
 from finanzas.models import AttendanceConsumption, Payment, Transaction
 from finanzas.services import resumen_financiero_estudiante, resumen_financiero_estudiante_periodo
 from personas.models import Persona, PersonaRol, SolicitudAcceso
@@ -107,14 +106,9 @@ def _metricas_academicas(request, organizaciones_ids):
     }
 
 
-def _jornada_hoy(request, organizaciones_ids, *, modo_profesor=False):
+def _jornada_hoy(request, organizaciones_ids):
     hoy = timezone.localdate()
-    if modo_profesor:
-        sesiones = sesiones_visibles_para_usuario(request.user)
-        if organizaciones_ids:
-            sesiones = sesiones.filter(disciplina__organizacion_id__in=organizaciones_ids)
-    else:
-        sesiones = SesionClase.objects.filter(disciplina__organizacion_id__in=organizaciones_ids)
+    sesiones = SesionClase.objects.filter(disciplina__organizacion_id__in=organizaciones_ids)
     sesiones = list(
         sesiones.filter(fecha=hoy)
         .select_related("disciplina", "disciplina__organizacion", "bloque")
@@ -130,22 +124,13 @@ def _jornada_hoy(request, organizaciones_ids, *, modo_profesor=False):
         .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
     )
     for sesion in sesiones:
-        query = _query_global(
-            request,
-            organizacion=sesion.disciplina.organizacion_id if modo_profesor else None,
-        )
+        query = _query_global(request)
         sesion.panel_url = f'{reverse("asistencias:sesion_detail", args=[sesion.pk])}?{query}'
 
-    if modo_profesor:
-        organizacion_param = request.GET.get("organizacion")
-        destino = "profesor:sesiones" if organizacion_param else "profesor:inicio"
-        gestion_url = f'{reverse(destino)}?{_query_global(request)}'
-    else:
-        gestion_url = f'{reverse("asistencias:asistencias_list")}?{_query_global(request)}'
+    gestion_url = f'{reverse("asistencias:asistencias_list")}?{_query_global(request)}'
     return {
         "fecha_hoy": hoy,
         "sesiones": sesiones,
-        "modo_profesor": modo_profesor,
         "gestion_url": gestion_url,
     }
 
@@ -168,13 +153,6 @@ def _metricas_personas(request, organizaciones_ids, organizacion):
         "estudiantes": roles.filter(rol__codigo__iexact="ESTUDIANTE").values("persona_id").distinct().count(),
         "profesores": roles.filter(rol__codigo__iexact="PROFESOR").values("persona_id").distinct().count(),
     }
-
-
-def _usuario_es_profesor(request):
-    persona = getattr(request.user, "persona", None)
-    if not persona or not persona.activo:
-        return False
-    return persona.roles.filter(activo=True, rol__codigo__iexact="PROFESOR").exists()
 
 
 def _metricas_financieras(request, organizaciones_ids):
@@ -452,13 +430,6 @@ def construir_dashboard_general(request, *, organizacion):
         context["dashboard_academico"] = _metricas_academicas(request, organizaciones_academicas)
         context["jornada_hoy"] = _jornada_hoy(request, organizaciones_academicas)
         context.update(_seguimiento_estudiantes(request, organizaciones_academicas))
-    elif _usuario_es_profesor(request):
-        organizaciones_profesor = [organizacion.pk] if organizacion is not None else []
-        context["jornada_hoy"] = _jornada_hoy(
-            request,
-            organizaciones_profesor,
-            modo_profesor=True,
-        )
     if organizaciones_financieras:
         context["dashboard_financiero"] = _metricas_financieras(request, organizaciones_financieras)
     if organizaciones_personas:

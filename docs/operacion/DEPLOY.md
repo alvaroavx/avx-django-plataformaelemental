@@ -43,7 +43,6 @@ directamente por SSH.
 - `scripts/release_asistencias_0005.sh`
 - `scripts/validar_gate_ci.py`
 - `scripts/smoke_produccion.sh`
-- `asistencias/management/commands/verificar_smoke_profesor.py`
 - `deploy/systemd/plataforma-elemental.service.example`
 
 ## Secrets de GitHub Actions
@@ -77,15 +76,11 @@ El smoke manual lee además, solo desde ese archivo local del servidor:
 ```dotenv
 DEPLOY_SMOKE_BASE_URL=https://apps.espacioelementos.cl
 DEPLOY_SMOKE_HOST=apps.espacioelementos.cl
-DEPLOY_SMOKE_PROFESOR_USERNAME=usuario_smoke_existente
-DEPLOY_SMOKE_PROFESOR_ORG_ID=1
-DEPLOY_SMOKE_FOREIGN_ORG_ID=2
 ```
 
-La cuenta debe estar activa, tener `PersonaRol(PROFESOR, activo=True)` únicamente
-en la organización autorizada del smoke y no tenerlo en la organización ajena.
-No se guarda su contraseña en GitHub: el comando usa una sesión firmada temporal
-en memoria y no persiste una sesión Django.
+El smoke público comprueba únicamente la redirección de `/` al login y la
+respuesta de `/accounts/login/`; no requiere una cuenta de profesor ni realiza
+una prueba autenticada del portal retirado.
 
 Para el despliegue oscuro inicial, mantener explícitamente:
 
@@ -269,7 +264,7 @@ flowchart TD
    en este camino si está pendiente y requiere su runbook escalonado;
 6. finalmente ejecuta `collectstatic` con nombres versionados por contenido,
    normaliza todo `STATIC_ROOT` a directorios `0755` y archivos `0644`, verifica
-   los recursos mínimos de Admin y Profesor, ejecuta `check --deploy`, reinicia
+   los recursos mínimos de Admin, ejecuta `check --deploy`, reinicia
    `systemd` y comprueba que quede activo.
 
 ## Base De Datos En CI
@@ -435,14 +430,13 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
   política en el repositorio.
 - Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
   productivo debe comprobar el valor exacto antes de iniciar procesos.
-- El smoke manual verifica `/` → login, `/accounts/login/` → `200` y el contrato
-  Profesor `200/404` con organizaciones autorizada/ajena. No prueba OAuth Google,
-  escritura de media ni restaurabilidad del backup.
+- El smoke manual verifica `/` → login y `/accounts/login/` → `200`. No prueba
+  OAuth Google, escritura de media ni restaurabilidad del backup.
 - El workflow automático no ejecuta el smoke. No existe rollback automático de
   migraciones ni restauración automática del dump.
 - Nginx sirve los estáticos de todas las apps desde el mismo `STATIC_ROOT`.
   El deploy no selecciona apps: recolecta el repositorio completo y falla si no
-  quedan legibles los recursos base de Admin o los CSS/JS de Profesor.
+  queda legible el recurso base de Admin.
 - El deploy valida el catálogo con `pg_restore --list`, pero no restaura el dump
   en una base aislada. Un respaldo no debe llamarse recuperable hasta probar una
   restauración completa fuera de la ventana de deploy.

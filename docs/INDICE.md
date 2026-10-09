@@ -41,10 +41,11 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0013-lenguaje-visual-panel-en-vistas-operativas.md](adr/0013-lenguaje-visual-panel-en-vistas-operativas.md): extiende la gramática visual del Panel a Calendario, Asistencias, Estudiantes y Profesores sin reducir su densidad operacional.
 - [docs/adr/0014-asistencias-cards-en-mobile.md](adr/0014-asistencias-cards-en-mobile.md): reemplaza el scroll horizontal de sesiones registradas por cards completas y filtrables en mobile.
 - [docs/adr/0015-cuadratura-duena-documentacion-fiscal.md](adr/0015-cuadratura-duena-documentacion-fiscal.md): retira de Elemental la documentación fiscal y fija su propiedad en Cuadratura.
+- [docs/adr/0016-retira-portal-profesor-conserva-dominio.md](adr/0016-retira-portal-profesor-conserva-dominio.md): retira las vistas dedicadas para profesores sin eliminar el rol ni sus relaciones operativas.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.
-- [docs/apps/OPERACION_PROFESOR.md](apps/OPERACION_PROFESOR.md): panel, autorización, pagos y evidencia del espacio profesor.
+- [docs/apps/OPERACION_PROFESOR.md](apps/OPERACION_PROFESOR.md): archivo histórico del portal de profesores retirado; no es una guía vigente.
 - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md): decisiones de `personas`.
 - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md): decisiones de `finanzas`.
 - [docs/apps/UX.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/UX.md): navegacion, login y UX responsive de `Elemental Apps`.

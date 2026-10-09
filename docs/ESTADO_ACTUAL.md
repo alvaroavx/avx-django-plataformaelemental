@@ -10,6 +10,12 @@ ni en producción. El usuario confirmó que no hay información productiva de es
 capacidad; esta afirmación no se verificó consultando producción. Los objetos
 eliminados y los PDFs continúan en el historial Git.
 
+En el mismo corte (2026-10-08) se retiró el portal dedicado de profesores por
+[ADR 0016](adr/0016-retira-portal-profesor-conserva-dominio.md). Se conserva el
+rol/perfil `PROFESOR`, sus asignaciones a clases/sesiones y su uso en gestión
+administrativa y reportes. No se eliminan modelos ni datos y no hay una interfaz
+sustituta aún.
+
 Fecha de corte: 2026-08-10
 Código base auditado: `origin/main` en `d4a4e48`; la funcionalidad está cerrada
 en `c47ce8225b3221b28a00baf9a4d2909e154c3b30` y el empaquetado operativo vive
@@ -101,8 +107,9 @@ Google activo y operativo en producción; este checkout no inspeccionó ese runt
 - Estados planificada (`programada`), abierta, cerrada (`completada`) y cancelada
   para sesión; presente, ausente y justificada para asistencia.
 - Una clase liberada conserva la asistencia y suspende cobro sin borrar historia.
-- `/profesor/` entrega tablero móvil, sesiones propias, roster, asistencia,
-  pagos acotados y glosa mensual sin abrir administración global.
+- El portal dedicado `/profesor/` fue retirado el 2026-10-08. El rol y perfil,
+  asignaciones a clases/sesiones y reportes administrativos correspondientes
+  permanecen; no hay interfaz sustituta aún.
 
 ### Cobranza operacional
 
@@ -265,9 +272,10 @@ explícitamente PostgreSQL ni dependencias externas.
    reversas sin inventar ni duplicar caja.
 10. Extraer casos de uso desde views de manera incremental, sin cambiar contratos HTML/JSON innecesariamente.
 
-## Corte Operación Profesor 2026-08-09
+## Corte histórico Operación Profesor 2026-08-09 (retirado 2026-10-08)
 
-Implementado y validado localmente:
+Implementado y validado localmente en agosto de 2026; la interfaz descrita fue
+retirada después por ADR 0016:
 
 - panel `/profesor/` mobile-first y navegación inferior;
 - asignaciones explícitas profesor–disciplina y alumno–disciplina;

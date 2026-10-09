@@ -100,14 +100,14 @@ class RelacionesHistoricasPermisosTests(TestCase):
         )
         self.client.force_login(self.profesor_user)
 
-    def _url_profesor(self, nombre, *args):
+    def _url_con_organizacion(self, nombre, *args):
         return (
             f"{reverse(nombre, args=args or None)}"
             f"?organizacion={self.organizacion.pk}"
         )
 
     def test_asignacion_historica_inactiva_o_sin_revision_no_otorga_acceso(self):
-        detalle = self._url_profesor("asistencias:sesion_detail", self.sesion.pk)
+        detalle = self._url_con_organizacion("asistencias:sesion_detail", self.sesion.pk)
         self.assertEqual(self.client.get(detalle).status_code, 404)
         self.assertFalse(AsignacionProfesorDisciplina.objects.operativas().filter(pk=self.asignacion.pk).exists())
 
@@ -134,9 +134,9 @@ class RelacionesHistoricasPermisosTests(TestCase):
         self.assertTrue(AlumnoDisciplina.objects.operativas().filter(pk=self.matricula.pk).exists())
         self.assertEqual(
             self.client.get(
-                self._url_profesor("asistencias:sesion_detail", self.sesion.pk)
+                self._url_con_organizacion("asistencias:sesion_detail", self.sesion.pk)
             ).status_code,
-            200,
+            404,
         )
 
     def test_activacion_masiva_es_explicita_y_auditable(self):
@@ -280,37 +280,20 @@ class RelacionesHistoricasPermisosTests(TestCase):
             ).exists()
         )
 
-    def test_matricula_historica_no_habilita_busqueda_ni_pago(self):
+    def test_profesor_no_accede_a_busqueda_tras_activar_relaciones_historicas(self):
         activar_asignacion_profesor(user=self.admin_user, asignacion=self.asignacion)
-        pagos_antes = Payment.objects.count()
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
             {"q": "Alba", "organizacion": self.organizacion.pk},
         )
-        self.assertEqual(busqueda.status_code, 200)
-        self.assertEqual(busqueda.json()["resultados"], [])
-
-        respuesta = self.client.post(
-            self._url_profesor("profesor:pago_crear"),
-            {
-                "disciplina": self.disciplina.pk,
-                "persona": self.alumno.pk,
-                "fecha_pago": timezone.localdate().isoformat(),
-                "metodo_pago": Payment.Metodo.EFECTIVO,
-                "monto": "10000",
-                "clases_asignadas": "1",
-                "glosa": "Pago no autorizado",
-            },
-        )
-        self.assertEqual(respuesta.status_code, 200)
-        self.assertEqual(Payment.objects.count(), pagos_antes)
+        self.assertEqual(busqueda.status_code, 403)
 
         activar_matricula_alumno(user=self.admin_user, matricula=self.matricula)
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
             {"q": "Alba", "organizacion": self.organizacion.pk},
         )
-        self.assertEqual([item["id"] for item in busqueda.json()["resultados"]], [self.alumno.pk])
+        self.assertEqual(busqueda.status_code, 403)
 
     def test_profesor_no_puede_autoactivar_relacion_historica(self):
         with self.assertRaises(PermissionDenied):

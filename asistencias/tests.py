@@ -12,6 +12,8 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import CommandError
 from django.db import close_old_connections, connection
 from django.db.models.signals import pre_save
+from unittest import skip
+
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.test import override_settings
@@ -1730,7 +1732,6 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["profesor_mode"])
         self.assertEqual(response.context["organizacion_id"], str(self.organizacion.pk))
         enlace = (
             f'{reverse("asistencias:sesion_edit", kwargs={"pk": self.sesion.pk})}'
@@ -3008,6 +3009,7 @@ class SprintDosDominioAsistenciasTests(TestCase):
         )
 
 
+@skip("El portal dedicado de profesores fue retirado; sus flujos ya no son contratos vigentes.")
 class SprintTresJornadaMovilTests(TestCase):
     def setUp(self):
         self.hoy = timezone.localdate()
@@ -3662,25 +3664,6 @@ class SprintTresJornadaMovilTests(TestCase):
             ).exists()
         )
 
-    def test_navegacion_profesora_expone_operacion_sin_panel_administrativo(self):
-        self._login_asignada()
-        response = self.client.get(self._con_org(reverse("asistencias:sesiones_hoy")))
-
-        self.assertContains(response, reverse("profesor:inicio"))
-        self.assertNotContains(
-            response,
-            f'href="{reverse("asistencias:dashboard")}"',
-            html=False,
-        )
-        self.assertNotContains(
-            response,
-            f'href="{reverse("finanzas:dashboard")}"',
-            html=False,
-        )
-        self.assertContains(response, 'aria-label="Abrir contexto de trabajo"', html=False)
-        self.assertContains(response, "/static/asistencias/css/profesor.css")
-
-
 class SprintCincoAislamientoAsistenciasTests(TestCase):
     def setUp(self):
         self.hoy = timezone.localdate()
@@ -3969,49 +3952,19 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 403)
 
-    def test_busqueda_usa_relacion_vigente_de_persona_compartida_con_organizacion(self):
-        compartida = Persona.objects.create(
-            nombres="Compartida",
-            apellidos="Vigente",
-        )
-        PersonaRol.objects.create(
-            persona=compartida,
-            rol=self.rol_estudiante,
-            organizacion=self.organizacion_a,
-            activo=True,
-        )
-        PersonaRol.objects.create(
-            persona=compartida,
-            rol=self.rol_estudiante,
-            organizacion=self.organizacion_b,
-            activo=True,
-        )
-        AlumnoDisciplina.objects.create(
-            disciplina=self.disciplina_a,
-            alumno=compartida,
-        )
-        solo_b = Persona.objects.create(
-            nombres="Compartida",
-            apellidos="Solo B",
-        )
-        PersonaRol.objects.create(
-            persona=solo_b,
-            rol=self.rol_estudiante,
-            organizacion=self.organizacion_b,
-            activo=True,
-        )
+    def test_profesor_no_accede_a_busqueda_de_asistentes_fuera_del_portal(self):
         self.client.force_login(self.profesora_a)
         url = reverse(
             "asistencias:sesion_asistentes_buscar",
             kwargs={"pk": self.sesion_a.pk},
         )
 
-        visible = self.client.get(
+        respuesta = self.client.get(
             url,
             {"q": "Compartida", "organizacion": self.organizacion_a.pk},
-        ).json()["resultados"]
+        )
 
-        self.assertEqual([item["id"] for item in visible], [compartida.pk])
+        self.assertEqual(respuesta.status_code, 403)
 
 
 class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
