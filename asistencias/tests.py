@@ -1822,7 +1822,7 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["estudiantes_activos_mes"], 2)
+        self.assertEqual(response.context["dashboard_academico"]["personas_con_asistencia"], 2)
 
     def test_menu_superior_permite_cerrar_sesion(self):
         response = self.client.get(reverse("elemental_apps"))
@@ -1865,7 +1865,7 @@ class AsistenciasViewTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["sesiones_realizadas_mes"], 1)
+        self.assertEqual(response.context["dashboard_academico"]["sesiones_completadas"], 1)
 
     def test_dashboard_muestra_columnas_de_deuda_y_mas_asistencia(self):
         otro_estudiante = Persona.objects.create(
@@ -1922,7 +1922,12 @@ class AsistenciasViewTests(TestCase):
         self.assertContains(response, "Estudiantes con deuda")
         self.assertContains(response, "Estudiantes con más asistencia")
         self.assertContains(response, "Alumnos con clases disponibles")
-        self.assertContains(response, "<details class=", count=3, html=False)
+        self.assertContains(
+            response,
+            '<details class="card elemental-dashboard-panel elemental-followup-card h-100"',
+            count=3,
+            html=False,
+        )
         self.assertContains(response, 'class="elemental-followup-summary"', count=3, html=False)
         self.assertContains(response, 'window.matchMedia("(min-width: 992px)")', html=False)
         self.assertNotContains(response, "Estudiantes sin asistencia")
@@ -2954,11 +2959,11 @@ class SprintDosDominioAsistenciasTests(TestCase):
             liberar_clase(asistencia=asistencia, motivo="Duplicada", usuario=self.admin)
         self.assertEqual(ClaseLiberada.objects.filter(asistencia=asistencia).count(), 1)
 
-    def test_matriz_permisos_sesion_por_asignacion_y_organizacion(self):
+    def test_matriz_permisos_sesion_por_rol_y_organizacion(self):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
         casos_get = (
             (self.admin, 200),
-            (self.profesor_asignado, 200),
+            (self.profesor_asignado, 404),
             (self.profesor_no_asignado, 404),
             (self.profesor_otra_org, 404),
             (self.admin_otra_org, 404),
@@ -2982,9 +2987,9 @@ class SprintDosDominioAsistenciasTests(TestCase):
                 "estado_asistencia": Asistencia.Estado.PRESENTE,
             },
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 404)
 
-    def test_profesora_asignada_puede_liberar_clase_con_trazabilidad(self):
+    def test_profesora_asignada_no_puede_liberar_clase_tras_retiro_del_portal(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
         self.client.force_login(self.profesor_asignado)
         with self.captureOnCommitCallbacks(execute=True):
@@ -2997,13 +3002,11 @@ class SprintDosDominioAsistenciasTests(TestCase):
                     "motivo_liberacion": "Liberación operativa autorizada",
                 },
             )
-        self.assertEqual(response.status_code, 302)
-        liberacion = ClaseLiberada.objects.get(asistencia=asistencia)
-        self.assertTrue(liberacion.activa)
-        self.assertEqual(liberacion.liberada_por, self.profesor_asignado)
-        self.assertTrue(
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(ClaseLiberada.objects.filter(asistencia=asistencia).exists())
+        self.assertFalse(
             AuditLog.objects.filter(
-                objeto_id=str(liberacion.pk),
+                objeto_id=str(asistencia.pk),
                 resumen="Clase liberada",
             ).exists()
         )

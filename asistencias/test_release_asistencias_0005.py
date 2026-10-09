@@ -106,7 +106,7 @@ class ReleaseAsistencias0005ContractTests(unittest.TestCase):
         self.assertIn("asistencias.0005", runbook)
         self.assertIn("forward-only", runbook)
         self.assertIn("push a `main`", deploy)
-        self.assertIn("con migraciones deja `deploy` omitido", deploy)
+        self.assertIn("un push con o sin migraciones despliega automáticamente tras CI verde", deploy)
 
 
 if __name__ == "__main__":
