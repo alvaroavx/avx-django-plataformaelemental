@@ -39,6 +39,7 @@ from finanzas.models import (
     PaymentPlan,
     Transaction,
     LotePago,
+    desglosar_montos,
 )
 
 
@@ -60,6 +61,28 @@ class FinanzasServicesCompatibilityTests(SimpleTestCase):
         self.assertTrue(callable(imputar_pago_a_deudas))
         self.assertTrue(callable(resumen_financiero_estudiante))
         self.assertTrue(callable(resumen_financiero_estudiante_periodo))
+
+
+class MontosClpTests(SimpleTestCase):
+    """Los montos se guardan en pesos enteros con la regla de IVA de Cuadratura."""
+
+    def test_iva_incluido_toma_el_total_como_ancla(self):
+        self.assertEqual(desglosar_montos(30000, afecto=True, incluye_iva=True), (25210, 4790, 30000))
+        self.assertEqual(desglosar_montos(50000, afecto=True, incluye_iva=True), (42017, 7983, 50000))
+
+    def test_iva_agregado_redondea_iva_y_total(self):
+        self.assertEqual(desglosar_montos(12345, afecto=True, incluye_iva=False), (12345, 2346, 14691))
+
+    def test_exento_no_lleva_iva(self):
+        self.assertEqual(desglosar_montos(9000, afecto=False, incluye_iva=True), (9000, 0, 9000))
+
+    def test_base_con_decimales_se_redondea_a_peso(self):
+        self.assertEqual(desglosar_montos(Decimal("9999.50"), afecto=False, incluye_iva=False), (10000, 0, 10000))
+
+    def test_iva_agregado_coincide_con_la_regla_de_cuadratura(self):
+        for neto in range(1, 20001):
+            _, iva, total = desglosar_montos(neto, afecto=True, incluye_iva=False)
+            self.assertEqual(desglosar_montos(total, afecto=True, incluye_iva=True), (neto, iva, total))
 
 
 class FinanzasAccessTests(TestCase):
@@ -193,6 +216,23 @@ class FinanzasAccessTests(TestCase):
         payload = prepare_month(organization=self.org, year=2026, month=9)
         self.assertEqual((payload["summary"]["operations"], payload["summary"]["pending"]), (0, 1))
         self.assertIn("missing_linked_transaction", payload["pending_records"][0]["reasons"])
+
+    def test_preparar_mes_exporta_pago_afecto_con_iva_en_pesos_enteros(self):
+        estudiante = Persona.objects.create(nombres="Afecta", apellidos="Ficticia", email="afecta-ficticia@example.com")
+        PersonaRol.objects.create(persona=estudiante, rol=self.rol_estudiante, organizacion=self.org, activo=True)
+        categoria = Category.objects.create(nombre="Cobranza afecta ficticia", tipo=Category.Tipo.INGRESO)
+        transaction = Transaction.objects.create(
+            organizacion=self.org, categoria=categoria, fecha=date(2026, 9, 4),
+            tipo=Transaction.Tipo.INGRESO, monto=50000, descripcion="Taller afecto ficticio",
+        )
+        Payment.objects.create(
+            persona=estudiante, organizacion=self.org, fecha_pago=date(2026, 9, 4),
+            aplica_iva=True, monto_incluye_iva=True, monto_referencia=50000, transaccion=transaction,
+        )
+        payload = prepare_month(organization=self.org, year=2026, month=9)
+        self.assertEqual(payload["pending_records"], [])
+        tax = payload["operations"][0]["tax"]
+        self.assertEqual((tax["classification"], tax["net"], tax["vat"], tax["total"]), ("TAXABLE", 42017, 7983, 50000))
 
 
     def test_listado_pagos_busca_persona_por_fragmentos_sin_tildes(self):
@@ -910,9 +950,9 @@ class FinanzasAccessTests(TestCase):
                 "Org Finanzas",
                 "No Admin",
                 "Transferencia",
-                "10000.00",
-                "0.00",
-                "10000.00",
+                "10000",
+                "0",
+                "10000",
                 "2",
             ],
         )
@@ -955,7 +995,7 @@ class FinanzasAccessTests(TestCase):
                 "Org Finanzas",
                 "Ingreso",
                 "Ventas clases",
-                "25000.00",
+                "25000",
                 "Ingreso febrero",
             ],
         )

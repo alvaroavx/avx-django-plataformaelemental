@@ -10,8 +10,26 @@ from django.utils import timezone
 IVA_RATE = Decimal("0.19")
 
 
-def _money(value: Decimal) -> Decimal:
-    return (value or Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _clp(value) -> int:
+    """Redondea a pesos enteros (CLP no usa decimales)."""
+    return int(Decimal(str(value or 0)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def desglosar_montos(base, *, afecto: bool, incluye_iva: bool) -> tuple[int, int, int]:
+    """Devuelve (neto, iva, total) en CLP enteros con la regla de Cuadratura.
+
+    Con IVA incluido el total manda: neto = round(total / 1,19) e iva = total - neto.
+    Con IVA agregado, iva = round(neto * 0,19); el resultado es idéntico a aplicar
+    la regla anterior sobre el total, porque el error de redondeo nunca supera 0,5.
+    """
+    base = _clp(base)
+    if not afecto:
+        return base, 0, base
+    if incluye_iva:
+        neto = _clp(Decimal(base) / (Decimal("1") + IVA_RATE))
+        return neto, base - neto, base
+    iva = _clp(Decimal(base) * IVA_RATE)
+    return base, iva, base + iva
 
 
 class TimeStampedModel(models.Model):
@@ -30,7 +48,7 @@ class PaymentPlan(TimeStampedModel):
     )
     nombre = models.CharField(max_length=150)
     num_clases = models.PositiveIntegerField(default=1)
-    precio = models.DecimalField(max_digits=12, decimal_places=2)
+    precio = models.BigIntegerField(help_text="Pesos chilenos enteros.")
     precio_incluye_iva = models.BooleanField(default=False)
     es_por_defecto = models.BooleanField(default=False)
     fecha_inicio = models.DateField(null=True, blank=True)
@@ -72,18 +90,11 @@ class PaymentPlan(TimeStampedModel):
                 PaymentPlan.objects.filter(pk=siguiente_plan.pk).update(es_por_defecto=True)
 
     def calcular_montos(self):
-        precio = _money(Decimal(self.precio or 0))
-        if self.organizacion.es_exenta_iva:
-            return precio, Decimal("0.00"), precio
-        if self.precio_incluye_iva:
-            total = precio
-            neto = _money(total / (Decimal("1.00") + IVA_RATE))
-            iva = _money(total - neto)
-            return neto, iva, total
-        neto = precio
-        iva = _money(neto * IVA_RATE)
-        total = _money(neto + iva)
-        return neto, iva, total
+        return desglosar_montos(
+            self.precio,
+            afecto=not self.organizacion.es_exenta_iva,
+            incluye_iva=self.precio_incluye_iva,
+        )
 
 
 class Category(TimeStampedModel):
@@ -122,7 +133,7 @@ class LotePago(TimeStampedModel):
         related_name="lotes_pago_creados",
     )
     cantidad_pagos = models.PositiveIntegerField(default=0)
-    monto_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    monto_total = models.BigIntegerField(default=0)
     confirmado_en = models.DateTimeField(null=True, blank=True)
     origen = models.CharField(max_length=40, default="pago_masivo")
     respaldo = models.FileField(upload_to="finanzas/lotes/", null=True, blank=True)
@@ -174,10 +185,10 @@ class Payment(TimeStampedModel):
     numero_comprobante = models.CharField(max_length=100, blank=True, default="")
     aplica_iva = models.BooleanField(default=True)
     monto_incluye_iva = models.BooleanField(default=False)
-    monto_referencia = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    monto_neto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    monto_iva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    monto_referencia = models.BigIntegerField(default=0)
+    monto_neto = models.BigIntegerField(default=0)
+    monto_iva = models.BigIntegerField(default=0)
+    monto_total = models.BigIntegerField(default=0)
     clases_asignadas = models.PositiveIntegerField(default=0)
     observaciones = models.TextField(blank=True)
     respaldo = models.FileField(upload_to="finanzas/pagos/", null=True, blank=True)
@@ -227,25 +238,14 @@ class Payment(TimeStampedModel):
         return f"Pago {self.persona} - {self.fecha_pago}"
 
     def calcular_montos(self):
-        base = Decimal(self.monto_referencia or 0)
+        base = self.monto_referencia or 0
         if self.plan_id and not base:
-            base = Decimal(self.plan.precio)
-        base = _money(base)
-
-        aplica_iva = bool(self.aplica_iva) and not self.organizacion.es_exenta_iva
-        if not aplica_iva:
-            neto = base
-            iva = Decimal("0.00")
-            total = base
-        elif self.monto_incluye_iva or (self.plan_id and self.plan.precio_incluye_iva):
-            total = base
-            neto = _money(total / (Decimal("1.00") + IVA_RATE))
-            iva = _money(total - neto)
-        else:
-            neto = base
-            iva = _money(neto * IVA_RATE)
-            total = _money(neto + iva)
-        return neto, iva, total
+            base = self.plan.precio
+        return desglosar_montos(
+            base,
+            afecto=bool(self.aplica_iva) and not self.organizacion.es_exenta_iva,
+            incluye_iva=self.monto_incluye_iva or bool(self.plan_id and self.plan.precio_incluye_iva),
+        )
 
     @property
     def clases_consumidas(self):
@@ -333,7 +333,7 @@ class Transaction(TimeStampedModel):
     )
     fecha = models.DateField(default=timezone.localdate)
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
-    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    monto = models.BigIntegerField(help_text="Pesos chilenos enteros.")
     descripcion = models.TextField(blank=True)
     archivo = models.FileField(upload_to="finanzas/transactions/", null=True, blank=True)
     creado_por = models.ForeignKey(

@@ -118,9 +118,7 @@ class PersonaRol(models.Model):
         related_name="persona_roles",
     )
     activo = models.BooleanField(default=True)
-    valor_clase = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
+    valor_clase = models.BigIntegerField(
         null=True,
         blank=True,
         default=None,

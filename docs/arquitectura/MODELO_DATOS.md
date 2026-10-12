@@ -88,7 +88,7 @@ erDiagram
         int id PK
         int organizacion_id FK
         int num_clases
-        decimal precio
+        bigint precio
     }
     PAYMENT {
         int id PK
@@ -320,9 +320,9 @@ Regla:
 ## Datos Que Se Duplican A Proposito
 
 - `Payment` guarda montos neto, IVA y total calculados al momento del pago
-  (`Payment.save()`), redondeados a dos decimales con `ROUND_HALF_UP`. Un pago
-  con IVA puede quedar con centavos; el export a Cuadratura los rechaza como
-  `non_integer_clp_amount`.
+  (`Payment.save()`), en pesos enteros con la regla de IVA de Cuadratura
+  (`desglosar_montos`, ADR 0022). Las migraciones `finanzas.0014`/`0015`
+  redondearon los datos existentes tomando el total cobrado como ancla.
 - `AttendanceConsumption` guarda `persona` y `clase_fecha` aunque esos datos tambien se puedan derivar desde `Asistencia`; esto facilita consultas de deuda/saldo por periodo.
 
 Regla:

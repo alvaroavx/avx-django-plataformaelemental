@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from functools import wraps
 
@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
+from django.db.models import BigIntegerField, Count, DateField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404
@@ -43,7 +43,7 @@ from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabr
 from .solicitudes_acceso import crear_o_recuperar_solicitud, obtener_identidad_pendiente, solicitud_pendiente_o_ultima
 
 
-MONEY_FIELD = DecimalField(max_digits=12, decimal_places=2)
+MONEY_FIELD = BigIntegerField()
 PERSONA_AUDIT_FIELDS = ["nombres", "apellidos", "rut", "email", "telefono", "activo"]
 PERSONA_ROL_AUDIT_FIELDS = ["activo", "valor_clase", "retencion_sii"]
 
@@ -384,7 +384,7 @@ def _procesar_accion_rol_persona(request, persona, organizacion, organizaciones_
         valor_clase_raw = (request.POST.get("valor_clase") or "").strip()
         retencion_sii_raw = (request.POST.get("retencion_sii") or "").strip()
         antes = _snapshot_persona_rol(persona_rol)
-        persona_rol.valor_clase = Decimal(valor_clase_raw) if valor_clase_raw else None
+        persona_rol.valor_clase = int(Decimal(valor_clase_raw).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if valor_clase_raw else None
         persona_rol.retencion_sii = Decimal(retencion_sii_raw) if retencion_sii_raw else None
         persona_rol.save(update_fields=["valor_clase", "retencion_sii"])
         _auditar_persona_rol(request, persona_rol, created=False, antes=antes)
@@ -502,7 +502,7 @@ def _annotate_personas_resumen(queryset, *, mes=None, anio=None, organizacion=No
         organizaciones_total=Count("roles__organizacion", filter=Q(roles__activo=True), distinct=True),
         asistencias_periodo=Coalesce(Subquery(asistencias_total_sq, output_field=IntegerField()), Value(0)),
         pagos_periodo=Coalesce(Subquery(pagos_total_sq, output_field=IntegerField()), Value(0)),
-        monto_pagado_periodo=Coalesce(Subquery(monto_pagado_sq, output_field=MONEY_FIELD), Value(Decimal("0")), output_field=MONEY_FIELD),
+        monto_pagado_periodo=Coalesce(Subquery(monto_pagado_sq, output_field=MONEY_FIELD), Value(0), output_field=MONEY_FIELD),
         deuda_periodo=Coalesce(Subquery(deuda_total_sq, output_field=IntegerField()), Value(0)),
         sesiones_profesor_periodo=Coalesce(Subquery(sesiones_profesor_total_sq, output_field=IntegerField()), Value(0)),
         ultima_asistencia=Subquery(ultima_asistencia_sq, output_field=DateField()),

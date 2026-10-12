@@ -218,7 +218,7 @@ class PagoMasivoForm(forms.Form):
     numero_comprobante = forms.CharField(required=False)
     aplica_iva = forms.BooleanField(required=False, initial=True)
     monto_incluye_iva = forms.BooleanField(required=False)
-    monto_referencia = forms.DecimalField(max_digits=12, decimal_places=2, min_value=0)
+    monto_referencia = forms.IntegerField(min_value=0)
     clases_asignadas = forms.IntegerField(min_value=0, required=False, initial=0)
     observaciones = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
     personas_seleccionadas = forms.CharField(widget=forms.HiddenInput)

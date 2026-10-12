@@ -35,9 +35,13 @@ importación, almacenamiento, asociación y edición (ADR 0015, migración
 `Payment` y `Transaction` no son intercambiables: el primero responde por la
 cobranza de clases y el segundo por el movimiento de dinero.
 
-`Payment.calcular_montos()` redondea a centavos (`Decimal` con dos decimales,
-`ROUND_HALF_UP`) e IVA 19 %. Si la organización es `es_exenta_iva`, el pago se
-guarda con `aplica_iva = False`.
+Todos los montos de dinero (`PaymentPlan.precio`, montos de `Payment`,
+`Transaction.monto`, `LotePago.monto_total`) son pesos chilenos enteros
+(`BigIntegerField`, ADR 0022). `desglosar_montos()` aplica la regla de
+Cuadratura con IVA 19 % y `ROUND_HALF_UP`: con IVA incluido, `neto =
+round(total / 1,19)` e `iva = total - neto`; con IVA agregado, `iva =
+round(neto × 0,19)`. Siempre se cumple `neto + iva = total`. Si la organización
+es `es_exenta_iva`, el pago se guarda con `aplica_iva = False`.
 
 ## Reglas principales
 
@@ -133,7 +137,8 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
   `pending_records` (`payment:<pk>` y motivos ordenados) si tiene alguno de:
   `payment_reversed`, `missing_linked_transaction`, `invalid_linked_transaction`
   (otra organización o tipo distinto de ingreso), `transaction_amount_mismatch`
-  o `non_integer_clp_amount` (algún monto con decimales).
+  o `non_integer_clp_amount` (guarda defensiva; desde ADR 0022 los montos son
+  enteros y este motivo no debería aparecer).
 - **`batch_id`:** SHA-256 de `organización|período|external_id` de las
   operaciones incluidas. Es estable mientras no cambie el conjunto de
   operaciones; `generated_at` cambia en cada descarga.

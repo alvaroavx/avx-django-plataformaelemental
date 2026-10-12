@@ -92,11 +92,9 @@ class PersonaRolCRMForm(forms.Form):
         queryset=Organizacion.objects.order_by("nombre"),
         required=False,
     )
-    valor_clase = forms.DecimalField(
+    valor_clase = forms.IntegerField(
         required=False,
         min_value=0,
-        decimal_places=2,
-        max_digits=12,
         widget=forms.NumberInput(attrs={"step": "1", "min": "0"}),
     )
     retencion_sii = forms.DecimalField(
