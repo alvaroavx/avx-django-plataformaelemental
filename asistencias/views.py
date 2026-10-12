@@ -282,6 +282,33 @@ def _usuario_puede_ver_detalle_sesion(user, sesion):
     return _usuario_puede_administrar_sesion(user, sesion) or _usuario_puede_agregar_asistentes(user, sesion)
 
 
+def _navegacion_adyacente_sesion(request, sesion, organizacion):
+    sesiones = aplicar_periodo(
+        sesiones_calendario_visibles_para_usuario(request.user),
+        "fecha",
+        request=request,
+    )
+    if organizacion:
+        sesiones = sesiones.filter(disciplina__organizacion=organizacion)
+    sesiones = sesiones.order_by("fecha", "bloque__hora_inicio", "disciplina__nombre", "pk")
+    sesiones_accesibles = [
+        candidata
+        for candidata in sesiones
+        if _usuario_puede_ver_detalle_sesion(request.user, candidata)
+    ]
+    ids = [candidata.pk for candidata in sesiones_accesibles]
+    if sesion.pk not in ids:
+        return None, None
+
+    posicion = ids.index(sesion.pk)
+    anterior = sesiones_accesibles[posicion - 1] if posicion > 0 else None
+    siguiente = sesiones_accesibles[posicion + 1] if posicion + 1 < len(sesiones_accesibles) else None
+    return (
+        _url_con_filtros(request, "asistencias:sesion_detail", pk=anterior.pk) if anterior else None,
+        _url_con_filtros(request, "asistencias:sesion_detail", pk=siguiente.pk) if siguiente else None,
+    )
+
+
 def _usuario_puede_liberar_clase(user, sesion):
     return usuario_tiene_permiso(
         user,
@@ -1219,6 +1246,7 @@ def sesion_detail(request, pk):
         and organizacion_solicitada != str(sesion.disciplina.organizacion_id)
     ):
         raise Http404
+    organizacion_contexto = organizacion_desde_request(request)
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
     puede_agregar = _usuario_puede_agregar_asistentes(request.user, sesion)
@@ -1494,6 +1522,11 @@ def sesion_detail(request, pk):
             asistencia.estado_financiero_clase = "light"
     asistentes_ids = set(asistencias.values_list("persona_id", flat=True))
     hay_alumnos_elegibles = estudiantes_qs.exclude(pk__in=asistentes_ids).exists()
+    sesion_anterior_url, sesion_siguiente_url = _navegacion_adyacente_sesion(
+        request,
+        sesion,
+        organizacion_contexto,
+    )
     context.update(
         {
             "sesion": sesion,
@@ -1509,6 +1542,8 @@ def sesion_detail(request, pk):
             "puede_agregar_asistentes": puede_agregar,
             "puede_liberar_clase": puede_liberar,
             "puede_quitar_asistente": puede_registrar,
+            "sesion_anterior_url": sesion_anterior_url,
+            "sesion_siguiente_url": sesion_siguiente_url,
             "back_url": request.META.get("HTTP_REFERER")
             or _url_con_filtros(request, "asistencias:sesiones_list"),
         }

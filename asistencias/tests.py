@@ -1739,6 +1739,55 @@ class AsistenciasViewTests(TestCase):
         )
         self.assertContains(response, f'href="{enlace}"', html=False)
 
+    def test_sesion_detail_expone_navegacion_adyacente_del_periodo_para_swipe(self):
+        sesion_anterior = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-02-20",
+        )
+        sesion_siguiente = SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-02-28",
+        )
+        SesionClase.objects.create(
+            disciplina=self.disciplina,
+            fecha="2026-03-01",
+        )
+        parametros = {
+            "periodo_mes": 2,
+            "periodo_anio": 2026,
+            "organizacion": self.organizacion.pk,
+        }
+
+        response = self.client.get(
+            reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk}),
+            parametros,
+        )
+
+        query = f"periodo_mes=2&periodo_anio=2026&organizacion={self.organizacion.pk}"
+        anterior_url = (
+            f'{reverse("asistencias:sesion_detail", kwargs={"pk": sesion_anterior.pk})}?{query}'
+        )
+        siguiente_url = (
+            f'{reverse("asistencias:sesion_detail", kwargs={"pk": sesion_siguiente.pk})}?{query}'
+        )
+        self.assertEqual(response.context["sesion_anterior_url"], anterior_url)
+        self.assertEqual(response.context["sesion_siguiente_url"], siguiente_url)
+        self.assertContains(
+            response,
+            f'data-sesion-anterior-url="{anterior_url.replace("&", "&amp;")}"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            f'data-sesion-siguiente-url="{siguiente_url.replace("&", "&amp;")}"',
+            html=False,
+        )
+        self.assertContains(response, "Math.abs(deltaX) < 72", html=False)
+        self.assertContains(response, "sesion-slide-out-", html=False)
+        self.assertContains(response, "sesion-slide-in-", html=False)
+        self.assertContains(response, "prefers-reduced-motion: reduce", html=False)
+        self.assertContains(response, "window.sessionStorage.setItem", html=False)
+
     def test_sesion_detail_admin_sin_contexto_profesor_rechaza_organizacion_ajena(self):
         otra_organizacion = Organizacion.objects.create(
             nombre="Org ajena al detalle",

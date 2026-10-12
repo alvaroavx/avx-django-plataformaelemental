@@ -113,13 +113,22 @@
     background: var(--bs-secondary-bg, #e9ecef);
   }
   @media (max-width: 575.98px) {
-    .jornada-sesion { margin-top: 0.25rem !important; }
+    .jornada-sesion {
+      margin-top: 0.25rem !important;
+      touch-action: pan-y;
+    }
     .jornada-sesion .sesion-actionbar {
-      width: 100%;
+      position: fixed;
+      z-index: 1020;
+      top: 5.75rem;
+      right: .75rem;
+      width: 48px;
+      margin: 0 !important;
       display: flex !important;
+      flex-direction: column;
       flex-wrap: nowrap !important;
       align-items: stretch !important;
-      gap: .5rem !important;
+      gap: .4rem !important;
     }
     .jornada-sesion .sesion-actionbar > .sesion-actions,
     .jornada-sesion .sesion-actionbar > .sesion-admin-actions,
@@ -127,16 +136,54 @@
       display: contents !important;
     }
     .jornada-sesion .sesion-actionbar .btn {
-      min-width: 0;
-      min-height: 52px;
-      flex: 1 1 0;
+      width: 48px;
+      min-width: 48px;
+      min-height: 48px;
+      flex: 0 0 48px;
       display: inline-grid;
       place-items: center;
       padding: .5rem;
       font-size: 1.05rem;
+      box-shadow: 0 .2rem .65rem rgba(15, 23, 42, .16);
+    }
+    .jornada-sesion .sesion-actionbar .btn-outline-secondary,
+    .jornada-sesion .sesion-actionbar .btn-outline-primary {
+      background-color: var(--bs-body-bg, #fff);
     }
     .jornada-sesion .sesion-actionbar .btn i {
       margin: 0 !important;
+    }
+  }
+  @media (max-width: 575.98px) and (prefers-reduced-motion: no-preference) {
+    html.sesion-slide-activo,
+    html.sesion-slide-activo body {
+      overflow-x: hidden;
+    }
+    .jornada-sesion.sesion-slide-out-next {
+      animation: sesion-slide-out-next 160ms ease-in forwards;
+    }
+    .jornada-sesion.sesion-slide-out-previous {
+      animation: sesion-slide-out-previous 160ms ease-in forwards;
+    }
+    .jornada-sesion.sesion-slide-in-next {
+      animation: sesion-slide-in-next 220ms ease-out both;
+    }
+    .jornada-sesion.sesion-slide-in-previous {
+      animation: sesion-slide-in-previous 220ms ease-out both;
+    }
+    @keyframes sesion-slide-out-next {
+      to { transform: translateX(-28vw); opacity: .35; }
+    }
+    @keyframes sesion-slide-out-previous {
+      to { transform: translateX(28vw); opacity: .35; }
+    }
+    @keyframes sesion-slide-in-next {
+      from { transform: translateX(28vw); opacity: .35; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes sesion-slide-in-previous {
+      from { transform: translateX(-28vw); opacity: .35; }
+      to { transform: translateX(0); opacity: 1; }
     }
   }
   @media (max-width: 359.98px) {
@@ -156,7 +203,11 @@
 {% endblock %}
 
 {% block content %}
-<div class="jornada-sesion mt-4">
+<div
+  class="jornada-sesion mt-4"
+  {% if sesion_anterior_url %}data-sesion-anterior-url="{{ sesion_anterior_url }}"{% endif %}
+  {% if sesion_siguiente_url %}data-sesion-siguiente-url="{{ sesion_siguiente_url }}"{% endif %}
+>
   <div class="sesion-actionbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div class="d-flex gap-2 sesion-actions">
       <a class="btn btn-outline-secondary btn-sm jornada-touch" href="{{ back_url }}" title="Volver" aria-label="Volver">
@@ -468,6 +519,88 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 (function () {
+  var swipeSurface = document.querySelector('.jornada-sesion');
+  var swipeStart = null;
+  var swipeNavigating = false;
+  var swipeInteractiveSelector = 'a, button, input, select, textarea, summary, form, [role="dialog"], .ts-wrapper';
+  var slideStorageKey = 'elemental-sesion-slide-direction';
+
+  function movimientoReducido() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function navegarConSlide(destino, direccion) {
+    if (!destino || swipeNavigating) return;
+    swipeNavigating = true;
+    if (movimientoReducido()) {
+      window.location.assign(destino);
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(slideStorageKey, direccion);
+    } catch (error) {
+      // La navegación sigue funcionando aunque el almacenamiento esté bloqueado.
+    }
+    document.documentElement.classList.add('sesion-slide-activo');
+    swipeSurface.classList.add('sesion-slide-out-' + direccion);
+    window.setTimeout(function () {
+      window.location.assign(destino);
+    }, 160);
+  }
+
+  if (swipeSurface) {
+    var direccionEntrada = null;
+    try {
+      direccionEntrada = window.sessionStorage.getItem(slideStorageKey);
+      window.sessionStorage.removeItem(slideStorageKey);
+    } catch (error) {
+      direccionEntrada = null;
+    }
+    if (
+      !movimientoReducido()
+      && window.matchMedia('(max-width: 575.98px)').matches
+      && (direccionEntrada === 'next' || direccionEntrada === 'previous')
+    ) {
+      document.documentElement.classList.add('sesion-slide-activo');
+      swipeSurface.classList.add('sesion-slide-in-' + direccionEntrada);
+      swipeSurface.addEventListener('animationend', function () {
+        swipeSurface.classList.remove('sesion-slide-in-' + direccionEntrada);
+        document.documentElement.classList.remove('sesion-slide-activo');
+      }, { once: true });
+    }
+
+    swipeSurface.addEventListener('touchstart', function (event) {
+      if (!window.matchMedia('(max-width: 575.98px)').matches || event.touches.length !== 1) {
+        swipeStart = null;
+        return;
+      }
+      if (event.target.closest(swipeInteractiveSelector)) {
+        swipeStart = null;
+        return;
+      }
+      swipeStart = {
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+      };
+    }, { passive: true });
+
+    swipeSurface.addEventListener('touchend', function (event) {
+      if (!swipeStart || event.changedTouches.length !== 1) return;
+      var deltaX = event.changedTouches[0].clientX - swipeStart.x;
+      var deltaY = event.changedTouches[0].clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(deltaX) < 72 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.35) return;
+      var destino = deltaX < 0
+        ? swipeSurface.dataset.sesionSiguienteUrl
+        : swipeSurface.dataset.sesionAnteriorUrl;
+      navegarConSlide(destino, deltaX < 0 ? 'next' : 'previous');
+    }, { passive: true });
+
+    swipeSurface.addEventListener('touchcancel', function () {
+      swipeStart = null;
+    }, { passive: true });
+  }
+
   var BUSCAR_URL = "{% url 'asistencias:sesion_asistentes_buscar' sesion.pk %}";
   var AGREGAR_URL = "{% url 'asistencias:sesion_asistente_agregar' sesion.pk %}";
   var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}";
