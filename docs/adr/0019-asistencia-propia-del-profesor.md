@@ -16,6 +16,8 @@ Se incorpora la capacidad configurable `agregar_asistentes_propios`, presentada 
 - buscar alumnos activos y vinculados operativamente a la disciplina;
 - agregar esos alumnos como asistentes, sin duplicarlos.
 
+El Panel reutiliza la sección “Hoy” para mostrar únicamente las sesiones de la fecha asignadas al Profesor. Desde allí puede abrir su propia sesión cuando esta capacidad está habilitada; si sólo cuenta con acceso al calendario, el enlace conserva ese alcance de lectura.
+
 No permite crear personas, editar o eliminar la sesión, cambiar su estado manualmente, quitar asistentes, corregir estados de asistencia, liberar clases ni consultar datos financieros. El servidor valida asignación, organización y capacidad en las vistas HTML y endpoints JSON; la visibilidad de botones no sustituye esta autorización.
 
 ## Alternativas descartadas

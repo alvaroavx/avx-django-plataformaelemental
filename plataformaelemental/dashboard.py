@@ -7,7 +7,7 @@ from django.http import Http404
 from django.urls import reverse
 from django.utils import timezone
 
-from asistencias.models import Asistencia, SesionClase
+from asistencias.models import AsignacionProfesorDisciplina, Asistencia, SesionClase
 from finanzas.models import AttendanceConsumption, Payment, Transaction
 from finanzas.services import resumen_financiero_estudiante, resumen_financiero_estudiante_periodo
 from personas.models import Persona, PersonaRol, SolicitudAcceso
@@ -15,8 +15,11 @@ from personas.permissions import (
     ACCION_ROLES,
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
+    ACCION_AGREGAR_ASISTENTES_PROPIOS,
+    ACCION_VER_CALENDARIO,
     ACCION_VER_FINANZAS,
     normalizar_codigo_rol,
+    usuario_tiene_permiso,
 )
 from personas.search import filtrar_por_fragmentos
 
@@ -132,6 +135,77 @@ def _jornada_hoy(request, organizaciones_ids):
         "fecha_hoy": hoy,
         "sesiones": sesiones,
         "gestion_url": gestion_url,
+    }
+
+
+def _jornada_hoy_profesor(request, organizacion):
+    persona = getattr(request.user, "persona", None)
+    if not persona:
+        return None
+    roles_profesor = PersonaRol.objects.select_related("organizacion").filter(
+        persona=persona,
+        rol__codigo__iexact="PROFESOR",
+        activo=True,
+    )
+    if organizacion:
+        roles_profesor = roles_profesor.filter(organizacion=organizacion)
+    organizaciones_ids = [
+        persona_rol.organizacion_id
+        for persona_rol in roles_profesor
+        if usuario_tiene_permiso(
+            request.user,
+            ACCION_VER_CALENDARIO,
+            organizacion=persona_rol.organizacion,
+            permitir_staff_global=False,
+        )
+    ]
+    if not organizaciones_ids:
+        return None
+
+    hoy = timezone.localdate()
+    disciplinas_operativas_ids = AsignacionProfesorDisciplina.objects.operativas().filter(
+        profesor=persona,
+        disciplina__organizacion_id__in=organizaciones_ids,
+    ).values("disciplina_id")
+    sesiones = list(
+        SesionClase.objects.filter(
+            fecha=hoy,
+            profesores=persona,
+            disciplina__organizacion_id__in=organizaciones_ids,
+            disciplina_id__in=disciplinas_operativas_ids,
+        )
+        .select_related("disciplina", "disciplina__organizacion", "bloque")
+        .prefetch_related("profesores")
+        .annotate(
+            asistentes_panel=Count("asistencias", distinct=True),
+            sin_horario=Case(
+                When(bloque__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            ),
+        )
+        .distinct()
+        .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
+    )
+    for sesion in sesiones:
+        puede_abrir = usuario_tiene_permiso(
+            request.user,
+            ACCION_AGREGAR_ASISTENTES_PROPIOS,
+            organizacion=sesion.disciplina.organizacion,
+            permitir_staff_global=False,
+        )
+        destino = (
+            reverse("asistencias:sesion_detail", args=[sesion.pk])
+            if puede_abrir
+            else reverse("asistencias:sesiones_list")
+        )
+        sesion.panel_url = f"{destino}?{_query_global(request)}"
+
+    return {
+        "fecha_hoy": hoy,
+        "sesiones": sesiones,
+        "gestion_url": f'{reverse("asistencias:sesiones_list")}?{_query_global(request)}',
+        "modo_profesor": True,
     }
 
 
@@ -430,6 +504,8 @@ def construir_dashboard_general(request, *, organizacion):
         context["dashboard_academico"] = _metricas_academicas(request, organizaciones_academicas)
         context["jornada_hoy"] = _jornada_hoy(request, organizaciones_academicas)
         context.update(_seguimiento_estudiantes(request, organizaciones_academicas))
+    elif getattr(request.user, "persona", None):
+        context["jornada_hoy"] = _jornada_hoy_profesor(request, organizacion)
     if organizaciones_financieras:
         context["dashboard_financiero"] = _metricas_financieras(request, organizaciones_financieras)
     if organizaciones_personas:

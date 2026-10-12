@@ -199,12 +199,51 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Panel")
         self.assertContains(response, "Calendario")
         self.assertContains(response, reverse("asistencias:sesiones_list"))
-        self.assertNotContains(response, "Mi jornada de hoy")
-        self.assertNotContains(response, "Ir a mis clases")
+        self.assertContains(response, "Mi jornada de hoy")
+        self.assertContains(response, "Ir a mis clases")
+        self.assertContains(response, "No hay sesiones programadas para hoy en este contexto.")
         self.assertNotContains(response, "/profesor/")
         self.assertNotContains(response, "Ingresos contables")
         self.assertNotContains(response, "Consulta de persona")
         self.assertNotContains(response, "Configuración")
+
+    def test_dashboard_profesor_muestra_solo_sus_sesiones_de_hoy(self):
+        hoy = timezone.localdate()
+        disciplina_propia = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Lira del profesor",
+        )
+        disciplina_ajena = Disciplina.objects.create(
+            organizacion=self.organizacion,
+            nombre="Tela de otra profesora",
+        )
+        AsignacionProfesorDisciplina.objects.create(
+            disciplina=disciplina_propia,
+            profesor=self.persona_profesor,
+        )
+        sesion_propia = SesionClase.objects.create(
+            disciplina=disciplina_propia,
+            fecha=hoy,
+            estado=SesionClase.Estado.PROGRAMADA,
+        )
+        sesion_propia.profesores.add(self.persona_profesor)
+        SesionClase.objects.create(
+            disciplina=disciplina_ajena,
+            fecha=hoy,
+            estado=SesionClase.Estado.PROGRAMADA,
+        )
+        self.client.force_login(self.user_profesor)
+
+        response = self.client.get(reverse("elemental_apps"))
+
+        self.assertEqual(response.status_code, 200)
+        jornada_hoy = response.context["jornada_hoy"]
+        self.assertTrue(jornada_hoy["modo_profesor"])
+        self.assertEqual(jornada_hoy["sesiones"], [sesion_propia])
+        self.assertContains(response, "Mi jornada de hoy")
+        self.assertContains(response, "Lira del profesor")
+        self.assertContains(response, reverse("asistencias:sesion_detail", args=[sesion_propia.pk]))
+        self.assertNotContains(response, "Tela de otra profesora")
 
     def test_dashboard_general_staff_ve_administracion_avanzada(self):
         self.client.force_login(self.user_staff)
