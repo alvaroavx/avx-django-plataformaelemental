@@ -22,11 +22,12 @@ from personas.search import filtrar_por_fragmentos
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
+    ACCION_AGREGAR_ASISTENTES_PROPIOS,
     ACCION_EXPORTAR_DATOS,
     ACCION_LIBERAR_CLASE,
     ACCION_OPERAR_PAGOS,
-    ACCION_VER_SESION,
     ACCION_VER_FINANZAS,
+    ACCION_VER_CALENDARIO,
     permiso_requerido,
     usuario_tiene_permiso,
 )
@@ -61,6 +62,7 @@ from .selectors import (
     asistencias_export_queryset,
     estudiantes_operativos_periodo,
     sesiones_visibles_para_usuario,
+    sesiones_calendario_visibles_para_usuario,
 )
 from .services.exportaciones import ASISTENCIAS_XLSX_HEADERS, filas_export_asistencias
 from .services.correos_cierre import construir_borrador_correo_profesor
@@ -256,6 +258,30 @@ def _usuario_puede_registrar_asistencia(user, sesion):
     return _usuario_puede_administrar_sesion(user, sesion)
 
 
+def _usuario_puede_agregar_asistentes(user, sesion):
+    if _usuario_puede_administrar_sesion(user, sesion):
+        return True
+    persona = getattr(user, "persona", None)
+    return bool(
+        persona
+        and sesion.profesores.filter(pk=persona.pk).exists()
+        and AsignacionProfesorDisciplina.objects.operativas().filter(
+            disciplina=sesion.disciplina,
+            profesor=persona,
+        ).exists()
+        and usuario_tiene_permiso(
+            user,
+            ACCION_AGREGAR_ASISTENTES_PROPIOS,
+            organizacion=sesion.disciplina.organizacion,
+            permitir_staff_global=False,
+        )
+    )
+
+
+def _usuario_puede_ver_detalle_sesion(user, sesion):
+    return _usuario_puede_administrar_sesion(user, sesion) or _usuario_puede_agregar_asistentes(user, sesion)
+
+
 def _usuario_puede_liberar_clase(user, sesion):
     return usuario_tiene_permiso(
         user,
@@ -295,14 +321,10 @@ def _verificar_acceso_sesion_json(request, pk):
     user = request.user
     if not user.is_authenticated:
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
-    if not usuario_tiene_permiso(
-        user,
-        ACCION_VER_SESION,
-        permitir_staff_global=False,
-    ):
+    if not usuario_tiene_permiso(user, ACCION_AGREGAR_ASISTENTES_PROPIOS, permitir_staff_global=False):
         return None, _json_error("PERMISO_DENEGADO", "No tienes permisos para operar esta sesión.", status=403)
     sesion = _sesion_para_endpoint_json(pk)
-    if not sesion or not _usuario_puede_registrar_asistencia(user, sesion):
+    if not sesion or not _usuario_puede_agregar_asistentes(user, sesion):
         return None, _json_error("SESION_NO_ENCONTRADA", "Sesión no encontrada.", status=404)
     return sesion, None
 
@@ -447,7 +469,11 @@ def dashboard(request):
     return redirect(f"{destino}?{query}" if query else destino)
 
 
-@role_required(ROLE_ADMIN, permitir_staff_global=False)
+@permiso_requerido(
+    ACCION_VER_CALENDARIO,
+    permitir_staff_global=False,
+    requerir_organizacion=False,
+)
 def sesiones_list(request):
     """Vista calendario mensual de sesiones."""
     context = nav_context(request, permitir_staff_global=False)
@@ -455,18 +481,22 @@ def sesiones_list(request):
     periodo = resolver_periodo(request)
     year = periodo["referencia_inicio"].year
     month = periodo["referencia_inicio"].month
-    sesiones_masivas_form = SesionesMasivasForm(organizacion=organizacion)
-    open_sesiones_masivas = False
-    sesiones_qs = (
-        SesionClase.objects.select_related("disciplina")
-        .prefetch_related("profesores")
-        .order_by("fecha")
+    puede_administrar_calendario = usuario_tiene_permiso(
+        request.user,
+        ACCION_ADMINISTRAR_SESIONES,
+        organizacion=organizacion,
+        permitir_staff_global=False,
     )
+    sesiones_masivas_form = SesionesMasivasForm(organizacion=organizacion) if puede_administrar_calendario else None
+    open_sesiones_masivas = False
+    sesiones_qs = sesiones_calendario_visibles_para_usuario(request.user).order_by("fecha")
     sesiones_qs = aplicar_periodo(sesiones_qs, "fecha", request=request)
     if organizacion:
         sesiones_qs = sesiones_qs.filter(disciplina__organizacion=organizacion)
 
     if request.method == "POST" and "crear_sesiones_masivas" in request.POST:
+        if not puede_administrar_calendario:
+            raise PermissionDenied("No tienes permiso para crear sesiones.")
         sesiones_masivas_form = SesionesMasivasForm(request.POST, organizacion=organizacion)
         open_sesiones_masivas = True
         if periodo["mes"] is None or periodo["anio"] is None:
@@ -509,13 +539,20 @@ def sesiones_list(request):
             return redirect(request.get_full_path())
 
     if periodo["mes"] is None or periodo["anio"] is None:
+        sesiones_listado = list(sesiones_qs)
+        for sesion in sesiones_listado:
+            sesion.puede_abrir_detalle = _usuario_puede_ver_detalle_sesion(request.user, sesion)
         context.update(
             {
                 "mostrar_calendario": False,
                 "periodo_descripcion_vista": descripcion_periodo(request=request, corta=False),
-                "sesiones_listado": sesiones_qs,
+                "sesiones_listado": sesiones_listado,
                 "sesiones_masivas_form": sesiones_masivas_form,
                 "open_sesiones_masivas": open_sesiones_masivas,
+                "puede_administrar_calendario": puede_administrar_calendario,
+                "puede_abrir_detalle_sesion": any(
+                    sesion.puede_abrir_detalle for sesion in sesiones_listado
+                ),
             }
         )
         return render(request, "asistencias/sesiones_list.html", context)
@@ -533,6 +570,7 @@ def sesiones_list(request):
             {
                 "sesion": sesion,
                 "badge_class": sesion.disciplina.badge_class,
+                "puede_abrir_detalle": _usuario_puede_ver_detalle_sesion(request.user, sesion),
             }
         )
     semanas = []
@@ -559,6 +597,8 @@ def sesiones_list(request):
             "mes_actual": inicio_mes,
             "sesiones_masivas_form": sesiones_masivas_form,
             "open_sesiones_masivas": open_sesiones_masivas,
+            "puede_administrar_calendario": puede_administrar_calendario,
+            "puede_abrir_detalle_sesion": puede_administrar_calendario,
         }
     )
     return render(request, "asistencias/sesiones_list.html", context)
@@ -1166,11 +1206,12 @@ def sesion_detail(request, pk):
     context = nav_context(request, permitir_staff_global=False)
     context["hide_periodo"] = True
     sesion = get_object_or_404(
-        sesiones_visibles_para_usuario(request.user).prefetch_related(
-            "asistencias__persona",
-        ),
+        SesionClase.objects.select_related("disciplina", "disciplina__organizacion")
+        .prefetch_related("profesores", "asistencias__persona"),
         pk=pk,
     )
+    if not _usuario_puede_ver_detalle_sesion(request.user, sesion):
+        raise Http404
     organizacion_solicitada = (request.GET.get("organizacion") or "").strip()
     if (
         organizacion_solicitada
@@ -1180,6 +1221,7 @@ def sesion_detail(request, pk):
         raise Http404
     puede_administrar = _usuario_puede_administrar_sesion(request.user, sesion)
     puede_registrar = _usuario_puede_registrar_asistencia(request.user, sesion)
+    puede_agregar = _usuario_puede_agregar_asistentes(request.user, sesion)
     puede_liberar = _usuario_puede_liberar_clase(request.user, sesion)
     estudiantes_qs = _estudiantes_sesion_para_usuario(request.user, sesion)
     estudiantes = _estudiantes_con_estado_operativo(estudiantes_qs, sesion.disciplina.organizacion)
@@ -1372,7 +1414,7 @@ def sesion_detail(request, pk):
                 messages.success(request, "Clase liberada revertida.")
             return redirect(_url_con_filtros(request, "asistencias:sesion_detail", pk=sesion.pk))
         elif "agregar_asistentes" in request.POST:
-            if not puede_registrar:
+            if not puede_agregar:
                 raise PermissionDenied("No tienes permisos para registrar asistencias en esta sesión.")
             estudiantes_ids = request.POST.getlist("estudiantes")
             estudiantes_seleccionados = list(estudiantes_qs.filter(pk__in=estudiantes_ids))
@@ -1464,6 +1506,7 @@ def sesion_detail(request, pk):
             "open_nueva_persona": open_nueva_persona,
             "puede_administrar_sesion": puede_administrar,
             "puede_registrar_asistencia": puede_registrar,
+            "puede_agregar_asistentes": puede_agregar,
             "puede_liberar_clase": puede_liberar,
             "puede_quitar_asistente": puede_registrar,
             "back_url": request.META.get("HTTP_REFERER")
@@ -1617,6 +1660,8 @@ def sesion_asistencia_estado(request, pk, asistencia_pk):
     sesion, error = _verificar_acceso_sesion_json(request, pk)
     if error:
         return error
+    if not _usuario_puede_registrar_asistencia(request.user, sesion):
+        return _json_error("PERMISO_DENEGADO", "No tienes permisos para corregir asistencias.", status=403)
 
     data = _post_data_json_o_form(request)
     if data is None:

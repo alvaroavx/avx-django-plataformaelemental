@@ -136,7 +136,7 @@ class RelacionesHistoricasPermisosTests(TestCase):
             self.client.get(
                 self._url_con_organizacion("asistencias:sesion_detail", self.sesion.pk)
             ).status_code,
-            404,
+            200,
         )
 
     def test_activacion_masiva_es_explicita_y_auditable(self):
@@ -280,20 +280,22 @@ class RelacionesHistoricasPermisosTests(TestCase):
             ).exists()
         )
 
-    def test_profesor_no_accede_a_busqueda_tras_activar_relaciones_historicas(self):
+    def test_profesor_busca_alumnos_solo_tras_activar_relaciones_historicas(self):
         activar_asignacion_profesor(user=self.admin_user, asignacion=self.asignacion)
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
             {"q": "Alba", "organizacion": self.organizacion.pk},
         )
-        self.assertEqual(busqueda.status_code, 403)
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(busqueda.json()["resultados"], [])
 
         activar_matricula_alumno(user=self.admin_user, matricula=self.matricula)
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
             {"q": "Alba", "organizacion": self.organizacion.pk},
         )
-        self.assertEqual(busqueda.status_code, 403)
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(busqueda.json()["resultados"][0]["id"], self.alumno.pk)
 
     def test_profesor_no_puede_autoactivar_relacion_historica(self):
         with self.assertRaises(PermissionDenied):

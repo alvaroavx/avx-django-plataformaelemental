@@ -1,0 +1,57 @@
+{% extends "personas/base_personas.html" %}
+{% block title %}Permisos{% endblock %}
+{% block content %}
+<div class="mt-4 elemental-section-page">
+  <div class="elemental-page-header elemental-section-header">
+    <div class="elemental-eyebrow">Configuración</div>
+    <h2 class="elemental-page-title">Permisos</h2>
+    <p class="elemental-section-lead">Capacidades comprensibles por rol y organización, sin exponer la matriz técnica de Django.</p>
+  </div>
+
+  {% if organizacion_obj and rol_profesor_disponible %}
+  <section class="card elemental-panel mb-4">
+    <div class="card-body">
+      <h3 class="h5 mb-1">Profesor · {{ organizacion_obj.nombre }}</h3>
+      <p class="text-muted">Esta primera opción controla el acceso al calendario. No concede creación ni edición de sesiones.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-check form-switch mb-3">
+          {{ form.profesor_ver_calendario }}
+          <label class="form-check-label fw-semibold" for="{{ form.profesor_ver_calendario.id_for_label }}">{{ form.profesor_ver_calendario.label }}</label>
+          <div class="form-text">{{ form.profesor_ver_calendario.help_text }}</div>
+        </div>
+        <div class="form-check form-switch mb-3">
+          {{ form.profesor_agregar_asistentes }}
+          <label class="form-check-label fw-semibold" for="{{ form.profesor_agregar_asistentes.id_for_label }}">{{ form.profesor_agregar_asistentes.label }}</label>
+          <div class="form-text">{{ form.profesor_agregar_asistentes.help_text }}</div>
+        </div>
+        <button class="btn btn-success" type="submit">
+          <span class="elemental-button-content"><i class="bi bi-shield-check" aria-hidden="true"></i><span>Guardar permisos</span></span>
+        </button>
+      </form>
+    </div>
+  </section>
+  {% elif not organizacion_obj %}
+    <div class="alert alert-info">Selecciona una organización para revisar y configurar sus permisos.</div>
+  {% else %}
+    <div class="alert alert-warning">No existe el rol Profesor en la plataforma.</div>
+  {% endif %}
+
+  <section class="card elemental-panel">
+    <div class="card-body">
+      <h3 class="h5">Mapa actual de capacidades</h3>
+      <p class="text-muted">Las opciones configurables del Profesor aparecen arriba. Las demás filas describen las reglas vigentes.</p>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>Capacidad</th><th>Control actual</th><th>Qué comprende</th></tr></thead>
+          <tbody>
+          {% for nombre, control, descripcion in mapa_permisos %}
+            <tr><td class="fw-semibold">{{ nombre }}</td><td>{{ control }}</td><td>{{ descripcion }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

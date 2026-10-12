@@ -4,10 +4,16 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from asistencias.models import Asistencia, Disciplina, SesionClase
+from asistencias.models import (
+    AlumnoDisciplina,
+    AsignacionProfesorDisciplina,
+    Asistencia,
+    Disciplina,
+    SesionClase,
+)
 from auditoria.models import AuditLog
 from finanzas.models import AttendanceConsumption, Category, Payment, Transaction
-from personas.models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from personas.models import ConfiguracionPermisoRol, Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
 
 
 TEST_PASSWORD = "not-a-real-test-password"
@@ -191,6 +197,8 @@ class ElementalAppsUXTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Panel")
+        self.assertContains(response, "Calendario")
+        self.assertContains(response, reverse("asistencias:sesiones_list"))
         self.assertNotContains(response, "Mi jornada de hoy")
         self.assertNotContains(response, "Ir a mis clases")
         self.assertNotContains(response, "/profesor/")
@@ -243,6 +251,163 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, f"organizacion={self.organizacion.pk}")
         self.assertContains(response, "data-elemental-theme-toggle", html=False)
         self.assertContains(response, 'localStorage.getItem("elemental-theme")', html=False)
+
+    def test_profesor_ve_solo_sus_sesiones_en_calendario_sin_acciones_admin(self):
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Lira propia")
+        propia = SesionClase.objects.create(disciplina=disciplina, fecha="2026-03-10")
+        propia.profesores.add(self.persona_profesor)
+        AsignacionProfesorDisciplina.objects.create(
+            disciplina=disciplina,
+            profesor=self.persona_profesor,
+        )
+        otra_disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Taller ajeno")
+        SesionClase.objects.create(disciplina=otra_disciplina, fecha="2026-03-11")
+        self.client.force_login(self.user_profesor)
+
+        response = self.client.get(
+            reverse("asistencias:sesiones_list"),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lira propia", count=2)
+        self.assertNotContains(response, "Taller ajeno")
+        self.assertNotContains(response, "Nueva sesión")
+        self.assertNotContains(response, "Sesiones masivas")
+        self.assertContains(response, reverse("asistencias:sesion_detail", args=[propia.pk]))
+        enlaces = [item["label"] for item in response.context["elemental_nav_items"]]
+        self.assertIn("Calendario", enlaces)
+        self.assertNotIn("Asistencias", enlaces)
+
+    def test_profesor_puede_abrir_calendario_sin_organizacion_preseleccionada(self):
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Aro propio")
+        sesion = SesionClase.objects.create(disciplina=disciplina, fecha="2026-03-12")
+        sesion.profesores.add(self.persona_profesor)
+        AsignacionProfesorDisciplina.objects.create(
+            disciplina=disciplina,
+            profesor=self.persona_profesor,
+        )
+        self.client.force_login(self.user_profesor)
+
+        response = self.client.get(
+            reverse("asistencias:sesiones_list"),
+            {"periodo_mes": 3, "periodo_anio": 2026},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Aro propio", count=2)
+
+    def test_profesor_no_puede_crear_sesiones_masivas_por_post_directo(self):
+        self.client.force_login(self.user_profesor)
+        response = self.client.post(
+            reverse("asistencias:sesiones_list")
+            + f"?periodo_mes=3&periodo_anio=2026&organizacion={self.organizacion.pk}",
+            {"crear_sesiones_masivas": "1"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_profesor_abre_su_sesion_y_agrega_alumno_de_la_disciplina(self):
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Tela propia")
+        sesion = SesionClase.objects.create(disciplina=disciplina, fecha="2026-03-15")
+        sesion.profesores.add(self.persona_profesor)
+        AsignacionProfesorDisciplina.objects.create(
+            disciplina=disciplina,
+            profesor=self.persona_profesor,
+        )
+        rol_estudiante = Rol.objects.create(nombre="Estudiante UX", codigo="ESTUDIANTE")
+        estudiante = Persona.objects.create(nombres="Ana", apellidos="Asistente")
+        PersonaRol.objects.create(
+            persona=estudiante,
+            rol=rol_estudiante,
+            organizacion=self.organizacion,
+            activo=True,
+        )
+        AlumnoDisciplina.objects.create(disciplina=disciplina, alumno=estudiante)
+        self.client.force_login(self.user_profesor)
+
+        detalle = self.client.get(reverse("asistencias:sesion_detail", args=[sesion.pk]))
+        self.assertEqual(detalle.status_code, 200)
+        self.assertContains(detalle, "Agregar asistente")
+        self.assertNotContains(detalle, "Nueva persona")
+        self.assertNotContains(detalle, "Eliminar sesión")
+
+        respuesta = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", args=[sesion.pk]),
+            {"persona_id": estudiante.pk},
+        )
+        self.assertEqual(respuesta.status_code, 201)
+        asistencia = Asistencia.objects.get(sesion=sesion, persona=estudiante)
+
+        correccion = self.client.post(
+            reverse("asistencias:sesion_asistencia_estado", args=[sesion.pk, asistencia.pk]),
+            {"estado": Asistencia.Estado.AUSENTE},
+        )
+        eliminacion = self.client.post(
+            reverse("asistencias:sesion_detail", args=[sesion.pk]),
+            {"eliminar_asistente": "1", "asistencia_id": asistencia.pk},
+        )
+        self.assertEqual(correccion.status_code, 403)
+        self.assertEqual(eliminacion.status_code, 403)
+        self.assertTrue(Asistencia.objects.filter(pk=asistencia.pk).exists())
+
+    def test_profesor_no_abre_ni_agrega_asistentes_en_sesion_ajena(self):
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Tela ajena")
+        sesion = SesionClase.objects.create(disciplina=disciplina, fecha="2026-03-16")
+        self.client.force_login(self.user_profesor)
+
+        detalle = self.client.get(reverse("asistencias:sesion_detail", args=[sesion.pk]))
+        escritura = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", args=[sesion.pk]),
+            {"persona_id": 99999},
+        )
+        self.assertEqual(detalle.status_code, 404)
+        self.assertEqual(escritura.status_code, 404)
+
+    def test_admin_puede_desactivar_calendario_del_profesor_por_organizacion(self):
+        self.client.force_login(self.user_admin)
+        url = reverse("personas:permisos_configuracion") + f"?organizacion={self.organizacion.pk}"
+        navigation_response = self.client.get(reverse("elemental_apps"), {"organizacion": self.organizacion.pk})
+        self.assertContains(navigation_response, "Permisos")
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ConfiguracionPermisoRol.objects.get(
+                organizacion=self.organizacion,
+                rol=self.rol_profesor,
+                capacidad="ver_calendario",
+            ).habilitado
+        )
+
+        self.client.force_login(self.user_profesor)
+        response = self.client.get(
+            reverse("asistencias:sesiones_list"),
+            {"organizacion": self.organizacion.pk},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_puede_mantener_calendario_y_desactivar_gestion_de_asistencia(self):
+        disciplina = Disciplina.objects.create(organizacion=self.organizacion, nombre="Trapecio propio")
+        sesion = SesionClase.objects.create(disciplina=disciplina, fecha="2026-03-18")
+        sesion.profesores.add(self.persona_profesor)
+        AsignacionProfesorDisciplina.objects.create(
+            disciplina=disciplina,
+            profesor=self.persona_profesor,
+        )
+        self.client.force_login(self.user_admin)
+        url = reverse("personas:permisos_configuracion") + f"?organizacion={self.organizacion.pk}"
+        response = self.client.post(url, {"profesor_ver_calendario": "on"})
+        self.assertEqual(response.status_code, 302)
+
+        self.client.force_login(self.user_profesor)
+        calendario = self.client.get(
+            reverse("asistencias:sesiones_list"),
+            {"periodo_mes": 3, "periodo_anio": 2026, "organizacion": self.organizacion.pk},
+        )
+        detalle = self.client.get(reverse("asistencias:sesion_detail", args=[sesion.pk]))
+        self.assertEqual(calendario.status_code, 200)
+        self.assertContains(calendario, "Trapecio propio", count=2)
+        self.assertNotContains(calendario, reverse("asistencias:sesion_detail", args=[sesion.pk]))
+        self.assertEqual(detalle.status_code, 404)
 
     def test_sidebar_usa_enlaces_directos_y_marca_pagina_actual(self):
         self.client.force_login(self.user_admin)

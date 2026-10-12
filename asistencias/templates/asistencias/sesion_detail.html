@@ -257,7 +257,7 @@
     </div>
   </div>
 
-  {% if puede_registrar_asistencia %}
+  {% if puede_agregar_asistentes %}
   <div class="card mb-3">
     <div class="card-header">Agregar asistente</div>
     <div class="card-body">
@@ -473,6 +473,7 @@
   var ESTADO_URL = "{% url 'asistencias:sesion_asistencia_estado' sesion.pk 0 %}";
   var PUEDE_QUITAR = {{ puede_quitar_asistente|yesno:"true,false" }};
   var PUEDE_LIBERAR = {{ puede_liberar_clase|yesno:"true,false" }};
+  var PUEDE_EDITAR_ESTADO = {{ puede_registrar_asistencia|yesno:"true,false" }};
   var CSRF = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
   var statusEl = document.getElementById('buscar-status');
   var counterEl = document.getElementById('total-asistentes');
@@ -552,6 +553,7 @@
   }
 
   function botonesEstado(a) {
+    if (!PUEDE_EDITAR_ESTADO) return '';
     var estados = [
       ['presente', 'bi-check-circle', 'Presente'],
       ['ausente', 'bi-x-circle', 'Ausente'],

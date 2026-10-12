@@ -150,6 +150,33 @@ class PersonaRol(models.Model):
         return self.valor_clase if self.valor_clase is not None else Decimal("0")
 
 
+class ConfiguracionPermisoRol(models.Model):
+    organizacion = models.ForeignKey(
+        Organizacion,
+        on_delete=models.CASCADE,
+        related_name="permisos_por_rol",
+    )
+    rol = models.ForeignKey(Rol, on_delete=models.CASCADE, related_name="permisos_configurados")
+    capacidad = models.SlugField(max_length=80)
+    habilitado = models.BooleanField(default=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Permiso de producto por rol"
+        verbose_name_plural = "Permisos de producto por rol"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("organizacion", "rol", "capacidad"),
+                name="personas_permiso_rol_org_capacidad_uniq",
+            )
+        ]
+        db_table = "cuentas_configuracion_permisorol"
+
+    def __str__(self):
+        estado = "habilitado" if self.habilitado else "deshabilitado"
+        return f"{self.organizacion} · {self.rol}: {self.capacidad} ({estado})"
+
+
 class SolicitudAcceso(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"

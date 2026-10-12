@@ -1,7 +1,7 @@
 from django.db.models import Case, Count, IntegerField, Max, Q, Sum, Value, When
 
 from personas.models import Persona, PersonaRol
-from personas.permissions import normalizar_codigo_rol
+from personas.permissions import ACCION_VER_CALENDARIO, normalizar_codigo_rol, usuario_tiene_permiso
 from plataformaelemental.context import aplicar_periodo, filtros_periodo, resolver_periodo
 
 from .models import AsignacionProfesorDisciplina, Asistencia, SesionClase
@@ -44,6 +44,42 @@ def sesiones_visibles_para_usuario(user):
 
     filtro = Q(disciplina__organizacion_id__in=organizaciones_administradas)
     return sesiones.filter(filtro).distinct()
+
+
+def sesiones_calendario_visibles_para_usuario(user):
+    sesiones = sesiones_visibles_para_usuario(user)
+    if not user.is_authenticated or user.is_superuser:
+        return sesiones
+    persona = getattr(user, "persona", None)
+    if not persona:
+        return SesionClase.objects.none()
+
+    organizaciones_profesor = []
+    for persona_rol in PersonaRol.objects.select_related("organizacion").filter(
+        persona=persona,
+        activo=True,
+        rol__codigo__iexact="PROFESOR",
+    ):
+        if usuario_tiene_permiso(
+            user,
+            ACCION_VER_CALENDARIO,
+            organizacion=persona_rol.organizacion,
+            permitir_staff_global=False,
+        ):
+            organizaciones_profesor.append(persona_rol.organizacion_id)
+
+    return (
+        SesionClase.objects.select_related("disciplina", "disciplina__organizacion", "bloque")
+        .prefetch_related("profesores")
+        .filter(
+            Q(pk__in=sesiones.values("pk"))
+            | Q(
+                profesores=persona,
+                disciplina__organizacion_id__in=organizaciones_profesor,
+            )
+        )
+        .distinct()
+    )
 
 
 def asistencias_export_queryset(request, *, organizacion=None):

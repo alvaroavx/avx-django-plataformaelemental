@@ -98,3 +98,6 @@ Superficies no aplicables:
 - La jornada móvil no ofrece archivos, descargas ni exports a profesoras.
 
 La sesión Django no constituye autorización persistente. Cada petición vuelve a consultar `User.is_active`, `PersonaRol.activo`, organización y asignación de profesora cuando corresponde.
+# Estado vigente
+
+La interfaz administrativa encapsula las reglas en capacidades comprensibles. Desde 2026-10-12, Profesor puede recibir `Calendario propio` y `Gestionar asistencia de mis sesiones` por organización: ve únicamente sesiones asignadas y puede agregar alumnos vinculados a la disciplina. No obtiene creación de personas o sesiones, correcciones, eliminaciones, liberaciones ni acceso a Personas o Finanzas. La matriz detallada que sigue se conserva como antecedente técnico; cualquier afirmación anterior sobre operación completa del profesor quedó reemplazada por ADR-0016, ADR-0018 y ADR-0019.

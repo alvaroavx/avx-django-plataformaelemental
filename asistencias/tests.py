@@ -2963,7 +2963,7 @@ class SprintDosDominioAsistenciasTests(TestCase):
         url = reverse("asistencias:sesion_detail", kwargs={"pk": self.sesion.pk})
         casos_get = (
             (self.admin, 200),
-            (self.profesor_asignado, 404),
+            (self.profesor_asignado, 200),
             (self.profesor_no_asignado, 404),
             (self.profesor_otra_org, 404),
             (self.admin_otra_org, 404),
@@ -2987,7 +2987,7 @@ class SprintDosDominioAsistenciasTests(TestCase):
                 "estado_asistencia": Asistencia.Estado.PRESENTE,
             },
         )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
 
     def test_profesora_asignada_no_puede_liberar_clase_tras_retiro_del_portal(self):
         asistencia = Asistencia.objects.create(sesion=self.sesion, persona=self.estudiante)
@@ -3002,7 +3002,7 @@ class SprintDosDominioAsistenciasTests(TestCase):
                     "motivo_liberacion": "Liberación operativa autorizada",
                 },
             )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
         self.assertFalse(ClaseLiberada.objects.filter(asistencia=asistencia).exists())
         self.assertFalse(
             AuditLog.objects.filter(
@@ -3955,7 +3955,7 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 403)
 
-    def test_profesor_no_accede_a_busqueda_de_asistentes_fuera_del_portal(self):
+    def test_profesor_accede_a_busqueda_de_asistentes_de_su_sesion(self):
         self.client.force_login(self.profesora_a)
         url = reverse(
             "asistencias:sesion_asistentes_buscar",
@@ -3967,7 +3967,7 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
             {"q": "Compartida", "organizacion": self.organizacion_a.pk},
         )
 
-        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(respuesta.status_code, 200)
 
 
 class SprintDosConcurrenciaConsumosTests(TransactionTestCase):

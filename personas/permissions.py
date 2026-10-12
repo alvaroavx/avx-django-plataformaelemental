@@ -3,7 +3,7 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
-from .models import PersonaRol
+from .models import ConfiguracionPermisoRol, PersonaRol
 
 
 ROL_ADMIN = "admin"
@@ -21,6 +21,8 @@ ACCION_ADMINISTRAR_SESIONES = "administrar_sesiones"
 ACCION_VER_SESION = "ver_sesion"
 ACCION_LIBERAR_CLASE = "liberar_clase"
 ACCION_REVERTIR_PAGO = "revertir_pago"
+ACCION_VER_CALENDARIO = "ver_calendario"
+ACCION_AGREGAR_ASISTENTES_PROPIOS = "agregar_asistentes_propios"
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -47,7 +49,11 @@ ACCION_ROLES = {
     ACCION_VER_SESION: {ROL_ADMIN, "staff_asistencia"},
     ACCION_LIBERAR_CLASE: {ROL_ADMIN},
     ACCION_REVERTIR_PAGO: {ROL_ADMIN},
+    ACCION_VER_CALENDARIO: {ROL_ADMIN, "staff_asistencia", ROL_PROFESOR},
+    ACCION_AGREGAR_ASISTENTES_PROPIOS: {ROL_ADMIN, "staff_asistencia", ROL_PROFESOR},
 }
+
+ACCIONES_CONFIGURABLES = {ACCION_VER_CALENDARIO, ACCION_AGREGAR_ASISTENTES_PROPIOS}
 
 
 def normalizar_codigo_rol(codigo):
@@ -69,14 +75,43 @@ def usuario_tiene_permiso(user, accion, *, organizacion=None, permitir_staff_glo
     if not persona:
         return False
 
-    roles_qs = PersonaRol.objects.filter(persona=persona, activo=True)
+    roles_qs = PersonaRol.objects.select_related("rol", "organizacion").filter(persona=persona, activo=True)
     if organizacion is not None:
         roles_qs = roles_qs.filter(organizacion=organizacion)
-    roles_usuario = {normalizar_codigo_rol(codigo) for codigo in roles_qs.values_list("rol__codigo", flat=True)}
-    return bool(roles_usuario.intersection(roles_permitidos))
+    roles = list(roles_qs)
+    if accion in ACCIONES_CONFIGURABLES and any(
+        normalizar_codigo_rol(item.rol.codigo) in roles_permitidos
+        and normalizar_codigo_rol(item.rol.codigo) != ROL_PROFESOR
+        for item in roles
+    ):
+        return True
+    configuraciones = {}
+    if accion in ACCIONES_CONFIGURABLES:
+        configuraciones = {
+            (item.organizacion_id, item.rol_id): item.habilitado
+            for item in ConfiguracionPermisoRol.objects.filter(
+                organizacion_id__in={item.organizacion_id for item in roles},
+                rol_id__in={item.rol_id for item in roles},
+                capacidad=accion,
+            )
+        }
+    for persona_rol in roles:
+        if normalizar_codigo_rol(persona_rol.rol.codigo) not in roles_permitidos:
+            continue
+        if not configuraciones.get((persona_rol.organizacion_id, persona_rol.rol_id), True):
+            continue
+        return True
+    return False
 
 
-def permiso_requerido(accion, *, accion_lectura=None, mensaje=None, permitir_staff_global=True):
+def permiso_requerido(
+    accion,
+    *,
+    accion_lectura=None,
+    mensaje=None,
+    permitir_staff_global=True,
+    requerir_organizacion=True,
+):
     def decorator(view_func):
         @login_required
         @wraps(view_func)
@@ -88,7 +123,7 @@ def permiso_requerido(accion, *, accion_lectura=None, mensaje=None, permitir_sta
             if not (
                 request.user.is_superuser
                 or (permitir_staff_global and request.user.is_staff)
-            ) and organizacion is None:
+            ) and requerir_organizacion and organizacion is None:
                 raise PermissionDenied("Debes seleccionar una organización autorizada para operar.")
             if usuario_tiene_permiso(
                 request.user,

@@ -13,6 +13,7 @@ urlpatterns = [
     path("solicitudes-acceso/<uuid:pk>/reabrir/", views.solicitud_acceso_reabrir, name="solicitud_acceso_reabrir"),
     path("", views.dashboard, name="dashboard"),
     path("organizaciones/", views.organizaciones_list, name="organizaciones_list"),
+    path("permisos/", views.permisos_configuracion, name="permisos_configuracion"),
     path("organizaciones/nueva/", views.organizacion_create, name="organizacion_create"),
     path("organizaciones/<int:pk>/", views.organizacion_detail, name="organizacion_detail"),
     path("organizaciones/<int:pk>/editar/", views.organizacion_edit, name="organizacion_edit"),

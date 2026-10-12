@@ -121,3 +121,10 @@ La matriz de acciones existe en `personas/permissions.py`, pero no constituye
 todavia un cierre transversal: el bypass de `staff`, el acceso sin organizacion
 activa, Django Admin, comandos y futuras vistas deben auditarse como superficies
 separadas. La fotografia y prioridad viven en `docs/ESTADO_ACTUAL.md`.
+# Permisos de producto
+
+La fuente de autorización de las vistas HTML es `personas/permissions.py`: capacidades de dominio, roles activos y organización seleccionada. Los permisos CRUD que Django genera por modelo no se presentan como opciones de negocio.
+
+`ConfiguracionPermisoRol` permite excepciones explícitas por organización, rol y capacidad. `ver_calendario` deja al Profesor consultar únicamente sesiones asignadas. `agregar_asistentes_propios` permite abrirlas y agregar alumnos vinculados a su disciplina. Ambas capacidades están habilitadas por defecto y pueden deshabilitarse desde Configuración → Permisos. Crear personas o sesiones, quitar asistentes, corregir estados, liberar clases, administrar personas y operar finanzas permanecen separados.
+
+Ocultar una acción en navegación o plantilla no autoriza ni protege por sí solo: cada vista y queryset debe aplicar la misma capacidad y alcance organizacional.

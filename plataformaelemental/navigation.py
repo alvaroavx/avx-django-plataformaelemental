@@ -7,6 +7,7 @@ from personas.models import SolicitudAcceso
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
+    ACCION_VER_CALENDARIO,
     ACCION_VER_FINANZAS,
     usuario_tiene_permiso,
 )
@@ -77,6 +78,27 @@ def build_navigation(request):
     can_asistencias = contexto_operable and usuario_tiene_permiso(
         user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion
     )
+    es_profesor = False
+    if not can_asistencias:
+        persona = getattr(user, "persona", None)
+        es_profesor = bool(
+            persona
+            and persona.roles.filter(rol__codigo__iexact="PROFESOR", activo=True).exists()
+        )
+    can_calendario = can_asistencias or (
+        (contexto_operable or es_profesor)
+        and usuario_tiene_permiso(
+            user, ACCION_VER_CALENDARIO, organizacion=organizacion, permitir_staff_global=False
+        )
+    )
+    can_configurar_permisos = can_personas
+    if user.is_staff and not user.is_superuser:
+        can_configurar_permisos = contexto_operable and usuario_tiene_permiso(
+            user,
+            ACCION_ADMINISTRAR_PERSONAS,
+            organizacion=organizacion,
+            permitir_staff_global=False,
+        )
     can_finanzas = contexto_operable and usuario_tiene_permiso(
         user, ACCION_VER_FINANZAS, organizacion=organizacion
     )
@@ -101,11 +123,12 @@ def build_navigation(request):
     items[0]["active"] = request.path == "/"
     configuracion = []
 
+    if can_calendario:
+        items.append(_item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"))
     if can_asistencias:
         disciplinas_path = reverse("asistencias:disciplinas_list")
         items.extend(
             [
-                _item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"),
                 _item(request, label="Asistencias", icon="bi-clipboard-check", url_name="asistencias:asistencias_list"),
                 _item(request, label="Estudiantes", icon="bi-people", url_name="asistencias:estudiantes_list"),
                 _item(request, label="Profesores", icon="bi-person-workspace", url_name="asistencias:profesores_list"),
@@ -163,6 +186,16 @@ def build_navigation(request):
                     icon="bi-building",
                     url_name="personas:organizaciones_list",
                     active_prefixes=[reverse("personas:organizaciones_list")],
+                )
+            )
+        if can_configurar_permisos:
+            configuracion.append(
+                _item(
+                    request,
+                    label="Permisos",
+                    icon="bi-shield-check",
+                    url_name="personas:permisos_configuracion",
+                    active_prefixes=[reverse("personas:permisos_configuracion")],
                 )
             )
         if can_gestionar_solicitudes:

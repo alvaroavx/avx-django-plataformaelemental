@@ -5,6 +5,7 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, DateField, DecimalField, ExpressionWrapper, F, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -29,9 +30,14 @@ from plataformaelemental.context import (
     resolver_periodo,
 )
 
-from .forms import OrganizacionCRMForm, PersonaCRMForm, PersonaRolCRMForm, ResolverSolicitudAccesoForm
-from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
-from .permissions import ACCION_ADMINISTRAR_PERSONAS, permiso_requerido
+from .forms import OrganizacionCRMForm, PermisosProfesorForm, PersonaCRMForm, PersonaRolCRMForm, ResolverSolicitudAccesoForm
+from .models import ConfiguracionPermisoRol, Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from .permissions import (
+    ACCION_ADMINISTRAR_PERSONAS,
+    ACCION_AGREGAR_ASISTENTES_PROPIOS,
+    ACCION_VER_CALENDARIO,
+    permiso_requerido,
+)
 from .search import filtrar_por_fragmentos
 from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
 from .solicitudes_acceso import crear_o_recuperar_solicitud, obtener_identidad_pendiente, solicitud_pendiente_o_ultima
@@ -534,6 +540,77 @@ def organizaciones_list(request):
         }
     )
     return render(request, "personas/organizaciones_list.html", context)
+
+
+@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS, permitir_staff_global=False)
+def permisos_configuracion(request):
+    context = _base_context(request)
+    organizacion = organizacion_desde_request(request)
+    rol_profesor = Rol.objects.filter(codigo__iexact="PROFESOR").first()
+    configuraciones = {}
+    if organizacion and rol_profesor:
+        configuraciones = {
+            item.capacidad: item.habilitado
+            for item in ConfiguracionPermisoRol.objects.filter(
+            organizacion=organizacion,
+            rol=rol_profesor,
+            capacidad__in=(ACCION_VER_CALENDARIO, ACCION_AGREGAR_ASISTENTES_PROPIOS),
+            )
+        }
+    form = PermisosProfesorForm(
+        request.POST if request.method == "POST" else None,
+        initial={
+            "profesor_ver_calendario": configuraciones.get(ACCION_VER_CALENDARIO, True),
+            "profesor_agregar_asistentes": configuraciones.get(ACCION_AGREGAR_ASISTENTES_PROPIOS, True),
+        },
+    )
+    if request.method == "POST":
+        if not organizacion or not rol_profesor:
+            raise PermissionDenied("Debes seleccionar una organización y contar con el rol Profesor.")
+        if form.is_valid():
+            valores = {
+                ACCION_VER_CALENDARIO: form.cleaned_data["profesor_ver_calendario"],
+                ACCION_AGREGAR_ASISTENTES_PROPIOS: form.cleaned_data["profesor_agregar_asistentes"],
+            }
+            objetos = []
+            with transaction.atomic():
+                for capacidad, habilitado in valores.items():
+                    configuracion, _ = ConfiguracionPermisoRol.objects.update_or_create(
+                        organizacion=organizacion,
+                        rol=rol_profesor,
+                        capacidad=capacidad,
+                        defaults={"habilitado": habilitado},
+                    )
+                    objetos.append(configuracion)
+            registrar_auditoria(
+                usuario=request.user,
+                accion=AuditLog.ACCION_EDITAR,
+                dominio="personas",
+                objeto=objetos[0],
+                organizacion=organizacion,
+                resumen="Configuración de permisos de Profesor actualizada",
+                metadata={"capacidades": valores},
+            )
+            messages.success(request, "Permisos de Profesor actualizados.")
+            return redirect(_url_con_filtros(request, "personas:permisos_configuracion"))
+
+    context.update(
+        {
+            "form": form,
+            "organizacion_obj": organizacion,
+            "rol_profesor_disponible": bool(rol_profesor),
+            "mapa_permisos": [
+                ("Calendario propio", "Configurable", "El Profesor ve solamente sus sesiones asignadas."),
+                ("Gestión de sesiones", "Administración", "Crear, editar, cancelar y generar sesiones masivas."),
+                ("Agregar asistentes propios", "Configurable", "Abrir una sesión asignada y sumar alumnos de su disciplina."),
+                ("Corregir asistencia", "Administración", "Quitar asistentes, cambiar estados o liberar clases."),
+                ("Personas", "Administración", "Crear personas, asignar roles y administrar organizaciones."),
+                ("Finanzas", "Según rol", "Consultar finanzas u operar pagos y transacciones."),
+                ("Solicitudes de acceso", "Permiso especial", "Se controla con el permiso técnico específico de Django."),
+            ],
+        }
+    )
+    return render(request, "personas/permisos_configuracion.html", context)
 
 
 @permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)

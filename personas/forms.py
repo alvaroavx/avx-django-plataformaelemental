@@ -132,6 +132,24 @@ class PersonaRolCRMForm(forms.Form):
         return cleaned
 
 
+class PermisosProfesorForm(forms.Form):
+    profesor_ver_calendario = forms.BooleanField(
+        required=False,
+        label="Ver calendario propio",
+        help_text="Muestra únicamente las sesiones en que la persona está asignada como profesora.",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    profesor_agregar_asistentes = forms.BooleanField(
+        required=False,
+        label="Gestionar asistencia de mis sesiones",
+        help_text=(
+            "Permite abrir las sesiones asignadas y agregar alumnos ya vinculados a la disciplina. "
+            "No permite crear personas, quitar asistentes ni editar la sesión."
+        ),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+
 class ResolverSolicitudAccesoForm(forms.Form):
     tipo_resolucion = forms.ChoiceField(choices=SolicitudAcceso.TipoResolucion.choices, label="Tipo de resolución")
     usuario = forms.ModelChoiceField(queryset=get_user_model().objects.none(), required=False)

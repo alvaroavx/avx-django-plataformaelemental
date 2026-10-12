@@ -14,7 +14,7 @@
       </h2>
       <p class="elemental-section-lead">Consulta las sesiones del período y abre cada jornada para revisar su asistencia.</p>
     </div>
-    <div class="elemental-page-actions justify-content-md-end" aria-label="Acciones del calendario">
+    {% if puede_administrar_calendario %}<div class="elemental-page-actions justify-content-md-end" aria-label="Acciones del calendario">
       <a class="btn btn-outline-success" href="{% url 'asistencias:asistencias_list' %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}&open=nueva_sesion">
         <span class="elemental-button-content"><i class="bi bi-calendar-plus" aria-hidden="true"></i><span class="d-none d-md-inline">Nueva sesión</span></span>
       </a>
@@ -27,9 +27,9 @@
       >
         <span class="elemental-button-content"><i class="bi bi-calendar-week" aria-hidden="true"></i><span class="d-none d-md-inline">Sesiones masivas</span></span>
       </button>
-    </div>
+    </div>{% endif %}
   </div>
-  {% if not mostrar_calendario %}
+  {% if not mostrar_calendario and puede_administrar_calendario %}
     <div class="alert alert-info">
       La creación masiva requiere seleccionar un mes y año específicos.
     </div>
@@ -57,7 +57,7 @@
                 </div>
                 <div class="elemental-calendar-day-events">
                   {% for item in dia.sesiones %}
-                    <a class="elemental-calendar-mobile-event" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                    {% if item.puede_abrir_detalle %}<a class="elemental-calendar-mobile-event" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{% else %}<div class="elemental-calendar-mobile-event">{% endif %}
                       <span class="d-flex align-items-center gap-2">
                         {% if item.sesion.estado == "cancelada" %}
                           <i class="bi bi-x-circle-fill text-danger" aria-hidden="true"></i>
@@ -71,7 +71,7 @@
                       <span class="small text-muted">
                         {% if item.sesion.estado == "cancelada" %}Sesión cancelada{% else %}{{ item.sesion.asistencias.count }} asistentes{% endif %}
                       </span>
-                    </a>
+                    {% if item.puede_abrir_detalle %}</a>{% else %}</div>{% endif %}
                   {% empty %}
                     <span class="small text-muted">Sin sesiones</span>
                   {% endfor %}
@@ -113,17 +113,15 @@
                     {% else %}
                       <i class="bi bi-calendar-event-fill text-info fs-5 flex-shrink-0" title="Programada" aria-hidden="true"></i><span class="visually-hidden">Programada</span>
                     {% endif %}
-                    <a class="badge {{ item.badge_class }} text-decoration-none" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
-                      {{ item.sesion.disciplina }}
-                    </a>
+                    {% if item.puede_abrir_detalle %}<a class="badge {{ item.badge_class }} text-decoration-none" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{{ item.sesion.disciplina }}</a>{% else %}<span class="badge {{ item.badge_class }}">{{ item.sesion.disciplina }}</span>{% endif %}
                   </div>
-                  <a class="small text-muted text-decoration-none d-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
+                  {% if item.puede_abrir_detalle %}<a class="small text-muted text-decoration-none d-block" href="{% url 'asistencias:sesion_detail' item.sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">{% else %}<span class="small text-muted d-block">{% endif %}
                     {% if item.sesion.estado == "cancelada" %}
                       sesión cancelada
                     {% else %}
                       asistentes: {{ item.sesion.asistencias.count }}
                     {% endif %}
-                  </a>
+                  {% if item.puede_abrir_detalle %}</a>{% else %}</span>{% endif %}
                 </div>
               {% empty %}
                 <div class="text-muted small">Sin sesiones</div>
@@ -147,7 +145,7 @@
               <th>Profesores</th>
               <th>Estado</th>
               <th>Asistentes</th>
-              <th class="text-end">Acciones</th>
+              {% if puede_abrir_detalle_sesion %}<th class="text-end">Acciones</th>{% endif %}
             </tr>
           </thead>
           <tbody>
@@ -178,15 +176,15 @@
                   {{ sesion.asistencias.count }}
                 {% endif %}
               </td>
-              <td class="text-end">
+              {% if sesion.puede_abrir_detalle %}<td class="text-end">
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'asistencias:sesion_detail' sesion.pk %}?periodo_mes={{ periodo_mes }}&periodo_anio={{ periodo_anio }}{% if organizacion_id %}&organizacion={{ organizacion_id }}{% endif %}">
                   Ver sesión
                 </a>
-              </td>
+              </td>{% elif puede_abrir_detalle_sesion %}<td></td>{% endif %}
             </tr>
             {% empty %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-4">No hay sesiones para el período seleccionado.</td>
+              <td colspan="{% if puede_abrir_detalle_sesion %}6{% else %}5{% endif %}" class="text-center text-muted py-4">No hay sesiones para el período seleccionado.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -198,6 +196,7 @@
 {% endblock %}
 
 {% block modals %}
+{% if puede_administrar_calendario %}
 <div class="modal fade" id="sesionesMasivasModal" tabindex="-1" aria-labelledby="sesionesMasivasModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -265,6 +264,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
