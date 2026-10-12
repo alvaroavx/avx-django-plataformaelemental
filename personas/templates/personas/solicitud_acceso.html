@@ -55,8 +55,6 @@
           <p class="mb-0">Iniciaste sesión con <strong class="text-break">{{ identidad.email }}</strong>. Puedes solicitar acceso para que un administrador revise tu caso.</p>
         </header>
 
-        {% for message in messages %}<div class="alert alert-danger" role="alert">{{ message }}</div>{% endfor %}
-
         {% if solicitud %}
           {% if solicitud.estado == "RECHAZADA" %}
             <div class="alert alert-secondary mb-0" role="status">Tu solicitud no fue aprobada. Si crees que es un error, contacta al administrador.</div>

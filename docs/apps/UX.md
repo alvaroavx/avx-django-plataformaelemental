@@ -1,6 +1,6 @@
 # UX
 
-Fecha de actualizacion: 2026-10-02
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 `Elemental Apps` es el nombre visible de Plataforma Elemental para la operacion diaria.
@@ -10,6 +10,23 @@ La UX v1.0 prioriza:
 - uso mobile-first
 - continuidad de filtros globales
 - accesos visibles segun permisos existentes
+
+## Notificaciones transitorias
+
+Los mensajes producidos por Django `messages` se muestran como notificaciones
+flotantes en la esquina inferior derecha. No ocupan espacio en el flujo del
+documento ni desplazan el contenido al aparecer. Conservan las variantes y
+colores de Bootstrap, admiten varias notificaciones apiladas y ofrecen cierre
+manual accesible.
+
+Éxito e información permanecen diez segundos; advertencias y errores, veinte.
+El conteo se pausa mientras la notificación tiene foco o el puntero encima. La
+entrada y salida ocurren desde el borde derecho, salvo que el sistema solicite
+movimiento reducido.
+
+Este patrón se limita a feedback transitorio posterior a una acción. Avisos que
+explican el estado de una página, errores de formulario, conflictos que exigen
+decisión y estados vacíos permanecen inline y no desaparecen automáticamente.
 
 ## Panel oficial
 La ruta `/` se presenta como `Panel` y muestra una lectura operacional transversal, no un catálogo de apps

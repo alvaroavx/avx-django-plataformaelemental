@@ -65,6 +65,55 @@
     }
   }
 
+  const notifications = document.querySelectorAll("[data-elemental-notification]");
+
+  notifications.forEach(function (notification) {
+    const closeButton = notification.querySelector("[data-elemental-notification-close]");
+    const duration = Number.parseInt(notification.dataset.timeout || "10000", 10);
+    let remaining = Number.isFinite(duration) ? duration : 10000;
+    let startedAt = 0;
+    let timerId = null;
+    let leaving = false;
+
+    function removeNotification() {
+      notification.remove();
+      const stack = document.querySelector(".elemental-notification-stack");
+      if (stack && !stack.querySelector("[data-elemental-notification]")) stack.remove();
+    }
+
+    function dismissNotification() {
+      if (leaving) return;
+      leaving = true;
+      if (timerId !== null) window.clearTimeout(timerId);
+      notification.classList.add("is-leaving");
+      notification.addEventListener("animationend", removeNotification, { once: true });
+      window.setTimeout(removeNotification, 400);
+    }
+
+    function startTimer() {
+      if (timerId !== null) return;
+      if (leaving || remaining <= 0) return dismissNotification();
+      startedAt = Date.now();
+      timerId = window.setTimeout(dismissNotification, remaining);
+    }
+
+    function pauseTimer() {
+      if (timerId === null || leaving) return;
+      window.clearTimeout(timerId);
+      timerId = null;
+      remaining = Math.max(0, remaining - (Date.now() - startedAt));
+    }
+
+    if (closeButton) closeButton.addEventListener("click", dismissNotification);
+    notification.addEventListener("mouseenter", pauseTimer);
+    notification.addEventListener("mouseleave", startTimer);
+    notification.addEventListener("focusin", pauseTimer);
+    notification.addEventListener("focusout", function (event) {
+      if (!notification.contains(event.relatedTarget)) startTimer();
+    });
+    startTimer();
+  });
+
   const storageKey = "elemental-sidebar-collapsed";
   const body = document.body;
   const button = document.querySelector("[data-elemental-sidebar-toggle]");

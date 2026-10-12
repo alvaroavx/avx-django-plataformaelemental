@@ -42,6 +42,11 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0014-asistencias-cards-en-mobile.md](adr/0014-asistencias-cards-en-mobile.md): reemplaza el scroll horizontal de sesiones registradas por cards completas y filtrables en mobile.
 - [docs/adr/0015-cuadratura-duena-documentacion-fiscal.md](adr/0015-cuadratura-duena-documentacion-fiscal.md): retira de Elemental la documentación fiscal y fija su propiedad en Cuadratura.
 - [docs/adr/0016-retira-portal-profesor-conserva-dominio.md](adr/0016-retira-portal-profesor-conserva-dominio.md): retira las vistas dedicadas para profesores sin eliminar el rol ni sus relaciones operativas.
+- [docs/adr/0017-notificaciones-transitorias-flotantes.md](adr/0017-notificaciones-transitorias-flotantes.md): presenta el feedback transitorio como notificaciones flotantes sin desplazar el contenido.
+- [docs/adr/0018-permisos-de-producto-por-organizacion.md](adr/0018-permisos-de-producto-por-organizacion.md): encapsula permisos técnicos como capacidades comprensibles y habilita el calendario propio del Profesor por organización.
+- [docs/adr/0019-asistencia-propia-del-profesor.md](adr/0019-asistencia-propia-del-profesor.md): permite al Profesor abrir sus sesiones y agregar alumnos de la disciplina sin conceder administración.
+- [docs/adr/0020-swipe-entre-sesiones-en-movil.md](adr/0020-swipe-entre-sesiones-en-movil.md): navega entre sesiones adyacentes accesibles mediante swipe horizontal en móvil sin perder período ni organización.
+- [docs/adr/0021-transicion-espacial-del-swipe-de-sesiones.md](adr/0021-transicion-espacial-del-swipe-de-sesiones.md): simula continuidad lateral entre páginas del detalle sin convertirlas en un carrusel ni ignorar movimiento reducido.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

@@ -1,5 +1,9 @@
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.template.loader import render_to_string
+from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -86,6 +90,26 @@ class ElementalAppsUXTests(TestCase):
         self.assertContains(response, "Plataforma Elemental")
         self.assertContains(response, ':root[data-theme="dark"] .login-page', html=False)
         self.assertContains(response, "login-google-button", html=False)
+
+    def test_mensajes_transitorios_se_renderizan_como_notificaciones_flotantes(self):
+        request = RequestFactory().get("/")
+        request.session = {}
+        request._messages = FallbackStorage(request)
+        messages.success(request, "Operación completada.")
+        messages.error(request, "No fue posible completar la operación.")
+
+        html = render_to_string(
+            "shared/_messages.html",
+            {"messages": list(request._messages)},
+        )
+
+        self.assertIn('class="elemental-notification-stack"', html)
+        self.assertEqual(html.count("data-elemental-notification\n"), 2)
+        self.assertIn('class="alert alert-success elemental-notification"', html)
+        self.assertIn('data-timeout="10000"', html)
+        self.assertIn('class="alert alert-danger elemental-notification"', html)
+        self.assertIn('data-timeout="20000"', html)
+        self.assertEqual(html.count('data-elemental-notification-close'), 2)
 
     @override_settings(GOOGLE_AUTH_ENFORCED=False)
     def test_login_post_valido_respeta_next(self):

@@ -11,9 +11,6 @@
     <a class="btn btn-outline-secondary" href="{% url 'finanzas:pagos_list' %}">Volver a pagos</a>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}" role="alert">{{ message }}</div>{% endfor %}
-  {% endif %}
   {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
 
   <form method="post" id="pago-masivo-form" novalidate>
