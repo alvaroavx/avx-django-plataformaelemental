@@ -1,6 +1,6 @@
 # Deuda técnica activa
 
-Fecha de actualización: 2026-08-09
+Fecha de actualización: 2026-10-12
 
 Este documento lista deuda verificable del código actual. La fotografía completa,
 incluidos riesgos operativos y de datos, está en [ESTADO_ACTUAL](../ESTADO_ACTUAL.md).
@@ -57,8 +57,8 @@ si la exposición justifica limpiar historial. No copiar contenido a documentaci
 
 Estado: activa controlada.
 
-Cobranza y contabilidad comparten app. Hay services/selectors y paquete de
-documentos, pero las views aún coordinan casos de uso grandes.
+Cobranza y caja comparten app. Hay services/selectors (el paquete de documentos
+fiscales se retiró por ADR 0015), pero las views aún coordinan casos de uso grandes.
 
 Acción: extraer incrementalmente sin crear otra app hasta que existan ciclo de
 vida, modelos y permisos realmente independientes.
@@ -74,9 +74,10 @@ Acción: estabilizar reglas y datos antes de añadir constraints compatibles.
 
 ### Desalineación de Python y selección de entorno
 
-Estado: activa.
+Estado: activa, parcialmente resuelta.
 
-PR usa Python 3.12, deploy prueba 3.13 y runtime no está fijado. Un valor desconocido
+PR y deploy prueban con Python 3.12, pero el runtime productivo no está fijado y
+`pyproject.toml` declara `target-version = "py313"` para ruff. Un valor desconocido
 de `DJANGO_ENV` cae a `dev`; el secret key base tiene fallback inseguro.
 
 Acción: alinear versión, fallar cerrado en entorno desconocido y exigir secretos
@@ -86,12 +87,29 @@ productivos antes de construir la aplicación.
 
 Estado: parcialmente resuelta.
 
-Los pushes a `main` despliegan automáticamente solo cuando CI pasa y no hay
-migraciones en el rango. El clon remoto rechaza cambios locales y usa el SHA
-probado en modo detached. Los cambios de esquema siguen en el release escalonado.
-Sigue pendiente reemplazar el healthcheck HTTP superficial por uno más profundo.
+Los pushes a `main` despliegan automáticamente cuando CI pasa. Desde `16cb3af`
+el deploy aplica migraciones pendientes tras detener el servicio y respaldar con
+`pg_dump`; solo las reparaciones históricas de asistencias quedan reservadas al
+release escalonado. El clon remoto rechaza cambios locales y usa el SHA probado
+en modo detached. `deploy.yml` no declara `environment:` y por tanto no exige
+revisores. Sigue pendiente reemplazar el healthcheck HTTP superficial por uno más
+profundo.
 
-Acción: verificar la política real del environment y diseñar healthcheck profundo.
+Acción: decidir si el deploy con migraciones requiere aprobación (environment
+protegido) y diseñar healthcheck profundo.
+
+### CI incompleto y desactualizado
+
+Estado: activa.
+
+Los workflows ejecutan `python manage.py test asistencias finanzas personas`,
+no la suite completa: `api`, `auditoria` y `plataformaelemental` no corren en CI.
+Además, `test.yml` invoca `asistencias.test_profesor_ux` y
+`asistencias.test_operacion_profesor`, eliminados en `d792f75`, por lo que ese
+paso falla.
+
+Acción: retirar los módulos inexistentes y usar `python manage.py test` en ambos
+workflows (ajustando `scripts/validar_gate_ci.py` si lo exige).
 
 ### Observabilidad y auditoría incompletas
 
@@ -108,6 +126,16 @@ Acción: definir mínimo de producción.
 - Sin coverage formal ni convención única de factories.
 - Auditoría histórica SQLite muy larga; se conserva como evidencia, no como guía.
 - API conserva ApiAccessKey/Token DRF sin consumidor de datos.
+- Residuos del portal retirado: `asistencias/services/profesor.py` conserva
+  siete servicios sin consumidores en código ni tests (`crear_sesion_profesor`,
+  `liberar_sesion_profesor`, `cambiar_estado_sesion_profesor`,
+  `crear_alumno_profesor`, `quitar_asistente_profesor`, `liberar_clase_profesor`,
+  `revertir_clase_liberada_profesor`), junto a las activaciones administrativas
+  que sí se usan; `scripts/e2e/profesor_*.js` quedan como archivo histórico.
+- Constantes de acción sin consumidor en el árbol de trabajo:
+  `ver_sesion` y `editar_asistencias` (`personas/permissions.py`).
+- Tablas `monitor_*` pendientes de retiro en ambientes distintos de desarrollo;
+  `migrate monitor zero` ya no es ejecutable desde `HEAD`.
 - Dependencias visuales CDN no están vendorizadas ni monitorizadas.
 
 ## Resuelta

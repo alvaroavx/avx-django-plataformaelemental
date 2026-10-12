@@ -1,5 +1,39 @@
 # Estado actual de Plataforma Elemental
 
+## Revisión documental contra código — 2026-10-12
+
+Auditoría de la documentación contra el árbol de trabajo (código como fuente de
+verdad). Correcciones aplicadas a este documento:
+
+- El job de test previo al deploy usa Python 3.12, no 3.13
+  (`.github/workflows/deploy.yml`). PR y deploy están alineados en 3.12; el
+  runtime productivo sigue sin fijarse desde el repo y `pyproject.toml` declara
+  `target-version = "py313"` para ruff.
+- El deploy rutinario **sí** aplica migraciones desde el commit `16cb3af`
+  (2026-09-11): `scripts/deploy.sh` detiene el servicio, respalda con `pg_dump`
+  y ejecuta `migrate`; solo aborta si quedan pendientes las reparaciones
+  históricas `asistencias.0004b`–`0007`.
+- `deploy.yml` no declara `environment:`; el deploy rutinario no pasa por
+  revisores obligatorios de GitHub. Solo `release-asistencias-escalonado.yml`
+  usa environments protegidos.
+- Ambos workflows ejecutan `python manage.py test asistencias finanzas personas`,
+  no la suite completa: `api`, `auditoria` y `plataformaelemental` no corren en CI.
+- `.github/workflows/test.yml` (PR) todavía ejecuta
+  `asistencias.test_profesor_ux` y `asistencias.test_operacion_profesor`,
+  módulos eliminados en `d792f75`; ese paso falla hasta corregir el workflow.
+- `finanzas.0013` ya figura aplicada en la base de desarrollo local
+  (`showmigrations`, 2026-10-12). En producción sigue sin confirmarse.
+- Trabajo en curso sin commitear (2026-10-12): `ConfiguracionPermisoRol`
+  (`personas.0011`, aún no versionada), Configuración → Permisos
+  (`/personas/permisos/`), calendario propio del Profesor y alta de asistentes en
+  sus sesiones, según ADR 0018 y ADR 0019. Mientras no se integre, la afirmación
+  “no hay interfaz sustituta” describe `HEAD`, no el árbol de trabajo.
+- Validación en esta revisión: `manage.py check` y `makemigrations --check`
+  pasan; `manage.py test --keepdb` (401 tests) terminó con 6 fallos, 21 errores
+  y 15 omitidos, pero **no es concluyente**: el árbol de trabajo cambió durante
+  la corrida y otra corrida `--keepdb` usaba la misma base de pruebas. Los fallos
+  visibles son expectativas de tests anteriores a ADR 0019 (profesor asignado).
+
 ## Actualización de alcance — 2026-10-08
 
 Se retiró la capacidad de comprobantes fiscales de Elemental. La migración
@@ -49,8 +83,8 @@ Superficies activas:
 | Componente | Estado verificable | Responsabilidad real |
 | --- | --- | --- |
 | `personas` | Activo | Personas, organizaciones, roles, cuentas Google y solicitudes de acceso. |
-| `asistencias` | Activo | Disciplinas, asignaciones, sesiones, asistencia, panel profesor y excepciones de cobro. |
-| `finanzas` | Activo | Planes, pagos, lotes, consumos/deuda, categorías y transacciones. |
+| `asistencias` | Activo | Disciplinas, asignaciones, sesiones, asistencia, borrador de correo de cierre y excepciones de cobro. El panel profesor fue retirado (ADR 0016). |
+| `finanzas` | Activo | Planes, pagos, lotes, consumos/deuda, categorías, transacciones y export mensual a Cuadratura. |
 | `auditoria` | Activo | Registro best-effort de mutaciones sensibles. |
 | `api` | Activo y mínimo | Salud, estado, versión y usuario autenticado; no hay CRUD de dominio. |
 
@@ -64,7 +98,9 @@ Las apps legacy `database` y `monitor` ya no existen: ninguna de las dos forma p
 - UI con Bootstrap, DataTables y Tom Select desde CDN.
 - Gunicorn detrás de un proxy, gestionado por `systemd` según el ejemplo versionado.
 - CI de pull requests: Python 3.12 y PostgreSQL 16.
-- Workflow de deploy: prueba con Python 3.13 y PostgreSQL 16, luego despliega `main` por SSH.
+- Workflow de deploy: prueba con Python 3.12 y PostgreSQL 16 (solo apps
+  `asistencias finanzas personas`), luego despliega por SSH el SHA probado y
+  aplica migraciones pendientes con respaldo previo.
 - Dominio hardcodeado como público y healthcheck: `apps.espacioelementos.cl`.
 - Zona horaria `America/Santiago`; idioma `es-cl`.
 
@@ -129,6 +165,9 @@ Google activo y operativo en producción; este checkout no inspeccionó ese runt
 - `Category` clasifica transacciones y hoy es global, no por organización.
 - `Payment` y `Transaction` son entidades distintas y pueden enlazarse uno a uno.
 - La documentación fiscal y la conciliación pertenecen a Cuadratura.
+- `Preparar mes` (`/finanzas/preparar-mes/`) genera el contrato JSON
+  `elemental-cuadratura-v1` por organización y mes, con pagos no elegibles en
+  `pending_records`; la descarga es manual. No existe API ni envío automático.
 - Un pago nuevo genera una transacción uno-a-uno; pagos históricos anteriores a
   la migración pueden conservar `transaccion=NULL` y requieren conciliación real,
   no un backfill que invente movimientos.
@@ -216,14 +255,19 @@ explícitamente PostgreSQL ni dependencias externas.
 
 ### Operación y despliegue
 
-- Un push a `main` despliega automáticamente solo tras CI verde y si el rango no
-  contiene migraciones. Los cambios de esquema se reservan para su release
-  escalonado y no ejecutan `migrate` desde el deploy rutinario.
+- Un push a `main` despliega automáticamente tras CI verde. Si hay migraciones
+  pendientes, `scripts/deploy.sh` detiene el servicio, respalda con `pg_dump` y
+  ejecuta `migrate`; si la migración falla, el servicio queda detenido y la
+  recuperación es forward-only. Solo las reparaciones históricas de asistencias
+  quedan reservadas al release escalonado.
 - El checkout productivo se rechaza si está sucio y cambia en modo detached al
   SHA exacto probado; ya no se fuerza a `origin/main`.
-- La protección efectiva exige configurar revisores obligatorios en el
-  environment de GitHub; el YAML no puede crear esa regla administrativa.
-- El job de PR usa Python 3.12 y el previo al deploy Python 3.13; producción no está fijada por el repo.
+- `deploy.yml` no usa `environment:`; ningún revisor obligatorio se interpone
+  entre un push a `main` y producción. Los environments protegidos solo aplican
+  al release escalonado de asistencias.
+- PR y deploy prueban con Python 3.12; producción no está fijada por el repo.
+- CI no ejecuta los tests de `api`, `auditoria` ni `plataformaelemental`, y el
+  workflow de PR referencia dos módulos de test eliminados.
 - Un `DJANGO_ENV` desconocido cae silenciosamente en `dev`.
 - `DJANGO_SECRET_KEY` tiene fallback inseguro en settings base; `check --deploy`
   puede advertir sin que el script trate warnings como error.
@@ -241,8 +285,8 @@ explícitamente PostgreSQL ni dependencias externas.
 
 ### Código y mantenibilidad
 
-- Las views principales siguen siendo grandes: Personas 1.047 líneas, Asistencias
-  1.669 y Finanzas 1.563 en este corte.
+- Las views principales siguen siendo grandes: Personas 1.068 líneas, Asistencias
+  1.764 y Finanzas 1.016 al 2026-10-12 (árbol de trabajo).
 - La auditoría es parcial y best-effort; no es una fuente completa para reconstruir historia.
 - Dependencias visuales CDN introducen una dependencia externa no verificada para producción.
 - No existe coverage formal ni separación uniforme de tests por capas.
@@ -253,21 +297,23 @@ explícitamente PostgreSQL ni dependencias externas.
   y se retiraron en este cambio. La auditoría larga de SQLite queda solo como evidencia histórica.
 - `data/` contiene dos cargas de alumnos versionadas que no son fixtures seguras.
 - `reporte.md` en raíz describe una rama de julio y se conserva solo con aviso histórico.
-- `plataformaelemental/settings/base.py` es un placeholder legacy y
-  `plataformaelemental/settings.py` un wrapper de compatibilidad; retirarlos requiere
-  buscar consumidores externos antes de considerarlos basura.
+- `plataformaelemental/settings.py` es un wrapper de compatibilidad sobre
+  `plataformaelemental.config`; retirarlo requiere buscar consumidores externos
+  antes de considerarlo basura. (`plataformaelemental/settings/base.py` ya no existe.)
+- `finanzas/documentos/` solo conserva `__pycache__` ignorado del paquete fiscal retirado.
 
 ## Cosas por resolver, en orden de riesgo
 
 1. Cerrar y probar una sola política de `staff`, superusuario, rol y organización para Personas, Asistencias, Finanzas, archivos, exports y Admin.
-2. Auditar datos productivos en modo lectura: identidades, roles, pagos, consumos, clases liberadas y documentos.
+2. Auditar datos productivos en modo lectura: identidades, roles, pagos, consumos y clases liberadas.
 3. Proteger operaciones de baja y corrección histórica; no ejecutar borrados ni recálculos globales sin preview, backup y rollback probado.
 4. Confirmar runtime productivo: commit, Python, PostgreSQL, flags, Nginx/media, unit, secrets y último backup restaurable.
-5. Revisar y retirar del HEAD los archivos reales de `data/` y `public/`; decidir si corresponde limpieza de historial.
-6. Alinear Python 3.12/3.13 entre CI, deploy y runtime, y hacer fallar cerrado la selección de entorno/configuración productiva.
+5. Revisar y retirar del HEAD los archivos reales de `data/` (los PDFs de `public/` ya se retiraron del HEAD el 2026-10-08); decidir si corresponde limpieza de historial.
+6. Fijar el runtime productivo en Python 3.12 (CI y deploy ya usan 3.12; ruff apunta a py313), y hacer fallar cerrado la selección de entorno/configuración productiva.
 7. Repetir el ensayo de migraciones y la restauración sobre una copia protegida y
    reciente de producción; luego documentar RPO/RTO operativos reales.
-8. Correr `python manage.py migrate monitor zero` (con respaldo previo) en cada ambiente que aún tenga tablas `monitor_*`, ya que la app fue retirada del código sin ese paso ejecutado en producción.
+8. Retirar las tablas `monitor_*` (con respaldo previo) en cada ambiente que aún las tenga. Desde `a64dbc2` la app ya no está en `INSTALLED_APPS`, por lo que `migrate monitor zero` no se puede ejecutar desde el `HEAD` actual: requiere un checkout anterior a ese commit o un `DROP` manual revisado, más la limpieza de filas `monitor` en `django_migrations`.
+11. Corregir CI: retirar de `test.yml` los módulos de test eliminados y ejecutar la suite completa (`python manage.py test`) en PR y deploy.
 9. Conciliar pagos históricos sin transacción y definir el contramovimiento de
    reversas sin inventar ni duplicar caja.
 10. Extraer casos de uso desde views de manera incremental, sin cambiar contratos HTML/JSON innecesariamente.
@@ -300,4 +346,5 @@ durante la preparación. Detalle:
 - Que toda la plataforma es multi-organización segura mientras persista el bypass de staff.
 - Que un backup es recuperable sin haber ejecutado `pg_restore` en un entorno controlado.
 - Que la API o el healthcheck ofrecen observabilidad productiva completa.
-- Que los PDFs y archivos de carga versionados son ficticios o publicables sin revisión.
+- Que los archivos de carga versionados en `data/` (o los PDFs retirados que siguen en el historial Git) son ficticios o publicables sin revisión.
+- Que el contrato `elemental-cuadratura-v1` acredita emisión fiscal o que Cuadratura ya lo consume automáticamente.

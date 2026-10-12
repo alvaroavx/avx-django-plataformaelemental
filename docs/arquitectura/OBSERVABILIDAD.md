@@ -1,11 +1,19 @@
 # Observabilidad
 
-Fecha de actualizacion: 2026-06-01
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento define criterios futuros de observabilidad interna de Plataforma Elemental.
 
 La app `monitor` (herramienta de observabilidad de un producto anterior, sin rutas ni navegacion activas) fue retirada del repositorio. Si la observabilidad vuelve a crecer, debe hacerlo como decision explicita y sin transformarse en una segunda fuente de verdad.
+
+## Lo que existe hoy
+- El Panel `/` (`plataformaelemental/dashboard.py`) calcula indicadores operativos de lectura por capacidad: sesiones completadas, personas con asistencia, clases en deuda e ingresos contables, con detalle en `/resumen/<indicador>/`, además de seguimiento de deuda, asistencia y clases restantes.
+- `/api/health/` y `/api/status/` responden un JSON fijo (`{"status": "ok"}`); no consultan PostgreSQL ni dependencias.
+- No hay configuración `LOGGING` en settings; solo `auditoria/services.py` usa `logging` para registrar fallos del log de auditoría.
+- `reconciliar_integridad_dominio` (finanzas) es un diagnóstico manual de solo lectura entre asistencias, consumos y pagos.
+
+Todo lo que sigue son criterios para crecimiento futuro (Planificado / no implementado).
 
 ## Principio
 Una futura herramienta de observabilidad debe observar datos de apps duenias.

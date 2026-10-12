@@ -1,6 +1,6 @@
 # PLATAFORMA
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.
@@ -29,13 +29,13 @@ Componentes de soporte:
 - `plataformaelemental`: configuracion del proyecto.
 
 ## Arquitectura vigente
-- Framework: Django 5.
+- Framework: Django 5.2.9 sobre Python 3.12.
 - API: Django REST Framework.
 - Base de datos: PostgreSQL, unico motor configurado en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`.
 - UI: Bootstrap 5, DataTables y Tom Select via CDN.
 - Zona horaria: `America/Santiago`.
 - Deploy: GitHub Actions + SSH + `systemd` + `gunicorn`.
-- Integración financiera inicial: exportación JSON versionada Elemental → Cuadratura. El archivo es transporte; la evolución a API conserva el mismo contrato y reglas de idempotencia.
+- Integración financiera inicial: exportación JSON versionada Elemental → Cuadratura (`elemental-cuadratura-v1`, `finanzas/services/cuadratura_v1.py`), descargada manualmente desde `Preparar mes`. Lo que existe: archivo JSON con `batch_id` determinista por organización, período y operaciones incluidas. Planificado / no implementado: transporte por API y reglas de idempotencia del lado receptor; cuando exista, debe conservar el mismo contrato. Detalle en [docs/apps/FINANZAS.md](../apps/FINANZAS.md).
 
 Detalle operativo:
 - Deploy y CI/CD: [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)
@@ -49,11 +49,14 @@ Detalle operativo:
 - Permisos y roles: [docs/arquitectura/PERMISOS_Y_ROLES.md](PERMISOS_Y_ROLES.md)
 
 ## Fronteras de dominio
-- `personas` define identidad: `Persona`, `Organizacion`, `Rol`, `PersonaRol`.
-- `asistencias` define operacion de clases: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`.
+- `personas` define identidad: `Persona`, `Organizacion`, `Rol`, `PersonaRol` y `SolicitudAcceso`.
+- `asistencias` define operacion de clases: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`, `LiberacionSesion` y `ClaseLiberada`.
 - `asistencias` mantiene las asignaciones profesor–disciplina y alumno–disciplina para la operación administrativa; el portal dedicado `/profesor/` fue retirado. El rol y perfil de profesor siguen vigentes.
-- `finanzas` contiene cobranza operacional, planes, pagos, deuda, saldo,
-  imputación contra asistencias, transacciones de caja, categorías y reportes.
+- `finanzas` contiene cobranza operacional, planes, pagos, lotes, deuda, saldo,
+  imputación contra asistencias, transacciones de caja, categorías, reportes y
+  la exportación mensual hacia Cuadratura.
+- `plataformaelemental` aloja configuración, Panel transversal (`/`), contexto
+  global de filtros y navegación.
 - Cuadratura es dueña de documentos fiscales, conciliación y cierres contables.
 - `api` expone solo superficie minima operativa en v1.0; no expone datos de personas, asistencias ni finanzas.
 - `auditoria` registra eventos seleccionados, pero no es una bitacora completa ni bloquea una operacion si falla el log.
@@ -118,17 +121,16 @@ Comando principal esperado:
 python manage.py test
 ```
 
-El inventario actual contiene 407 metodos de test. El workflow de pull requests
-los ejecuta con Python 3.12 y PostgreSQL 16; el workflow previo al deploy usa
-Python 3.13. El resultado de una suite no confirma por si solo el estado del
-servidor ni de los datos productivos.
+Al 2026-10-12 el inventario contiene 394 metodos `test_*` en `HEAD` (400 en el
+arbol de trabajo con cambios en curso). Los workflows de pull request y de
+deploy usan Python 3.12 y PostgreSQL 16, pero solo ejecutan
+`python manage.py test asistencias finanzas personas`; `api`, `auditoria` y
+`plataformaelemental` quedan fuera de CI. El resultado de una suite no confirma
+por si solo el estado del servidor ni de los datos productivos.
 
-En el corte 2026-08-09 la suite local completa pasó 404 tests, con 12 omitidos,
-en 517,437 s contra la base PostgreSQL local de desarrollo. La evidencia oficial
-de compatibilidad declarada por el pipeline sigue siendo PostgreSQL 16.
-Los dos tests añadidos el 2026-08-10 para el poblador mensual pasaron de forma
-focalizada. La regresión adicional de solicitudes pasó dentro de su clase de 6
-casos; todavía no se ha repetido la suite completa de 407 casos.
+Historico: en el corte 2026-08-09 la suite local completa pasó 404 tests, con 12
+omitidos, contra PostgreSQL local. El resultado vigente se registra en
+[docs/ESTADO_ACTUAL.md](../ESTADO_ACTUAL.md).
 
 Fotografia verificable y riesgos activos:
 - [docs/ESTADO_ACTUAL.md](../ESTADO_ACTUAL.md)

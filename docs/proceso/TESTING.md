@@ -1,6 +1,6 @@
 # Testing
 
-Fecha de actualizacion: 2026-08-16
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento define la estrategia de pruebas vigente.
@@ -27,7 +27,15 @@ El set principal esperado es:
 python manage.py test
 ```
 
-Este comando descubre la suite completa y es el que usan los workflows de test y deploy. Los comandos por app se reservan para validaciones focalizadas.
+Este comando descubre la suite completa. **Los workflows no lo usan**: `test.yml`
+y `deploy.yml` ejecutan `python manage.py test asistencias finanzas personas`, por
+lo que `api`, `auditoria` y `plataformaelemental` no corren en CI. Los comandos
+por app se reservan para validaciones focalizadas.
+
+Django crea o reutiliza la base `test_<POSTGRES_DB>`. Si el rol PostgreSQL no
+puede crearla en cada corrida, usar `python manage.py test --keepdb --noinput`
+sobre una base de pruebas ya existente. No ejecutar dos corridas `--keepdb`
+simultáneas sobre la misma base de pruebas.
 
 ## Checks Base
 Para cambios generales:
@@ -42,8 +50,10 @@ Para cambios de migraciones:
 python manage.py makemigrations --check --dry-run
 ```
 
-CI ejecuta este mismo comando antes de cualquier deploy. Un archivo nuevo o
-modificado bajo `*/migrations/*.py` impide el despliegue automático del push.
+CI ejecuta este mismo comando antes de cualquier deploy. Un archivo de migración
+en el push no impide el despliegue: `scripts/deploy.sh` respalda con `pg_dump` y
+aplica `migrate` en el servidor, salvo las reparaciones históricas de
+`asistencias` (0004b–0007), que abortan el deploy y van por el release escalonado.
 
 Para produccion:
 
@@ -162,7 +172,17 @@ Debe cubrir:
 - API key de solo lectura,
 - rechazo de escritura con API key,
 - throttling cuando aplique,
-- filtros base `organizacion`, `periodo_mes`, `periodo_anio`.
+- filtros base `organizacion`, `periodo_mes`, `periodo_anio` cuando existan endpoints de datos (hoy no existen).
+
+### Contrato Cuadratura
+Debe cubrir cualquier cambio en `finanzas/services/cuadratura_v1.py`:
+- operaciones incluidas y motivos de `pending_records`,
+- montos CLP enteros y clasificación `EXEMPT`/`TAXABLE`,
+- estabilidad de `batch_id`,
+- permisos y aislamiento por organización de `preparar_mes`/`descargar_cuadratura`.
+
+Hoy solo existen dos tests (`finanzas/tests.py`): exportación de un pago válido
+sin mutar registros y pendiente por pago sin transacción.
 
 ### UI y templates
 Debe cubrir al menos:
@@ -177,15 +197,25 @@ No conviene testear:
 - detalles visuales que cambian con frecuencia.
 
 ## CI Actual
-El workflow ejecuta:
+Ambos workflows (`test.yml` en pull requests y `deploy.yml` en push a `main`) ejecutan:
+- `python scripts/validar_gate_ci.py`
+- `python manage.py check`
+- `python manage.py makemigrations --check --dry-run`
 - `ruff check .`
-- `python manage.py test`
+- `python manage.py test asistencias finanzas personas`
+
+`test.yml` además ejecuta `asistencias.test_profesor_ux` y
+`asistencias.test_operacion_profesor`, módulos eliminados en `d792f75`; ese paso
+falla hasta corregir el workflow (pendiente en `docs/arquitectura/DEUDA_TECNICA.md`).
 
 La base de datos de CI usa PostgreSQL mediante service container.
 
-Inventario al 2026-08-10: 410 métodos `test_*`. Este número orienta el tamaño,
-pero el resultado válido es el del runner; 15 métodos pertenecen a `monitor` y
-sus clases de vistas están explícitamente omitidas porque la app está archivada.
+Inventario al 2026-10-12: 394 métodos `test_*` en `HEAD` y 400 en el árbol de
+trabajo con cambios en curso. La app `monitor` y sus 15 métodos se retiraron en
+`a64dbc2`; los tests del portal de profesores, en `d792f75`. Este número orienta
+el tamaño, pero el resultado válido es el del runner.
+
+Histórico (corte 2026-08-10, 410 métodos incluyendo `monitor`):
 
 Validación local de este corte: `python manage.py test` pasó 404 tests, con 12
 omitidos, en 517,437 segundos contra PostgreSQL local de desarrollo. Este
@@ -206,9 +236,8 @@ personas, asistentes, alumnos de pago masivo y pagos. Pasaron 100 pruebas
 focalizadas más los 6 casos de resolución contra PostgreSQL 18.4 local; la suite
 completa de 410 métodos queda pendiente de una futura ejecución integral.
 
-El workflow `test.yml` usa Python 3.12; el job de test previo a deploy usa
-Python 3.13. Esta diferencia es riesgo operativo hasta alinear o demostrar ambas
-versiones junto al runtime productivo.
+Los workflows `test.yml` y `deploy.yml` usan Python 3.12. El runtime productivo
+no está fijado desde el repositorio.
 
 Detalle operativo:
 - [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)

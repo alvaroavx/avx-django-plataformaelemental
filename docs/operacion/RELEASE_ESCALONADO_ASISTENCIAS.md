@@ -1,11 +1,20 @@
 # Release escalonado de asistencias
 
-Estado: implementado localmente; requiere publicar un tag nuevo y ejecutar CI.
+Estado: implementado en `.github/workflows/release-asistencias-escalonado.yml`
+(se activa con tags `release/asistencias-*`; el repositorio ya contiene tags
+`release/asistencias-escalonado-20260823.*` y `release/asistencias-20260828.*`).
+Este documento no acredita qué release se aplicó en producción.
 
 Este procedimiento reemplaza la ejecución manual por SSH del release de
 `asistencias.0005`. El workflow rutinario sigue siendo `deploy.yml`; este
- workflow separado se activa únicamente por un tag anotado `release/asistencias-*`.
-Los pushes a `main` ejecutan CI y no despliegan.
+workflow separado se activa únicamente por un tag anotado `release/asistencias-*`.
+
+Relación con el deploy rutinario (verificado en `.github/workflows/deploy.yml` y
+`scripts/deploy.sh`): un push a `main` ejecuta CI y, si pasa, despliega. Si hay
+migraciones pendientes, `deploy.sh` detiene el servicio, respalda y aplica
+`migrate` global, **excepto** cuando alguna de `0004b`, `0005_..._v2`, `0006` o
+`0007` de `asistencias` está pendiente: en ese caso aborta y exige este release
+escalonado.
 
 ## Etapas independientes
 

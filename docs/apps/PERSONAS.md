@@ -1,6 +1,6 @@
 # Personas
 
-Fecha de actualizacion: 2026-08-10
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 `personas` es el CRM transversal de la plataforma.
@@ -78,7 +78,20 @@ Debe concentrar:
 - En `personas/<id>/`, el bloque `Perfil profesor` debe mostrar el resumen economico del periodo con cards separadas para `pago bruto`, `retencion SII` en monto y `monto neto`; el porcentaje de retencion se configura en el rol, pero no se muestra como card principal.
 - En `personas/<id>/`, la tabla de sesiones del `Perfil profesor` debe ofrecer acciones operativas de sesion para `Ver sesion`, `Agregar asistentes` y cambiar estado de sesion desde un selector autoaplicado, manteniendo los filtros globales y abriendo el modal vigente de asistentes.
 - `personas` no reemplaza la operacion diaria de `asistencias`; cumple una funcion administrativa y transversal.
+- `/personas/permisos/` (`permisos_configuracion`, exige `administrar_personas`
+  sin excepción por `is_staff`) guarda en `ConfiguracionPermisoRol` si el rol
+  Profesor recibe por organización las capacidades configurables
+  `ver_calendario` y `agregar_asistentes_propios`. Sin registro, la capacidad se
+  considera habilitada. Estado: trabajo en curso sin commitear (migración
+  `personas.0011_configuracionpermisorol`); decisión en ADR 0018.
 - Las acciones rapidas de estudiantes desde vistas operativas deben apuntar a perfiles consolidados en `personas/<id>/` y preservar filtros globales.
+
+## Comandos de gestion
+- `python manage.py auditar_identidades_acceso`: auditoría read-only de identidades antes de cambios de autenticación.
+- `python manage.py auditar_datos_v1`: auditoría read-only de calidad de datos de personas.
+- `python manage.py importar_personas <archivo.txt> [--dominio example.com] [--dry-run]`:
+  carga histórica de personas desde un texto con un nombre por línea; genera
+  correos con el dominio indicado. Escribe en la base salvo `--dry-run`.
 
 ## Relacion con otras apps
 - `asistencias` usa perfiles operativos y flujos rapidos.

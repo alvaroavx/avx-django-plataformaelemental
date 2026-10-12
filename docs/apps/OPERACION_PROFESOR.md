@@ -11,7 +11,12 @@ Fecha de actualización: 2026-10-08
 > vigentes en sus apps correspondientes. No se ha decidido construir un portal
 > sustituto.
 
-> Nota de despliegue (2026-09-11): producción usa
+> Nota histórica de despliegue (2026-09-11), ya no vigente: tras el retiro
+> (commit `d792f75`) no existen `profesor.css`, `profesor_contexto.js`,
+> `asistencias/test_profesor_ux.py`, `asistencias/test_operacion_profesor.py` ni
+> el comando `verificar_smoke_profesor`, y `deploy.yml` dejó de validarlos.
+> (Pendiente en código: `.github/workflows/test.yml` aún invoca esos dos módulos
+> de prueba.) Texto original: producción usa
 > `ManifestStaticFilesStorage`, por lo que `profesor.css` y
 > `profesor_contexto.js` cambian de URL cuando cambia su contenido. El pipeline
 > ejecuta toda la suite de `asistencias` y los 25 tests específicos de Profesor antes del

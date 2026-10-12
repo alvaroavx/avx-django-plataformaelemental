@@ -1,6 +1,6 @@
 # API
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito v1.0
 La app `api` queda reducida a una superficie minima operativa para `Elemental Apps`.
@@ -37,6 +37,9 @@ Respuesta:
 {"name": "Elemental Apps", "version": "v1.0"}
 ```
 
+`version` se lee de `settings.APP_VERSION`; hoy ese setting no está definido y
+la vista usa el valor por defecto `v1.0`.
+
 ### Usuario actual
 - `GET /api/me/`
 - Requiere usuario autenticado.
@@ -71,6 +74,14 @@ Estos endpoints deben responder `404` al no estar registrados en `api.urls`.
 - API key no entrega acceso a datos en v1.0 porque no hay endpoints de datos activos.
 - `ApiAccessKey` se conserva temporalmente para no tocar tabla/migracion y para una futura decision explicita.
 - Token DRF se mantiene disponible a nivel de dependencias/settings, pero no existe flujo publico de login API activo en v1.0.
+- Autenticación DRF por defecto: `ApiKeyAuthentication` (header `X-API-Key` o
+  `Authorization: ApiKey <clave>`), sesión y token. Throttling por defecto
+  `api_burst` 120/min y `api_sustained` 5000/día por API key, usuario o IP.
+- `python manage.py crear_api_key <nombre> [--descripcion ...]` sigue disponible
+  e imprime la clave una sola vez; hoy no habilita datos.
+- La integración con Cuadratura no usa esta API: es una descarga JSON manual
+  desde `/finanzas/preparar-mes/` (ver `docs/apps/FINANZAS.md`). Exponerla por
+  API está planificado / no implementado.
 
 ## Operacion
 Comandos utiles:

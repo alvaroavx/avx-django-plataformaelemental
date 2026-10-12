@@ -7,6 +7,7 @@ Hoy el proyecto integra:
 - CRM de personas, roles y organizaciones
 - pagos y consumo de clases
 - transacciones de caja
+- preparación mensual y exportación JSON versionada hacia Cuadratura (`elemental-cuadratura-v1`)
 - API minima de salud/estado/version
 
 ## Estado actual
@@ -20,22 +21,32 @@ Reglas funcionales vigentes:
 ## Apps del proyecto
 
 ### `asistencias`
-- sesiones
-- registro de asistencia
-- perfiles operativos de estudiantes y profesores
+- disciplinas, calendario y sesiones (individuales y masivas)
+- registro de asistencia y clases liberadas
+- asignaciones profesor–disciplina y matrículas alumno–disciplina
+- listados operativos de estudiantes y profesores, borrador de correo mensual de cierre por profesor
 - integración con consumo financiero de clases
+
+El portal dedicado de profesores (`/profesor/`) fue retirado el 2026-10-08
+([ADR 0016](docs/adr/0016-retira-portal-profesor-conserva-dominio.md)); el rol
+Profesor y sus relaciones se conservan.
 
 ### `personas`
 - personas
 - roles por organización
 - organizaciones
+- login Google controlado y solicitudes de acceso
 - vista administrativa consolidada
 
 ### `finanzas`
 - planes
-- pagos
+- pagos individuales y lotes de pago masivo idempotentes, con reversa histórica
 - transacciones
-- categorías y reportes
+- categorías, reportes y exportaciones CSV/XLSX
+- `Preparar mes`: vista previa y descarga del contrato JSON `elemental-cuadratura-v1`
+
+La documentación fiscal (boletas, facturas) y la conciliación pertenecen a
+Cuadratura ([ADR 0015](docs/adr/0015-cuadratura-duena-documentacion-fiscal.md)).
 
 ### `api`
 - endpoints minimos operativos
@@ -49,7 +60,8 @@ Reglas funcionales vigentes:
 ## Arquitectura
 
 ### Stack
-- Django 5
+- Python 3.12
+- Django 5.2.9
 - Django REST Framework
 - PostgreSQL activo en `dev` y `prod`
 - PostgreSQL es el único motor configurado; SQLite no es un fallback soportado
@@ -63,26 +75,34 @@ Reglas funcionales vigentes:
 - `personas/`: personas, roles y organizaciones
 - `finanzas/`: pagos, consumo de clases y caja
 - `api/`: API minima de salud/estado/version
+- `auditoria/`: registro best-effort de mutaciones sensibles
+- `templates/`: plantillas compartidas
+- `scripts/`: deploy, releases escalonados, validadores de documentación y CI
+- `deploy/`: ejemplo de unit `systemd`
 - `docs/`: documentación viva
 - `data/`: cargas y soporte de datos
 
 ### Ownership de modelos
-- `personas.models`: `Organizacion`, `Persona`, `Rol`, `PersonaRol`
-- `asistencias.models`: `Disciplina`, `BloqueHorario`, `SesionClase`, `Asistencia`
-- `finanzas.models`: `PaymentPlan`, `Payment`, `AttendanceConsumption`, `Transaction`, `Category`
+- `personas.models`: `Organizacion`, `Persona`, `Rol`, `PersonaRol`, `SolicitudAcceso` y, en curso (sin commitear al 2026-10-12), `ConfiguracionPermisoRol`
+- `asistencias.models`: `Disciplina`, `AsignacionProfesorDisciplina`, `AlumnoDisciplina`, `BloqueHorario`, `SesionClase`, `LiberacionSesion`, `Asistencia`, `ClaseLiberada`
+- `finanzas.models`: `PaymentPlan`, `Category`, `LotePago`, `Payment`, `AttendanceConsumption`, `Transaction`
+- `auditoria.models`: `AuditLog`
+- `api.models`: `ApiAccessKey`
 
 ## Rutas principales
 
 ### Acceso
-- `/`
-- `/app/`
-- `/accounts/login/`
+- `/` (Panel transversal) y `/resumen/<metrica>/` (detalle de indicadores)
+- `/app/` (redirige a `/`)
+- `/accounts/login/`, `/accounts/emergencia/` (solo superusuarios), `/accounts/logout/`
+- `/accounts/google/iniciar/` y `/accounts/google/login/callback/`
 - `/admin/`
 
 ### HTML
-- `/asistencias/`
+- `/asistencias/` (redirige al calendario `/asistencias/calendario/`)
 - `/personas/`
 - `/finanzas/`
+- `/finanzas/preparar-mes/` y `/finanzas/preparar-mes/descargar/` (contrato Cuadratura)
 
 ### API base
 - `/api/health/`
@@ -177,10 +197,19 @@ curl http://127.0.0.1:8000/api/version/
 
 ## CI/CD y despliegue
 
-El proyecto incluye una base mínima de CI/CD con GitHub Actions:
-- corre tests en cada push a `main`
-- si los tests pasan y el push no contiene migraciones, despliega por SSH al servidor
-- el servidor actualiza código, instala dependencias, recopila estáticos y reinicia `systemd`; las migraciones usan su release escalonado
+El proyecto incluye una base mínima de CI/CD con GitHub Actions
+(`.github/workflows/deploy.yml`, `test.yml` y `release-asistencias-escalonado.yml`):
+- en cada push a `main` corre `check`, `makemigrations --check`, `ruff check .`
+  y los tests de `asistencias finanzas personas` sobre PostgreSQL 16 y Python 3.12
+  (no corre `api`, `auditoria` ni `plataformaelemental`; ver
+  [docs/ESTADO_ACTUAL.md](docs/ESTADO_ACTUAL.md))
+- si los tests pasan, despliega por SSH el SHA probado (checkout detached) con
+  `scripts/deploy.sh`
+- el servidor instala dependencias; si hay migraciones pendientes detiene el
+  servicio, respalda PostgreSQL con `pg_dump` en `DEPLOY_BACKUP_DIR` y aplica
+  `migrate`; luego publica estáticos, ejecuta `check --deploy` y reinicia `systemd`
+- las reparaciones históricas de `asistencias` (0004b–0007) no se aplican por esta
+  vía: el script aborta y deben ir por el release escalonado
 
 La guía operativa completa está en:
 - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
@@ -195,12 +224,14 @@ Obligatorios:
 - `DEPLOY_SERVICE`
   - acepta nombre con o sin sufijo `.service`
   - valor real de producción: `plataforma-elemental`
+- `DEPLOY_ENV_FILE`
+  - contiene una ruta absoluta al archivo de entorno local del servidor; no contiene ni transporta su contenido.
 
 Opcionales:
 - `DEPLOY_PORT`
   - default: `22`
-- `DEPLOY_ENV_FILE` es obligatorio para despliegue productivo.
-  - contiene una ruta absoluta al archivo de entorno local del servidor; no contiene ni transporta su contenido.
+- `DEPLOY_BACKUP_DIR`
+  - obligatorio en la práctica cuando el release trae migraciones pendientes; ahí se escribe el `pg_dump` previo
 - `DEPLOY_VENV_DIR`
   - si no se define, usa `.venv` dentro del repo
 - `DEPLOY_PYTHON_BIN`
@@ -245,17 +276,28 @@ base64 < ~/.ssh/plataforma_elemental_deploy | tr -d '\n'
 python manage.py test
 ```
 
+Los tests necesitan una base PostgreSQL de pruebas (`test_<POSTGRES_DB>`). Si el
+rol de base de datos no puede crearla en cada corrida, reutilizarla con
+`python manage.py test --keepdb --noinput`.
+
 ### Por app
 ```bash
-python manage.py test asistencias.tests
-python manage.py test personas.tests
-python manage.py test finanzas.tests
-python manage.py test api.tests
+python manage.py test asistencias
+python manage.py test personas
+python manage.py test finanzas
+python manage.py test api auditoria plataformaelemental
 ```
 
 Última validación conocida:
-- inventario actual: 396 métodos `test_*`
+- inventario al 2026-10-12: 394 métodos `test_*` en `HEAD` y 400 en el árbol de trabajo con cambios en curso
 - estado y evidencia: [docs/ESTADO_ACTUAL.md](docs/ESTADO_ACTUAL.md)
+
+### Comandos de gestión propios
+- `personas`: `importar_personas`, `auditar_datos_v1`, `auditar_identidades_acceso` (solo lectura)
+- `asistencias`: `import_asistencias`, `poblar_mes_pruebas` (solo desarrollo, preview por defecto),
+  `reportar_relaciones_historicas`, `activar_relaciones_operativas` (preview salvo confirmación literal)
+- `finanzas`: `reconciliar_integridad_dominio` (diagnóstico sin escrituras)
+- `api`: `crear_api_key`
 
 La validación de cierre debe usar `python manage.py test`; una lista manual de
 apps puede omitir pruebas transversales, auditoría o módulos nuevos.

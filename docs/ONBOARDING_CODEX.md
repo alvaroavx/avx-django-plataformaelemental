@@ -1,6 +1,6 @@
 # Onboarding Codex
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento explica como leer el repo antes de tocarlo.
@@ -39,11 +39,12 @@ Este documento explica como leer el repo antes de tocarlo.
     - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md)
     - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md)
     - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md)
+    - ADRs vigentes del área en `docs/adr/` (listados en `docs/INDICE.md`); por ejemplo ADR 0015 (Cuadratura dueña de la documentación fiscal) y ADR 0016 (retiro del portal de profesores).
 15. [README.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/README.md)
     Resumen humano y puesta en marcha.
 16. Documentos operativos si aplica:
     - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
-    - [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md)
+    - [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md) (solo evidencia histórica; no describe la configuración actual)
     - [docs/operacion/SEGURIDAD_PRODUCCION.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/SEGURIDAD_PRODUCCION.md)
 
 ## Como Mantener Documentacion Viva

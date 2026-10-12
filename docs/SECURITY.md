@@ -1,6 +1,6 @@
 # Seguridad del repositorio
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Regla base
 No guardar credenciales reales en el repositorio.
@@ -40,8 +40,10 @@ Quitar un secreto del HEAD no lo elimina del historial Git.
 
 ## Datos personales y tributarios
 
-- `data/` y `public/` no son zonas autorizadas para datos reales por el solo hecho
-  de estar fuera de `media/`.
+- `data/` no es una zona autorizada para datos reales por el solo hecho de
+  estar fuera de `media/`. Hoy versiona `data/alumnos_elementos_2025.txt` y
+  `data/alumnos_latinrengo.txt` (listas de nombres usadas por
+  `importar_personas`); su origen y retención deben confirmarse con su dueño.
 - Una fixture versionada debe ser sintética y estar referenciada por tests.
 - Antes de eliminar archivos ambiguos, confirmar retención y dueño; después,
   decidir si basta retirarlos del HEAD o si corresponde limpiar el historial.

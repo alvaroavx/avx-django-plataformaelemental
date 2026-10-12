@@ -8,6 +8,11 @@ Especificación y prototipo técnico aislado. No está conectado a rutas activas
 
 La validación con Beisics y dos profesoras está pendiente. Este documento no representa validación usuaria.
 
+> Estado 2026-10-12: histórico. La superficie "Hoy de profesora" no está
+> disponible para profesores (`/asistencias/hoy/` exige `administrar_sesiones`) y
+> el portal `/profesor/` fue retirado (ADR 0016). Las reglas de accesibilidad
+> siguen siendo referencia para el detalle de sesión.
+
 ## Superficies
 
 ### Hoy de profesora

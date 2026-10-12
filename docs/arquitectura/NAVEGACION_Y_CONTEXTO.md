@@ -1,6 +1,6 @@
 # Navegacion Y Contexto Global
 
-Fecha de actualizacion: 2026-09-11
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento concentra las reglas transversales de navegacion, periodo, organizacion activa y contexto global de UI.
@@ -42,6 +42,7 @@ Reglas:
   organización, `organizacion` parte en `Todas`.
 - El portal dedicado `/profesor/` fue retirado por [ADR 0016](../adr/0016-retira-portal-profesor-conserva-dominio.md); no existe un selector de organización ni contexto de navegación propio para profesores.
 - Las relaciones de profesor y organización se mantienen en el dominio y en los formularios administrativos; no conceden por sí solas acceso a vistas de sesión.
+- En el árbol de trabajo (sin commitear al 2026-10-12, ADR 0018/0019) el sidebar muestra `Calendario` a quien tenga `ver_calendario` (incluido Profesor, salvo que la organización lo deshabilite) y `Configuración → Permisos` a administradores. El Profesor usa los mismos filtros globales; no existe contexto propio.
 - Los selectores deben autoaplicarse al cambiar; no usan boton `Aplicar filtros`.
 - `periodo_mes` y `periodo_anio` aceptan la opcion `Todos`.
 - El sistema debe soportar filtros parciales:
@@ -110,11 +111,11 @@ contexto está en `Todas`: las vistas de destino exigen una organización concre
 y la portada no elige una silenciosamente. Staff y superusuarios conservan el
 agregado global porque sus decoradores permiten ese alcance.
 
-Una profesora sin capacidades administrativas también entra a `/`, pero su
-composición se limita a las sesiones de hoy devueltas por
-`sesiones_visibles_para_usuario`: rol Profesor activo, asignación operativa y
-presencia explícita en la sesión. Este acceso no amplía sus alcances ni reutiliza
-las métricas agregadas administrativas.
+Una profesora sin capacidades administrativas también entra a `/`, pero desde el
+retiro del portal (ADR 0016) `construir_dashboard_general` no compone ningún
+bloque para ella: la jornada de hoy y las métricas solo se calculan para
+organizaciones con `administrar_sesiones`, `ver_finanzas` o `administrar_personas`
+(`plataformaelemental/dashboard.py`). Este acceso no amplía sus alcances.
 
 Al final del Panel administrativo se ubica `Seguimiento del período`, con deuda
 de clases, mayor asistencia y clases disponibles. Estos bloques reutilizan el
@@ -138,9 +139,13 @@ conjunto que la compone. En ingresos, el encabezado conserva la suma monetaria y
 la tabla enumera sus transacciones; en personas, el valor es la cantidad de
 personas únicas y cada fila informa cuántos registros aportó.
 
-`Clases disponibles` no forma parte de esta entrega: existe diferencia entre
-saldo por pago y agregaciones acotadas al período. Incorporarlo exige fijar antes
-la pregunta temporal y extraer una regla canónica.
+`Clases disponibles` no es un KPI con detalle `/resumen/<indicador>/`: existe
+diferencia entre saldo por pago y agregaciones acotadas al período. El bloque de
+seguimiento sí lista estudiantes con clases restantes, calculadas como
+`clases_asignadas` de pagos no revertidos con `fecha_pago` en el período menos
+consumos `CONSUMIDO` con `clase_fecha` en el período; no es el saldo canónico por
+pago. Convertirlo en KPI exige fijar antes la pregunta temporal y extraer una
+regla canónica.
 
 La búsqueda de personas parte de un queryset previamente acotado por capacidad
 y organización. El helper de texto no concede acceso. El resultado individual

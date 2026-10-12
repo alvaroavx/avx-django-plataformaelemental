@@ -1,6 +1,6 @@
 # Artefactos de trabajo
 
-Fecha de actualización: 2026-08-18
+Fecha de actualización: 2026-10-12
 
 ## Propósito
 
@@ -123,12 +123,13 @@ npm run test:mermaid
   flujos del profesor. No valida OAuth Google real porque usa el acceso local del
   ambiente de prueba.
 
-Variables requeridas:
+Variables requeridas (histórico: el script `test:e2e:profesor` ya no existe en
+`package.json` y las rutas que recorre fueron retiradas):
 
 ```bash
 export ELEMENTAL_E2E_USERNAME='usuario-sintetico'
 export ELEMENTAL_E2E_PASSWORD='clave-no-versionada'
-npm run test:e2e:profesor
+node scripts/e2e/profesor_operacion.js  # antes: npm run test:e2e:profesor
 ```
 
 Variables opcionales: `ELEMENTAL_E2E_BASE_URL`, `ELEMENTAL_E2E_OUTPUT_DIR`,
@@ -259,11 +260,13 @@ confirmación solo dentro de su DOM aislado.
   `.github/workflows/deploy.yml`: trigger de `main`, PostgreSQL efímero, comandos
   completos, verificación de migraciones, `needs: test`, ausencia de `always()`,
   `success()` explícito, respaldo previo, aplicación de migraciones y estáticos
-  versionados. Se ejecuta dentro de los workflows de test y deploy.
+  versionados. Se ejecuta dentro de los workflows de test y deploy. No valida
+  que los módulos de test invocados existan ni que se ejecute la suite completa.
 - `scripts/smoke_produccion.sh`: smoke de solo lectura manual posterior al reinicio.
-  Comprueba los códigos HTTP públicos y delega la autorización Profesor al
-  comando Django. Lee parámetros desde el `DEPLOY_ENV_FILE` local del servidor;
-  no recibe contraseñas ni IDs productivos desde el repositorio.
+  Comprueba los códigos HTTP públicos (portada y login). Hasta el 2026-10-08
+  delegaba además la autorización Profesor a un comando Django, hoy retirado.
+  Lee parámetros desde el `DEPLOY_ENV_FILE` local del servidor; no recibe
+  contraseñas ni IDs productivos desde el repositorio. `deploy.yml` no lo ejecuta.
 - El comando `verificar_smoke_profesor` se retiró el 2026-10-08 junto con el
   portal que probaba. El smoke vigente conserva solo las comprobaciones públicas
   de portada y login. Este archivo registra el cambio; los resultados anteriores
@@ -314,15 +317,14 @@ confirmación solo dentro de su DOM aislado.
   de estos componentes según la búsqueda ocurra en servidor o navegador; no debe
   crear otra normalización local.
 
-## Regla de reemplazo
-
 ### Release escalonado de asistencias
 
 - `scripts/release_asistencias_escalonado.sh`: preflight read-only y aplicación
   forward-only con recuperación únicamente antes de iniciar una migración.
 - `.github/workflows/release-asistencias-escalonado.yml`: workflow automático por
   tag anotado, con preflight y apply separados, environments protegidos y
-  concurrencia productiva. Los pushes a `main` no despliegan.
+  concurrencia productiva. Este workflow no se dispara con pushes a `main`
+  (el deploy rutinario de `main` vive en `deploy.yml`).
 - `docs/operacion/RELEASE_ESCALONADO_ASISTENCIAS.md`: contrato, estados y
   límites. Reutilizar el script para futuras reparaciones solo mediante un tag
   y SHA nuevos; nunca copiarlo manualmente al servidor.
@@ -346,11 +348,6 @@ confirmación solo dentro de su DOM aislado.
   predicado reproducido de `0004b`/`0005_v2`, conteos de filas objetivo e IDs
   técnicos de relaciones activas que serían desactivadas; no contiene PII.
 
-Si una herramienta nueva reemplaza otra, no se borra silenciosamente la anterior.
-Debe marcarse como `reemplazada`, indicar fecha y enlazar la versión canónica. Si
-la versión anterior contenía un secreto o dato prohibido, no se copia: se conserva
-solo una descripción sanitizada del motivo y se rota el secreto si correspondía.
-
 ### Inspección de canal SSH y función de preflight 2026-08-23
 
 - `docs/evidencia/release-escalonado-20260823/inspeccion-funcion-wrappers.json`:
@@ -362,3 +359,10 @@ solo una descripción sanitizada del motivo y se rota el secreto si correspondí
   checksum verificado; no contiene secretos.
 - La evidencia registra la corrección del owner y las pruebas posteriores sin
   reiniciar servicios ni modificar tablas, datos o migraciones.
+
+## Regla de reemplazo
+
+Si una herramienta nueva reemplaza otra, no se borra silenciosamente la anterior.
+Debe marcarse como `reemplazada`, indicar fecha y enlazar la versión canónica. Si
+la versión anterior contenía un secreto o dato prohibido, no se copia: se conserva
+solo una descripción sanitizada del motivo y se rota el secreto si correspondía.

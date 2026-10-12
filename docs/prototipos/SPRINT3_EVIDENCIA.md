@@ -2,6 +2,10 @@
 
 Fecha: 2026-07-26
 
+> Evidencia histórica. La "Vista Hoy" capturada ya no está disponible para
+> profesores (ADR 0016 y control actual de `asistencias:sesiones_hoy`); el
+> detalle de sesión sigue existiendo con permisos según ADR 0019.
+
 Las capturas se generaron con Chrome headless desde respuestas reales de las
 vistas Django, usando exclusivamente fixtures ficticias en la base PostgreSQL
 de pruebas. No contienen datos históricos ni información de personas reales.

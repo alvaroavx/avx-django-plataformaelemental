@@ -1,6 +1,6 @@
 # Auditoria
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 `auditoria` registra trazabilidad operativa minima para acciones sensibles de Plataforma Elemental v1.0.
 
@@ -64,6 +64,12 @@ Personas:
 - Creacion de persona desde vistas HTML.
 - Edicion de persona.
 - Agregar/reactivar/configurar/toggle de roles desde perfil o edicion.
+- Solicitudes de acceso: creación o recuperación, intentos de gestión sin
+  permiso, aprobación (asociación o creación de User/Persona/rol), rechazo y reapertura.
+- Primer vínculo Google de un usuario existente (`personas/auth_google.py`).
+- Cambio de estado de sesión desde el perfil de profesor.
+- Cambios de configuración de permisos de Profesor por organización
+  (`personas/views.py::permisos_configuracion`, trabajo en curso; ver ADR 0018).
 
 Asistencias:
 
@@ -76,10 +82,12 @@ Asistencias:
 - Eliminar asistente.
 - Eliminar sesion.
 - Liberar y revertir clases, incluyendo actor, organización, motivo y asistencia.
+- Activación/desactivación explícita de relaciones operativas
+  (`AsignacionProfesorDisciplina`, `AlumnoDisciplina`) desde servicios o Django Admin.
 
 Finanzas:
 
-- Crear y editar pagos.
+- Crear y editar pagos, incluida la transacción creada o sincronizada desde el pago.
 - Revertir pagos, incluyendo actor, fecha, motivo y consumos recalculados.
 - Crear persona rapida desde pagos.
 - Crear, editar y eliminar transacciones.
@@ -90,9 +98,10 @@ Finanzas:
 No se audita:
 
 - GET o vistas de lectura.
-- Exports.
+- Exports, incluida la preparación y descarga del archivo para Cuadratura.
 - API minima (`health`, `status`, `version`, `me`).
-- Monitor archivado.
+- Alta y edición de organizaciones.
+- Asignación masiva de roles desde Django Admin (`PersonaRolAdmin.add_view`).
 - Signals de finanzas.
 - Imputacion automatica de consumos.
 - Cambios derivados automaticos que no sean accion directa del usuario.

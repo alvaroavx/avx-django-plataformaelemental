@@ -1,6 +1,6 @@
 # Roadmap De Dominios
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento ordena crecimiento futuro por dominio sin convertir el monolito Django en microservicios.
@@ -80,10 +80,13 @@ App duena:
 - `finanzas`.
 
 Responsabilidad:
-- transacciones,
+- transacciones de caja,
 - categorias,
-- reportes para contadora,
-- respaldos financieros.
+- reportes operacionales y exportaciones CSV/XLSX,
+- preparacion mensual y exportacion `elemental-cuadratura-v1` hacia Cuadratura.
+
+No le corresponde (ADR 0015):
+- documentos tributarios, respaldos fiscales, conciliacion ni cierres contables; pertenecen a Cuadratura.
 
 No debe absorber:
 - reglas academicas,
@@ -97,11 +100,15 @@ Estado:
 App duena:
 - `api`.
 
-Responsabilidad:
-- endpoints REST,
-- autenticacion API,
-- throttling,
-- contratos externos.
+Responsabilidad actual (v1.0):
+- endpoints minimos `health`, `status`, `version` y `me`,
+- autenticacion API (sesion, token DRF, `ApiAccessKey`),
+- throttling.
+
+Planificado / no implementado:
+- endpoints de datos o contratos externos. El unico contrato externo vigente
+  (`elemental-cuadratura-v1`) vive en `finanzas/services/cuadratura_v1.py` y se
+  entrega como archivo, no por esta app.
 
 No debe contener:
 - reglas de negocio nuevas que no existan en apps/services duenos.
@@ -133,21 +140,14 @@ Criterio de app:
 
 ### Contabilidad Avanzada
 Estado:
-- Futuro.
+- Fuera de Elemental desde ADR 0015 (2026-10-08).
 
-Posible responsabilidad:
-- conciliacion formal,
-- libro de compras/ventas,
-- reglas contables mas estrictas,
-- exportaciones para contadora,
-- cierres mensuales.
+Conciliacion formal, libros de compras/ventas, reglas contables y cierres
+mensuales pertenecen a Cuadratura. Elemental solo entrega hechos operacionales
+mediante el contrato versionado `elemental-cuadratura-v1`.
 
-Relacion probable:
-- evoluciona desde `finanzas`,
-- puede requerir separar cobranza operacional de contabilidad,
-
-Criterio de app:
-- Mantener dentro de `finanzas` hasta que existan reglas contables propias y estables.
+Planificado / no implementado:
+- transporte por API del mismo contrato y confirmacion de recepcion desde Cuadratura.
 
 ### CRM Avanzado
 Estado:

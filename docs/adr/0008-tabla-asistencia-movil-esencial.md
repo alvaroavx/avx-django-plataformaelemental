@@ -1,6 +1,6 @@
 # ADR 0008: tabla móvil de asistencia con información esencial
 
-- Estado: en revisión
+- Estado: reemplazada por [ADR 0009](0009-acciones-asistencia-segun-viewport.md)
 - Fecha: 2026-10-02
 - Decisor: Álvaro
 

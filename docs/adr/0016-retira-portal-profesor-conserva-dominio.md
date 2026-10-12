@@ -1,7 +1,7 @@
 # ADR 0016: Retirar el portal dedicado de profesores y conservar el dominio
 
 Fecha: 2026-10-08
-Estado: Aceptada
+Estado: Aceptada; complementada por [ADR 0019](0019-asistencia-propia-del-profesor.md), que devuelve al rol profesor el calendario propio y el registro de asistentes en sus sesiones dentro de la aplicación común.
 Decisor: Álvaro
 
 ## Contexto

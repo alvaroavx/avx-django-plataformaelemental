@@ -1,6 +1,6 @@
 # Checklist De Cambios
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este checklist reduce documentacion falsa y cambios incompletos.
@@ -38,6 +38,7 @@ python manage.py makemigrations --check --dry-run
 - Mantener la conciliación y documentos fiscales fuera del flujo de imputación de pagos.
 - Si toca deuda, saldo, pagos, consumos o imputacion, agregar o ajustar test de regla.
 - Mantener queries puras en selectors y reglas de negocio en services.
+- Si cambia `Payment`, `Transaction`, `Organizacion` o la selección mensual, revisar el impacto en el contrato `elemental-cuadratura-v1` (`finanzas/services/cuadratura_v1.py`) y sus tests.
 
 ## Si Toca Asistencias
 - Revisar [docs/apps/ASISTENCIAS.md](../apps/ASISTENCIAS.md).
@@ -84,7 +85,9 @@ python manage.py test
 ```
 
 La lista manual de apps omite `auditoria`, `plataformaelemental`, pruebas de
-fase y cualquier app futura; no usarla como equivalente a suite completa.
+fase y cualquier app futura; no usarla como equivalente a suite completa. Los
+workflows de CI usan hoy esa lista parcial (`asistencias finanzas personas`), por
+lo que un CI verde no prueba `api`, `auditoria` ni `plataformaelemental`.
 
 - Para cambios solo documentales no se requieren tests, pero se debe revisar enlaces y rutas.
 

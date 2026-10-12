@@ -2,6 +2,15 @@
 
 Fecha de actualización: 2026-08-18
 
+> **Estado documental (2026-10-12): histórico.** El runbook manual de este
+> documento fue reemplazado por el release automatizado descrito en
+> [RELEASE_ESCALONADO_ASISTENCIAS.md](RELEASE_ESCALONADO_ASISTENCIAS.md), que
+> aplica `0004b`, `0005_..._v2`, `0006` y `0007`. `scripts/deploy.sh` rechaza
+> desplegar mientras alguna de esas migraciones esté pendiente. El portal
+> `/profesor/` que motivó estas migraciones fue retirado (ADR 0016), pero sus
+> modelos y datos se conservan. El "Gate actual: NO-GO" de abajo refleja la
+> fecha del documento, no un estado verificado hoy.
+
 ## Estado y decisión
 
 **Gate actual: NO-GO.** Producción no fue consultada ni modificada al preparar

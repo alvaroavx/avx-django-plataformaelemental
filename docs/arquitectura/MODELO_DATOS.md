@@ -1,6 +1,6 @@
 # Modelo De Datos
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 ## Proposito
 Este documento resume el mapa relacional vigente de Plataforma Elemental.
@@ -196,6 +196,7 @@ erDiagram
 - `Rol`: catalogo de roles como estudiante o profesor.
 - `PersonaRol`: une persona, rol y organizacion. Guarda configuracion operativa por rol, como `valor_clase` y `retencion_sii`.
 - `SolicitudAcceso`: conserva la decisión administrativa sobre una identidad Google y la organización/rol resueltos.
+- `ConfiguracionPermisoRol` (en curso, sin commitear al 2026-10-12; migración `personas.0011`): excepción por organización + rol + capacidad (`habilitado`), única por esa terna. Hoy solo se consulta para `ver_calendario` y `agregar_asistentes_propios`; la ausencia de fila equivale a habilitado. No figura en el diagrama hasta integrarse.
 
 ### Asistencias
 - `Disciplina`: actividad dictada dentro de una organizacion.
@@ -239,7 +240,7 @@ La app `monitor` fue retirada del producto activo de la misma forma.
 Estado actual:
 - No existe app `monitor` en `INSTALLED_APPS`.
 - No existen modelos, vistas, urls ni templates de `monitor` en el repositorio.
-- Las tablas `monitor_*` se retiraron en desarrollo con `python manage.py migrate monitor zero` antes de borrar el codigo; cada ambiente (incluida produccion) debe correr el mismo paso, con respaldo previo, antes o durante el despliegue que retira la app.
+- Las tablas `monitor_*` se retiraron en desarrollo con `python manage.py migrate monitor zero` antes de borrar el codigo (`a64dbc2`). En produccion ese paso no está confirmado. Como `monitor` ya no está en `INSTALLED_APPS`, el comando no puede ejecutarse desde el `HEAD` actual: requiere un checkout anterior a `a64dbc2` o un `DROP` manual revisado, siempre con respaldo previo.
 
 Regla:
 - No reintroducir modelos ni imports desde `monitor`.
@@ -281,16 +282,23 @@ Regla:
 - `Disciplina` es unica por `organizacion + nombre + nivel`.
 - `Asistencia` es unica por `sesion + persona`.
 - `PaymentPlan` es unico por `organizacion + nombre`.
+- `AsignacionProfesorDisciplina` es unica por `disciplina + profesor` y `AlumnoDisciplina` por `disciplina + alumno`.
+- `SolicitudAcceso` pendiente es unica por `provider + provider_subject` y por `email_normalizado` (constraints parciales).
+- `LotePago.clave_idempotencia` es unica; `Payment.clave_idempotencia` es unica cuando no es nula.
+- `Persona.rut` no tiene constraint de base de datos: la unicidad se valida en `Persona.clean()`.
 
 ### Cascadas
 - El intento de eliminar una `Organizacion` puede borrar roles, disciplinas,
   bloques, planes, pagos y transacciones, pero puede ser bloqueado
-  por `ClaseLiberada.organizacion` o `LotePago.organizacion` con `PROTECT`.
+  por `ClaseLiberada.organizacion` o `LotePago.organizacion` con `PROTECT`, y
+  también indirectamente por `Payment.disciplina` o `Payment.transaccion`
+  (ambos `PROTECT`) cuando la cascada alcanza disciplinas o transacciones con pagos.
 - Si se elimina una `Persona`, se eliminan sus roles, asistencias y consumos por
   `CASCADE`, salvo que un `Payment.persona` la proteja.
 - Si se elimina el `User` vinculado, `Persona.user` usa `CASCADE` y por tanto
   intenta eliminar también la Persona. Es un riesgo productivo explícito.
-- Si se elimina una `SesionClase`, se eliminan sus asistencias por `CASCADE`.
+- Si se elimina una `SesionClase`, se eliminan sus asistencias por `CASCADE`,
+  salvo que tenga una `LiberacionSesion` (`PROTECT`).
 - Si se elimina una `Asistencia`, se elimina su `AttendanceConsumption` por `CASCADE`.
 
 ### Protecciones
@@ -298,6 +306,9 @@ Regla:
 - `Payment.persona` usa `PROTECT`, por lo que no se puede eliminar una persona con pagos.
 - `Transaction.categoria` usa `PROTECT`, por lo que no se puede eliminar una categoria con transacciones.
 - `ClaseLiberada.organizacion` y `LotePago.organizacion` usan `PROTECT`.
+- `Payment.disciplina` usa `PROTECT`: no se puede eliminar una disciplina con pagos imputados.
+- `Payment.transaccion` usa `PROTECT`: no se puede eliminar una `Transaction` enlazada a un pago.
+- `LiberacionSesion.sesion` y `LiberacionSesion.liberada_por` usan `PROTECT`.
 
 ### SET_NULL
 - `BloqueHorario.disciplina` queda en `NULL` si se elimina la disciplina.
@@ -308,7 +319,10 @@ Regla:
 
 ## Datos Que Se Duplican A Proposito
 
-- `Payment` guarda montos neto, IVA y total calculados al momento del pago.
+- `Payment` guarda montos neto, IVA y total calculados al momento del pago
+  (`Payment.save()`), redondeados a dos decimales con `ROUND_HALF_UP`. Un pago
+  con IVA puede quedar con centavos; el export a Cuadratura los rechaza como
+  `non_integer_clp_amount`.
 - `AttendanceConsumption` guarda `persona` y `clase_fecha` aunque esos datos tambien se puedan derivar desde `Asistencia`; esto facilita consultas de deuda/saldo por periodo.
 
 Regla:

@@ -1,6 +1,6 @@
 # Deploy
 
-Fecha de actualizacion: 2026-10-08
+Fecha de actualizacion: 2026-10-12
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:
@@ -41,6 +41,9 @@ directamente por SSH.
 - `scripts/deploy.sh`
 - `scripts/release_operacion_profesor.sh`
 - `scripts/release_asistencias_0005.sh`
+- `scripts/release_asistencias_escalonado.sh`
+- `.github/workflows/release-asistencias-escalonado.yml`
+- `.github/workflows/test.yml`
 - `scripts/validar_gate_ci.py`
 - `scripts/smoke_produccion.sh`
 - `deploy/systemd/plataforma-elemental.service.example`
@@ -101,7 +104,7 @@ Los jobs de prueba también fijan esos cuatro flags en `false` de forma explíci
   - ruta absoluta del virtualenv si no quieres usar `.venv` dentro del repo
   - si no existe, usa `.venv` en el repo
 - `DEPLOY_PYTHON_BIN`
-  - binario python a usar para crear el virtualenv, por ejemplo `python3.13`
+  - binario python a usar para crear el virtualenv, por ejemplo `python3.12`
   - si no existe, usa `python3`
 
 ## Llave SSH de deploy
@@ -247,11 +250,15 @@ flowchart TD
     E -- "Sí" --> M["Detener servicio, pg_dump validado y migrate"]
     E -- "No" --> H
     M --> H["collectstatic con nombres versionados, check y restart"]
-    H --> I["Smoke post-deploy"]
+    H -.-> I["Smoke manual opcional (scripts/smoke_produccion.sh)"]
 ```
 
-1. cada push a `main` corre `check`, `makemigrations --check --dry-run`, Ruff y
-   la suite Django sobre PostgreSQL aislado;
+1. cada push a `main` corre `scripts/validar_gate_ci.py`, `check`,
+   `makemigrations --check --dry-run`, Ruff y
+   `python manage.py test asistencias finanzas personas` sobre PostgreSQL
+   aislado. Esa lista **no** incluye `api`, `auditoria` ni
+   `plataformaelemental.tests`; esas pruebas solo corren localmente con
+   `python manage.py test`;
 2. el job `cambios_esquema` informa si el push contiene archivos de migración,
    pero no sustituye la comprobación efectiva de migraciones pendientes contra
    la base productiva;
@@ -279,7 +286,11 @@ flowchart TD
   el contenedor PostgreSQL junto con el runner efímero.
 - El job no carga `.env.prod`, `DEPLOY_ENV_FILE` ni secrets de PostgreSQL.
 - SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
-- `.github/workflows/test.yml` ejecuta el mismo conjunto completo en `pull_request` o `workflow_dispatch`, incluido `makemigrations --check --dry-run`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
+- `.github/workflows/test.yml` ejecuta el mismo conjunto en `pull_request` o `workflow_dispatch`, incluido `makemigrations --check --dry-run`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
+- Discrepancia vigente: `test.yml` agrega un paso final
+  `python manage.py test asistencias.test_profesor_ux asistencias.test_operacion_profesor`.
+  Esos módulos se eliminaron al retirar el portal de profesores (ADR 0016), por
+  lo que ese paso falla en cada PR hasta que se corrija el workflow.
 
 ## SSH En CI
 - El workflow valida `DEPLOY_SSH_KEY_B64` como secret obligatorio.
@@ -315,8 +326,9 @@ Checklist operativo para validar el deploy que incluye `Organizacion.logo`:
 1. Confirmar que `Pillow` esta en `requirements.txt`.
 2. Confirmar que el workflow remoto ejecuta `pip install -r requirements.txt` mediante `scripts/deploy.sh`.
 3. Hacer push a `main` sin migraciones y confirmar que CI activa el deploy.
-4. Si el cambio incluye una migración, usar el release escalonado antes de
-   publicar código que dependa de ella.
+4. Si el cambio incluye una migración rutinaria, el deploy automático la
+   aplica con backup previo; el release escalonado queda reservado para la
+   reparación histórica `asistencias.0004b–0007`.
 5. Confirmar que `python manage.py check --deploy` corre en el script.
 6. Confirmar que `python manage.py collectstatic --noinput` corre en el script.
 7. Confirmar que Gunicorn/systemd se reinicia y queda activo.
@@ -331,7 +343,7 @@ Checklist operativo para validar el deploy que incluye `Organizacion.logo`:
 16. Revisar logs de Gunicorn y Nginx si algo falla.
 
 Fallback de Pillow:
-- En Python 3.13, `Pillow==11.3.0` deberia instalarse desde wheel manylinux con `pip`.
+- En Python 3.12 (versión validada en CI), `Pillow==11.3.0` deberia instalarse desde wheel manylinux con `pip`.
 - No se agregan paquetes `apt` por defecto.
 - Si `pip install -r requirements.txt` falla compilando Pillow, revisar version de Python, arquitectura del servidor y disponibilidad de wheel.
 - Solo si no hay wheel disponible, instalar dependencias del sistema para compilar Pillow segun la distribucion del servidor.
@@ -367,9 +379,16 @@ En producción Django no sirve archivos directamente desde `MEDIA_ROOT`. Sin emb
 Clasificación:
 
 - público: `media/organizaciones/logos/`;
-- protegido: `media/finanzas/documentos/pdf/`, `media/finanzas/documentos/xml/`, `media/finanzas/transactions/` y `media/finanzas/importaciones_tmp/`.
+- protegido: `media/finanzas/transactions/` (archivo de `Transaction`),
+  `media/finanzas/pagos/` (`Payment.respaldo`) y `media/finanzas/lotes/`
+  (`LotePago.respaldo`).
 
-Los archivos protegidos se descargan o visualizan exclusivamente por rutas Django con autorización. Nginx solo publica los logos.
+Los adjuntos de transacciones se visualizan solo por
+`/finanzas/transacciones/<id>/archivo/` con autorización. `Payment.respaldo` y
+`LotePago.respaldo` no tienen hoy ruta Django de descarga ni formulario que los
+cargue. Las carpetas `media/finanzas/documentos/` e `importaciones_tmp/` de
+documentos tributarios ya no se usan (ADR 0015); si quedan en un servidor deben
+seguir sin publicarse. Nginx solo publica los logos.
 
 Bloque sugerido, ajustando la ruta real al `MEDIA_ROOT` de produccion:
 
@@ -388,7 +407,7 @@ Validaciones:
 - Nginx necesita permisos de lectura únicamente sobre la carpeta pública.
 - El usuario que ejecuta Gunicorn necesita permisos de escritura para subir logos desde Django Admin.
 - Solicitar directamente una ruta bajo `/media/finanzas/` debe responder `404`.
-- Las rutas Django de documentos y transacciones deben seguir entregando archivos solo al actor y organización autorizados.
+- La ruta Django de archivos de transacciones debe seguir entregándolos solo al actor y organización autorizados.
 - Si `/media/` no esta configurado, la plataforma sigue funcionando con fallback de iniciales o `Elemental Apps`, pero los logos subidos no se serviran correctamente.
 
 La configuración efectiva de Nginx debe comprobarse en el servidor durante el Gate 3. No se puede declarar seguro el despliegue únicamente porque las vistas Django estén protegidas.
@@ -425,9 +444,10 @@ aplicar `asistencias.0004` o usar la nueva operación; ver su runbook específic
 - `python manage.py check --deploy` se ejecuta automaticamente y puede mostrar warnings de seguridad; bloquea el deploy solo si Django retorna error.
 - Si `DEPLOY_SSH_KEY_B64` esta mal cargado, el workflow fallara antes de intentar el SSH remoto.
 - Si `DJANGO_SECRET_KEY` es corto, repetitivo o empieza con `django-insecure-`, Django mostrara `security.W009` en deploy; no siempre bloquea, pero debe corregirse en produccion.
-- La aprobación efectiva depende de configurar revisores obligatorios en el
-  environment GitHub `production`; declararlo en YAML por sí solo no crea esa
-  política en el repositorio.
+- `deploy.yml` no declara `environment`; el deploy automático no pasa por
+  revisores. Solo `release-asistencias-escalonado.yml` declara los environments
+  `production-readonly` y `production`, y su aprobación efectiva depende de
+  configurarlos en GitHub; declararlos en YAML por sí solo no crea esa política.
 - Un valor desconocido de `DJANGO_ENV` se resuelve como `dev`; el entorno
   productivo debe comprobar el valor exacto antes de iniciar procesos.
 - El smoke manual verifica `/` → login y `/accounts/login/` → `200`. No prueba

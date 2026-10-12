@@ -4,6 +4,15 @@ Estado al 2026-08-23: GitHub devolvió `{"total_count":0,"environments":[]}`.
 No existen todavía `production-readonly` ni `production`. Este documento
 prepara la configuración; no crea environments ni rota secrets.
 
+Verificación contra el código (2026-10-12): `.github/workflows/release-asistencias-escalonado.yml`
+se dispara solo por push de tags `release/asistencias-*` (no tiene
+`workflow_dispatch`) y consume únicamente los secrets `DEPLOY_HOST`,
+`DEPLOY_PORT`, `DEPLOY_USER`, `DEPLOY_SSH_KEY_B64` y `DEPLOY_KNOWN_HOSTS`. Los
+demás nombres listados abajo (`DEPLOY_PATH`, `DEPLOY_ENV_FILE`,
+`DEPLOY_SERVICE`, `RELEASE_BACKUP_FILE`, `RELEASE_OPS_DIR`) no los lee el
+workflow; corresponden a la configuración esperada del wrapper en el servidor.
+El estado real de los environments en GitHub no se verificó en esta revisión.
+
 ## production-readonly
 
 Crear un environment con revisores obligatorios y definir allí, no a nivel de
@@ -49,7 +58,7 @@ gh secret list --repo alvaroavx/avx-django-plataformaelemental --app actions
 gh api repos/alvaroavx/avx-django-plataformaelemental/environments
 ```
 
-El workflow debe ejecutarse seleccionando un tag y comprobar:
+El workflow se ejecuta al publicar un tag anotado y comprueba:
 
 ```bash
 test "$GITHUB_REF_TYPE" = tag

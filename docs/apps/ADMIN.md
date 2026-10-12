@@ -1,6 +1,6 @@
 # Django Admin
 
-Fecha de actualizacion: 2026-08-09
+Fecha de actualizacion: 2026-10-12
 
 El Django Admin de Plataforma Elemental es una herramienta interna de soporte, revision y diagnostico.
 
@@ -19,15 +19,27 @@ Modelos cubiertos para soporte:
 - `finanzas.Transaction`
 - `auditoria.AuditLog`
 
-Tambien existen admins auxiliares para modelos de catalogo o compatibilidad, pero no deben convertirse en operacion diaria.
+Tambien existen admins auxiliares para modelos de catalogo o compatibilidad, pero no deben convertirse en operacion diaria:
+`personas.Rol`, `asistencias.Disciplina`, `BloqueHorario`, `LiberacionSesion`,
+`ClaseLiberada`, `AsignacionProfesorDisciplina`, `AlumnoDisciplina`,
+`finanzas.PaymentPlan`, `LotePago`, `AttendanceConsumption`, `Category` y
+`api.ApiAccessKey`.
+
+No están registrados en Admin: `personas.SolicitudAcceso` (se gestiona en
+`/personas/solicitudes-acceso/`) ni `personas.ConfiguracionPermisoRol` (se
+gestiona en `/personas/permisos/`, trabajo en curso; ver ADR 0018).
 
 ## Reglas
 
 - No usar admin para cerrar meses, recalcular saldos ni imputar pagos.
 - No crear acciones masivas destructivas.
 - `actions = None` deshabilita acciones masivas en Organización, Persona,
-  PersonaRol, SesionClase, Asistencia, ClaseLiberada, LotePago, Payment,
-  Transaction y AuditLog.
+  PersonaRol, SesionClase, Asistencia, LiberacionSesion, ClaseLiberada,
+  LotePago, Payment, Transaction y AuditLog.
+- `AsignacionProfesorDisciplina` y `AlumnoDisciplina` reemplazan las acciones
+  estándar por una única acción auditada, `Activar relaciones seleccionadas
+  tras revisión`, sin `delete_selected`; activar o desactivar exige el permiso
+  organizacional correspondiente (`asistencias/admin.py::ActivacionRelacionAdminMixin`).
 - No está deshabilitado de forma uniforme: Rol, Disciplina, BloqueHorario,
   PaymentPlan, AttendanceConsumption, Category y ApiAccessKey conservan las
   acciones estándar del Admin según permisos Django. Esto es un riesgo operativo.
@@ -51,6 +63,8 @@ La revision de logs se hace desde `Auditoria > Registros de auditoria`.
 - El admin es para staff/superuser.
 - Los permisos nativos del Admin no equivalen a la matriz organizacional de
   `PersonaRol`; una cuenta staff debe revisarse separadamente.
-- La asignacion masiva de roles existente en `PersonaRol` es sensible y debe usarse con criterio.
+- La asignacion masiva de roles existente en `PersonaRol` (alta con varias
+  personas en `PersonaRolAdmin.add_view`) es sensible, no queda registrada en
+  `AuditLog` y debe usarse con criterio.
 - No hay acciones de recuperacion, recalculo o conciliacion desde admin.
 - `AuditLog` puede ser visto por cualquier `is_staff`; no filtra por organización.

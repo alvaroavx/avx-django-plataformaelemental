@@ -1,6 +1,6 @@
 # Inventario de reglas de negocio
 
-Fecha de actualización: 2026-08-09
+Fecha de actualización: 2026-10-12
 
 Este inventario referencia la implementación vigente. No reemplaza los tests ni
 los documentos dueños de cada app.
@@ -21,7 +21,7 @@ los documentos dueños de cada app.
 | --- | --- |
 | Acciones se mapean a roles normalizados. | `personas/permissions.py` |
 | Asistencias limita objetos a organizaciones/roles vigentes y no da bypass a staff ordinario. | `asistencias/selectors.py`, `asistencias/decorators.py`, `asistencias/views.py` |
-| Profesora solo opera sesiones asignadas cuando la superficie lo permite. | `asistencias/views.py`, `asistencias/utils.py` |
+| Sin portal dedicado (ADR 0016). En el árbol de trabajo (sin commitear, ADR 0018/0019) Profesor puede ver solo sesiones donde figura como profesor (`ver_calendario`) y agregar alumnos vinculados a la disciplina en esas sesiones (`agregar_asistentes_propios`); ambas capacidades se pueden deshabilitar por organización. | `personas/permissions.py`, `asistencias/selectors.py`, `asistencias/views.py` |
 | Personas y Finanzas todavía conservan bypass histórico de `is_staff`. | `personas/permissions.py`, decoradores consumidores |
 
 ## Operación académica
@@ -53,6 +53,14 @@ los documentos dueños de cada app.
 | Transaction toma ingreso/egreso desde la categoría y alimenta libro de caja. | `finanzas/forms.py`, `finanzas/selectors.py`, `finanzas/services/reportes.py` |
 | Payment y Transaction no son intercambiables y pueden enlazarse uno a uno. | `finanzas/models.py`, `docs/apps/FINANZAS.md` |
 
+## Integración con Cuadratura
+
+| Regla | Implementación principal |
+| --- | --- |
+| Solo pagos con `fecha_pago` en el mes, no revertidos, con transacción de ingreso de la misma organización, monto total igual y montos CLP enteros se exportan como operación; el resto va a `pending_records` con motivos. | `finanzas/services/cuadratura_v1.py:prepare_month` |
+| `batch_id` es SHA-256 de organización, período e IDs de operaciones incluidas; la generación no muta registros. | `finanzas/services/cuadratura_v1.py`, `finanzas/tests.py` |
+| La exportación exige organización, mes y año concretos y la acción `exportar_datos` (roles Admin/Finanzas; `is_staff` conserva bypass). | `finanzas/views.py:preparar_mes`, `finanzas/views.py:descargar_cuadratura` |
+
 ## Auditoría y API
 
 | Regla | Implementación principal |
@@ -65,7 +73,7 @@ los documentos dueños de cada app.
 
 - Eliminar el bypass global de `is_staff` requiere una decisión y migración de permisos.
 - Varias invariantes son de aplicación y no constraints PostgreSQL.
-- No existe conciliación formal entre pagos, transacciones y documentos.
+- No existe conciliación formal entre pagos y transacciones dentro de Elemental; la conciliación fiscal pertenece a Cuadratura (ADR 0015).
 - No existe política productiva única de bajas/cascadas.
 - `Category` sigue siendo catálogo global entre organizaciones.
 
