@@ -2,7 +2,7 @@
 {% block title %}Preparar mes{% endblock %}
 {% block content %}
 <div class="mt-4">
-  <div class="elemental-page-header mb-3"><div><div class="text-muted small text-uppercase">Elemental → Cuadratura</div><h2>Preparar mes</h2><p class="mb-0">Prepara información para revisión en Cuadratura. No emite boletas, no cierra el mes y no modifica deudas ni clases disponibles.</p></div></div>
+  <div class="elemental-page-header mb-3"><div><div class="text-muted small text-uppercase">Elemental → Cuadratura</div><h2>Preparar mes</h2><p class="mb-0">Prepara información para revisión en Cuadratura. No emite boletas ni cierra el período contable en Cuadratura, y no modifica deudas ni clases disponibles.</p></div></div>
   {% if not organizacion or periodo_mes == 'todos' or periodo_anio == 'todos' %}
     <div class="alert alert-warning" role="alert">Selecciona una organización, un mes y un año específicos en los filtros superiores.</div>
   {% else %}
@@ -17,7 +17,39 @@
       </div>
     </div></div>
     {% if preparacion.pending_records %}<div class="card mb-3"><div class="card-header">Registros excluidos o pendientes de aclaración</div><div class="card-body"><ul class="mb-0">{% for item in preparacion.pending_records %}<li><code>{{ item.external_id }}</code>: {{ item.reasons|join:", " }}</li>{% endfor %}</ul></div></div>{% endif %}
-    <a class="btn btn-primary" href="{% url 'finanzas:descargar_cuadratura' %}?{{ request.GET.urlencode }}"><i class="bi bi-download"></i> Descargar para Cuadratura</a>
+    <div class="card shadow-sm mb-3"><div class="card-body">
+      <h3 class="h5">Enviar a Cuadratura</h3>
+      {% if envio.enviado %}
+        <div class="alert alert-success mb-2" role="status">
+          <i class="bi bi-lock-fill"></i> Enviado el {{ envio.enviado.creado_en|date:"d/m/Y H:i" }}{% if envio.enviado.enviado_por %} por {{ envio.enviado.enviado_por.get_full_name|default:envio.enviado.enviado_por.username }}{% endif %}: {{ envio.enviado.operaciones }} operaciones por {{ envio.enviado.monto_total|clp }}.
+          Este mes quedó bloqueado: sus pagos ya no se pueden registrar, editar ni revertir.
+        </div>
+        <p class="mb-0 small text-muted">Estado en Cuadratura al enviar: {{ envio.enviado.estado_cuadratura|default:"—" }}. Una persona de Cuadratura debe revisar y confirmar el lote.{% if envio.enviado.url_revision %} <a href="{{ envio.enviado.url_revision }}" target="_blank" rel="noopener">Ver en Cuadratura</a>{% endif %}</p>
+      {% else %}
+        {% if envio.incierto %}
+          <div class="alert alert-warning mb-2" role="alert"><i class="bi bi-hourglass-split"></i> El último envío salió pero Cuadratura no confirmó la recepción. El mes queda bloqueado; reintenta el envío (se manda el mismo contenido y Cuadratura no lo duplica).</div>
+        {% endif %}
+        <p>Envía las operaciones del mes directamente a Cuadratura. Allá quedan en revisión hasta que alguien las confirme. <strong>Después del envío este mes queda bloqueado en Elemental</strong> y no se puede volver a enviar.</p>
+        {% if envio.motivos %}
+          <div class="alert alert-warning mb-2" role="alert"><ul class="mb-0">{% for motivo in envio.motivos %}<li>{{ motivo }}</li>{% endfor %}</ul></div>
+        {% else %}
+          <form method="post" action="{% url 'finanzas:enviar_cuadratura' %}?{{ request.GET.urlencode }}">
+            {% csrf_token %}
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="confirmo_bloqueo" value="1" id="confirmo_bloqueo" required>
+              <label class="form-check-label" for="confirmo_bloqueo">Entiendo que {{ periodo_descripcion_corta }} quedará bloqueado después del envío.</label>
+            </div>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i> Enviar {{ preparacion.summary.operations }} operaciones a Cuadratura</button>
+          </form>
+        {% endif %}
+      {% endif %}
+      {% if envio.intentos %}
+        <details class="mt-3"><summary class="small">Intentos de envío ({{ envio.intentos|length }})</summary>
+          <ul class="small mb-0 mt-2">{% for intento in envio.intentos %}<li>{{ intento.creado_en|date:"d/m/Y H:i" }} · {{ intento.get_estado_display }}{% if intento.detalle_error %}: {{ intento.detalle_error }}{% endif %}</li>{% endfor %}</ul>
+        </details>
+      {% endif %}
+    </div></div>
+    <a class="btn btn-outline-secondary" href="{% url 'finanzas:descargar_cuadratura' %}?{{ request.GET.urlencode }}"><i class="bi bi-download"></i> Descargar para Cuadratura</a>
   {% endif %}
 </div>
 {% endblock %}

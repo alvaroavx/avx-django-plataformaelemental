@@ -5,6 +5,7 @@ import uuid
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import transaction as db_transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -60,6 +61,7 @@ from .forms_helpers import (
     url_with_query_without as _url_with_query_without,
 )
 from .models import Category, LotePago, Payment, PaymentPlan, Transaction
+from .services.cuadratura_api import enviar_mes, estado_envio
 from .services.cuadratura_v1 import prepare_month, serialize_contract
 from personas.models import Persona
 from personas.search import filtrar_por_fragmentos
@@ -559,16 +561,20 @@ def pago_masivo(request):
         filas, errores_filas = _filas_pago_masivo(request, form)
         preview = request.POST.get("accion") == "preview"
         if request.POST.get("accion") == "confirmar" and not errores_filas:
-            lote, creado = confirmar_lote_pagos(
-                usuario=request.user,
-                organizacion_id=organizacion.pk,
-                clave_idempotencia=form.cleaned_data["clave_idempotencia"],
-                filas=filas,
-                metadatos={"personas": form.cleaned_data["personas_seleccionadas"]},
-            )
-            if not creado:
-                messages.info(request, "Esta clave ya fue procesada; se muestra el lote existente.")
-            return redirect("finanzas:pago_masivo_resultado", pk=lote.pk)
+            try:
+                lote, creado = confirmar_lote_pagos(
+                    usuario=request.user,
+                    organizacion_id=organizacion.pk,
+                    clave_idempotencia=form.cleaned_data["clave_idempotencia"],
+                    filas=filas,
+                    metadatos={"personas": form.cleaned_data["personas_seleccionadas"]},
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc.messages[0])
+            else:
+                if not creado:
+                    messages.info(request, "Esta clave ya fue procesada; se muestra el lote existente.")
+                return redirect("finanzas:pago_masivo_resultado", pk=lote.pk)
     contexto = {
         "form": form,
         "organizaciones": _organizaciones_pago_masivo(request.user),
@@ -855,17 +861,22 @@ def transaccion_edit(request, pk):
 def transaccion_delete(request, pk):
     transaccion = get_object_or_404(_queryset_en_organizacion_activa(Transaction.objects.all(), request), pk=pk)
     if request.method == "POST":
-        registrar_auditoria(
-            usuario=request.user,
-            accion=AuditLog.ACCION_ELIMINAR,
-            dominio="finanzas",
-            objeto=transaccion,
-            organizacion=transaccion.organizacion,
-            resumen="Transacción eliminada",
-            metadata=_snapshot_transaccion(transaccion),
-        )
-        transaccion.delete()
-        messages.success(request, "Transaccion eliminada.")
+        try:
+            with db_transaction.atomic():
+                registrar_auditoria(
+                    usuario=request.user,
+                    accion=AuditLog.ACCION_ELIMINAR,
+                    dominio="finanzas",
+                    objeto=transaccion,
+                    organizacion=transaccion.organizacion,
+                    resumen="Transacción eliminada",
+                    metadata=_snapshot_transaccion(transaccion),
+                )
+                transaccion.delete()
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+        else:
+            messages.success(request, "Transaccion eliminada.")
         return _redirect_with_query(request, "finanzas:transacciones_list")
     return render(
         request,
@@ -894,12 +905,49 @@ def preparar_mes(request):
     organizacion = organizacion_desde_request(request)
     context = _base_context(request)
     context["preparacion"] = None
+    context["envio"] = None
     if organizacion and periodo["mes"] and periodo["anio"]:
         context["preparacion"] = prepare_month(
             organization=organizacion, year=periodo["anio"], month=periodo["mes"]
         )
+        context["envio"] = estado_envio(
+            organizacion=organizacion,
+            anio=periodo["anio"],
+            mes=periodo["mes"],
+            preparacion=context["preparacion"],
+        )
     context["organizacion"] = organizacion
     return render(request, "finanzas/preparar_mes.html", context)
+
+
+@exportar_finanzas_required
+def enviar_cuadratura(request):
+    if request.method != "POST":
+        return _redirect_with_query(request, "finanzas:preparar_mes")
+    periodo = resolver_periodo(request)
+    organizacion = organizacion_desde_request(request)
+    if not organizacion or not periodo["mes"] or not periodo["anio"]:
+        messages.error(request, "Selecciona una organización, un mes y un año específicos.")
+    elif request.POST.get("confirmo_bloqueo") != "1":
+        messages.error(request, "Confirma que entiendes que el mes quedará bloqueado después del envío.")
+    else:
+        try:
+            envio = enviar_mes(
+                organizacion=organizacion, anio=periodo["anio"], mes=periodo["mes"], usuario=request.user
+            )
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+        else:
+            if envio.estado == envio.Estado.ENVIADO:
+                messages.success(
+                    request,
+                    "Mes enviado a Cuadratura. Queda en revisión allá y bloqueado aquí.",
+                )
+            elif envio.estado == envio.Estado.INCIERTO:
+                messages.warning(request, f"{envio.get_estado_display()}: {envio.detalle_error}")
+            else:
+                messages.error(request, f"{envio.get_estado_display()}: {envio.detalle_error}")
+    return _redirect_with_query(request, "finanzas:preparar_mes")
 
 
 @exportar_finanzas_required

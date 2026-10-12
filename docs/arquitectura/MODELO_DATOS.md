@@ -217,6 +217,7 @@ erDiagram
 - `AttendanceConsumption`: imputacion financiera de una asistencia contra un pago o deuda.
 - `Category`: categoria contable para transacciones.
 - `Transaction`: movimiento financiero de ingreso o egreso, asociado a categoría y organización.
+- `EnvioCuadratura`: cada intento de enviar un mes a la API de Cuadratura (estado, `batch_id`, acuse y error). Hay a lo sumo un intento `en_curso` o `enviado` por organización y mes. El último intento decide el bloqueo: `en_curso`, `enviado` e `incierto` bloquean los pagos del mes y sus transacciones enlazadas (ADR 0023, migración `finanzas.0016`).
 
 ### Soporte transversal
 - `AuditLog`: evento parcial de auditoría con usuario y organización opcionales.

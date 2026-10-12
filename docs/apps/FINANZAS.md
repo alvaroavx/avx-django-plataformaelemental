@@ -16,6 +16,7 @@ contables pertenecen a Cuadratura.
 - Transacciones de ingreso o egreso y sus categorías.
 - Panel financiero, reporte por categorías y exportaciones operacionales.
 - Exportación JSON versionada Elemental → Cuadratura (`elemental-cuadratura-v1`).
+- Envío del mes a la API v1 de Cuadratura (`cuadratura-operations-v1`) con bloqueo del mes enviado (ADR 0023).
 
 Quedan fuera de esta app los comprobantes fiscales, sus archivos XML/PDF, su
 importación, almacenamiento, asociación y edición (ADR 0015, migración
@@ -73,6 +74,7 @@ es `es_exenta_iva`, el pago se guarda con `aplica_iva = False`.
 - `services/reconciliacion.py`: diagnóstico de integridad asistencias/consumos/pagos.
 - `services/reportes.py`: composición del panel y filas de exportación.
 - `services/cuadratura_v1.py`: contrato de salida hacia Cuadratura.
+- `services/cuadratura_api.py`: traducción al contrato genérico de Cuadratura, envío por API y estado del envío.
 - `views.py`: autorización y coordinación HTTP.
 
 Comando de diagnóstico (solo lectura; termina con error si hay inconsistencias):
@@ -94,6 +96,7 @@ Exportaciones (permiso `exportar_datos`):
 - `export/pagos-profesores.xlsx`: estimación de pago a profesores calculada con
   `asistencias/services/exportaciones.py`; no es un pago registrado.
 - `preparar-mes/descargar/`: archivo JSON para Cuadratura (ver sección siguiente).
+- `preparar-mes/enviar/` (POST): envía el mes a la API de Cuadratura (ver «Envío por API»).
 
 ## Contrato Elemental → Cuadratura v1
 
@@ -109,8 +112,8 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
   organización, mes y año específicos. Sin ellos la descarga responde `400` en
   texto plano.
 - **Archivo:** JSON UTF-8, indentado, claves ordenadas, nombre
-  `elemental_cuadratura_AAAA-MM.json`. Es transporte manual; no hay envío
-  automático ni endpoint API.
+  `elemental_cuadratura_AAAA-MM.json`. Es transporte manual; el envío directo
+  usa otro contrato (ver «Envío por API»).
 - **Selección:** `Payment` de la organización con `fecha_pago` dentro del mes
   (`selection.criterion = confirmed_payment_date_in_period`), ordenados por id.
   No muta datos.
@@ -145,14 +148,50 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
 - **Pruebas:** `finanzas/tests.py` cubre una operación válida (sin mutar el
   pago) y un pago sin transacción enlazada.
 
+### Envío por API (ADR 0023)
+
+- **Dónde:** botón «Enviar a Cuadratura» en `/finanzas/preparar-mes/`, con permiso
+  `exportar_datos` y una casilla obligatoria que confirma el bloqueo.
+- **Contrato:** `construir_documento` traduce `prepare_month` a
+  `cuadratura-operations-v1`, el contrato genérico que define Cuadratura.
+  - Sin `origin_system`: lo fija el token.
+  - `customer_name` viene del nombre del beneficiario.
+  - `pending_records` pasa a `excluded_records`.
+  - `batch_id` es el SHA-256 del documento sin `generated_at`.
+- **Llamadas:** `GET {CUADRATURA_API_URL}/api/v1/` para elegir la organización por
+  RUT, y luego `POST .../organizations/{id}/periods/AAAA-MM/batches/`. Usa
+  `Authorization: Bearer {CUADRATURA_API_TOKEN}` y el timeout
+  `CUADRATURA_API_TIMEOUT`.
+- **Condiciones (`estado_envio`):**
+  - el mes terminó;
+  - la integración está configurada, con `https://` salvo en `DEBUG`;
+  - hay operaciones;
+  - no hay pendientes salvo `payment_reversed`.
+- **Registro:** cada intento crea `EnvioCuadratura` y un `AuditLog`. Los estados son
+  `en_curso`, `enviado`, `incierto`, `rechazado` y `fallido`.
+  - Bloquean el mes `en_curso`, `enviado` e `incierto`. El intento `en_curso` se
+    registra antes de leer los datos, para que nadie edite durante el envío.
+  - `incierto` se reintenta con el mismo contenido.
+  - `rechazado` y `fallido` liberan el mes.
+  - Tabla completa en el ADR 0023.
+- **Firma:** cada request va firmado con Ed25519 usando la llave de
+  `CUADRATURA_API_PRIVATE_KEY_FILE` (comando `generar_llave_cuadratura`). No se
+  siguen redirecciones.
+- **Bloqueo:** `validar_meses_no_enviados` (según el último intento del mes) impide crear, editar, revertir o eliminar
+  pagos con `fecha_pago` en un mes enviado, o moverlos desde o hacia él.
+  - También impide editar o eliminar las transacciones enlazadas a esos pagos.
+  - Se aplica en `Payment.save/delete`, en `Transaction.save/delete` y en los
+    formularios de pago, pago masivo y transacción.
+  - Para desbloquear, un superusuario elimina el envío desde la base. No hay
+    pantalla para eso.
+- **Pruebas:** `finanzas/test_envio_cuadratura.py`.
+
 ### Planificado / no implementado
 
-- Entrega por API o integración automática; hoy solo existe descarga manual.
-- Idempotencia del lado receptor y política de reemplazo/anulación de lotes ya
-  enviados (una reversa posterior solo aparece como pendiente en una nueva
-  descarga; no se emite un evento de anulación).
-- Esquema formal versionado (JSON Schema) compartido con Cuadratura.
-- Auditoría de la descarga: hoy no se registra en `AuditLog`.
+- Reenvío, corrección o anulación de un mes ya enviado (hoy el mes queda bloqueado).
+- Consultar desde Elemental si Cuadratura ya confirmó el lote (la API lo permite con
+  `GET .../batches/{id}/`, pero Elemental no lo consulta).
+- Auditoría de la descarga manual: hoy no se registra en `AuditLog` (el envío sí).
 
 ## Seguridad y auditoría
 
@@ -163,7 +202,7 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
   `ver_finanzas`. El pago masivo y su resultado exigen `operar_pagos` en
   la organización real del lote, sin excepción por `is_staff`.
 - Las acciones sensibles registran ids, montos y fechas; no adjuntos ni datos personales completos.
-- La API pública no expone pagos ni transacciones.
+- La API pública de Elemental no expone pagos ni transacciones. El token de Cuadratura vive solo en la variable de entorno `CUADRATURA_API_TOKEN` y la llave privada en el archivo de `CUADRATURA_API_PRIVATE_KEY_FILE`, fuera del repo y con permisos 600. Ninguno se guarda en base de datos, auditoría ni mensajes de error.
 
 ## Validación esperada
 

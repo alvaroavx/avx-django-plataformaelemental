@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AttendanceConsumption, Category, LotePago, Payment, PaymentPlan, Transaction
+from .models import AttendanceConsumption, Category, EnvioCuadratura, LotePago, Payment, PaymentPlan, Transaction
 
 
 @admin.register(LotePago)
@@ -81,3 +81,20 @@ class TransactionAdmin(admin.ModelAdmin):
     @admin.display(description="Descripcion")
     def descripcion_corta(self, obj):
         return (obj.descripcion[:80] + "...") if len(obj.descripcion) > 80 else obj.descripcion
+
+
+@admin.register(EnvioCuadratura)
+class EnvioCuadraturaAdmin(admin.ModelAdmin):
+    """Solo lectura. Eliminar un envío «enviado» desbloquea el mes: es un procedimiento
+    de emergencia que debe coordinarse con Cuadratura (ADR 0023)."""
+
+    list_display = ("creado_en", "organizacion", "periodo", "estado", "estado_cuadratura", "operaciones", "monto_total")
+    list_filter = ("organizacion", "estado")
+    readonly_fields = tuple(field.name for field in EnvioCuadratura._meta.fields)
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

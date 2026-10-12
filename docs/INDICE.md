@@ -48,6 +48,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0020-swipe-entre-sesiones-en-movil.md](adr/0020-swipe-entre-sesiones-en-movil.md): navega entre sesiones adyacentes accesibles mediante swipe horizontal en móvil sin perder período ni organización.
 - [docs/adr/0021-transicion-espacial-del-swipe-de-sesiones.md](adr/0021-transicion-espacial-del-swipe-de-sesiones.md): simula continuidad lateral entre páginas del detalle sin convertirlas en un carrusel ni ignorar movimiento reducido.
 - [docs/adr/0022-montos-en-pesos-enteros.md](adr/0022-montos-en-pesos-enteros.md): guarda todos los montos en pesos chilenos enteros con la regla de IVA de Cuadratura.
+- [docs/adr/0023-envio-de-mes-a-cuadratura-por-api.md](adr/0023-envio-de-mes-a-cuadratura-por-api.md): envía el mes a la API genérica de Cuadratura y bloquea el mes enviado.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

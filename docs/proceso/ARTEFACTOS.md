@@ -360,6 +360,23 @@ confirmación solo dentro de su DOM aislado.
 - La evidencia registra la corrección del owner y las pruebas posteriores sin
   reiniciar servicios ni modificar tablas, datos o migraciones.
 
+### Envío firmado a Cuadratura 2026-10-12
+
+- `finanzas/management/commands/generar_llave_cuadratura.py`: genera el par Ed25519
+  con que Elemental firma cada request a la API de Cuadratura.
+  - Escribe la llave privada con permisos 600 y se niega a dejarla dentro del repo.
+  - Imprime la llave pública, que se registra en Cuadratura.
+- `finanzas/test_envio_cuadratura.py` contiene `FakeSession`, un doble de la API v1 de
+  Cuadratura que verifica la firma y que no se sigan redirecciones. Sirve para probar
+  envíos sin red.
+- La prueba de punta a punta contra Cuadratura local se hizo con la organización
+  ficticia «Taller Ficticio SpA» y llaves temporales fuera del repo, que no se
+  conservan. Para repetirla:
+  1. `generar_llave_cuadratura`;
+  2. `create_api_client` o `set_api_client_public_key` en Cuadratura;
+  3. `runserver` de Cuadratura con `API_REQUIRE_SIGNATURES=true`;
+  4. `_transmitir` con un documento ficticio.
+
 ## Regla de reemplazo
 
 Si una herramienta nueva reemplaza otra, no se borra silenciosamente la anterior.

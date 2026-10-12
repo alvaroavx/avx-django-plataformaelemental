@@ -97,6 +97,12 @@ GOOGLE_AUTH_ENFORCED=false
 Los jobs de prueba también fijan esos cuatro flags en `false` de forma explícita.
 
 ### Opcionales
+- `CUADRATURA_API_URL`, `CUADRATURA_API_TOKEN`, `CUADRATURA_API_PRIVATE_KEY_FILE`, `CUADRATURA_API_TIMEOUT`: habilitan el botón «Enviar a Cuadratura» (ADR 0023).
+  - La URL es la base de Cuadratura sin `/api/v1/` y debe ser `https://`.
+  - La llave privada se genera en el servidor con `manage.py generar_llave_cuadratura --salida /etc/elemental/cuadratura.pem` (fuera del repo, dueño el usuario del servicio, permisos 600). La pública se entrega a Cuadratura.
+  - El token lo emite Cuadratura con `create_api_client --origin-system ELEMENTAL --public-key …` y se carga solo como secreto del entorno.
+  - El servidor necesita el reloj sincronizado (NTP) para que la firma sea válida.
+  - Sin estas variables el botón aparece deshabilitado con su motivo.
 - `DEPLOY_PORT`
   - puerto SSH, normalmente `22`
   - si no existe, el workflow usa `22`

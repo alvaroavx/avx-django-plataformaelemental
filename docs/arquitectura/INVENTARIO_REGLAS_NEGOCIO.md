@@ -60,6 +60,7 @@ los documentos dueños de cada app.
 | Solo pagos con `fecha_pago` en el mes, no revertidos, con transacción de ingreso de la misma organización, monto total igual y montos CLP enteros se exportan como operación; el resto va a `pending_records` con motivos. | `finanzas/services/cuadratura_v1.py:prepare_month` |
 | `batch_id` es SHA-256 de organización, período e IDs de operaciones incluidas; la generación no muta registros. | `finanzas/services/cuadratura_v1.py`, `finanzas/tests.py` |
 | La exportación exige organización, mes y año concretos y la acción `exportar_datos` (roles Admin/Finanzas; `is_staff` conserva bypass). | `finanzas/views.py:preparar_mes`, `finanzas/views.py:descargar_cuadratura` |
+| Un mes se envía a la API de Cuadratura solo si terminó, está configurado (https salvo DEBUG), tiene operaciones y no tiene pendientes salvo pagos revertidos; el último intento `en_curso`, `enviado` o `incierto` bloquea crear, editar, revertir o eliminar pagos del mes y sus transacciones enlazadas; cada request va firmado con Ed25519. | `finanzas/services/cuadratura_api.py`, `finanzas/models.py:validar_meses_no_enviados`, `finanzas/test_envio_cuadratura.py` |
 
 ## Auditoría y API
 

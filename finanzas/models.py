@@ -1,8 +1,10 @@
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -272,7 +274,19 @@ class Payment(TimeStampedModel):
         self.monto_neto = neto
         self.monto_iva = iva
         self.monto_total = total
+        self._validar_mes_no_enviado()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self._validar_mes_no_enviado()
+        return super().delete(*args, **kwargs)
+
+    def _validar_mes_no_enviado(self):
+        if self.pk:
+            original = Payment.objects.filter(pk=self.pk).values_list("organizacion_id", "fecha_pago").first()
+            if original:
+                validar_meses_no_enviados(*original)
+        validar_meses_no_enviados(self.organizacion_id, self.fecha_pago)
 
 
 class AttendanceConsumption(TimeStampedModel):
@@ -355,3 +369,116 @@ class Transaction(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_tipo_display()} {self.monto} ({self.categoria})"
+
+    def save(self, *args, **kwargs):
+        self._validar_mes_no_enviado()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self._validar_mes_no_enviado()
+        return super().delete(*args, **kwargs)
+
+    def _validar_mes_no_enviado(self):
+        """Solo los movimientos enlazados a un pago viajan a Cuadratura y quedan bloqueados."""
+        if not self.pk:
+            return
+        pago = Payment.objects.filter(transaccion_id=self.pk).values_list("organizacion_id", "fecha_pago").first()
+        if pago:
+            validar_meses_no_enviados(pago[0], pago[1], self.fecha)
+
+
+class EnvioCuadratura(TimeStampedModel):
+    """Intento de envío de un mes a la API de Cuadratura (ADR 0023).
+
+    El mes queda bloqueado (pagos y movimientos enlazados no se pueden crear, editar,
+    revertir ni eliminar) mientras el último intento esté en curso, enviado o incierto.
+    Un intento rechazado o fallido antes de transmitir datos lo libera.
+    """
+
+    class Estado(models.TextChoices):
+        EN_CURSO = "en_curso", "En curso"
+        ENVIADO = "enviado", "Enviado"
+        INCIERTO = "incierto", "Sin confirmación de Cuadratura"
+        RECHAZADO = "rechazado", "Rechazado por Cuadratura"
+        FALLIDO = "fallido", "No se pudo transmitir"
+
+    ESTADOS_QUE_BLOQUEAN = (Estado.EN_CURSO, Estado.ENVIADO, Estado.INCIERTO)
+
+    organizacion = models.ForeignKey(
+        "personas.Organizacion",
+        on_delete=models.PROTECT,
+        related_name="envios_cuadratura",
+    )
+    periodo = models.DateField(help_text="Primer día del mes enviado.")
+    estado = models.CharField(max_length=20, choices=Estado.choices)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="envios_cuadratura",
+    )
+    contrato = models.CharField(max_length=64)
+    batch_id = models.CharField(max_length=64, help_text="Llave de idempotencia enviada a Cuadratura.")
+    operaciones = models.PositiveIntegerField(default=0)
+    monto_total = models.BigIntegerField(default=0)
+    lote_cuadratura = models.CharField(max_length=64, blank=True, help_text="Identificador del lote en Cuadratura.")
+    estado_cuadratura = models.CharField(max_length=20, blank=True)
+    url_revision = models.URLField(max_length=500, blank=True)
+    respuesta = models.JSONField(default=dict, blank=True, help_text="Acuse o error devuelto por Cuadratura.")
+    detalle_error = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Envío a Cuadratura"
+        verbose_name_plural = "Envíos a Cuadratura"
+        ordering = ["-creado_en", "-id"]
+        db_table = "finanzas_enviocuadratura"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organizacion", "periodo"],
+                condition=models.Q(estado__in=["en_curso", "enviado"]),
+                name="uq_envio_cuadratura_mes_activo",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.organizacion} {self.periodo:%Y-%m} ({self.get_estado_display()})"
+
+
+MESES_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def ultimo_envio_cuadratura(organizacion_id, periodo):
+    return (
+        EnvioCuadratura.objects.filter(organizacion_id=organizacion_id, periodo=periodo)
+        .order_by("-creado_en", "-id")
+        .first()
+    )
+
+
+def validar_meses_no_enviados(organizacion_id, *fechas):
+    """Rechaza cambios financieros en un mes enviado o en envío a Cuadratura."""
+    periodos = set()
+    for fecha in fechas:
+        if isinstance(fecha, str):
+            fecha = date.fromisoformat(fecha)
+        if fecha:
+            periodos.add(fecha.replace(day=1))
+    if not organizacion_id or not periodos:
+        return
+    for periodo in sorted(periodos):
+        envio = ultimo_envio_cuadratura(organizacion_id, periodo)
+        if envio is None or envio.estado not in EnvioCuadratura.ESTADOS_QUE_BLOQUEAN:
+            continue
+        mes = f"{MESES_ES[periodo.month - 1].capitalize()} {periodo.year}"
+        if envio.estado == EnvioCuadratura.Estado.ENVIADO:
+            raise ValidationError(
+                f"{mes} ya fue enviado a Cuadratura y está bloqueado: no se pueden registrar ni modificar sus pagos."
+            )
+        raise ValidationError(
+            f"{mes} tiene un envío a Cuadratura en curso o sin confirmar: está bloqueado hasta que "
+            "un reintento del envío termine."
+        )

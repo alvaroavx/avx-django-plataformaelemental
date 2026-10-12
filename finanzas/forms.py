@@ -1,12 +1,13 @@
 import json
 
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
 from personas.models import Organizacion, Persona, PersonaRol
 
-from .models import Category, Payment, PaymentPlan, Transaction
+from .models import Category, Payment, PaymentPlan, Transaction, validar_meses_no_enviados
 
 
 class PersonaOrganizacionSelect(forms.Select):
@@ -87,6 +88,13 @@ class PaymentPlanForm(forms.ModelForm):
             "fecha_fin": forms.DateInput(attrs={"type": "date"}),
             "descripcion": forms.Textarea(attrs={"rows": 2}),
         }
+
+
+def _agregar_error_mes_enviado(form, campo, organizacion_id, *fechas):
+    try:
+        validar_meses_no_enviados(organizacion_id, *fechas)
+    except ValidationError as exc:
+        form.add_error(campo, exc.messages[0])
 
 
 class PaymentForm(forms.ModelForm):
@@ -207,6 +215,10 @@ class PaymentForm(forms.ModelForm):
         organizacion = cleaned.get("organizacion")
         if plan and organizacion and plan.organizacion_id != organizacion.id:
             self.add_error("plan", "El plan seleccionado no pertenece a la organizacion indicada.")
+        if self.instance.pk:
+            _agregar_error_mes_enviado(self, None, self.instance.organizacion_id, self.instance.fecha_pago)
+        if organizacion and cleaned.get("fecha_pago"):
+            _agregar_error_mes_enviado(self, "fecha_pago", organizacion.pk, cleaned["fecha_pago"])
         return cleaned
 
 
@@ -271,6 +283,8 @@ class PagoMasivoForm(forms.Form):
         plan = cleaned.get("plan")
         if plan and organizacion and plan.organizacion_id != organizacion.pk:
             self.add_error("plan", "El plan no pertenece a la organización seleccionada.")
+        if organizacion and cleaned.get("fecha_pago"):
+            _agregar_error_mes_enviado(self, "fecha_pago", organizacion.pk, cleaned["fecha_pago"])
         return cleaned
 
 
@@ -329,4 +343,12 @@ class TransactionForm(forms.ModelForm):
         categoria = cleaned.get("categoria")
         if categoria:
             cleaned["tipo"] = categoria.tipo
+        if self.instance.pk:
+            pago = (
+                Payment.objects.filter(transaccion_id=self.instance.pk)
+                .values_list("organizacion_id", "fecha_pago")
+                .first()
+            )
+            if pago:
+                _agregar_error_mes_enviado(self, None, pago[0], pago[1], cleaned.get("fecha"))
         return cleaned

@@ -27,6 +27,7 @@ urlpatterns = [
     path("reportes/categorias/", views.reporte_categorias, name="reporte_categorias"),
     path("preparar-mes/", views.preparar_mes, name="preparar_mes"),
     path("preparar-mes/descargar/", views.descargar_cuadratura, name="descargar_cuadratura"),
+    path("preparar-mes/enviar/", views.enviar_cuadratura, name="enviar_cuadratura"),
     path("export/libro-caja.csv", views.export_libro_caja_csv, name="export_libro_caja_csv"),
     path("export/pagos.csv", views.export_pagos_csv, name="export_pagos_csv"),
     path("export/pagos-alumnos.xlsx", views.export_pagos_alumnos_xlsx, name="export_pagos_alumnos_xlsx"),

@@ -146,6 +146,13 @@ GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_CONFIGURED = bool(GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET)
 
+# Envío de meses a la API v1 de Cuadratura (ADR 0023). URL base sin /api/v1/.
+CUADRATURA_API_URL = os.environ.get("CUADRATURA_API_URL", "").strip().rstrip("/")
+CUADRATURA_API_TOKEN = os.environ.get("CUADRATURA_API_TOKEN", "").strip()
+CUADRATURA_API_TIMEOUT = int(os.environ.get("CUADRATURA_API_TIMEOUT", "30"))
+# Llave privada Ed25519 (PEM, fuera del repo, permisos 600) con la que se firma cada request.
+CUADRATURA_API_PRIVATE_KEY_FILE = os.environ.get("CUADRATURA_API_PRIVATE_KEY_FILE", "").strip()
+
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
