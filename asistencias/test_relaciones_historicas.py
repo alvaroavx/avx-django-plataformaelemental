@@ -280,22 +280,28 @@ class RelacionesHistoricasPermisosTests(TestCase):
             ).exists()
         )
 
-    def test_profesor_busca_alumnos_solo_tras_activar_relaciones_historicas(self):
+    def test_profesor_busca_alumno_activo_y_activa_matricula_al_agregarlo(self):
         activar_asignacion_profesor(user=self.admin_user, asignacion=self.asignacion)
         busqueda = self.client.get(
             reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
             {"q": "Alba", "organizacion": self.organizacion.pk},
         )
         self.assertEqual(busqueda.status_code, 200)
-        self.assertEqual(busqueda.json()["resultados"], [])
-
-        activar_matricula_alumno(user=self.admin_user, matricula=self.matricula)
-        busqueda = self.client.get(
-            reverse("asistencias:sesion_asistentes_buscar", args=[self.sesion.pk]),
-            {"q": "Alba", "organizacion": self.organizacion.pk},
-        )
-        self.assertEqual(busqueda.status_code, 200)
         self.assertEqual(busqueda.json()["resultados"][0]["id"], self.alumno.pk)
+
+        agregado = self.client.post(
+            reverse("asistencias:sesion_asistente_agregar", args=[self.sesion.pk]),
+            {"persona_id": self.alumno.pk},
+        )
+
+        self.assertEqual(agregado.status_code, 201)
+        self.matricula.refresh_from_db()
+        self.assertTrue(self.matricula.activa)
+        self.assertEqual(self.matricula.revisada_por, self.profesor_user)
+        self.assertIsNotNone(self.matricula.revisada_en)
+        self.assertTrue(
+            AlumnoDisciplina.objects.operativas().filter(pk=self.matricula.pk).exists()
+        )
 
     def test_profesor_no_puede_autoactivar_relacion_historica(self):
         with self.assertRaises(PermissionDenied):

@@ -69,6 +69,7 @@ from .services.correos_cierre import construir_borrador_correo_profesor
 from .services import (
     asegurar_asignaciones_profesores,
     asegurar_matricula_operativa,
+    asegurar_matricula_operativa_desde_sesion,
     cambiar_estado_asistencia,
     liberar_clase,
     revertir_clase_liberada,
@@ -205,11 +206,7 @@ def _estudiantes_sesion_para_usuario(user, sesion):
         permitir_staff_global=False,
     )
     if not puede_administrar_personas:
-        alumnos_operativos = AlumnoDisciplina.objects.operativas().filter(
-            disciplina=sesion.disciplina,
-        ).values("alumno_id")
         queryset = queryset.filter(
-            pk__in=alumnos_operativos,
             activo=True,
             roles__organizacion=sesion.disciplina.organizacion,
             roles__rol__codigo__iexact="ESTUDIANTE",
@@ -1449,17 +1446,11 @@ def sesion_detail(request, pk):
             creados = 0
             asistencia_ids_creadas = []
             for persona in estudiantes_seleccionados:
-                if usuario_tiene_permiso(
-                    request.user,
-                    ACCION_ADMINISTRAR_PERSONAS,
-                    organizacion=sesion.disciplina.organizacion,
-                    permitir_staff_global=False,
-                ):
-                    asegurar_matricula_operativa(
-                        user=request.user,
-                        disciplina=sesion.disciplina,
-                        alumno=persona,
-                    )
+                asegurar_matricula_operativa_desde_sesion(
+                    user=request.user,
+                    sesion=sesion,
+                    alumno=persona,
+                )
                 _reactivar_estudiante_para_asistencia(persona, sesion.disciplina.organizacion)
                 asistencia, created = Asistencia.objects.get_or_create(
                     sesion=sesion,
@@ -1615,17 +1606,11 @@ def sesion_asistente_agregar(request, pk):
         sesion = SesionClase.objects.select_for_update().select_related("disciplina", "disciplina__organizacion").get(
             pk=sesion.pk
         )
-        if usuario_tiene_permiso(
-            request.user,
-            ACCION_ADMINISTRAR_PERSONAS,
-            organizacion=sesion.disciplina.organizacion,
-            permitir_staff_global=False,
-        ):
-            asegurar_matricula_operativa(
-                user=request.user,
-                disciplina=sesion.disciplina,
-                alumno=persona,
-            )
+        asegurar_matricula_operativa_desde_sesion(
+            user=request.user,
+            sesion=sesion,
+            alumno=persona,
+        )
         asistencia, created = Asistencia.objects.get_or_create(
             sesion=sesion,
             persona=persona,

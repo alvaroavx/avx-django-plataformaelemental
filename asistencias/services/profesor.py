@@ -7,6 +7,7 @@ from auditoria.services import registrar_auditoria
 from finanzas.models import AttendanceConsumption
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 from personas.permissions import (
+    ACCION_AGREGAR_ASISTENTES_PROPIOS,
     ACCION_ADMINISTRAR_PERSONAS,
     ACCION_ADMINISTRAR_SESIONES,
     usuario_tiene_permiso,
@@ -198,6 +199,117 @@ def asegurar_matricula_operativa(*, user, disciplina, alumno):
         )
         return matricula
     return activar_matricula_alumno(user=user, matricula=matricula)
+
+
+@transaction.atomic
+def asegurar_matricula_operativa_desde_sesion(*, user, sesion, alumno):
+    """Matricula a un estudiante activo al agregarlo desde una sesión autorizada."""
+    sesion = (
+        SesionClase.objects.select_for_update()
+        .select_related("disciplina__organizacion")
+        .get(pk=sesion.pk)
+    )
+    organizacion = sesion.disciplina.organizacion
+    if usuario_tiene_permiso(
+        user,
+        ACCION_ADMINISTRAR_PERSONAS,
+        organizacion=organizacion,
+        permitir_staff_global=False,
+    ):
+        return asegurar_matricula_operativa(
+            user=user,
+            disciplina=sesion.disciplina,
+            alumno=alumno,
+        )
+
+    persona_profesor = getattr(user, "persona", None)
+    puede_administrar_sesion = usuario_tiene_permiso(
+        user,
+        ACCION_ADMINISTRAR_SESIONES,
+        organizacion=organizacion,
+        permitir_staff_global=False,
+    )
+    puede_agregar_como_profesor = bool(
+        persona_profesor
+        and sesion.profesores.filter(pk=persona_profesor.pk).exists()
+        and AsignacionProfesorDisciplina.objects.operativas().filter(
+            disciplina=sesion.disciplina,
+            profesor=persona_profesor,
+        ).exists()
+        and usuario_tiene_permiso(
+            user,
+            ACCION_AGREGAR_ASISTENTES_PROPIOS,
+            organizacion=organizacion,
+            permitir_staff_global=False,
+        )
+    )
+    estudiante_activo = PersonaRol.objects.filter(
+        persona=alumno,
+        persona__activo=True,
+        organizacion=organizacion,
+        rol__codigo__iexact="ESTUDIANTE",
+        activo=True,
+    ).exists()
+    if not estudiante_activo or not (puede_administrar_sesion or puede_agregar_como_profesor):
+        raise PermissionDenied("No puedes matricular a esta persona desde la sesión.")
+
+    matricula, creada = AlumnoDisciplina.objects.select_for_update().get_or_create(
+        disciplina=sesion.disciplina,
+        alumno=alumno,
+        defaults={
+            "activa": True,
+            "origen": AlumnoDisciplina.Origen.EXPLICITA,
+            "asignada_por": user,
+        },
+    )
+    if creada:
+        registrar_auditoria(
+            usuario=user,
+            accion=AuditLog.ACCION_CREAR,
+            dominio="asistencias",
+            objeto=matricula,
+            organizacion=organizacion,
+            resumen="Matrícula creada al agregar asistente desde sesión",
+            metadata={
+                "sesion_id": sesion.pk,
+                "disciplina_id": sesion.disciplina_id,
+                "alumno_id": alumno.pk,
+            },
+        )
+        return matricula
+
+    requiere_revision = (
+        matricula.origen == AlumnoDisciplina.Origen.HISTORICA
+        and (not matricula.revisada_por_id or not matricula.revisada_en)
+    )
+    if not matricula.activa or requiere_revision:
+        matricula.activa = True
+        matricula.asignada_por = user
+        matricula.revisada_por = user
+        matricula.revisada_en = timezone.now()
+        matricula.save(
+            update_fields=[
+                "activa",
+                "asignada_por",
+                "revisada_por",
+                "revisada_en",
+            ]
+        )
+        registrar_auditoria(
+            usuario=user,
+            accion=AuditLog.ACCION_CAMBIAR_ESTADO,
+            dominio="asistencias",
+            objeto=matricula,
+            organizacion=organizacion,
+            resumen="Matrícula activada al agregar asistente desde sesión",
+            metadata={
+                "sesion_id": sesion.pk,
+                "disciplina_id": sesion.disciplina_id,
+                "alumno_id": alumno.pk,
+                "origen": matricula.origen,
+            },
+        )
+    return matricula
 
 
 @transaction.atomic

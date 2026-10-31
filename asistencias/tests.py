@@ -4018,6 +4018,110 @@ class SprintCincoAislamientoAsistenciasTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 200)
 
+    def test_profesora_busca_y_agrega_estudiante_activo_sin_matricula_previa(self):
+        self.client.force_login(self.profesora_a)
+        buscar_url = reverse(
+            "asistencias:sesion_asistentes_buscar",
+            kwargs={"pk": self.sesion_a.pk},
+        )
+        agregar_url = reverse(
+            "asistencias:sesion_asistente_agregar",
+            kwargs={"pk": self.sesion_a.pk},
+        )
+
+        busqueda = self.client.get(
+            buscar_url,
+            {"q": "Organización A", "organizacion": self.organizacion_a.pk},
+        )
+        agregado = self.client.post(
+            agregar_url,
+            {"persona_id": self.estudiante_a.pk},
+        )
+
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in busqueda.json()["resultados"]],
+            [self.estudiante_a.pk],
+        )
+        self.assertEqual(agregado.status_code, 201)
+        self.assertTrue(
+            AlumnoDisciplina.objects.operativas().filter(
+                disciplina=self.disciplina_a,
+                alumno=self.estudiante_a,
+            ).exists()
+        )
+        self.assertTrue(
+            Asistencia.objects.filter(
+                sesion=self.sesion_a,
+                persona=self.estudiante_a,
+            ).exists()
+        )
+
+    def test_profesora_no_busca_ni_agrega_estudiante_de_otra_organizacion(self):
+        estudiante_b = Persona.objects.create(
+            nombres="Estudiante",
+            apellidos="Organización B",
+        )
+        PersonaRol.objects.create(
+            persona=estudiante_b,
+            rol=self.rol_estudiante,
+            organizacion=self.organizacion_b,
+            activo=True,
+        )
+        self.client.force_login(self.profesora_a)
+
+        busqueda = self.client.get(
+            reverse(
+                "asistencias:sesion_asistentes_buscar",
+                kwargs={"pk": self.sesion_a.pk},
+            ),
+            {"q": "Organización B", "organizacion": self.organizacion_a.pk},
+        )
+        agregado = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_a.pk},
+            ),
+            {"persona_id": estudiante_b.pk},
+        )
+
+        self.assertEqual(busqueda.status_code, 200)
+        self.assertEqual(busqueda.json()["resultados"], [])
+        self.assertEqual(agregado.status_code, 400)
+        self.assertEqual(agregado.json()["codigo"], "PERSONA_INVALIDA")
+        self.assertFalse(
+            AlumnoDisciplina.objects.filter(
+                disciplina=self.disciplina_a,
+                alumno=estudiante_b,
+            ).exists()
+        )
+
+    def test_profesora_activa_matricula_historica_al_agregar_estudiante(self):
+        matricula = AlumnoDisciplina.objects.create(
+            disciplina=self.disciplina_a,
+            alumno=self.estudiante_a,
+            activa=False,
+            origen=AlumnoDisciplina.Origen.HISTORICA,
+        )
+        self.client.force_login(self.profesora_a)
+
+        respuesta = self.client.post(
+            reverse(
+                "asistencias:sesion_asistente_agregar",
+                kwargs={"pk": self.sesion_a.pk},
+            ),
+            {"persona_id": self.estudiante_a.pk},
+        )
+
+        self.assertEqual(respuesta.status_code, 201)
+        matricula.refresh_from_db()
+        self.assertTrue(matricula.activa)
+        self.assertEqual(matricula.revisada_por, self.profesora_a)
+        self.assertIsNotNone(matricula.revisada_en)
+        self.assertTrue(
+            AlumnoDisciplina.objects.operativas().filter(pk=matricula.pk).exists()
+        )
+
 
 class SprintDosConcurrenciaConsumosTests(TransactionTestCase):
     reset_sequences = True

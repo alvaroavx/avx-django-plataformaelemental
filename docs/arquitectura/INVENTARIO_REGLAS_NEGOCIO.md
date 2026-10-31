@@ -1,6 +1,6 @@
 # Inventario de reglas de negocio
 
-Fecha de actualización: 2026-10-12
+Fecha de actualización: 2026-10-31
 
 Este inventario referencia la implementación vigente. No reemplaza los tests ni
 los documentos dueños de cada app.
@@ -21,7 +21,7 @@ los documentos dueños de cada app.
 | --- | --- |
 | Acciones se mapean a roles normalizados. | `personas/permissions.py` |
 | Asistencias limita objetos a organizaciones/roles vigentes y no da bypass a staff ordinario. | `asistencias/selectors.py`, `asistencias/decorators.py`, `asistencias/views.py` |
-| Sin portal dedicado (ADR 0016). En el árbol de trabajo (sin commitear, ADR 0018/0019) Profesor puede ver solo sesiones donde figura como profesor (`ver_calendario`) y agregar alumnos vinculados a la disciplina en esas sesiones (`agregar_asistentes_propios`); ambas capacidades se pueden deshabilitar por organización. | `personas/permissions.py`, `asistencias/selectors.py`, `asistencias/views.py` |
+| Sin portal dedicado (ADR 0016). Profesor puede ver solo sesiones donde figura como profesor (`ver_calendario`) y agregar estudiantes activos de la organización real; la operación crea o activa su matrícula de disciplina (ADR 0024). Ambas capacidades se pueden deshabilitar por organización. | `personas/permissions.py`, `asistencias/views.py`, `asistencias/services/profesor.py` |
 | Personas y Finanzas todavía conservan bypass histórico de `is_staff`. | `personas/permissions.py`, decoradores consumidores |
 
 ## Operación académica

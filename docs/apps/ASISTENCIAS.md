@@ -1,6 +1,6 @@
 # Asistencias
 
-Fecha de actualizacion: 2026-10-12
+Fecha de actualizacion: 2026-10-31
 
 > El portal dedicado `/profesor/` fue retirado por [ADR 0016](../adr/0016-retira-portal-profesor-conserva-dominio.md). Se mantienen el rol y perfil de profesor, asignaciones a disciplinas/sesiones, su administración diaria y los reportes que dependen de esos datos. Las secciones históricas que describen la experiencia del portal no son contratos vigentes.
 >
@@ -20,9 +20,10 @@ Lo que existe (verificado en `asistencias/views.py`, `asistencias/selectors.py` 
   la organización o si es profesor asignado a esa sesión con la capacidad
   `agregar_asistentes_propios`. En otro caso responde `404`.
 - El profesor asignado solo puede agregar asistentes (formulario HTML y
-  endpoints JSON `asistentes/buscar/` y `asistentes/agregar/`). El roster se
-  limita a estudiantes activos con `AlumnoDisciplina` operativa en la disciplina
-  y rol `ESTUDIANTE` activo en la organización.
+  endpoints JSON `asistentes/buscar/` y `asistentes/agregar/`). Puede buscar a
+  cualquier persona activa con rol `ESTUDIANTE` activo en la organización real
+  de la sesión. Al agregarla se crea o activa su `AlumnoDisciplina` de forma
+  atómica y auditada (ADR 0024).
 - El profesor no puede crear personas, editar/eliminar la sesión, cambiar su
   estado, quitar asistentes, corregir estados de asistencia (el endpoint
   `.../estado/` responde `403 PERMISO_DENEGADO`), liberar clases ni ver estado
@@ -31,9 +32,10 @@ Lo que existe (verificado en `asistencias/views.py`, `asistencias/selectors.py` 
   `personas.ConfiguracionPermisoRol` (pantalla `personas/permisos/`); sin fila,
   están habilitadas por defecto para Profesor. Para admin y `staff_asistencia`
   no se pueden desactivar.
-- `AsignacionProfesorDisciplina` ya no participa en la autorización de la
-  sesión: basta la asignación en `SesionClase.profesores` más el rol y la
-  capacidad. Sigue acotando datos históricos y procesos de reconciliación.
+- `AsignacionProfesorDisciplina` operativa y `SesionClase.profesores` se
+  comprueban juntas para operar la sesión, además del rol y la capacidad. La
+  primera expresa el vínculo vigente con la disciplina y la segunda la
+  asignación concreta de la clase.
 - `GET /asistencias/hoy/` no está disponible para profesores: exige
   `administrar_sesiones` y responde `404` en otro caso.
 
@@ -244,12 +246,13 @@ flowchart TD
 - La organización activa sirve para navegación y filtrado, pero no concede autorización. Las operaciones por identificador resuelven primero la sesión o disciplina desde un queryset autorizado y contrastan las relaciones compuestas contra la organización del objeto real.
 - *(Histórico, portal retirado)* La regla de organización con rol Profesor sin
   asignación docente operativa aplicaba al portal `/profesor/`; hoy el alcance
-  del profesor se rige por `SesionClase.profesores` y las capacidades de
+  del profesor se rige por `AsignacionProfesorDisciplina` operativa,
+  `SesionClase.profesores` y las capacidades de
   [Profesor en la aplicación común](#profesor-en-la-aplicacion-comun).
 - Solo `is_superuser` conserva alcance operativo global. `is_staff` permite entrar al Django Admin cuando Django lo autoriza, pero no reemplaza un `PersonaRol` activo ni amplía las organizaciones visibles en Asistencias.
 - Una sesión ajena, una sesión no asignada a la profesora y una sesión inexistente responden `404` con estructura indistinguible en HTML, POST y endpoints JSON basados en objeto. Un `403` se reserva para negar una capacidad general antes de resolver un objeto.
 - Los detalles y formularios de disciplina se resuelven desde el queryset de la organización autorizada. Un identificador ajeno y uno inexistente responden `404` tanto en GET como en POST; no existen endpoints JSON específicos de disciplina.
-- Los permisos se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora, quitarla de `SesionClase.profesores` o deshabilitar la capacidad en `ConfiguracionPermisoRol` corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta. Desactivar `AsignacionProfesorDisciplina` ya no corta el acceso a una sesión asignada (no participa en `_usuario_puede_agregar_asistentes`); desactivar la `AlumnoDisciplina` sí retira al alumno del roster del profesor.
+- Los permisos se recalculan en cada petición. Desactivar el `User`, desactivar el `PersonaRol` de profesora, quitarla de `SesionClase.profesores` o deshabilitar la capacidad en `ConfiguracionPermisoRol` corta nuevas lecturas y escrituras aunque la sesión Django continúe abierta. Una matrícula inactiva no oculta a una estudiante activa de la organización: al agregarla desde una sesión autorizada se reactiva con trazabilidad.
 - La app debe consumir el contexto global de filtros desde `plataformaelemental.context`; no debe exponer helpers compartidos desde `asistencias.views`.
 - Si no hay filtros explícitos en la URL, el período global parte en el mes y
   año actuales y la organización parte en `Todas`.
@@ -266,11 +269,11 @@ flowchart TD
 ## Decisiones funcionales vigentes
 - *(Histórico, portal retirado)* El contrato `periodo=todos` y el historial
   paginado de 25 en 25 eran del portal `/profesor/`.
-- El buscador de asistentes, para quien no tiene `administrar_personas` en la
-  organización (profesor y `staff_asistencia`), parte de `AlumnoDisciplina`
-  operativa y de un rol `ESTUDIANTE` activo en la organización de la disciplina.
-  No exige una asistencia histórica. El POST vuelve a comprobar sesión,
-  organización, matrícula y asignación del profesor a la sesión.
+- El buscador de asistentes para una profesora parte de personas activas con rol
+  `ESTUDIANTE` activo en la organización real de la sesión; no exige matrícula
+  previa ni asistencia histórica. El POST vuelve a comprobar sesión,
+  organización, rol activo y asignación de la profesora, y crea o activa la
+  matrícula de disciplina dentro de la misma operación.
 - Quitar asistentes y corregir estados requiere `administrar_sesiones`; liberar
   o revertir una clase individual requiere `liberar_clase` (solo admin). Un
   profesor asignado no puede hacerlo (ver ADR 0019). Ambas operaciones son
@@ -592,20 +595,20 @@ idempotente del dominio; ausencias y justificaciones no recuperan cupo.
 
 Lo que existe:
 
-- `SesionClase.profesores` autoriza la sesión concreta del profesor y
-  `AlumnoDisciplina` operativa acota roster y búsqueda. `AsignacionProfesorDisciplina`
-  se conserva y se sincroniza al crear/editar sesiones
-  (`asegurar_asignaciones_profesores`), pero ya no autoriza vistas.
+- `AsignacionProfesorDisciplina` operativa autoriza la disciplina y
+  `SesionClase.profesores` autoriza la sesión concreta del profesor.
+  `AlumnoDisciplina` conserva la matrícula resultante, pero no acota la búsqueda
+  previa de estudiantes activos de la organización. La asignación docente se
+  sincroniza al crear/editar sesiones (`asegurar_asignaciones_profesores`).
 - Una relación operativa debe estar activa y ser explícita, o ser histórica con
   actor y fecha de revisión administrativa. `activa=True` por sí solo no basta
   para una relación inferida (`RelacionOperativaQuerySet.operativas`).
 - El primer asistente registrado por profesor cambia una sesión planificada a
   `abierta`; cerrarla requiere el cambio de estado administrativo, auditado.
-- La búsqueda incremental de sesión no lista a todos los estudiantes de la
-  organización para profesoras y staff de asistencia: exige matrícula operativa
-  en la disciplina. Quien tiene `administrar_personas` ve a todos los estudiantes
-  de la organización y, al agregar uno, se crea o activa su matrícula
-  (`asegurar_matricula_operativa`).
+- La búsqueda incremental de sesión lista estudiantes activos de la organización
+  real para profesoras autorizadas y staff de asistencia. Al agregar uno, crea o
+  activa su matrícula mediante `asegurar_matricula_operativa_desde_sesion`, sin
+  ampliar el alcance a otras organizaciones.
 
 Planificado / no implementado (sin vista ni ruta; solo quedan servicios en
 `asistencias/services/profesor.py` sin consumidores):
