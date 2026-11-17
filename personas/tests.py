@@ -939,6 +939,88 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, f'href="{detalle_sesion}"', html=False)
         self.assertContains(response, f'href="{agregar_asistentes}"', html=False)
 
+    def test_profesor_puede_registrar_pago_desde_su_perfil_en_su_organizacion(self):
+        User = get_user_model()
+        usuario_profesor = User.objects.create_user("profesor_pago", password=TEST_PASSWORD)
+        self.profesor.user = usuario_profesor
+        self.profesor.save(update_fields=["user"])
+        self.client.force_login(usuario_profesor)
+        query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+        url = f"{reverse('personas:persona_detail', kwargs={'pk': self.profesor.pk})}?{query}"
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Registrar pago de una persona")
+        self.assertNotContains(response, "Editar perfil")
+        self.assertNotContains(response, "Pago masivo")
+
+        response = self.client.post(
+            url,
+            {
+                "accion": "registrar_pago_profesor",
+                "organizacion": str(self.org.pk),
+                "persona": str(self.estudiante.pk),
+                "plan": "",
+                "fecha_pago": "2026-03-20",
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "numero_comprobante": "",
+                "aplica_iva": "",
+                "monto_incluye_iva": "",
+                "monto_referencia": "15000",
+                "clases_asignadas": "2",
+                "observaciones": "Pago registrado por profesor",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        pago = Payment.objects.get(persona=self.estudiante, fecha_pago="2026-03-20")
+        self.assertEqual(pago.organizacion, self.org)
+        self.assertEqual(pago.registrado_por, usuario_profesor)
+        self.assertEqual(pago.transaccion.organizacion, self.org)
+        self.assertEqual(pago.transaccion.monto, 15000)
+
+    def test_profesor_no_puede_registrar_pago_a_persona_de_otra_organizacion(self):
+        otra_org = Organizacion.objects.create(nombre="Otra org pago", rut="66.666.666-6")
+        estudiante_ajeno = Persona.objects.create(nombres="Eva", apellidos="Ajena")
+        PersonaRol.objects.create(persona=estudiante_ajeno, rol=self.rol_estudiante, organizacion=otra_org)
+        usuario_profesor = get_user_model().objects.create_user("profesor_pago_ajeno", password=TEST_PASSWORD)
+        self.profesor.user = usuario_profesor
+        self.profesor.save(update_fields=["user"])
+        self.client.force_login(usuario_profesor)
+        query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
+
+        response = self.client.post(
+            f"{reverse('personas:persona_detail', kwargs={'pk': self.profesor.pk})}?{query}",
+            {
+                "accion": "registrar_pago_profesor",
+                "organizacion": str(self.org.pk),
+                "persona": str(estudiante_ajeno.pk),
+                "plan": "",
+                "fecha_pago": "2026-03-20",
+                "metodo_pago": Payment.Metodo.EFECTIVO,
+                "monto_referencia": "15000",
+                "clases_asignadas": "2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Payment.objects.filter(persona=estudiante_ajeno).exists())
+        self.assertIn("persona", response.context["form_pago_profesor"].errors)
+
+    def test_profesor_solo_puede_abrir_su_propio_perfil(self):
+        usuario_profesor = get_user_model().objects.create_user("profesor_perfil", password=TEST_PASSWORD)
+        self.profesor.user = usuario_profesor
+        self.profesor.save(update_fields=["user"])
+        self.client.force_login(usuario_profesor)
+
+        response = self.client.get(
+            reverse("personas:persona_detail", kwargs={"pk": self.estudiante.pk}),
+            {"organizacion": self.org.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_persona_detail_profesor_permite_cambiar_estado_de_sesion(self):
         query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
         response = self.client.post(

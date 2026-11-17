@@ -13,13 +13,15 @@ from django.http import Http404
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.forms import HiddenInput
 from django.urls import reverse
 
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from finanzas.models import AttendanceConsumption, Payment
-from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
+from finanzas.forms import PaymentForm
+from finanzas.models import AttendanceConsumption, Payment, PaymentPlan
+from finanzas.services import asociar_asistencia_a_pago, crear_pago_operacional, resumen_financiero_estudiante
 from plataformaelemental.context import (
     aplicar_periodo,
     descripcion_periodo,
@@ -37,6 +39,7 @@ from .permissions import (
     ACCION_AGREGAR_ASISTENTES_PROPIOS,
     ACCION_VER_CALENDARIO,
     permiso_requerido,
+    usuario_tiene_permiso,
 )
 from .search import filtrar_por_fragmentos
 from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
@@ -254,6 +257,18 @@ def solicitud_acceso_reabrir(request, pk):
 
 def _base_context(request):
     return nav_context(request)
+
+
+def _estilizar_formulario_pago_profesor(form):
+    for field in form.visible_fields():
+        widget = field.field.widget
+        tipo_widget = getattr(widget, "input_type", "")
+        clase = "form-check-input" if tipo_widget == "checkbox" else (
+            "form-select" if tipo_widget == "select" else "form-control"
+        )
+        widget.attrs["class"] = f"{widget.attrs.get('class', '')} {clase}".strip()
+        if field.errors:
+            widget.attrs["class"] += " is-invalid"
 
 
 def _url_con_filtros(request, nombre_url, **kwargs):
@@ -785,10 +800,28 @@ def persona_create(request):
     return render(request, "personas/persona_create.html", context)
 
 
-@permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)
 def persona_detail(request, pk):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
+    if not organizacion and not (request.user.is_superuser or request.user.is_staff):
+        raise PermissionDenied("Debes seleccionar una organización autorizada para ver este perfil.")
+    puede_administrar_perfil = usuario_tiene_permiso(
+        request.user, ACCION_ADMINISTRAR_PERSONAS, organizacion=organizacion
+    )
+    persona_usuario = getattr(request.user, "persona", None)
+    puede_operar_pago_desde_perfil = bool(
+        persona_usuario
+        and organizacion
+        and persona_usuario.pk == pk
+        and PersonaRol.objects.filter(
+            persona=persona_usuario,
+            organizacion=organizacion,
+            rol__codigo__iexact="PROFESOR",
+            activo=True,
+        ).exists()
+    )
+    if not puede_administrar_perfil and not puede_operar_pago_desde_perfil:
+        raise PermissionDenied("Solo puedes abrir tu propio perfil de profesor en una organización autorizada.")
     organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
     roles_visibles = PersonaRol.objects.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre")
     if organizacion:
@@ -822,8 +855,59 @@ def persona_detail(request, pk):
     )
     if not (request.user.is_superuser or request.user.is_staff) and not persona.roles.filter(organizacion=organizacion).exists():
         raise Http404
+    form_pago_profesor = None
+    periodo_pago_profesor = resolver_periodo(request)
+    estudiantes_pago_profesor = Persona.objects.filter(
+        activo=True,
+        roles__organizacion=organizacion,
+        roles__rol__codigo__iexact="ESTUDIANTE",
+        roles__activo=True,
+    ).distinct().order_by("apellidos", "nombres") if puede_operar_pago_desde_perfil else Persona.objects.none()
+    planes_pago_profesor = PaymentPlan.objects.filter(
+        organizacion=organizacion, activo=True
+    ).order_by("-es_por_defecto", "nombre") if puede_operar_pago_desde_perfil else PaymentPlan.objects.none()
+    if puede_operar_pago_desde_perfil:
+        form_pago_profesor = PaymentForm(
+            periodo_mes=periodo_pago_profesor["mes"],
+            periodo_anio=periodo_pago_profesor["anio"],
+            organizacion=organizacion,
+            organizaciones=Organizacion.objects.filter(pk=organizacion.pk),
+            personas=estudiantes_pago_profesor,
+            planes=planes_pago_profesor,
+            initial={"organizacion": organizacion.pk},
+        )
+        form_pago_profesor.fields["organizacion"].widget = HiddenInput()
+        _estilizar_formulario_pago_profesor(form_pago_profesor)
     if request.method == "POST":
         accion = request.POST.get("accion")
+        if not puede_administrar_perfil and accion != "registrar_pago_profesor":
+            raise PermissionDenied("No tienes permiso para modificar este perfil.")
+        if accion == "registrar_pago_profesor":
+            form_pago_profesor = PaymentForm(
+                request.POST,
+                periodo_mes=periodo_pago_profesor["mes"],
+                periodo_anio=periodo_pago_profesor["anio"],
+                organizacion=organizacion,
+                organizaciones=Organizacion.objects.filter(pk=organizacion.pk),
+                personas=estudiantes_pago_profesor,
+                planes=planes_pago_profesor,
+                initial={"organizacion": organizacion.pk},
+            )
+            form_pago_profesor.fields["organizacion"].widget = HiddenInput()
+            _estilizar_formulario_pago_profesor(form_pago_profesor)
+            pago_valido = form_pago_profesor.is_valid()
+            if pago_valido:
+                try:
+                    crear_pago_operacional(
+                        pago=form_pago_profesor.save(commit=False), usuario=request.user, origen="perfil_profesor"
+                    )
+                except ValidationError as exc:
+                    form_pago_profesor.add_error(None, exc.messages[0])
+                else:
+                    messages.success(request, "Pago registrado para la persona seleccionada.")
+                    return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona_usuario.pk))
+            if not pago_valido:
+                messages.error(request, "Revisa los datos del pago antes de guardarlo.")
         if "asociar_pago_asistencia" in request.POST:
             asistencia = get_object_or_404(
                 Asistencia.objects.select_related("sesion__disciplina", "consumo_financiero__pago"),
@@ -1012,6 +1096,12 @@ def persona_detail(request, pk):
             "retencion_sii_mixta": retencion_sii_mixta,
             "monto_retencion_sii_profesor": monto_retencion_sii_profesor,
             "monto_neto_profesor": monto_neto_profesor,
+            "puede_administrar_perfil": puede_administrar_perfil,
+            "puede_registrar_pago_profesor": puede_operar_pago_desde_perfil,
+            "organizacion_pago_profesor": organizacion,
+            "personas_pago_profesor": estudiantes_pago_profesor,
+            "form_pago_profesor": form_pago_profesor,
+            "abrir_pago_profesor": bool(form_pago_profesor and form_pago_profesor.is_bound and form_pago_profesor.errors),
         }
     )
     return render(request, "personas/persona_detail.html", context)

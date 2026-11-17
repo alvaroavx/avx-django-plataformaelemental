@@ -9,12 +9,12 @@
       <div class="text-muted small">Perfil CRM consolidado</div>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-sm btn-outline-secondary" href="{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}" title="Volver" aria-label="Volver">
+      <a class="btn btn-sm btn-outline-secondary" href="{% if puede_administrar_perfil %}{% url 'personas:personas_list' %}?{{ request.GET.urlencode }}{% else %}{% url 'elemental_apps' %}?{{ request.GET.urlencode }}{% endif %}" title="Volver" aria-label="Volver">
         <i class="bi bi-arrow-left"></i><span class="d-none d-md-inline ms-1">Volver</span>
       </a>
-      <a class="btn btn-sm btn-primary" href="{% url 'personas:persona_edit' persona_obj.pk %}?{{ request.GET.urlencode }}">
+      {% if puede_administrar_perfil %}<a class="btn btn-sm btn-primary" href="{% url 'personas:persona_edit' persona_obj.pk %}?{{ request.GET.urlencode }}">
         <i class="bi bi-pencil"></i><span class="d-none d-md-inline ms-1">Editar perfil</span>
-      </a>
+      </a>{% endif %}
     </div>
   </div>
 
@@ -50,7 +50,7 @@
       <div class="card">
         <div class="card-header">Roles y organizaciones</div>
         <div class="card-body">
-          <form method="post" class="row g-2 mb-3">
+          {% if puede_administrar_perfil %}<form method="post" class="row g-2 mb-3">
             {% csrf_token %}
             <input type="hidden" name="accion" value="agregar_rol">
             <div class="col-md-3">
@@ -76,7 +76,7 @@
                 type="submit"
               >Agregar</button>
             </div>
-          </form>
+          </form>{% endif %}
           {% for item in roles_asignados %}
             <div class="border-bottom pb-2 mb-2">
               <div class="fw-semibold">
@@ -89,7 +89,7 @@
               </div>
               <div class="small text-muted">{{ item.organizacion.nombre }}</div>
               <div class="small">Asignado: {{ item.asignado_en|date:"d/m/Y" }}</div>
-              {% if item.rol.codigo == "PROFESOR" %}
+              {% if item.rol.codigo == "PROFESOR" and puede_administrar_perfil %}
               <form method="post" class="row g-2 mt-2">
                 {% csrf_token %}
                 <input type="hidden" name="accion" value="guardar_configuracion_profesor">
@@ -123,7 +123,7 @@
                 </div>
               </form>
               {% endif %}
-              <form method="post" class="mt-2">
+              {% if puede_administrar_perfil %}<form method="post" class="mt-2">
                 {% csrf_token %}
                 <input type="hidden" name="accion" value="toggle_rol">
                 <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
@@ -132,7 +132,7 @@
                 {% else %}
                 <button class="btn btn-sm btn-outline-success" type="submit">Activar</button>
                 {% endif %}
-              </form>
+              </form>{% endif %}
             </div>
           {% empty %}
             <div class="text-muted">Sin roles asignados.</div>
@@ -352,6 +352,35 @@
           </div>
         </div>
 
+        {% if puede_registrar_pago_profesor %}
+        <details class="card mb-3"{% if abrir_pago_profesor %} open{% endif %}>
+          <summary class="card-header" style="cursor:pointer">Registrar pago de una persona</summary>
+          <div class="card-body">
+            <p class="small text-muted">Registra un pago para una persona con rol estudiante activo en {{ organizacion_pago_profesor.nombre }}.</p>
+            {% if personas_pago_profesor %}
+            <form method="post" class="row g-3">
+              {% csrf_token %}
+              <input type="hidden" name="accion" value="registrar_pago_profesor">
+              {{ form_pago_profesor.organizacion }}
+              {% for field in form_pago_profesor.visible_fields %}
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              {% endfor %}
+              {% for error in form_pago_profesor.non_field_errors %}<div class="col-12"><div class="alert alert-danger mb-0">{{ error }}</div></div>{% endfor %}
+              <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-success" type="submit"><i class="bi bi-cash-coin me-1"></i>Guardar pago</button>
+              </div>
+            </form>
+            {% else %}
+            <div class="text-muted">No hay personas con rol estudiante activo en esta organización.</div>
+            {% endif %}
+          </div>
+        </details>
+        {% endif %}
+
         <div class="card">
           <div class="card-header">Sesiones como profesor</div>
           <div class="card-body table-responsive">
@@ -368,7 +397,7 @@
                   <td>{{ item.asistencias.count }}</td>
                   <td class="text-nowrap">
                     {% include "asistencias/_sesion_profesor_acciones.html" with sesion=item %}
-                    <form method="post" class="d-inline-flex gap-1 align-items-center mt-1 mt-md-0">
+                    {% if puede_administrar_perfil %}<form method="post" class="d-inline-flex gap-1 align-items-center mt-1 mt-md-0">
                       {% csrf_token %}
                       <input type="hidden" name="accion" value="cambiar_estado_sesion">
                       <input type="hidden" name="sesion_id" value="{{ item.pk }}">
@@ -377,7 +406,7 @@
                           <option value="{{ value }}" {% if value == item.estado %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                       </select>
-                    </form>
+                    </form>{% endif %}
                   </td>
                 </tr>
                 {% endfor %}

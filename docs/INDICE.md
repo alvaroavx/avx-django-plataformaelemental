@@ -50,6 +50,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 - [docs/adr/0022-montos-en-pesos-enteros.md](adr/0022-montos-en-pesos-enteros.md): guarda todos los montos en pesos chilenos enteros con la regla de IVA de Cuadratura.
 - [docs/adr/0023-envio-de-mes-a-cuadratura-por-api.md](adr/0023-envio-de-mes-a-cuadratura-por-api.md): envía el mes a la API genérica de Cuadratura y bloquea el mes enviado.
 - [docs/adr/0024-profesor-agrega-estudiantes-activos-organizacion.md](adr/0024-profesor-agrega-estudiantes-activos-organizacion.md): permite al Profesor agregar estudiantes activos de su organización y crea la matrícula de disciplina al registrar la asistencia.
+- [docs/adr/0025-profesor-registra-pago-desde-su-perfil.md](adr/0025-profesor-registra-pago-desde-su-perfil.md): habilita el registro de pagos individuales desde el perfil propio, limitado a estudiantes y planes de su organización.
 
 ## Apps
 - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md): decisiones de `asistencias`.

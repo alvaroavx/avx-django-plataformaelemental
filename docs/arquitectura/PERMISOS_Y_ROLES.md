@@ -74,7 +74,10 @@ Reglas:
   revisión administrativa. Ninguna relación inferida desde sesiones o
   asistencias concede permisos actuales por sí sola.
 - El profesor no recibe `ACCION_VER_FINANZAS`. Pagos y cálculos relacionados se
-  consultan desde los flujos administrativos autorizados.
+  consultan desde los flujos administrativos autorizados. La excepción de
+  ADR-0025 permite registrar un pago individual desde su propio perfil, acotado
+  a estudiantes y planes activos de la organización donde tiene rol Profesor;
+  no concede acceso a Finanzas ni a edición, reversa, exportación o pago masivo.
 
 ## Acceso HTML
 Estado actual:

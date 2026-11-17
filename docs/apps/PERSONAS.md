@@ -72,6 +72,13 @@ Debe concentrar:
 - El queryset base se filtra y pagina antes de calcular metricas correlacionadas. Solo el filtro explicito de deuda puede calcular esa metrica antes de paginar porque la necesita para definir el universo.
 - Si la organizacion esta en `Todas`, el listado sigue siendo paginado para evitar una carga inicial masiva.
 - El detalle de persona muestra pagos y consumos relacionados.
+- El perfil completo sigue protegido para administración. Como excepción,
+  una persona autenticada con rol Profesor activo puede abrir solo su propio
+  perfil con una organización seleccionada donde tenga ese rol y registrar allí
+  pagos individuales para estudiantes activos de esa organización (ADR-0025).
+  La vista de profesor oculta controles de administración de personas y el
+  registro usa el servicio financiero existente; no habilita el módulo general
+  de Finanzas.
 - El detalle de persona debe separar la columna operativa derecha entre `Perfil estudiante` y `Perfil profesor`; la columna izquierda de datos personales y acceso al sistema debe ser mas compacta, y no deben mostrarse bloques de rol que no apliquen a esa persona.
 - En `personas/<id>/`, el bloque `Perfil estudiante` debe permitir asociar pagos disponibles a asistencias presentes, respetando periodo, organizacion, saldo del pago y las validaciones de `finanzas`.
 - La configuracion de honorarios de un profesor no debe hardcodearse ni vivir en organizacion global: `valor por clase` y `retencion SII` deben guardarse en `PersonaRol` para el rol `PROFESOR`, porque dependen de la combinacion persona + organizacion.

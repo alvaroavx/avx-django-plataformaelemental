@@ -119,14 +119,26 @@ class PaymentForm(forms.ModelForm):
             "observaciones": forms.Textarea(attrs={"rows": 2}),
         }
 
-    def __init__(self, *args, periodo_mes=None, periodo_anio=None, organizacion=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        periodo_mes=None,
+        periodo_anio=None,
+        organizacion=None,
+        organizaciones=None,
+        personas=None,
+        planes=None,
+        **kwargs,
+    ):
         self.periodo_mes = periodo_mes
         self.periodo_anio = periodo_anio
         self.organizacion_filtro = organizacion
         super().__init__(*args, **kwargs)
         if not self.is_bound and not self.initial.get("fecha_pago"):
             self.initial["fecha_pago"] = timezone.localdate()
-        organizaciones_qs = self.fields["organizacion"].queryset.only("id", "es_exenta_iva")
+        organizaciones_qs = organizaciones if organizaciones is not None else self.fields["organizacion"].queryset
+        organizaciones_qs = organizaciones_qs.only("id", "es_exenta_iva")
+        self.fields["organizacion"].queryset = organizaciones_qs
         self.fields["organizacion"].widget = OrganizacionIvaSelect(
             attrs=self.fields["organizacion"].widget.attrs,
             choices=self.fields["organizacion"].choices,
@@ -137,25 +149,28 @@ class PaymentForm(forms.ModelForm):
             .distinct()
             .order_by("apellidos", "nombres")
         )
+        if personas is not None:
+            estudiantes_qs = personas
         self.fields["persona"].queryset = estudiantes_qs
         persona_orgs = {}
-        for persona_id, org_id in (
-            PersonaRol.objects.filter(
-                persona_id__in=estudiantes_qs.values_list("id", flat=True),
-                rol__codigo="ESTUDIANTE",
-                activo=True,
-            )
-            .values_list("persona_id", "organizacion_id")
-            .iterator()
-        ):
+        persona_roles = PersonaRol.objects.filter(
+            persona_id__in=estudiantes_qs.values_list("id", flat=True),
+            rol__codigo="ESTUDIANTE",
+            activo=True,
+        )
+        if organizacion is not None:
+            persona_roles = persona_roles.filter(organizacion=organizacion)
+        for persona_id, org_id in persona_roles.values_list("persona_id", "organizacion_id").iterator():
             persona_orgs.setdefault(persona_id, set()).add(org_id)
         self.fields["persona"].widget = PersonaOrganizacionSelect(
             attrs=self.fields["persona"].widget.attrs,
             choices=self.fields["persona"].choices,
             persona_orgs={k: sorted(v) for k, v in persona_orgs.items()},
         )
-        planes_qs = PaymentPlan.objects.filter(activo=True).order_by("-es_por_defecto", "nombre")
-        if self.instance.pk and self.instance.plan_id:
+        planes_qs = planes if planes is not None else PaymentPlan.objects.filter(activo=True).order_by(
+            "-es_por_defecto", "nombre"
+        )
+        if self.instance.pk and self.instance.plan_id and planes is None:
             planes_qs = PaymentPlan.objects.filter(Q(activo=True) | Q(pk=self.instance.plan_id)).order_by(
                 "-es_por_defecto",
                 "nombre",

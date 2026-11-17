@@ -197,9 +197,12 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
 
 - Los roles Administrador y Finanzas operan la app según la matriz de permisos;
   Solo lectura puede ver finanzas, sin operar ni exportar.
-- Profesor no tiene permisos financieros (`personas/permissions.py::ACCION_ROLES`):
-  no registra pagos, no exporta y no accede a las vistas protegidas por
-  `ver_finanzas`. El pago masivo y su resultado exigen `operar_pagos` en
+- Profesor no recibe acceso general a Finanzas ni a `ver_finanzas`. La excepción
+  de ADR-0025 permite registrar un pago individual desde su propio perfil,
+  limitado a estudiantes y planes activos de la organización donde tiene rol
+  Profesor activo. No permite listar pagos, editarlos, revertirlos, exportarlos
+  ni registrar pagos masivos. El alta usa `crear_pago_operacional` y conserva
+  la auditoría del actor. El pago masivo y su resultado exigen `operar_pagos` en
   la organización real del lote, sin excepción por `is_staff`.
 - Las acciones sensibles registran ids, montos y fechas; no adjuntos ni datos personales completos.
 - La API pública de Elemental no expone pagos ni transacciones. El token de Cuadratura vive solo en la variable de entorno `CUADRATURA_API_TOKEN` y la llave privada en el archivo de `CUADRATURA_API_PRIVATE_KEY_FILE`, fuera del repo y con permisos 600. Ninguno se guarda en base de datos, auditoría ni mensajes de error.
