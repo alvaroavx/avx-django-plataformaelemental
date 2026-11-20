@@ -93,7 +93,7 @@ Cuadratura quedan con datos distintos.
 
 ## Verificación
 
-- `src/finanzas/test_envio_cuadratura.py` (14 pruebas) cubre, además de la firma
+- `tests/finanzas/test_envio_cuadratura.py` (14 pruebas) cubre, además de la firma
   verificada en cada llamada, el bloqueo durante el envío, el estado incierto con
   reintento idéntico, el fallo de conexión que no bloquea, la URL ajena descartada y
   la llave obligatoria. También cubre:

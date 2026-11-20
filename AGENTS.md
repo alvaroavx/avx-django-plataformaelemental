@@ -39,6 +39,7 @@ src/personas/ identidad, organizaciones, roles, login Google y solicitudes de ac
 src/plataformaelemental/ config de django, panel transversal, contexto global y navegacion
 scripts/ deploy, releases escalonados y validadores
 src/templates/ plantillas compartidas
+tests/ pruebas de Django agrupadas por aplicación
 
 ## Entorno local
 - Usar Python 3.12 para el entorno virtual local: `python3.12 -m venv .venv`.

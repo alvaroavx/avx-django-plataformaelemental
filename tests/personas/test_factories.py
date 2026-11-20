@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 
-from .models import Persona, PersonaRol
+from personas.models import Persona, PersonaRol
 
 
 def crear_usuario_con_rol(

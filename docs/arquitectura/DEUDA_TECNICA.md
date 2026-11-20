@@ -104,12 +104,8 @@ Estado: activa.
 
 Los workflows ejecutan `python manage.py test asistencias finanzas personas`,
 no la suite completa: `api`, `auditoria` y `plataformaelemental` no corren en CI.
-Además, `test.yml` invoca `asistencias.test_profesor_ux` y
-`asistencias.test_operacion_profesor`, eliminados en `d792f75`, por lo que ese
-paso falla.
-
-Acción: retirar los módulos inexistentes y usar `python manage.py test` en ambos
-workflows (ajustando `scripts/validar_gate_ci.py` si lo exige).
+Acción pendiente: usar `python manage.py test` en ambos workflows y ajustar
+`scripts/validar_gate_ci.py` para cubrir todas las aplicaciones.
 
 ### Observabilidad y auditoría incompletas
 

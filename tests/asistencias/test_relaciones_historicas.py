@@ -16,16 +16,16 @@ from auditoria.models import AuditLog
 from finanzas.models import Payment
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
-from .admin import AsignacionProfesorDisciplinaAdmin
-from .models import (
+from asistencias.admin import AsignacionProfesorDisciplinaAdmin
+from asistencias.models import (
     AlumnoDisciplina,
     AsignacionProfesorDisciplina,
     Asistencia,
     Disciplina,
     SesionClase,
 )
-from .management.commands.reportar_relaciones_historicas import construir_reporte
-from .services import (
+from asistencias.management.commands.reportar_relaciones_historicas import construir_reporte
+from asistencias.services import (
     activar_asignacion_profesor,
     activar_asignaciones_profesor_en_lote,
     activar_matricula_alumno,

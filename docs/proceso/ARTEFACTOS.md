@@ -244,7 +244,7 @@ confirmación solo dentro de su DOM aislado.
   un preflight PostgreSQL read-only, valida un dump restaurado y un snapshot
   previo mediante confirmaciones auditables, y aplica únicamente destinos de
   migración explícitos.
-- `src/asistencias/test_release_asistencias_0005.py`: contrato estático sin base de
+- `tests/asistencias/test_release_asistencias_0005.py`: contrato estático sin base de
   datos. Comprueba la máquina de estados, la ausencia de `migrate` global, la
   conservación del release anterior y los requisitos documentales.
 - Runbook vigente:
@@ -366,7 +366,7 @@ confirmación solo dentro de su DOM aislado.
   con que Elemental firma cada request a la API de Cuadratura.
   - Escribe la llave privada con permisos 600 y se niega a dejarla dentro del repo.
   - Imprime la llave pública, que se registra en Cuadratura.
-- `src/finanzas/test_envio_cuadratura.py` contiene `FakeSession`, un doble de la API v1 de
+- `tests/finanzas/test_envio_cuadratura.py` contiene `FakeSession`, un doble de la API v1 de
   Cuadratura que verifica la firma y que no se sigan redirecciones. Sirve para probar
   envíos sin red.
 - La prueba de punta a punta contra Cuadratura local se hizo con la organización

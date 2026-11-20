@@ -180,9 +180,8 @@ de color, pero elevan contraste de fondo, borde y texto.
 El Panel incorpora las sesiones de la fecha actual visibles para
 el usuario, con organización, horario, profesores, estado y asistentes. La
 selección global de organización limita también esta sección. El acceso `Hoy`
-se retira del menú administrativo para evitar dos puntos de entrada a la misma
-información; la ruta `/asistencias/hoy/` se conserva porque sigue siendo la
-jornada operativa de la aplicación de profesores.
+y la antigua pantalla `/asistencias/hoy/` se retiraron. El Panel conserva
+la información de la jornada y enlaza con las vistas operativas.
 
 `Próximas sesiones del período` no forma parte del Panel: duplicaba el calendario
 y alejaba las acciones prioritarias y la consulta de personas.
@@ -233,10 +232,10 @@ Desde v1.0 se usa `Panel` para vistas principales. `Dashboard` queda reservado s
 
 La gramática mínima de `Hoy`, detalle de sesión y resumen administrativo se documenta en `docs/apps/GRAMATICA_MOVIL_SPRINT2.md`. El prototipo vive en `docs/prototipos/`, separado de rutas activas. Su validación con Beisics y dos profesoras continúa pendiente.
 
-## Jornada móvil de clases — Sprint 3
+## Jornada móvil de clases — Sprint 3 (histórico)
 
-La ruta activa `/asistencias/hoy/` materializa la parte operativa del prototipo
-para profesoras autorizadas. La experiencia incluye:
+La ruta retirada `/asistencias/hoy/` materializaba la parte operativa del
+prototipo. La experiencia incluía:
 
 - sesiones del día ordenadas por horario, con organización, equipo, cantidad de
   asistentes y estado temporal expresado con texto e icono;

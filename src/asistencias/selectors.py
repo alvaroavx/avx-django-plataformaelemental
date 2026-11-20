@@ -4,7 +4,7 @@ from personas.models import Persona, PersonaRol
 from personas.permissions import ACCION_VER_CALENDARIO, normalizar_codigo_rol, usuario_tiene_permiso
 from plataformaelemental.context import aplicar_periodo, filtros_periodo, resolver_periodo
 
-from .models import AsignacionProfesorDisciplina, Asistencia, SesionClase
+from .models import Asistencia, SesionClase
 
 
 def sesiones_visibles_para_usuario(user):

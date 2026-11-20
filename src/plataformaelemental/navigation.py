@@ -264,16 +264,5 @@ def build_navigation(request):
     return items
 
 
-def build_dashboard_cards(request):
-    return [
-        item
-        for item in build_navigation(request)
-        if item["label"] not in {"Panel", "Configuración"}
-    ]
-
-
 def navigation_context(request):
-    return {
-        "elemental_nav_items": build_navigation(request),
-        "elemental_dashboard_cards": build_dashboard_cards(request),
-    }
+    return {"elemental_nav_items": build_navigation(request)}

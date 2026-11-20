@@ -8,8 +8,8 @@ from django.test import TestCase, override_settings
 from finanzas.models import AttendanceConsumption, Payment, PaymentPlan, Transaction
 from personas.models import Organizacion, Persona, PersonaRol, Rol
 
-from .management.commands.poblar_mes_pruebas import MARCADOR
-from .models import AsignacionProfesorDisciplina, Asistencia, Disciplina, SesionClase
+from asistencias.management.commands.poblar_mes_pruebas import MARCADOR
+from asistencias.models import AsignacionProfesorDisciplina, Asistencia, Disciplina, SesionClase
 
 
 @override_settings(DEBUG=True)

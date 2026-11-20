@@ -6,9 +6,24 @@ Fecha de actualizacion: 2026-10-12
 El código Python, las plantillas y los estáticos fuente se organizan bajo
 `src/`. Las aplicaciones mantienen sus nombres de importación y sus etiquetas
 Django. `manage.py` y `gunicorn.conf.py`, en la raíz, incorporan esa carpeta al
-path de Python. `manage.py test` descubre la suite en `src/` y acepta las mismas
+path de Python. `manage.py test` descubre la suite en `tests/` y acepta las mismas
 etiquetas de app que antes. Las rutas de archivos subidos y estáticos
 recopilados se detallan en la [guía de despliegue](../operacion/DEPLOY.md).
+
+
+## Alcance de la limpieza por navegación
+
+Se consideran operativas las funciones alcanzables desde el menú, Panel,
+formularios o acciones de una pantalla accesible. El alcance incluye enlaces
+y acciones condicionados por rol y endpoints que esas pantallas usan
+indirectamente. API, inicio de sesión, administración avanzada y comandos
+operativos tienen contratos propios.
+
+La jornada diaria se consulta en el Panel y el desglose de categorías en
+Resumen financiero. Se retiraron las vistas independientes `/asistencias/hoy/`
+y `/finanzas/reportes/categorias/` junto con su código exclusivo. La navegación
+se calcula una vez por contexto y las entradas históricas al calendario
+comparten la misma redirección.
 
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.

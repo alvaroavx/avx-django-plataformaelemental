@@ -87,7 +87,8 @@ python manage.py reconciliar_integridad_dominio
 
 Bajo `/finanzas/`: panel, planes, pagos (individual, masivo, detalle, edición,
 reversa), categorías, transacciones (detalle, archivo protegido, edición,
-eliminación), `reportes/categorias/` y `preparar-mes/`.
+eliminación) y `preparar-mes/`. El desglose por categoría se consulta en
+Resumen financiero. El reporte separado `reportes/categorias/` fue retirado.
 
 Exportaciones (permiso `exportar_datos`):
 
@@ -145,7 +146,7 @@ Implementación: `src/finanzas/services/cuadratura_v1.py` (`prepare_month`,
 - **`batch_id`:** SHA-256 de `organización|período|external_id` de las
   operaciones incluidas. Es estable mientras no cambie el conjunto de
   operaciones; `generated_at` cambia en cada descarga.
-- **Pruebas:** `src/finanzas/tests.py` cubre una operación válida (sin mutar el
+- **Pruebas:** `tests/finanzas/tests.py` cubre una operación válida (sin mutar el
   pago) y un pago sin transacción enlazada.
 
 ### Envío por API (ADR 0023)
@@ -184,7 +185,7 @@ Implementación: `src/finanzas/services/cuadratura_v1.py` (`prepare_month`,
     formularios de pago, pago masivo y transacción.
   - Para desbloquear, un superusuario elimina el envío desde la base. No hay
     pantalla para eso.
-- **Pruebas:** `src/finanzas/test_envio_cuadratura.py`.
+- **Pruebas:** `tests/finanzas/test_envio_cuadratura.py`.
 
 ### Planificado / no implementado
 

@@ -22,11 +22,11 @@ from allauth.socialaccount.models import EmailAddress, SocialAccount, SocialLogi
 from auditoria.models import AuditLog
 from asistencias.models import Asistencia, Disciplina, SesionClase
 
-from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
-from .auth_google import AdaptadorSocialGoogleElemental
-from .identidades_google import bloquear_identidad_google
-from .resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
-from .solicitudes_acceso import crear_o_recuperar_solicitud
+from personas.models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from personas.auth_google import AdaptadorSocialGoogleElemental
+from personas.identidades_google import bloquear_identidad_google
+from personas.resolucion_solicitudes import aprobar_solicitud, rechazar_solicitud, reabrir_solicitud
+from personas.solicitudes_acceso import crear_o_recuperar_solicitud
 
 
 TEST_PASSWORD = "not-a-real-test-password"

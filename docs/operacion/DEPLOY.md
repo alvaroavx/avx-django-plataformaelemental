@@ -316,10 +316,9 @@ flowchart TD
 - El job no carga `.env.prod`, `DEPLOY_ENV_FILE` ni secrets de PostgreSQL.
 - SQLite no forma parte de settings ni del pipeline; PostgreSQL es obligatorio.
 - `.github/workflows/test.yml` ejecuta el mismo conjunto en `pull_request` o `workflow_dispatch`, incluido `makemigrations --check --dry-run`, con PostgreSQL 16 y sin pasos de SSH, migración productiva ni deploy. Es la vía segura para validar una rama antes de integrarla a `main`.
-- Discrepancia vigente: `test.yml` agrega un paso final
-  `python manage.py test asistencias.test_profesor_ux asistencias.test_operacion_profesor`.
-  Esos módulos se eliminaron al retirar el portal de profesores (ADR 0016), por
-  lo que ese paso falla en cada PR hasta que se corrija el workflow.
+- `test.yml` agrega una ejecución explícita de
+  `asistencias.test_relaciones_historicas` y
+  `asistencias.test_release_asistencias_escalonado`.
 
 ## SSH En CI
 - El workflow valida `DEPLOY_SSH_KEY_B64` como secret obligatorio.

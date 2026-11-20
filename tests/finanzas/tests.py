@@ -14,7 +14,7 @@ from decimal import Decimal
 from openpyxl import load_workbook
 
 from auditoria.models import AuditLog
-from finanzas.forms import PaymentForm, TransactionForm
+from finanzas.forms import PaymentForm
 from finanzas.services import asociar_asistencia_a_pago, resumen_financiero_estudiante
 from finanzas.services.reconciliacion import reconciliar_integridad_dominio
 from finanzas.services.reversas import revertir_pago
@@ -30,7 +30,7 @@ from finanzas.services.pagos import (
 from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, ClaseLiberada, Disciplina, SesionClase
 from personas.models import Organizacion, Persona, PersonaRol, Rol
-from personas.test_factories import crear_usuario_con_rol
+from tests.personas.test_factories import crear_usuario_con_rol
 
 from finanzas.models import (
     AttendanceConsumption,
@@ -888,28 +888,6 @@ class FinanzasAccessTests(TestCase):
         self.assertIn("inline;", response["Content-Disposition"])
 
 
-
-    def test_reporte_categorias_muestra_grafico_torta(self):
-        categoria = Category.objects.create(nombre="Arriendo sala", tipo="egreso", activa=True)
-        Transaction.objects.create(
-            organizacion=self.org,
-            categoria=categoria,
-            fecha="2026-02-27",
-            tipo=Transaction.Tipo.EGRESO,
-            monto=25000,
-            descripcion="Arriendo febrero",
-        )
-
-        self.client.force_login(self.user_admin)
-        response = self.client.get(
-            reverse("finanzas:reporte_categorias"),
-            {"periodo_mes": 2, "periodo_anio": 2026, "organizacion": self.org.pk},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'canvas id="categoriasChart"', html=False)
-        self.assertContains(response, "Chart(", html=False)
-        self.assertContains(response, "Arriendo sala")
 
     def test_export_pagos_csv_mantiene_headers_y_filas_filtradas(self):
         Payment.objects.create(

@@ -5,8 +5,7 @@ from . import views
 app_name = "asistencias"
 
 urlpatterns = [
-    path("", views.dashboard, name="dashboard"),
-    path("hoy/", views.sesiones_hoy, name="sesiones_hoy"),
+    path("", views.sesiones_legacy_redirect, name="dashboard"),
     path("calendario/", views.sesiones_list, name="sesiones_list"),
     path("sesiones/", views.sesiones_legacy_redirect),
     path("sesiones/<int:pk>/", views.sesion_detail, name="sesion_detail"),

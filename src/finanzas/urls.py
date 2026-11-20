@@ -24,7 +24,6 @@ urlpatterns = [
     path("transacciones/<int:pk>/archivo/", views.transaccion_archivo, name="transaccion_archivo"),
     path("transacciones/<int:pk>/editar/", views.transaccion_edit, name="transaccion_edit"),
     path("transacciones/<int:pk>/eliminar/", views.transaccion_delete, name="transaccion_delete"),
-    path("reportes/categorias/", views.reporte_categorias, name="reporte_categorias"),
     path("preparar-mes/", views.preparar_mes, name="preparar_mes"),
     path("preparar-mes/descargar/", views.descargar_cuadratura, name="descargar_cuadratura"),
     path("preparar-mes/enviar/", views.enviar_cuadratura, name="enviar_cuadratura"),

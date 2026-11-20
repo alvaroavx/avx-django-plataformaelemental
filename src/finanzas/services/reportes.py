@@ -68,13 +68,6 @@ def armar_dashboard_financiero(
     }
 
 
-def armar_reporte_categorias(*, consolidado_qs, periodo_descripcion):
-    return {
-        "consolidado": list(consolidado_qs),
-        "periodo_descripcion_vista": periodo_descripcion,
-    }
-
-
 def filas_export_pagos(pagos):
     for pago in pagos:
         yield [
@@ -182,7 +175,6 @@ __all__ = [
     "TRANSACCIONES_CSV_HEADERS",
     "TRANSACCIONES_XLSX_HEADERS",
     "armar_dashboard_financiero",
-    "armar_reporte_categorias",
     "filas_export_libro_caja",
     "filas_export_pagos_alumnos_xlsx",
     "filas_export_pagos",

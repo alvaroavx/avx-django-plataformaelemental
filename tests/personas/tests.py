@@ -25,13 +25,13 @@ from asistencias.forms import PersonaRapidaForm
 from asistencias.models import Asistencia, Disciplina, SesionClase
 from finanzas.models import AttendanceConsumption, Payment
 
-from .admin import PersonaRolBulkForm
-from .auth_google import AdaptadorSocialGoogleElemental
-from .auth_views import GoogleOAuth2AdapterElemental
-from .forms import PersonaCRMForm
-from .models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
-from .solicitudes_acceso import SESION_IDENTIDAD_PENDIENTE
-from .resolucion_solicitudes import aprobar_solicitud
+from personas.admin import PersonaRolBulkForm
+from personas.auth_google import AdaptadorSocialGoogleElemental
+from personas.auth_views import GoogleOAuth2AdapterElemental
+from personas.forms import PersonaCRMForm
+from personas.models import Organizacion, Persona, PersonaRol, Rol, SolicitudAcceso
+from personas.solicitudes_acceso import SESION_IDENTIDAD_PENDIENTE
+from personas.resolucion_solicitudes import aprobar_solicitud
 
 
 TEST_PASSWORD = "not-a-real-test-password"

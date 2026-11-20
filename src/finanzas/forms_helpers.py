@@ -47,12 +47,6 @@ def ayuda_finanzas(clave):
                 "como transferencia, cartola o comprobante."
             ),
         },
-        "reporte_categorias": {
-            "titulo": "Como leer este reporte",
-            "texto": (
-                "Este consolidado agrupa transacciones por categoría dentro del período filtrado para analizar caja."
-            ),
-        },
     }
     return ayudas.get(clave)
 

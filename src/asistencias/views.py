@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_POST
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from finanzas.models import AttendanceConsumption
-from personas.models import Organizacion, Persona, PersonaRol, Rol
+from personas.models import Persona, PersonaRol, Rol
 from personas.search import filtrar_por_fragmentos
 from personas.permissions import (
     ACCION_ADMINISTRAR_PERSONAS,
@@ -51,7 +51,6 @@ from .forms import (
     SesionesMasivasForm,
 )
 from .models import (
-    AlumnoDisciplina,
     AsignacionProfesorDisciplina,
     Asistencia,
     Disciplina,
@@ -107,12 +106,6 @@ def _metadata_asistencia(asistencia):
         "persona_id": asistencia.persona_id,
         "estado": asistencia.estado,
     }
-
-
-def _periodo(request):
-    """Retorna un periodo de referencia para vistas que requieren una fecha base visible."""
-    periodo = resolver_periodo(request)
-    return periodo["referencia_inicio"], periodo["referencia_fin"]
 
 
 def _url_con_filtros(request, nombre_url, **kwargs):
@@ -405,92 +398,6 @@ def _fechas_del_mes_para_dias(year, month, dias_semana, max_sesiones=None):
     if max_sesiones:
         return fechas[:max_sesiones]
     return fechas
-
-
-@login_required
-def sesiones_hoy(request):
-    hoy = timezone.localdate()
-    ahora = timezone.localtime()
-    sesiones_qs = sesiones_visibles_para_usuario(request.user)
-    organizacion_solicitada = None
-    if not request.user.is_superuser:
-        if request.GET.get("organizacion"):
-            try:
-                organizacion_solicitada = Organizacion.objects.filter(
-                    pk=request.GET.get("organizacion")
-                ).first()
-            except (TypeError, ValueError, ValidationError):
-                organizacion_solicitada = None
-            if not organizacion_solicitada or not usuario_tiene_permiso(
-                request.user,
-                ACCION_ADMINISTRAR_SESIONES,
-                organizacion=organizacion_solicitada,
-                permitir_staff_global=False,
-            ):
-                raise Http404
-        elif not usuario_tiene_permiso(
-            request.user,
-            ACCION_ADMINISTRAR_SESIONES,
-            permitir_staff_global=False,
-        ):
-            raise Http404
-        if organizacion_solicitada:
-            sesiones_qs = sesiones_qs.filter(
-                disciplina__organizacion=organizacion_solicitada,
-            )
-    sesiones = list(
-        sesiones_qs
-        .filter(fecha=hoy)
-        .order_by("sin_horario", "bloque__hora_inicio", "disciplina__nombre", "pk")
-    )
-    hora_actual = ahora.time()
-    for sesion in sesiones:
-        if sesion.estado == SesionClase.Estado.CANCELADA:
-            sesion.momento_label = "Cancelada"
-            sesion.momento_clase = "secondary"
-            sesion.momento_icono = "bi-x-circle"
-        elif sesion.estado == SesionClase.Estado.COMPLETADA:
-            sesion.momento_label = "Finalizada"
-            sesion.momento_clase = "success"
-            sesion.momento_icono = "bi-check-circle"
-        elif sesion.estado == SesionClase.Estado.ABIERTA:
-            sesion.momento_label = "Abierta"
-            sesion.momento_clase = "warning"
-            sesion.momento_icono = "bi-play-circle"
-        elif sesion.bloque and hora_actual < sesion.bloque.hora_inicio:
-            sesion.momento_label = "Próxima"
-            sesion.momento_clase = "primary"
-            sesion.momento_icono = "bi-clock"
-        elif sesion.bloque and hora_actual <= sesion.bloque.hora_fin:
-            sesion.momento_label = "En curso"
-            sesion.momento_clase = "warning"
-            sesion.momento_icono = "bi-play-circle"
-        elif sesion.bloque:
-            sesion.momento_label = "Horario finalizado"
-            sesion.momento_clase = "secondary"
-            sesion.momento_icono = "bi-clock-history"
-        else:
-            sesion.momento_label = "Programada · sin horario"
-            sesion.momento_clase = "info"
-            sesion.momento_icono = "bi-calendar-event"
-
-    context = nav_context(request, permitir_staff_global=False)
-    context.update(
-        {
-            "hide_periodo": True,
-            "fecha_hoy": hoy,
-            "sesiones": sesiones,
-        }
-    )
-    return render(request, "asistencias/sesiones_hoy.html", context)
-
-
-@role_required(ROLE_ADMIN, permitir_staff_global=False)
-def dashboard(request):
-    """Compatibilidad: el antiguo panel de Sesiones ahora abre el calendario."""
-    destino = reverse("asistencias:sesiones_list")
-    query = request.GET.urlencode()
-    return redirect(f"{destino}?{query}" if query else destino)
 
 
 @permiso_requerido(

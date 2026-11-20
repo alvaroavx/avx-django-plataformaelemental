@@ -67,7 +67,6 @@ from personas.models import Persona
 from personas.search import filtrar_por_fragmentos
 from .selectors import (
     categorias_queryset,
-    consolidado_categorias_queryset,
     dashboard_querysets,
     libro_caja_queryset,
     pago_detail_queryset,
@@ -94,7 +93,6 @@ from .services.reportes import (
     TRANSACCIONES_CSV_HEADERS,
     TRANSACCIONES_XLSX_HEADERS,
     armar_dashboard_financiero,
-    armar_reporte_categorias,
     LIBRO_CAJA_CSV_HEADERS,
     filas_export_libro_caja,
     filas_export_pagos,
@@ -883,20 +881,6 @@ def transaccion_delete(request, pk):
         "finanzas/confirm_delete.html",
         {"obj": transaccion, "title": "Eliminar transaccion", "back_url": _url_with_query(request, "finanzas:transacciones_list")},
     )
-
-
-@finanzas_read_required
-def reporte_categorias(request):
-    context = _base_context(request)
-    organizacion = organizacion_desde_request(request)
-    context.update(
-        armar_reporte_categorias(
-            consolidado_qs=consolidado_categorias_queryset(request, organizacion=organizacion),
-            periodo_descripcion=descripcion_periodo(request=request, corta=False),
-        )
-    )
-    context["ayuda_seccion"] = _ayuda_finanzas("reporte_categorias")
-    return render(request, "finanzas/reporte_categorias.html", context)
 
 
 @exportar_finanzas_required

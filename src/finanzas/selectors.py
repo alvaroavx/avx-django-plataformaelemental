@@ -176,16 +176,6 @@ def resumen_dashboard(pagos_qs, transacciones_qs, consumos_qs, *, mes=None, anio
     }
 
 
-def consolidado_categorias_queryset(request, *, organizacion=None):
-    queryset = aplicar_periodo(Transaction.objects.all(), "fecha", request=request)
-    if organizacion:
-        queryset = queryset.filter(organizacion=organizacion)
-    return queryset.values("categoria__nombre", "categoria__tipo").annotate(total=Sum("monto")).order_by(
-        "categoria__tipo",
-        "-total",
-    )
-
-
 def categorias_queryset():
     return Category.objects.order_by("tipo", "nombre")
 

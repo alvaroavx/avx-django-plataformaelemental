@@ -21,7 +21,6 @@ from .reportes import (
     PAGOS_CSV_HEADERS,
     TRANSACCIONES_CSV_HEADERS,
     armar_dashboard_financiero,
-    armar_reporte_categorias,
     filas_export_pagos,
     filas_export_transacciones,
 )
@@ -32,7 +31,6 @@ __all__ = [
     "asignar_consumo_asistencia",
     "asociar_asistencia_a_pago",
     "armar_dashboard_financiero",
-    "armar_reporte_categorias",
     "calcular_saldo_clases_pago",
     "confirmar_lote_pagos",
     "consumo_tiene_derecho_valido",

@@ -36,8 +36,8 @@ Lo que existe (verificado en `src/asistencias/views.py`, `src/asistencias/select
   comprueban juntas para operar la sesión, además del rol y la capacidad. La
   primera expresa el vínculo vigente con la disciplina y la segunda la
   asignación concreta de la clase.
-- `GET /asistencias/hoy/` no está disponible para profesores: exige
-  `administrar_sesiones` y responde `404` en otro caso.
+- La jornada diaria está en el Panel. Calendario y el detalle de sesión
+  conservan sus capacidades y filtros por organización.
 
 ## Proposito
 `asistencias` es la capa operativa diaria de la plataforma.
@@ -565,9 +565,8 @@ idempotente del dominio; ausencias y justificaciones no recuperan cupo.
 ## Jornada móvil de profesoras — base histórica Sprint 3
 
 > **Histórico.** Describe la jornada Sprint 3 y el portal posterior, ambos
-> retirados. Estado actual: `GET /asistencias/hoy/` exige `administrar_sesiones`
-> (admin o `staff_asistencia`) y responde `404` a profesores; el profesor opera
-> desde Calendario y el detalle de sesión según
+> retirados. La ruta histórica `/asistencias/hoy/` también fue retirada.
+> El profesor opera desde Calendario y el detalle de sesión según
 > [Profesor en la aplicación común](#profesor-en-la-aplicacion-comun).
 
 - `GET /asistencias/hoy/` lista solamente las sesiones del día accesibles para

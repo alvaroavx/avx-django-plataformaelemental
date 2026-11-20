@@ -18,9 +18,8 @@ verdad). Correcciones aplicadas a este documento:
   usa environments protegidos.
 - Ambos workflows ejecutan `python manage.py test asistencias finanzas personas`,
   no la suite completa: `api`, `auditoria` y `plataformaelemental` no corren en CI.
-- `.github/workflows/test.yml` (PR) todavía ejecuta
-  `asistencias.test_profesor_ux` y `asistencias.test_operacion_profesor`,
-  módulos eliminados en `d792f75`; ese paso falla hasta corregir el workflow.
+- `.github/workflows/test.yml` (PR) ejecuta de forma explícita las pruebas
+  de relaciones históricas y releases escalonados de asistencias.
 - `finanzas.0013` ya figura aplicada en la base de desarrollo local
   (`showmigrations`, 2026-10-12). En producción sigue sin confirmarse.
 - Trabajo en curso sin commitear (2026-10-12): `ConfiguracionPermisoRol`

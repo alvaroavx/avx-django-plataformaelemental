@@ -8,8 +8,8 @@ from django.urls import reverse
 
 from personas.models import Organizacion, Persona
 
-from .models import AuditLog
-from .services import registrar_auditoria, registrar_cambio
+from auditoria.models import AuditLog
+from auditoria.services import registrar_auditoria, registrar_cambio
 
 
 TEST_PASSWORD = "not-a-real-test-password"

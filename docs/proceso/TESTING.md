@@ -27,7 +27,7 @@ El set principal esperado es:
 python manage.py test
 ```
 
-Este comando descubre la suite completa en `src/`. Las etiquetas de app se resuelven dentro de `src/`, incluso si un checkout anterior dejó directorios de caché en la raíz. **Los workflows no lo usan**: `test.yml`
+Este comando descubre la suite completa en `tests/`. Las etiquetas de app y módulo se resuelven en sus paquetes dentro de esa carpeta. **Los workflows no lo usan**: `test.yml`
 y `deploy.yml` ejecutan `python manage.py test asistencias finanzas personas`, por
 lo que `api`, `auditoria` y `plataformaelemental` no corren en CI. Los comandos
 por app se reservan para validaciones focalizadas.
@@ -185,7 +185,7 @@ Debe cubrir cualquier cambio en `src/finanzas/services/cuadratura_v1.py`:
 - estabilidad de `batch_id`,
 - permisos y aislamiento por organización de `preparar_mes`/`descargar_cuadratura`.
 
-Hoy solo existen dos tests (`src/finanzas/tests.py`): exportación de un pago válido
+Hoy solo existen dos tests (`tests/finanzas/tests.py`): exportación de un pago válido
 sin mutar registros y pendiente por pago sin transacción.
 
 ### UI y templates
@@ -208,9 +208,8 @@ Ambos workflows (`test.yml` en pull requests y `deploy.yml` en push a `main`) ej
 - `ruff check .`
 - `python manage.py test asistencias finanzas personas`
 
-`test.yml` además ejecuta `asistencias.test_profesor_ux` y
-`asistencias.test_operacion_profesor`, módulos eliminados en `d792f75`; ese paso
-falla hasta corregir el workflow (pendiente en `docs/arquitectura/DEUDA_TECNICA.md`).
+`test.yml` además ejecuta `asistencias.test_relaciones_historicas` y
+`asistencias.test_release_asistencias_escalonado` de forma explícita.
 
 La base de datos de CI usa PostgreSQL mediante service container.
 

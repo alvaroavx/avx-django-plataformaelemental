@@ -82,6 +82,7 @@ Las rutas históricas `plataformaelemental/media/` y
 - `src/api/`: API minima de salud/estado/version
 - `src/auditoria/`: registro best-effort de mutaciones sensibles
 - `src/templates/`: plantillas compartidas
+- `tests/`: suite de Django y auxiliares de pruebas, organizados por app
 - `scripts/`: deploy, releases escalonados, validadores de documentación y CI
 - `deploy/`: ejemplo de unit `systemd`
 - `docs/`: documentación viva

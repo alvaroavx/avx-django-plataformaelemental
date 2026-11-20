@@ -1,5 +1,3 @@
-from django.core.exceptions import PermissionDenied
-
 from .models import Disciplina
 from personas.models import Persona, PersonaRol
 from personas.permissions import normalizar_codigo_rol
@@ -8,17 +6,6 @@ ROLE_ADMIN = "admin"
 ROLE_STAFF_ASISTENCIA = "staff_asistencia"
 ROLE_PROFESOR = "profesor"
 ROLE_ESTUDIANTE = "estudiante"
-
-
-def get_persona_for_user(user):
-    if not user.is_authenticated:
-        raise PermissionDenied("Debes iniciar sesión.")
-    if user.is_superuser:
-        return None
-    try:
-        return user.persona
-    except Persona.DoesNotExist:
-        raise PermissionDenied("Tu usuario no está vinculado a una persona.")
 
 
 def usuario_tiene_roles(user, roles: list[str], *, organizacion=None) -> bool:
