@@ -311,6 +311,19 @@
     }
   }
 
+  .elemental-sidebar-desktop > .elemental-sidebar-content {
+    min-height: calc(100% - 68px);
+  }
+
+  #elementalSidebar .elemental-sidebar-content {
+    min-height: 100%;
+  }
+
+  .elemental-sidebar-account button {
+    background: transparent;
+    border: 0;
+  }
+
   .elemental-nav-link {
     color: var(--ea-sidebar-text);
     text-decoration: none;
@@ -1215,23 +1228,6 @@
     .solicitudes-acceso .form-control,
     .solicitudes-acceso .form-select {
       min-height: 44px;
-    }
-  }
-
-  @media (max-width: 260px) {
-    .elemental-user-actions,
-    .elemental-user-name {
-      min-width: 0;
-    }
-
-    .elemental-user-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .elemental-user-actions form {
-      flex: 0 0 auto;
     }
   }
 

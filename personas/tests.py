@@ -939,6 +939,14 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertContains(response, f'href="{detalle_sesion}"', html=False)
         self.assertContains(response, f'href="{agregar_asistentes}"', html=False)
 
+    def test_mi_perfil_administrador_es_personal_y_de_consulta(self):
+        url = reverse("personas:mi_perfil")
+        response = self.client.get(url)
+        self.assertContains(response, self.persona_admin.nombre_completo)
+        self.assertContains(response, "Roles y organizaciones")
+        self.assertNotContains(response, 'value="agregar_rol"')
+        self.assertNotContains(response, self.estudiante.email)
+
     def test_profesor_puede_registrar_pago_desde_su_perfil_en_su_organizacion(self):
         User = get_user_model()
         usuario_profesor = User.objects.create_user("profesor_pago", password=TEST_PASSWORD)
@@ -946,13 +954,17 @@ class PersonasOrganizacionesTests(TestCase):
         self.profesor.save(update_fields=["user"])
         self.client.force_login(usuario_profesor)
         query = f"periodo_mes=3&periodo_anio=2026&organizacion={self.org.pk}"
-        url = f"{reverse('personas:persona_detail', kwargs={'pk': self.profesor.pk})}?{query}"
+        url = f"{reverse('personas:mis_cobros', kwargs={'pk': self.profesor.pk})}?{query}"
 
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Registrar pago de una persona")
         self.assertNotContains(response, "Editar perfil")
+        for bloque in ("Datos personales", "Acceso al sistema", "Roles y organizaciones"):
+            self.assertNotContains(response, bloque)
+            self.assertContains(self.client.get(reverse("personas:mi_perfil")), bloque)
+        self.assertNotContains(self.client.get(reverse("personas:mi_perfil")), "Registrar pago de una persona")
         self.assertNotContains(response, "Pago masivo")
 
         datos_pago = {
@@ -1008,7 +1020,7 @@ class PersonasOrganizacionesTests(TestCase):
         otra_persona = Persona.objects.create(nombres="Otro", apellidos="Docente", user=otro_profesor)
         PersonaRol.objects.create(persona=otra_persona, rol=self.rol_profesor, organizacion=self.org, activo=True)
         self.client.force_login(otro_profesor)
-        otro_url = f"{reverse('personas:persona_detail', args=[otra_persona.pk])}?{query}"
+        otro_url = f"{reverse('personas:mis_cobros', args=[otra_persona.pk])}?{query}"
         self.assertEqual(self.client.post(otro_url, datos_pago).status_code, 404)
         self.assertNotContains(self.client.get(otro_url), "17.000")
 

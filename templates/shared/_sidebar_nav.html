@@ -1,5 +1,5 @@
 {% load static %}
-<div class="p-3">
+<div class="p-3 elemental-sidebar-content d-flex flex-column">
   {% if not hide_sidebar_brand %}
     <a class="elemental-brand d-flex align-items-center gap-2 mb-4" href="{% url 'elemental_apps' %}" title="Elemental Apps">
       <img src="{% static 'img/isotipo-blanco.png' %}" alt="" width="34" height="34">
@@ -42,4 +42,20 @@
       {% endif %}
     {% endfor %}
   </nav>
+  {% if request.user.is_authenticated %}
+  <div class="elemental-sidebar-account mt-auto pt-3 d-grid gap-1">
+    {% url 'personas:mi_perfil' as perfil_url %}
+    <a class="elemental-nav-link{% if request.path == perfil_url %} active{% endif %}" href="{{ perfil_url }}"
+       title="Mi perfil" aria-label="Mi perfil de {{ request.user.get_username }}"{% if request.path == perfil_url %} aria-current="page"{% endif %}>
+      <i class="bi bi-person-circle" aria-hidden="true"></i>
+      <span class="text-truncate">{{ request.user.get_username }}</span>
+    </a>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="elemental-nav-link w-100 text-start" type="submit" title="Salir" aria-label="Salir">
+        <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>Salir</span>
+      </button>
+    </form>
+  </div>
+  {% endif %}
 </div>

@@ -132,7 +132,7 @@ def build_navigation(request):
     if organizacion_docente:
         filtros = {key: request.GET[key] for key in FILTROS_GLOBALES if request.GET.get(key)}
         filtros["organizacion"] = organizacion_docente
-        perfil = reverse("personas:persona_detail", args=[perfil_docente.pk])
+        perfil = reverse("personas:mis_cobros", args=[perfil_docente.pk])
         items.append(
             _item(request, label="Mis cobros", icon="bi-cash-coin", url=f"{perfil}?{urlencode(filtros)}#pagos-profesor")
         )

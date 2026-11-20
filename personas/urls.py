@@ -19,6 +19,8 @@ urlpatterns = [
     path("organizaciones/<int:pk>/editar/", views.organizacion_edit, name="organizacion_edit"),
     path("nuevo/", views.persona_create, name="persona_create"),
     path("listado/", views.personas_list, name="personas_list"),
+    path("mi-perfil/", views.mi_perfil, name="mi_perfil"),
+    path("<int:pk>/mis-cobros/", views.persona_detail, {"solo_cobros": True}, name="mis_cobros"),
     path("<int:pk>/", views.persona_detail, name="persona_detail"),
     path("<int:pk>/editar/", views.persona_edit, name="persona_edit"),
 ]

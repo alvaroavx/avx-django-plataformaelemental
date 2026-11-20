@@ -1,0 +1,121 @@
+{% if persona_obj %}
+<div class="card mb-3">
+        <div class="card-header">Datos personales</div>
+        <div class="card-body">
+          <div class="mb-2"><span class="small text-muted d-block">Nombre</span>{{ persona_obj }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Email</span>{{ persona_obj.email|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Telefono</span>{{ persona_obj.telefono|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">RUT</span>{{ persona_obj.rut|default:"-" }}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Nacimiento</span>{% if persona_obj.fecha_nacimiento %}{{ persona_obj.fecha_nacimiento|date:"d/m/Y" }}{% else %}-{% endif %}</div>
+          <div class="mb-2"><span class="small text-muted d-block">Estado</span>{% if persona_obj.activo %}<span class="badge text-bg-success">Activa</span>{% else %}<span class="badge text-bg-secondary">Inactiva</span>{% endif %}</div>
+          <div class="mb-0"><span class="small text-muted d-block">Creado</span>{{ persona_obj.creado_en|date:"d/m/Y H:i" }}</div>
+        </div>
+      </div>
+
+{% endif %}
+      <div class="card mb-3">
+        <div class="card-header">Acceso al sistema</div>
+        <div class="card-body">
+          {% if cuenta %}
+            <div class="mb-2"><span class="small text-muted d-block">Usuario</span>{{ cuenta.username }}</div>
+            <div class="mb-2"><span class="small text-muted d-block">Email usuario</span>{{ cuenta.email|default:"-" }}</div>
+            <div class="mb-2"><span class="small text-muted d-block">Staff</span>{% if cuenta.is_staff %}Si{% else %}No{% endif %}</div>
+            <div class="mb-0"><span class="small text-muted d-block">Ultimo acceso</span>{% if cuenta.last_login %}{{ cuenta.last_login|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+          {% else %}
+            <div class="text-muted">Sin usuario vinculado.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Roles y organizaciones</div>
+        <div class="card-body">
+          {% if puede_administrar_perfil %}<form method="post" class="row g-2 mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="agregar_rol">
+            <div class="col-md-3">
+              <label class="form-label small">Rol</label>
+              {{ rol_form.rol }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Organizacion</label>
+              {{ rol_form.organizacion }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Valor clase profesor</label>
+              {{ rol_form.valor_clase }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Retención SII %</label>
+              {{ rol_form.retencion_sii }}
+            </div>
+            <div class="col-12">
+              <button
+                class="btn btn-success w-100 d-inline-flex align-items-center justify-content-center"
+                style="min-height: 44px;"
+                type="submit"
+              >Agregar</button>
+            </div>
+          </form>{% endif %}
+          {% for item in roles_asignados %}
+            <div class="border-bottom pb-2 mb-2">
+              <div class="fw-semibold">
+                {{ item.rol.nombre }}
+                {% if item.activo %}
+                <span class="badge text-bg-success">Activo</span>
+                {% else %}
+                <span class="badge text-bg-secondary">Inactivo</span>
+                {% endif %}
+              </div>
+              <div class="small text-muted">{{ item.organizacion.nombre }}</div>
+              <div class="small">Asignado: {{ item.asignado_en|date:"d/m/Y" }}</div>
+              {% if item.rol.codigo == "PROFESOR" and puede_administrar_perfil %}
+              <form method="post" class="row g-2 mt-2">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="guardar_configuracion_profesor">
+                <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
+                <div class="col-md-5">
+                  <label class="form-label small mb-1">Valor clase</label>
+                  <input
+                    type="number"
+                    name="valor_clase"
+                    class="form-control form-control-sm"
+                    min="0"
+                    step="1"
+                    value="{% if item.valor_clase %}{{ item.valor_clase|floatformat:0 }}{% endif %}"
+                    placeholder="Sin configurar"
+                  >
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small mb-1">Retención SII %</label>
+                  <input
+                    type="number"
+                    name="retencion_sii"
+                    class="form-control form-control-sm"
+                    min="0"
+                    step="0.01"
+                    value="{% if item.retencion_sii %}{{ item.retencion_sii|floatformat:2 }}{% endif %}"
+                    placeholder="Sin configurar"
+                  >
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                  <button class="btn btn-sm btn-outline-primary w-100" type="submit">Guardar</button>
+                </div>
+              </form>
+              {% endif %}
+              {% if puede_administrar_perfil %}<form method="post" class="mt-2">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="toggle_rol">
+                <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
+                {% if item.activo %}
+                <button class="btn btn-sm btn-outline-danger" type="submit">Desactivar</button>
+                {% else %}
+                <button class="btn btn-sm btn-outline-success" type="submit">Activar</button>
+                {% endif %}
+              </form>{% endif %}
+            </div>
+          {% empty %}
+            <div class="text-muted">Sin roles asignados.</div>
+          {% endfor %}
+        </div>
+      </div>

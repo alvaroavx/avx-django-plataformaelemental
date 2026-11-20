@@ -19,129 +19,13 @@
   </div>
 
   <div class="row g-3">
+    {% if puede_administrar_perfil %}
     <div class="col-lg-3">
-      <div class="card mb-3">
-        <div class="card-header">Datos personales</div>
-        <div class="card-body">
-          <div class="mb-2"><span class="small text-muted d-block">Nombre</span>{{ persona_obj }}</div>
-          <div class="mb-2"><span class="small text-muted d-block">Email</span>{{ persona_obj.email|default:"-" }}</div>
-          <div class="mb-2"><span class="small text-muted d-block">Telefono</span>{{ persona_obj.telefono|default:"-" }}</div>
-          <div class="mb-2"><span class="small text-muted d-block">RUT</span>{{ persona_obj.rut|default:"-" }}</div>
-          <div class="mb-2"><span class="small text-muted d-block">Nacimiento</span>{% if persona_obj.fecha_nacimiento %}{{ persona_obj.fecha_nacimiento|date:"d/m/Y" }}{% else %}-{% endif %}</div>
-          <div class="mb-2"><span class="small text-muted d-block">Estado</span>{% if persona_obj.activo %}<span class="badge text-bg-success">Activa</span>{% else %}<span class="badge text-bg-secondary">Inactiva</span>{% endif %}</div>
-          <div class="mb-0"><span class="small text-muted d-block">Creado</span>{{ persona_obj.creado_en|date:"d/m/Y H:i" }}</div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header">Acceso al sistema</div>
-        <div class="card-body">
-          {% if persona_obj.user %}
-            <div class="mb-2"><span class="small text-muted d-block">Usuario</span>{{ persona_obj.user.username }}</div>
-            <div class="mb-2"><span class="small text-muted d-block">Email usuario</span>{{ persona_obj.user.email|default:"-" }}</div>
-            <div class="mb-2"><span class="small text-muted d-block">Staff</span>{% if persona_obj.user.is_staff %}Si{% else %}No{% endif %}</div>
-            <div class="mb-0"><span class="small text-muted d-block">Ultimo acceso</span>{% if persona_obj.user.last_login %}{{ persona_obj.user.last_login|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
-          {% else %}
-            <div class="text-muted">Sin usuario vinculado.</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">Roles y organizaciones</div>
-        <div class="card-body">
-          {% if puede_administrar_perfil %}<form method="post" class="row g-2 mb-3">
-            {% csrf_token %}
-            <input type="hidden" name="accion" value="agregar_rol">
-            <div class="col-md-3">
-              <label class="form-label small">Rol</label>
-              {{ rol_form.rol }}
-            </div>
-            <div class="col-md-3">
-              <label class="form-label small">Organizacion</label>
-              {{ rol_form.organizacion }}
-            </div>
-            <div class="col-md-3">
-              <label class="form-label small">Valor clase profesor</label>
-              {{ rol_form.valor_clase }}
-            </div>
-            <div class="col-md-3">
-              <label class="form-label small">Retención SII %</label>
-              {{ rol_form.retencion_sii }}
-            </div>
-            <div class="col-12">
-              <button
-                class="btn btn-success w-100 d-inline-flex align-items-center justify-content-center"
-                style="min-height: 44px;"
-                type="submit"
-              >Agregar</button>
-            </div>
-          </form>{% endif %}
-          {% for item in roles_asignados %}
-            <div class="border-bottom pb-2 mb-2">
-              <div class="fw-semibold">
-                {{ item.rol.nombre }}
-                {% if item.activo %}
-                <span class="badge text-bg-success">Activo</span>
-                {% else %}
-                <span class="badge text-bg-secondary">Inactivo</span>
-                {% endif %}
-              </div>
-              <div class="small text-muted">{{ item.organizacion.nombre }}</div>
-              <div class="small">Asignado: {{ item.asignado_en|date:"d/m/Y" }}</div>
-              {% if item.rol.codigo == "PROFESOR" and puede_administrar_perfil %}
-              <form method="post" class="row g-2 mt-2">
-                {% csrf_token %}
-                <input type="hidden" name="accion" value="guardar_configuracion_profesor">
-                <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
-                <div class="col-md-5">
-                  <label class="form-label small mb-1">Valor clase</label>
-                  <input
-                    type="number"
-                    name="valor_clase"
-                    class="form-control form-control-sm"
-                    min="0"
-                    step="1"
-                    value="{% if item.valor_clase %}{{ item.valor_clase|floatformat:0 }}{% endif %}"
-                    placeholder="Sin configurar"
-                  >
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label small mb-1">Retención SII %</label>
-                  <input
-                    type="number"
-                    name="retencion_sii"
-                    class="form-control form-control-sm"
-                    min="0"
-                    step="0.01"
-                    value="{% if item.retencion_sii %}{{ item.retencion_sii|floatformat:2 }}{% endif %}"
-                    placeholder="Sin configurar"
-                  >
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                  <button class="btn btn-sm btn-outline-primary w-100" type="submit">Guardar</button>
-                </div>
-              </form>
-              {% endif %}
-              {% if puede_administrar_perfil %}<form method="post" class="mt-2">
-                {% csrf_token %}
-                <input type="hidden" name="accion" value="toggle_rol">
-                <input type="hidden" name="persona_rol_id" value="{{ item.pk }}">
-                {% if item.activo %}
-                <button class="btn btn-sm btn-outline-danger" type="submit">Desactivar</button>
-                {% else %}
-                <button class="btn btn-sm btn-outline-success" type="submit">Activar</button>
-                {% endif %}
-              </form>{% endif %}
-            </div>
-          {% empty %}
-            <div class="text-muted">Sin roles asignados.</div>
-          {% endfor %}
-        </div>
-      </div>
+      {% include "personas/_identidad.html" with cuenta=persona_obj.user %}
     </div>
+    {% endif %}
 
-    <div class="col-lg-9">
+    <div class="{% if puede_administrar_perfil %}col-lg-9{% else %}col-12{% endif %}">
       {% if mostrar_bloque_estudiante %}
       <section class="mb-4">
         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -353,70 +237,7 @@
         </div>
 
         {% if puede_registrar_pago_profesor %}
-        <section id="pagos-profesor" class="card mb-3">
-          <h3 class="h5 card-header">Mis cobros</h3>
-          <div class="card-body">
-            {% if form_reversa_docente %}
-            <form method="post" action="{{ perfil_pago_docente_url }}" class="mb-3">
-              {% csrf_token %}
-              <input type="hidden" name="accion" value="revertir_pago_profesor">
-              <input type="hidden" name="pago_docente_id" value="{{ reversa_pendiente_docente.pk }}">
-              <p>Revertir el pago de {{ reversa_pendiente_docente.persona }} por {{ reversa_pendiente_docente.monto_total|clp }}.</p>
-              {{ form_reversa_docente.as_p }}
-              <button type="submit" class="btn btn-danger">Confirmar reversa</button>
-              <a href="{{ perfil_pago_docente_url }}" class="btn btn-outline-secondary">Cancelar</a>
-            </form>
-            {% endif %}
-            <ul class="list-group list-group-flush">
-              {% for cobro in pagos_docente %}
-              <li class="list-group-item px-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <span>{{ cobro.persona }} · {{ cobro.fecha_pago|date:"d/m/Y" }} · {{ cobro.monto_total|clp }}</span>
-                {% if cobro.revertido_en %}
-                <span class="badge text-bg-secondary">Revertido</span>
-                {% else %}
-                <div class="d-flex gap-2">
-                  <a class="btn btn-sm btn-outline-primary" href="?{{ query_pago_docente }}&amp;editar_pago={{ cobro.pk }}#pagos-profesor">Editar</a>
-                  <a class="btn btn-sm btn-outline-danger" href="?{{ query_pago_docente }}&amp;revertir_pago={{ cobro.pk }}#pagos-profesor">Revertir</a>
-                </div>
-                {% endif %}
-              </li>
-              {% empty %}
-              <li class="list-group-item px-0 text-muted">Todavía no tienes cobros registrados en este período.</li>
-              {% endfor %}
-            </ul>
-          </div>
-        <details class="mx-3 mb-3"{% if abrir_pago_profesor or pago_edicion_docente %} open{% endif %}>
-          <summary class="card-header" style="cursor:pointer">{% if pago_edicion_docente %}Editar pago{% else %}Registrar pago de una persona{% endif %}</summary>
-          <div class="card-body">
-            <p class="small text-muted">Registra un pago para una persona con rol estudiante activo en {{ organizacion_pago_profesor.nombre }}.</p>
-            {% if personas_pago_profesor %}
-            <form method="post" action="{{ perfil_pago_docente_url }}" class="row g-3">
-              {% csrf_token %}
-              {% if pago_edicion_docente %}
-              <input type="hidden" name="accion" value="editar_pago_profesor">
-              <input type="hidden" name="pago_docente_id" value="{{ pago_edicion_docente.pk }}">
-              {% else %}
-              <input type="hidden" name="accion" value="registrar_pago_profesor">
-              {% endif %}
-              {{ form_pago_profesor.organizacion }}
-              {% for field in form_pago_profesor.visible_fields %}
-              <div class="col-12 col-md-6">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-              {% endfor %}
-              {% for error in form_pago_profesor.non_field_errors %}<div class="col-12"><div class="alert alert-danger mb-0">{{ error }}</div></div>{% endfor %}
-              <div class="col-12 d-flex justify-content-end">
-                <button class="btn btn-success" type="submit"><i class="bi bi-cash-coin me-1"></i>Guardar pago</button>
-              </div>
-            </form>
-            {% else %}
-            <div class="text-muted">No hay personas con rol estudiante activo en esta organización.</div>
-            {% endif %}
-          </div>
-        </details>
-        </section>
+        {% include "personas/_cobros_docente.html" %}
         {% endif %}
 
         <div class="card">

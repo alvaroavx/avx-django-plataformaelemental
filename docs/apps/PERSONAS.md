@@ -72,11 +72,14 @@ Debe concentrar:
 - El queryset base se filtra y pagina antes de calcular metricas correlacionadas. Solo el filtro explicito de deuda puede calcular esa metrica antes de paginar porque la necesita para definir el universo.
 - Si la organizacion esta en `Todas`, el listado sigue siendo paginado para evitar una carga inicial masiva.
 - El detalle de persona muestra pagos y consumos relacionados.
+- **Mi perfil** está al pie del menú lateral, junto a **Salir**. Profesores y
+  administradores consultan allí sus datos personales, acceso al sistema y roles.
+  La asignación de roles se realiza desde la ficha administrativa de Personas.
 - El perfil completo sigue protegido para administración. Como excepción,
   una persona autenticada con rol Profesor activo puede abrir solo su propio
   perfil con una organización seleccionada donde tenga ese rol y registrar allí
   pagos individuales para estudiantes activos de esa organización (ADR-0025).
-  **Mis cobros** enlaza al perfil y permite consultar, editar y revertir los
+  **Mis cobros** abre una página operativa propia y permite consultar, editar y revertir los
   pagos individuales registrados por la propia cuenta.
   La vista de profesor oculta controles de administración de personas y el
   registro usa el servicio financiero existente; no habilita el módulo general

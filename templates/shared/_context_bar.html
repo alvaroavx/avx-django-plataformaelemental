@@ -72,17 +72,6 @@
           </div>
         </form>
       {% endif %}
-      <div class="elemental-user-actions d-flex align-items-center justify-content-between justify-content-xl-end gap-2">
-        <span class="elemental-user-name small text-muted d-inline-flex align-items-center gap-1">
-          <i class="bi bi-person-circle"></i>{{ request.user.get_username }}
-        </span>
-        <form method="post" action="{% url 'logout' %}" class="d-inline">
-          {% csrf_token %}
-          <button class="btn btn-sm btn-outline-secondary" type="submit" title="Cerrar sesión" aria-label="Cerrar sesión">
-            <i class="bi bi-box-arrow-right"></i><span class="d-none d-sm-inline ms-1">Salir</span>
-          </button>
-        </form>
-      </div>
       </div>
     </div>
   </div>

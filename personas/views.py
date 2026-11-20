@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.http import Http404
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_safe
 from django.core.exceptions import PermissionDenied
 from django.forms import HiddenInput
 from django.urls import reverse
@@ -802,7 +803,19 @@ def persona_create(request):
     return render(request, "personas/persona_create.html", context)
 
 
-def persona_detail(request, pk):
+@login_required
+@require_safe
+def mi_perfil(request):
+    persona = getattr(request.user, "persona", None)
+    roles = persona.roles.select_related("rol", "organizacion").order_by("organizacion__nombre", "rol__nombre") if persona else ()
+    return render(request, "personas/mi_perfil.html", {
+        "persona_obj": persona,
+        "cuenta": request.user,
+        "roles_asignados": roles,
+    })
+
+
+def persona_detail(request, pk, *, solo_cobros=False):
     context = _base_context(request)
     organizacion = organizacion_desde_request(request)
     if not organizacion and not (request.user.is_superuser or request.user.is_staff):
@@ -822,6 +835,8 @@ def persona_detail(request, pk):
             activo=True,
         ).exists()
     )
+    if solo_cobros and not puede_operar_pago_desde_perfil:
+        raise PermissionDenied("Debes seleccionar una organización donde tengas el rol Profesor activo.")
     if not puede_administrar_perfil and not puede_operar_pago_desde_perfil:
         raise PermissionDenied("Solo puedes abrir tu propio perfil de profesor en una organización autorizada.")
     organizaciones_autorizadas = organizaciones_visibles_para_usuario(request.user)
@@ -886,7 +901,8 @@ def persona_detail(request, pk):
         filtros_limpios = request.GET.copy()
         filtros_limpios.pop("editar_pago", None)
         filtros_limpios.pop("revertir_pago", None)
-        perfil_url = f"{reverse('personas:persona_detail', args=[pk])}?{filtros_limpios.urlencode()}#pagos-profesor"
+        ruta = "personas:mis_cobros" if solo_cobros else "personas:persona_detail"
+        perfil_url = f"{reverse(ruta, args=[pk])}?{filtros_limpios.urlencode()}#pagos-profesor"
 
         def construir_formulario_pago(data=None, pago=None):
             form = PaymentForm(
@@ -951,7 +967,7 @@ def persona_detail(request, pk):
         if form_pago_profesor is None:
             form_pago_profesor = construir_formulario_pago(pago=pago_edicion)
     if request.method == "POST" and accion not in acciones_pago:
-        if not puede_administrar_perfil:
+        if solo_cobros or not puede_administrar_perfil:
             raise PermissionDenied("No tienes permiso para modificar este perfil.")
         if "asociar_pago_asistencia" in request.POST:
             asistencia = get_object_or_404(
@@ -1155,7 +1171,8 @@ def persona_detail(request, pk):
             "abrir_pago_profesor": bool(form_pago_profesor and form_pago_profesor.is_bound and form_pago_profesor.errors),
         }
     )
-    return render(request, "personas/persona_detail.html", context)
+    plantilla = "personas/mis_cobros.html" if solo_cobros else "personas/persona_detail.html"
+    return render(request, plantilla, context)
 
 
 @permiso_requerido(ACCION_ADMINISTRAR_PERSONAS)

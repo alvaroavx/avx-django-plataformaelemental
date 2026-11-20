@@ -36,3 +36,8 @@ auditoría.
 **Condiciones de revisión:** Revisar si la organización requiere limitar la
 visibilidad del padrón entre talleres o asignar esta capacidad a profesores
 específicos en vez de habilitarla a todo el rol activo.
+
+**Separación de navegación:** **Mis cobros** abre una página dedicada al
+registro y gestión de cobros propios. **Mi perfil** reúne la información de
+la cuenta autenticada, tanto docente como administrativa. La ficha CRM conserva
+las operaciones de administración de personas y roles.
