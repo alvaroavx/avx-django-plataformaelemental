@@ -1,0 +1,5 @@
+# Fragmento de Nginx para el esquema de releases: solo cambia la ruta de estáticos.
+# El resto del server block (TLS, redirecciones, proxy_pass) sigue igual.
+    location /static/ {
+        alias /srv/apps/elemental/current/plataformaelemental/staticfiles/;
+    }

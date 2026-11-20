@@ -1,0 +1,22 @@
+# Configuración de scripts/release/release.sh para Plataforma Elemental.
+# En el servidor vive en /srv/apps/elemental/shared/release.conf (fuera de las releases).
+# No contiene secretos: las credenciales están en ENV_FILE.
+
+APP_NAME=plataforma-elemental
+DEPLOY_ROOT=/srv/apps/elemental
+SERVICE=plataforma-elemental
+ENV_FILE=/srv/apps/elemental/shared/.env.prod
+DJANGO_SETTINGS_MODULE=plataformaelemental.config
+PYTHON_BIN=/usr/bin/python3.12
+
+# Rutas relativas a la release que deben sobrevivir entre deploys (archivos subidos).
+SHARED_LINKS="plataformaelemental/media"
+
+# Respaldos fuera de DEPLOY_ROOT. Los backups semanales de DigitalOcean copian el disco
+# completo; estos dumps permiten deshacer una migración o un borrado equivocado.
+BACKUP_DIR=/var/backups/plataforma-elemental
+KEEP_RELEASES=5
+KEEP_BACKUPS=20
+
+HEALTH_URL=http://127.0.0.1:8000/api/health/
+HEALTH_HOST=apps.espacioelementos.cl

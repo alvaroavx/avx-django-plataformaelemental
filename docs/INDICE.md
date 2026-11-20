@@ -72,6 +72,7 @@ Para una ruta de lectura antes de tocar codigo, usar [docs/ONBOARDING_CODEX.md](
 
 ## Operacion
 - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md): CI/CD, deploy y rollback.
+- [docs/operacion/RELEASES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/RELEASES.md): releases estilo Capistrano, respaldo por deploy, rollback y restauración (probado en local; corte en el servidor pendiente).
 - [docs/operacion/MIGRACIONES_OPERACION_PROFESOR.md](operacion/MIGRACIONES_OPERACION_PROFESOR.md): semántica histórica, ensayo PostgreSQL, backup/restore, runbook y gate productivo.
 - [docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/AUDITORIA_SQLITE_POSTGRESQL.md): evidencia historica de la migracion; no describe el modelo ni la configuracion actuales.
 - [docs/operacion/SEGURIDAD_PRODUCCION.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/SEGURIDAD_PRODUCCION.md): seguridad productiva.
