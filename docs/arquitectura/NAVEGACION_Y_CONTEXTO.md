@@ -98,6 +98,9 @@ Reglas:
   Profesores. La URL raíz histórica de la app redirige al Calendario.
 - `Configuración` es el último grupo, inicia colapsado salvo cuando una de sus
   rutas está activa y reúne los mantenedores autorizados sin cambiar permisos.
+- Al pie del menú lateral, las cuentas autenticadas tienen el acceso al perfil
+  propio y el botón **Salir**. El formulario de salida usa POST con CSRF,
+  cierra la sesión y redirige al inicio de sesión.
 
 ## Panel general
 

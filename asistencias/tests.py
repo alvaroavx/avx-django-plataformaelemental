@@ -1873,17 +1873,18 @@ class AsistenciasViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["dashboard_academico"]["personas_con_asistencia"], 2)
 
-    def test_menu_superior_permite_cerrar_sesion(self):
+    def test_menu_lateral_permite_cerrar_sesion(self):
         response = self.client.get(reverse("elemental_apps"))
+        logout_url = reverse("logout")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cerrar sesión")
-        self.assertContains(response, 'action="/accounts/logout/"')
+        self.assertTemplateUsed(response, "shared/_sidebar_nav.html")
+        self.assertContains(response, 'aria-label="Salir"')
+        self.assertContains(response, f'<form method="post" action="{logout_url}">')
 
-        logout_response = self.client.post("/accounts/logout/")
+        logout_response = self.client.post(logout_url)
 
-        self.assertEqual(logout_response.status_code, 302)
-        self.assertEqual(logout_response.url, "/accounts/login/")
+        self.assertRedirects(logout_response, reverse("login"))
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_antiguo_panel_de_sesiones_redirige_al_calendario_con_filtros(self):
         response = self.client.get(
