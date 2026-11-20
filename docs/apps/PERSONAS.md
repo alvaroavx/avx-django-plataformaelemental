@@ -76,6 +76,8 @@ Debe concentrar:
   una persona autenticada con rol Profesor activo puede abrir solo su propio
   perfil con una organización seleccionada donde tenga ese rol y registrar allí
   pagos individuales para estudiantes activos de esa organización (ADR-0025).
+  **Mis cobros** enlaza al perfil y permite consultar, editar y revertir los
+  pagos individuales registrados por la propia cuenta.
   La vista de profesor oculta controles de administración de personas y el
   registro usa el servicio financiero existente; no habilita el módulo general
   de Finanzas.

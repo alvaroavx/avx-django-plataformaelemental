@@ -19,8 +19,14 @@ propio perfil si selecciona esa organización. Desde allí puede registrar un pa
 individual solo para personas activas con rol `ESTUDIANTE` activo y planes
 activos de esa misma organización. El servidor fija y valida la organización;
 el flujo usa `crear_pago_operacional`, que crea pago, transacción y auditoría
-atómicamente. La profesora no obtiene acceso general a Finanzas, edición,
-reversa, exportación ni pago masivo.
+atómicamente. La profesora conserva acceso al flujo acotado de su perfil.
+
+**Ampliación del 19 de noviembre de 2026:** El menú docente incluye **Mis cobros**.
+En la organización seleccionada, el profesor puede listar, editar y revertir
+los pagos individuales registrados por su cuenta. La edición conserva al
+estudiante original y sincroniza la transacción. La reversa conserva el historial
+y requiere motivo. Rige el bloqueo de meses enviados a Cuadratura. Los permisos
+generales de Finanzas, exportación y pago masivo siguen siendo independientes.
 
 **Consecuencias asumidas:** El profesor puede consultar el padrón activo de
 estudiantes de su organización en el selector de pago. El pago aparece en los

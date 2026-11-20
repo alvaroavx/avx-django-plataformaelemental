@@ -20,7 +20,7 @@ En Asistencias, solo `superuser` de Django conserva acceso total operativo. `is_
 |---|---:|---:|---:|---:|
 | Ver finanzas | si | si | no | si |
 | Crear/editar pagos | si | si | no | no |
-| Registrar pago individual desde el perfil propio | si | si | si, solo perfil propio y organización con rol Profesor activo | no |
+| Registrar, consultar, editar y revertir cobros propios desde el perfil | si | si | si, solo perfil propio y organización con rol Profesor activo | no |
 | Crear/editar transacciones | si | si | no | no |
 | Exportar datos | si | si | no | no |
 | Editar asistencias | si | no | no | no |
@@ -38,7 +38,7 @@ Un lote ajeno o inexistente no se entrega. La clave de idempotencia se comprueba
 - Cualquier `POST` financiero requiere rol operativo especifico: pagos o transacciones.
 - Los exports existentes quedan protegidos por permiso de exportacion, aunque los exports v1.0 definitivos se implementen despues.
 - El rol `profesor` no accede a finanzas completa.
-- Excepción acotada (ADR-0025): una persona con rol Profesor activo puede abrir su perfil propio con organización seleccionada y registrar pagos individuales solo para estudiantes activos y planes activos de esa organización. No accede al listado financiero, edición, reversas, exportaciones, transacciones ni pago masivo.
+- Excepción acotada (ADR-0025): una persona con rol Profesor activo puede abrir su perfil propio con organización seleccionada y registrar pagos individuales solo para estudiantes activos y planes activos de esa organización. **Mis cobros** permite listar, editar y revertir sus propios pagos individuales. El listado financiero general, las exportaciones, las transacciones y el pago masivo conservan sus permisos propios.
 - Si hay filtro de organizacion activo, el rol debe existir activo en esa organizacion.
 - Si no hay organizacion filtrada, el chequeo permite acceso si el usuario tiene el rol activo en alguna organizacion. Esta es una limitacion conocida para mantener compatibilidad con vistas globales.
 

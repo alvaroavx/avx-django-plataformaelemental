@@ -200,8 +200,8 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
 - Profesor no recibe acceso general a Finanzas ni a `ver_finanzas`. La excepción
   de ADR-0025 permite registrar un pago individual desde su propio perfil,
   limitado a estudiantes y planes activos de la organización donde tiene rol
-  Profesor activo. No permite listar pagos, editarlos, revertirlos, exportarlos
-  ni registrar pagos masivos. El alta usa `crear_pago_operacional` y conserva
+  Profesor activo. **Mis cobros** permite listar, editar y revertir sus propios
+  pagos individuales. Exportación y pago masivo conservan sus permisos propios. El alta usa `crear_pago_operacional` y conserva
   la auditoría del actor. El pago masivo y su resultado exigen `operar_pagos` en
   la organización real del lote, sin excepción por `is_staff`.
 - Las acciones sensibles registran ids, montos y fechas; no adjuntos ni datos personales completos.

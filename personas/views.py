@@ -19,9 +19,11 @@ from django.urls import reverse
 from auditoria.models import AuditLog
 from auditoria.services import registrar_auditoria, registrar_cambio
 from asistencias.models import Asistencia, Disciplina, SesionClase
-from finanzas.forms import PaymentForm
+from finanzas.forms import PaymentForm, ReversaPagoForm
 from finanzas.models import AttendanceConsumption, Payment, PaymentPlan
 from finanzas.services import asociar_asistencia_a_pago, crear_pago_operacional, resumen_financiero_estudiante
+from finanzas.services.pagos import sincronizar_transaccion_pago
+from finanzas.services.reversas import revertir_pago
 from plataformaelemental.context import (
     aplicar_periodo,
     descripcion_periodo,
@@ -866,25 +868,29 @@ def persona_detail(request, pk):
     planes_pago_profesor = PaymentPlan.objects.filter(
         organizacion=organizacion, activo=True
     ).order_by("-es_por_defecto", "nombre") if puede_operar_pago_desde_perfil else PaymentPlan.objects.none()
+    pagos_docente = Payment.objects.none()
+    pago_edicion = None
+    perfil_url = ""
+    filtros_limpios = {}
+    reversa_pendiente = None
+    form_reversa = None
+    accion = request.POST.get("accion")
+    acciones_pago = {"registrar_pago_profesor", "editar_pago_profesor", "revertir_pago_profesor"}
+    if accion in acciones_pago and not puede_operar_pago_desde_perfil:
+        raise PermissionDenied("Solo puedes gestionar pagos desde tu perfil docente.")
     if puede_operar_pago_desde_perfil:
-        form_pago_profesor = PaymentForm(
-            periodo_mes=periodo_pago_profesor["mes"],
-            periodo_anio=periodo_pago_profesor["anio"],
-            organizacion=organizacion,
-            organizaciones=Organizacion.objects.filter(pk=organizacion.pk),
-            personas=estudiantes_pago_profesor,
-            planes=planes_pago_profesor,
-            initial={"organizacion": organizacion.pk},
-        )
-        form_pago_profesor.fields["organizacion"].widget = HiddenInput()
-        _estilizar_formulario_pago_profesor(form_pago_profesor)
-    if request.method == "POST":
-        accion = request.POST.get("accion")
-        if not puede_administrar_perfil and accion != "registrar_pago_profesor":
-            raise PermissionDenied("No tienes permiso para modificar este perfil.")
-        if accion == "registrar_pago_profesor":
-            form_pago_profesor = PaymentForm(
-                request.POST,
+        pagos_docente = Payment.objects.filter(
+            organizacion=organizacion, registrado_por=request.user, lote__isnull=True,
+        ).select_related("persona").order_by("-fecha_pago", "-pk")
+        pagos_activos = pagos_docente.filter(revertido_en__isnull=True)
+        filtros_limpios = request.GET.copy()
+        filtros_limpios.pop("editar_pago", None)
+        filtros_limpios.pop("revertir_pago", None)
+        perfil_url = f"{reverse('personas:persona_detail', args=[pk])}?{filtros_limpios.urlencode()}#pagos-profesor"
+
+        def construir_formulario_pago(data=None, pago=None):
+            form = PaymentForm(
+                data, instance=pago,
                 periodo_mes=periodo_pago_profesor["mes"],
                 periodo_anio=periodo_pago_profesor["anio"],
                 organizacion=organizacion,
@@ -893,21 +899,60 @@ def persona_detail(request, pk):
                 planes=planes_pago_profesor,
                 initial={"organizacion": organizacion.pk},
             )
-            form_pago_profesor.fields["organizacion"].widget = HiddenInput()
-            _estilizar_formulario_pago_profesor(form_pago_profesor)
-            pago_valido = form_pago_profesor.is_valid()
-            if pago_valido:
-                try:
-                    crear_pago_operacional(
-                        pago=form_pago_profesor.save(commit=False), usuario=request.user, origen="perfil_profesor"
+            if pago:
+                form.fields["persona"].disabled = True
+            form.fields["organizacion"].widget = HiddenInput()
+            _estilizar_formulario_pago_profesor(form)
+            return form
+
+        if accion in {"registrar_pago_profesor", "editar_pago_profesor"}:
+            with transaction.atomic():
+                if accion == "editar_pago_profesor":
+                    pago_edicion = get_object_or_404(
+                        pagos_activos.select_for_update(of=("self",)), pk=request.POST.get("pago_docente_id"),
                     )
+                form_pago_profesor = construir_formulario_pago(request.POST, pago_edicion)
+                if form_pago_profesor.is_valid():
+                    try:
+                        with transaction.atomic():
+                            pago = form_pago_profesor.save(commit=False)
+                            if pago_edicion:
+                                pago.save()
+                                sincronizar_transaccion_pago(pago=pago, usuario=request.user)
+                                registrar_auditoria(
+                                    usuario=request.user, accion=AuditLog.ACCION_EDITAR, dominio="finanzas",
+                                    objeto=pago, organizacion=organizacion, resumen="Pago actualizado desde perfil docente",
+                                    metadata={"campos": form_pago_profesor.changed_data},
+                                )
+                            else:
+                                crear_pago_operacional(pago=pago, usuario=request.user, origen="perfil_profesor")
+                    except ValidationError as exc:
+                        form_pago_profesor.add_error(None, exc)
+                    else:
+                        messages.success(request, "Pago actualizado." if pago_edicion else "Pago registrado.")
+                        return redirect(perfil_url)
+        elif accion == "revertir_pago_profesor":
+            reversa_pendiente = get_object_or_404(pagos_activos, pk=request.POST.get("pago_docente_id"))
+            form_reversa = ReversaPagoForm(request.POST)
+            if form_reversa.is_valid():
+                try:
+                    revertir_pago(pago=reversa_pendiente, motivo=form_reversa.cleaned_data["motivo"], usuario=request.user)
                 except ValidationError as exc:
-                    form_pago_profesor.add_error(None, exc.messages[0])
+                    form_reversa.add_error(None, exc)
                 else:
-                    messages.success(request, "Pago registrado para la persona seleccionada.")
-                    return redirect(_url_con_filtros(request, "personas:persona_detail", pk=persona_usuario.pk))
-            if not pago_valido:
-                messages.error(request, "Revisa los datos del pago antes de guardarlo.")
+                    messages.success(request, "Pago revertido.")
+                    return redirect(perfil_url)
+        elif request.method == "GET":
+            if request.GET.get("editar_pago"):
+                pago_edicion = get_object_or_404(pagos_activos, pk=request.GET["editar_pago"])
+            if request.GET.get("revertir_pago"):
+                reversa_pendiente = get_object_or_404(pagos_activos, pk=request.GET["revertir_pago"])
+                form_reversa = ReversaPagoForm()
+        if form_pago_profesor is None:
+            form_pago_profesor = construir_formulario_pago(pago=pago_edicion)
+    if request.method == "POST" and accion not in acciones_pago:
+        if not puede_administrar_perfil:
+            raise PermissionDenied("No tienes permiso para modificar este perfil.")
         if "asociar_pago_asistencia" in request.POST:
             asistencia = get_object_or_404(
                 Asistencia.objects.select_related("sesion__disciplina", "consumo_financiero__pago"),
@@ -1101,6 +1146,12 @@ def persona_detail(request, pk):
             "organizacion_pago_profesor": organizacion,
             "personas_pago_profesor": estudiantes_pago_profesor,
             "form_pago_profesor": form_pago_profesor,
+            "pagos_docente": aplicar_periodo(pagos_docente, "fecha_pago", request=request),
+            "pago_edicion_docente": pago_edicion,
+            "reversa_pendiente_docente": reversa_pendiente,
+            "form_reversa_docente": form_reversa,
+            "perfil_pago_docente_url": perfil_url,
+            "query_pago_docente": filtros_limpios.urlencode() if perfil_url else "",
             "abrir_pago_profesor": bool(form_pago_profesor and form_pago_profesor.is_bound and form_pago_profesor.errors),
         }
     )

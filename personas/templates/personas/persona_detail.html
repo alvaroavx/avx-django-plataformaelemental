@@ -353,14 +353,51 @@
         </div>
 
         {% if puede_registrar_pago_profesor %}
-        <details class="card mb-3"{% if abrir_pago_profesor %} open{% endif %}>
-          <summary class="card-header" style="cursor:pointer">Registrar pago de una persona</summary>
+        <section id="pagos-profesor" class="card mb-3">
+          <h3 class="h5 card-header">Mis cobros</h3>
+          <div class="card-body">
+            {% if form_reversa_docente %}
+            <form method="post" action="{{ perfil_pago_docente_url }}" class="mb-3">
+              {% csrf_token %}
+              <input type="hidden" name="accion" value="revertir_pago_profesor">
+              <input type="hidden" name="pago_docente_id" value="{{ reversa_pendiente_docente.pk }}">
+              <p>Revertir el pago de {{ reversa_pendiente_docente.persona }} por {{ reversa_pendiente_docente.monto_total|clp }}.</p>
+              {{ form_reversa_docente.as_p }}
+              <button type="submit" class="btn btn-danger">Confirmar reversa</button>
+              <a href="{{ perfil_pago_docente_url }}" class="btn btn-outline-secondary">Cancelar</a>
+            </form>
+            {% endif %}
+            <ul class="list-group list-group-flush">
+              {% for cobro in pagos_docente %}
+              <li class="list-group-item px-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <span>{{ cobro.persona }} · {{ cobro.fecha_pago|date:"d/m/Y" }} · {{ cobro.monto_total|clp }}</span>
+                {% if cobro.revertido_en %}
+                <span class="badge text-bg-secondary">Revertido</span>
+                {% else %}
+                <div class="d-flex gap-2">
+                  <a class="btn btn-sm btn-outline-primary" href="?{{ query_pago_docente }}&amp;editar_pago={{ cobro.pk }}#pagos-profesor">Editar</a>
+                  <a class="btn btn-sm btn-outline-danger" href="?{{ query_pago_docente }}&amp;revertir_pago={{ cobro.pk }}#pagos-profesor">Revertir</a>
+                </div>
+                {% endif %}
+              </li>
+              {% empty %}
+              <li class="list-group-item px-0 text-muted">Todavía no tienes cobros registrados en este período.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        <details class="mx-3 mb-3"{% if abrir_pago_profesor or pago_edicion_docente %} open{% endif %}>
+          <summary class="card-header" style="cursor:pointer">{% if pago_edicion_docente %}Editar pago{% else %}Registrar pago de una persona{% endif %}</summary>
           <div class="card-body">
             <p class="small text-muted">Registra un pago para una persona con rol estudiante activo en {{ organizacion_pago_profesor.nombre }}.</p>
             {% if personas_pago_profesor %}
-            <form method="post" class="row g-3">
+            <form method="post" action="{{ perfil_pago_docente_url }}" class="row g-3">
               {% csrf_token %}
+              {% if pago_edicion_docente %}
+              <input type="hidden" name="accion" value="editar_pago_profesor">
+              <input type="hidden" name="pago_docente_id" value="{{ pago_edicion_docente.pk }}">
+              {% else %}
               <input type="hidden" name="accion" value="registrar_pago_profesor">
+              {% endif %}
               {{ form_pago_profesor.organizacion }}
               {% for field in form_pago_profesor.visible_fields %}
               <div class="col-12 col-md-6">
@@ -379,6 +416,7 @@
             {% endif %}
           </div>
         </details>
+        </section>
         {% endif %}
 
         <div class="card">

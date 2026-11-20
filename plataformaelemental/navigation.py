@@ -78,13 +78,19 @@ def build_navigation(request):
     can_asistencias = contexto_operable and usuario_tiene_permiso(
         user, ACCION_ADMINISTRAR_SESIONES, organizacion=organizacion
     )
+    perfil_docente = None
+    organizacion_docente = None
     es_profesor = False
     if not can_asistencias:
-        persona = getattr(user, "persona", None)
-        es_profesor = bool(
-            persona
-            and persona.roles.filter(rol__codigo__iexact="PROFESOR", activo=True).exists()
-        )
+        perfil_docente = getattr(user, "persona", None)
+        if perfil_docente:
+            roles_docentes = perfil_docente.roles.filter(activo=True, rol__codigo__iexact="PROFESOR")
+            if organizacion:
+                roles_docentes = roles_docentes.filter(organizacion=organizacion)
+            organizacion_docente = roles_docentes.order_by("organizacion__nombre", "organizacion_id").values_list(
+                "organizacion_id", flat=True
+            ).first()
+            es_profesor = organizacion_docente is not None
     can_calendario = can_asistencias or (
         (contexto_operable or es_profesor)
         and usuario_tiene_permiso(
@@ -122,6 +128,14 @@ def build_navigation(request):
     ]
     items[0]["active"] = request.path == "/"
     configuracion = []
+
+    if organizacion_docente:
+        filtros = {key: request.GET[key] for key in FILTROS_GLOBALES if request.GET.get(key)}
+        filtros["organizacion"] = organizacion_docente
+        perfil = reverse("personas:persona_detail", args=[perfil_docente.pk])
+        items.append(
+            _item(request, label="Mis cobros", icon="bi-cash-coin", url=f"{perfil}?{urlencode(filtros)}#pagos-profesor")
+        )
 
     if can_calendario:
         items.append(_item(request, label="Calendario", icon="bi-calendar3", url_name="asistencias:sesiones_list"))

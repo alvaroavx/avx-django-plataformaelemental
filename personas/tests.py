@@ -955,23 +955,21 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertNotContains(response, "Editar perfil")
         self.assertNotContains(response, "Pago masivo")
 
-        response = self.client.post(
-            url,
-            {
-                "accion": "registrar_pago_profesor",
-                "organizacion": str(self.org.pk),
-                "persona": str(self.estudiante.pk),
-                "plan": "",
-                "fecha_pago": "2026-03-20",
-                "metodo_pago": Payment.Metodo.EFECTIVO,
-                "numero_comprobante": "",
-                "aplica_iva": "",
-                "monto_incluye_iva": "",
-                "monto_referencia": "15000",
-                "clases_asignadas": "2",
-                "observaciones": "Pago registrado por profesor",
-            },
-        )
+        datos_pago = {
+            "accion": "registrar_pago_profesor",
+            "organizacion": str(self.org.pk),
+            "persona": str(self.estudiante.pk),
+            "plan": "",
+            "fecha_pago": "2026-03-20",
+            "metodo_pago": Payment.Metodo.EFECTIVO,
+            "numero_comprobante": "",
+            "aplica_iva": "",
+            "monto_incluye_iva": "",
+            "monto_referencia": "15000",
+            "clases_asignadas": "2",
+            "observaciones": "Pago registrado por profesor",
+        }
+        response = self.client.post(url, datos_pago)
 
         self.assertEqual(response.status_code, 302)
         pago = Payment.objects.get(persona=self.estudiante, fecha_pago="2026-03-20")
@@ -979,6 +977,50 @@ class PersonasOrganizacionesTests(TestCase):
         self.assertEqual(pago.registrado_por, usuario_profesor)
         self.assertEqual(pago.transaccion.organizacion, self.org)
         self.assertEqual(pago.transaccion.monto, 15000)
+
+        panel = self.client.get(reverse("elemental_apps"))
+        self.assertContains(panel, "#pagos-profesor")
+        for nombre in (
+            "dashboard", "pagos_list", "planes_list",
+            "transacciones_list", "export_pagos_csv", "export_pagos_alumnos_xlsx", "export_pagos_profesores_xlsx",
+        ):
+            with self.subTest(ruta=nombre):
+                self.assertEqual(self.client.get(f"{reverse(f'finanzas:{nombre}')}?{query}").status_code, 403)
+        masivo = reverse("finanzas:pago_masivo")
+        busqueda_masiva = reverse("finanzas:pago_masivo_personas")
+        self.assertEqual(self.client.get(f"{busqueda_masiva}?{query}").status_code, 404)
+        self.assertEqual(
+            self.client.post(f"{masivo}?{query}", {"organizacion": self.org.pk, "accion": "confirmar"}).status_code,
+            404,
+        )
+        for nombre in ("pago_detail", "pago_edit", "pago_revertir"):
+            with self.subTest(ruta=nombre):
+                ruta = reverse(f"finanzas:{nombre}", args=[pago.pk])
+                self.assertEqual(self.client.get(f"{ruta}?{query}").status_code, 403)
+        self.assertContains(self.client.get(url), "15.000")
+        self.assertContains(self.client.get(f"{url}&editar_pago={pago.pk}"), "Editar pago")
+        datos_pago.update(accion="editar_pago_profesor", pago_docente_id=pago.pk, monto_referencia="17000")
+        self.assertEqual(self.client.post(url, datos_pago).status_code, 302)
+        pago.refresh_from_db()
+        self.assertEqual(pago.transaccion.monto, 17000)
+
+        otro_profesor = get_user_model().objects.create_user("otro_docente_pago")
+        otra_persona = Persona.objects.create(nombres="Otro", apellidos="Docente", user=otro_profesor)
+        PersonaRol.objects.create(persona=otra_persona, rol=self.rol_profesor, organizacion=self.org, activo=True)
+        self.client.force_login(otro_profesor)
+        otro_url = f"{reverse('personas:persona_detail', args=[otra_persona.pk])}?{query}"
+        self.assertEqual(self.client.post(otro_url, datos_pago).status_code, 404)
+        self.assertNotContains(self.client.get(otro_url), "17.000")
+
+        self.client.force_login(usuario_profesor)
+        self.assertContains(self.client.get(f"{url}&revertir_pago={pago.pk}"), "Confirmar reversa")
+        self.assertEqual(self.client.post(url, {
+            "accion": "revertir_pago_profesor", "pago_docente_id": pago.pk, "motivo": "Prueba de reversa",
+        }).status_code, 302)
+        pago.refresh_from_db()
+        self.assertIsNotNone(pago.revertido_en)
+        self.assertContains(self.client.get(url), "Revertido")
+        self.assertEqual(self.client.post(url, datos_pago).status_code, 404)
 
     def test_profesor_no_puede_registrar_pago_a_persona_de_otra_organizacion(self):
         otra_org = Organizacion.objects.create(nombre="Otra org pago", rut="66.666.666-6")

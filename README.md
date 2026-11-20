@@ -146,14 +146,17 @@ source .venv/bin/activate
 set -a
 source .env.dev
 set +a
-python manage.py runserver 127.0.0.1:8000
+python manage.py runserver 127.0.0.1:8001
 ```
 
 `runserver` recarga automáticamente el proceso cuando detecta cambios en Python
 o en las plantillas durante el desarrollo local.
 
-Cuando se pruebe el acceso Google, `http://127.0.0.1:8000` es el origen local
-canónico. Google Cloud debe autorizar exactamente
+En el workspace compartido, Cuadratura usa 8000 y Elemental usa 8001.
+Para probar Google en paralelo, Google Cloud debe autorizar
+`http://127.0.0.1:8001/accounts/google/login/callback/`.
+Si se usa el origen histórico de Elemental en 8000 con el puerto libre, el
+callback correspondiente es
 `http://127.0.0.1:8000/accounts/google/login/callback/`; cambiar host o puerto
 genera `redirect_uri_mismatch`. Después de cambiar el origen hay que iniciar un
 flujo OAuth nuevo: recargar una página de error conserva el callback anterior.
@@ -185,9 +188,9 @@ Estado v1.0:
 
 ### Consultar estado
 ```bash
-curl http://127.0.0.1:8000/api/health/
-curl http://127.0.0.1:8000/api/status/
-curl http://127.0.0.1:8000/api/version/
+curl http://127.0.0.1:8001/api/health/
+curl http://127.0.0.1:8001/api/status/
+curl http://127.0.0.1:8001/api/version/
 ```
 
 ### Seguridad base actual

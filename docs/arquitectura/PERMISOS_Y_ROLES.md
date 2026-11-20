@@ -77,7 +77,8 @@ Reglas:
   consultan desde los flujos administrativos autorizados. La excepción de
   ADR-0025 permite registrar un pago individual desde su propio perfil, acotado
   a estudiantes y planes activos de la organización donde tiene rol Profesor;
-  no concede acceso a Finanzas ni a edición, reversa, exportación o pago masivo.
+  **Mis cobros** permite listar, editar y revertir pagos individuales registrados
+  por su cuenta. El módulo financiero general conserva sus permisos propios.
 
 ## Acceso HTML
 Estado actual:
