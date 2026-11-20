@@ -27,7 +27,7 @@ El set principal esperado es:
 python manage.py test
 ```
 
-Este comando descubre la suite completa. **Los workflows no lo usan**: `test.yml`
+Este comando descubre la suite completa en `src/`. Las etiquetas de app se resuelven dentro de `src/`, incluso si un checkout anterior dejó directorios de caché en la raíz. **Los workflows no lo usan**: `test.yml`
 y `deploy.yml` ejecutan `python manage.py test asistencias finanzas personas`, por
 lo que `api`, `auditoria` y `plataformaelemental` no corren en CI. Los comandos
 por app se reservan para validaciones focalizadas.
@@ -36,6 +36,10 @@ Django crea o reutiliza la base `test_<POSTGRES_DB>`. Si el rol PostgreSQL no
 puede crearla en cada corrida, usar `python manage.py test --keepdb --noinput`
 sobre una base de pruebas ya existente. No ejecutar dos corridas `--keepdb`
 simultáneas sobre la misma base de pruebas.
+
+Validación del cambio a `src/` el 2026-11-20 con Python 3.12 y PostgreSQL 18.6
+desechable. La suite ejecutó 431 pruebas, con 416 aprobadas y 15 omitidas del
+portal retirado. El gate CI, la comprobación de migraciones y Ruff pasaron.
 
 ## Checks Base
 Para cambios generales:
@@ -175,13 +179,13 @@ Debe cubrir:
 - filtros base `organizacion`, `periodo_mes`, `periodo_anio` cuando existan endpoints de datos (hoy no existen).
 
 ### Contrato Cuadratura
-Debe cubrir cualquier cambio en `finanzas/services/cuadratura_v1.py`:
+Debe cubrir cualquier cambio en `src/finanzas/services/cuadratura_v1.py`:
 - operaciones incluidas y motivos de `pending_records`,
 - montos CLP enteros y clasificación `EXEMPT`/`TAXABLE`,
 - estabilidad de `batch_id`,
 - permisos y aislamiento por organización de `preparar_mes`/`descargar_cuadratura`.
 
-Hoy solo existen dos tests (`finanzas/tests.py`): exportación de un pago válido
+Hoy solo existen dos tests (`src/finanzas/tests.py`): exportación de un pago válido
 sin mutar registros y pendiente por pago sin transacción.
 
 ### UI y templates

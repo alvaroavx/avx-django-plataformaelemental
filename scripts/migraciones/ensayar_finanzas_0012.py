@@ -50,7 +50,7 @@ def argumentos():
 
 def preparar_django():
     raiz = Path(__file__).resolve().parents[2]
-    sys.path.insert(0, str(raiz))
+    sys.path.insert(0, str(raiz / "src"))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "plataformaelemental.settings")
     import django
 

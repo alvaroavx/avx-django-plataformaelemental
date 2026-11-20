@@ -2,6 +2,14 @@
 
 Fecha de actualizacion: 2026-10-12
 
+
+El código Python, las plantillas y los estáticos fuente se organizan bajo
+`src/`. Las aplicaciones mantienen sus nombres de importación y sus etiquetas
+Django. `manage.py` y `gunicorn.conf.py`, en la raíz, incorporan esa carpeta al
+path de Python. `manage.py test` descubre la suite en `src/` y acepta las mismas
+etiquetas de app que antes. Las rutas de archivos subidos y estáticos
+recopilados se detallan en la [guía de despliegue](../operacion/DEPLOY.md).
+
 ## Proposito
 Este documento es la fotografia ejecutiva de Plataforma Elemental.
 
@@ -31,11 +39,11 @@ Componentes de soporte:
 ## Arquitectura vigente
 - Framework: Django 5.2.9 sobre Python 3.12.
 - API: Django REST Framework.
-- Base de datos: PostgreSQL, unico motor configurado en `plataformaelemental/config/dev.py` y `plataformaelemental/config/prod.py`.
+- Base de datos: PostgreSQL, unico motor configurado en `src/plataformaelemental/config/dev.py` y `src/plataformaelemental/config/prod.py`.
 - UI: Bootstrap 5, DataTables y Tom Select via CDN.
 - Zona horaria: `America/Santiago`.
 - Deploy: GitHub Actions + SSH + `systemd` + `gunicorn`.
-- Integración financiera inicial: exportación JSON versionada Elemental → Cuadratura (`elemental-cuadratura-v1`, `finanzas/services/cuadratura_v1.py`), descargada manualmente desde `Preparar mes`. Lo que existe: archivo JSON con `batch_id` determinista por organización, período y operaciones incluidas. Planificado / no implementado: transporte por API y reglas de idempotencia del lado receptor; cuando exista, debe conservar el mismo contrato. Detalle en [docs/apps/FINANZAS.md](../apps/FINANZAS.md).
+- Integración financiera inicial: exportación JSON versionada Elemental → Cuadratura (`elemental-cuadratura-v1`, `src/finanzas/services/cuadratura_v1.py`), descargada manualmente desde `Preparar mes`. Lo que existe: archivo JSON con `batch_id` determinista por organización, período y operaciones incluidas. Planificado / no implementado: transporte por API y reglas de idempotencia del lado receptor; cuando exista, debe conservar el mismo contrato. Detalle en [docs/apps/FINANZAS.md](../apps/FINANZAS.md).
 
 Detalle operativo:
 - Deploy y CI/CD: [docs/operacion/DEPLOY.md](../operacion/DEPLOY.md)

@@ -17,7 +17,7 @@ Cuadratura quedan con datos distintos.
 
 - **Botón «Enviar a Cuadratura»** en `/finanzas/preparar-mes/` (permiso
   `exportar_datos`), con una casilla obligatoria que confirma el bloqueo del mes.
-- **El envío (`finanzas/services/cuadratura_api.py`):**
+- **El envío (`src/finanzas/services/cuadratura_api.py`):**
   1. reutiliza `prepare_month` y traduce el resultado al contrato genérico;
   2. consulta `GET /api/v1/` y elige la organización destino por RUT;
   3. hace `POST` del lote.
@@ -93,7 +93,7 @@ Cuadratura quedan con datos distintos.
 
 ## Verificación
 
-- `finanzas/test_envio_cuadratura.py` (14 pruebas) cubre, además de la firma
+- `src/finanzas/test_envio_cuadratura.py` (14 pruebas) cubre, además de la firma
   verificada en cada llamada, el bloqueo durante el envío, el estado incierto con
   reintento idéntico, el fallo de conexión que no bloquea, la URL ajena descartada y
   la llave obligatoria. También cubre:

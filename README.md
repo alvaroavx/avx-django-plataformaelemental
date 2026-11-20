@@ -70,13 +70,18 @@ Cuadratura ([ADR 0015](docs/adr/0015-cuadratura-duena-documentacion-fiscal.md)).
 - Tom Select
 
 ### Estructura del repo
-- `plataformaelemental/`: configuración del proyecto Django
-- `asistencias/`: dominio académico
-- `personas/`: personas, roles y organizaciones
-- `finanzas/`: pagos, consumo de clases y caja
-- `api/`: API minima de salud/estado/version
-- `auditoria/`: registro best-effort de mutaciones sensibles
-- `templates/`: plantillas compartidas
+Los comandos `python manage.py` se ejecutan desde la raíz. Allí también viven
+`docs/`, `data/`, `deploy/`, `scripts/` y la configuración de Gunicorn.
+Las rutas históricas `plataformaelemental/media/` y
+`plataformaelemental/staticfiles/` se reservan para archivos en ejecución.
+
+- `src/plataformaelemental/`: configuración del proyecto Django
+- `src/asistencias/`: dominio académico
+- `src/personas/`: personas, roles y organizaciones
+- `src/finanzas/`: pagos, consumo de clases y caja
+- `src/api/`: API minima de salud/estado/version
+- `src/auditoria/`: registro best-effort de mutaciones sensibles
+- `src/templates/`: plantillas compartidas
 - `scripts/`: deploy, releases escalonados, validadores de documentación y CI
 - `deploy/`: ejemplo de unit `systemd`
 - `docs/`: documentación viva

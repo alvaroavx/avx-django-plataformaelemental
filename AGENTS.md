@@ -29,16 +29,16 @@
   al inventario.
 
 ## Estructura del proyecto
-api/ API minima (health/status/version/me); no expone datos de dominio
-asistencias/ disciplinas, sesiones, asistencia y relaciones profesor/alumno-disciplina
-auditoria/ registro best-effort de mutaciones sensibles
+src/api/ API minima (health/status/version/me); no expone datos de dominio
+src/asistencias/ disciplinas, sesiones, asistencia y relaciones profesor/alumno-disciplina
+src/auditoria/ registro best-effort de mutaciones sensibles
 data/ cargas masivas de informacion
 docs/ documentacion viva (ver docs/INDICE.md)
-finanzas/ planes, pagos, consumos, caja, reportes y export a Cuadratura
-personas/ identidad, organizaciones, roles, login Google y solicitudes de acceso
-plataformaelemental/ config de django, panel transversal, contexto global y navegacion
+src/finanzas/ planes, pagos, consumos, caja, reportes y export a Cuadratura
+src/personas/ identidad, organizaciones, roles, login Google y solicitudes de acceso
+src/plataformaelemental/ config de django, panel transversal, contexto global y navegacion
 scripts/ deploy, releases escalonados y validadores
-templates/ plantillas compartidas
+src/templates/ plantillas compartidas
 
 ## Entorno local
 - Usar Python 3.12 para el entorno virtual local: `python3.12 -m venv .venv`.
@@ -69,7 +69,7 @@ Un cambio se considera terminado solo si:
 ## Fronteras de dominio
 - `personas` define identidad: Persona, Organizacion, Rol, PersonaRol.
 - `asistencias` define operación de clases: Disciplina, BloqueHorario, SesionClase, Asistencia, AsignacionProfesorDisciplina, AlumnoDisciplina, LiberacionSesion y ClaseLiberada.
-- `cobranzas` es un dominio conceptual, por ahora implementado dentro de `finanzas/services/`, y maneja planes, pagos operacionales, deuda e imputación de clases.
+- `cobranzas` es un dominio conceptual, por ahora implementado dentro de `src/finanzas/services/`, y maneja planes, pagos operacionales, deuda e imputación de clases.
 - `finanzas` maneja pagos, transacciones de caja, categorías y reportes operacionales. La documentación fiscal y la conciliación pertenecen a Cuadratura.
 
 ## Reglas de dependencia

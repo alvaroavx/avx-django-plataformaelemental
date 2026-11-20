@@ -197,12 +197,12 @@ confirmación solo dentro de su DOM aislado.
 - Exige la confirmación literal `COPIA_NO_PRODUCTIVA`, espacio disponible y el
   estado `finanzas.0011`; rechaza motores no PostgreSQL, `DJANGO_ENV` productivo,
   nombres con `prod` y una base donde `0012` ya esté aplicada.
-- `asistencias/management/commands/reportar_relaciones_historicas.py`: reporte
+- `src/asistencias/management/commands/reportar_relaciones_historicas.py`: reporte
   reutilizable de conteos para historia y transición operativa. Identifica
   asignaciones futuras pendientes y matrículas recientes para revisión sin
   activarlas. `--fallar-si-inseguro` lo convierte en gate; el detalle nominal
   opcional debe guardarse fuera del repo en almacenamiento protegido.
-- `asistencias/management/commands/activar_relaciones_operativas.py`: activación
+- `src/asistencias/management/commands/activar_relaciones_operativas.py`: activación
   administrativa por IDs para ventanas con el sitio en mantenimiento. Sin la
   confirmación literal solo previsualiza; al confirmar reutiliza los servicios
   atómicos, valida el actor por organización y audita cada relación.
@@ -244,7 +244,7 @@ confirmación solo dentro de su DOM aislado.
   un preflight PostgreSQL read-only, valida un dump restaurado y un snapshot
   previo mediante confirmaciones auditables, y aplica únicamente destinos de
   migración explícitos.
-- `asistencias/test_release_asistencias_0005.py`: contrato estático sin base de
+- `src/asistencias/test_release_asistencias_0005.py`: contrato estático sin base de
   datos. Comprueba la máquina de estados, la ausencia de `migrate` global, la
   conservación del release anterior y los requisitos documentales.
 - Runbook vigente:
@@ -277,7 +277,7 @@ confirmación solo dentro de su DOM aislado.
 
 ### Poblador mensual operativo
 
-- `asistencias/management/commands/poblar_mes_pruebas.py`: genera un mes
+- `src/asistencias/management/commands/poblar_mes_pruebas.py`: genera un mes
   sintético para Lyra, LatinRengo y una disciplina circense parametrizable;
   también genera planes, pagos variados y sus transacciones enlazadas mediante
   los servicios canónicos de Finanzas.
@@ -306,10 +306,10 @@ confirmación solo dentro de su DOM aislado.
 
 ### Componentes reutilizables de búsqueda de personas
 
-- `personas/search.py`: filtro ORM canónico para consultas por fragmentos sin
+- `src/personas/search.py`: filtro ORM canónico para consultas por fragmentos sin
   sensibilidad a tildes. Recibe querysets ya autorizados y sirve a Personas,
   Asistencias y Finanzas sin importar helpers desde `views.py`.
-- `templates/shared/_busqueda_texto_script.html`: normalización equivalente en
+- `src/templates/shared/_busqueda_texto_script.html`: normalización equivalente en
   navegador para selectores y DataTables que filtran datos ya renderizados.
 - `docs/evidencia/busqueda-personas-20260810/RESULTADOS.md`: matriz de cajas
   cubiertas, comandos y resultados de la regresión PostgreSQL.
@@ -362,11 +362,11 @@ confirmación solo dentro de su DOM aislado.
 
 ### Envío firmado a Cuadratura 2026-10-12
 
-- `finanzas/management/commands/generar_llave_cuadratura.py`: genera el par Ed25519
+- `src/finanzas/management/commands/generar_llave_cuadratura.py`: genera el par Ed25519
   con que Elemental firma cada request a la API de Cuadratura.
   - Escribe la llave privada con permisos 600 y se niega a dejarla dentro del repo.
   - Imprime la llave pública, que se registra en Cuadratura.
-- `finanzas/test_envio_cuadratura.py` contiene `FakeSession`, un doble de la API v1 de
+- `src/finanzas/test_envio_cuadratura.py` contiene `FakeSession`, un doble de la API v1 de
   Cuadratura que verifica la firma y que no se sigan redirecciones. Sirve para probar
   envíos sin red.
 - La prueba de punta a punta contra Cuadratura local se hizo con la organización

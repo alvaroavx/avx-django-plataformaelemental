@@ -8,7 +8,10 @@ import os
 from pathlib import Path
 from typing import List
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+SOURCE_DIR = Path(__file__).resolve().parents[2]
+REPOSITORY_DIR = SOURCE_DIR.parent
+# Nginx y las releases utilizan este directorio de ejecución.
+BASE_DIR = REPOSITORY_DIR / "plataformaelemental"
 
 
 def env_list(var_name: str, default: str = "") -> List[str]:
@@ -77,7 +80,7 @@ ROOT_URLCONF = "plataformaelemental.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR.parent / "templates"],
+        "DIRS": [SOURCE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -95,6 +98,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "plataformaelemental.wsgi.application"
+TEST_RUNNER = "plataformaelemental.testing.SourceDiscoverRunner"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -118,7 +122,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [SOURCE_DIR / "plataformaelemental" / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

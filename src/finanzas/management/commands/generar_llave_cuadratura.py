@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import (
     PrivateFormat,
     PublicFormat,
 )
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -24,7 +25,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         ruta = Path(options["salida"]).expanduser().resolve()
-        repo = Path(__file__).resolve().parents[3]
+        repo = settings.REPOSITORY_DIR
         if ruta.is_relative_to(repo):
             raise CommandError("La llave privada no puede quedar dentro del repositorio.")
         if ruta.exists() and not options["reemplazar"]:

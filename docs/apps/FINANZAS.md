@@ -55,7 +55,7 @@ es `es_exenta_iva`, el pago se guarda con `aplica_iva = False`.
   `transaccion = NULL`.
 - Una reversa no elimina el pago: conserva motivo, autor y fecha, y recalcula
   los consumos afectados. **No** modifica ni anula la `Transaction` enlazada.
-- La imputación se ejecuta por señales (`finanzas/signals.py`): cada `Asistencia`
+- La imputación se ejecuta por señales (`src/finanzas/signals.py`): cada `Asistencia`
   guardada asigna su consumo y cada `Payment` nuevo se imputa a deudas del mismo
   mes y año según `services/imputacion.py`.
 - Los montos exportados a Cuadratura son CLP enteros y conservan identificadores estables.
@@ -94,7 +94,7 @@ Exportaciones (permiso `exportar_datos`):
 - `export/pagos.csv`, `export/pagos-alumnos.xlsx`.
 - `export/transacciones.csv`, `export/transacciones.xlsx`, `export/libro-caja.csv`.
 - `export/pagos-profesores.xlsx`: estimación de pago a profesores calculada con
-  `asistencias/services/exportaciones.py`; no es un pago registrado.
+  `src/asistencias/services/exportaciones.py`; no es un pago registrado.
 - `preparar-mes/descargar/`: archivo JSON para Cuadratura (ver sección siguiente).
 - `preparar-mes/enviar/` (POST): envía el mes a la API de Cuadratura (ver «Envío por API»).
 
@@ -102,9 +102,9 @@ Exportaciones (permiso `exportar_datos`):
 
 ### Lo que existe
 
-Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
+Implementación: `src/finanzas/services/cuadratura_v1.py` (`prepare_month`,
 `serialize_contract`) y las vistas `preparar_mes` y `descargar_cuadratura` de
-`finanzas/views.py`.
+`src/finanzas/views.py`.
 
 - **Acceso:** `/finanzas/preparar-mes/` muestra el resumen y los registros
   pendientes; `/finanzas/preparar-mes/descargar/` entrega el archivo. Ambas exigen
@@ -145,7 +145,7 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
 - **`batch_id`:** SHA-256 de `organización|período|external_id` de las
   operaciones incluidas. Es estable mientras no cambie el conjunto de
   operaciones; `generated_at` cambia en cada descarga.
-- **Pruebas:** `finanzas/tests.py` cubre una operación válida (sin mutar el
+- **Pruebas:** `src/finanzas/tests.py` cubre una operación válida (sin mutar el
   pago) y un pago sin transacción enlazada.
 
 ### Envío por API (ADR 0023)
@@ -184,7 +184,7 @@ Implementación: `finanzas/services/cuadratura_v1.py` (`prepare_month`,
     formularios de pago, pago masivo y transacción.
   - Para desbloquear, un superusuario elimina el envío desde la base. No hay
     pantalla para eso.
-- **Pruebas:** `finanzas/test_envio_cuadratura.py`.
+- **Pruebas:** `src/finanzas/test_envio_cuadratura.py`.
 
 ### Planificado / no implementado
 

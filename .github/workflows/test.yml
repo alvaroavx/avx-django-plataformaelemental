@@ -57,6 +57,9 @@ jobs:
       - name: Reject model changes without a migration
         run: python manage.py makemigrations --check --dry-run
 
+      - name: Verify Gunicorn entry point
+        run: gunicorn --check-config plataformaelemental.wsgi:application
+
       - name: Run lint
         run: ruff check .
 

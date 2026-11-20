@@ -32,7 +32,7 @@ Indices principales:
 
 ## Helper
 
-La escritura se centraliza en `auditoria/services.py`:
+La escritura se centraliza en `src/auditoria/services.py`:
 
 - `registrar_auditoria(...)`: registra una accion puntual.
 - `registrar_cambio(...)`: registra diferencias entre valores antes/despues solo para campos declarados.
@@ -66,7 +66,7 @@ Personas:
 - Agregar/reactivar/configurar/toggle de roles desde perfil o edicion.
 - Solicitudes de acceso: creación o recuperación, intentos de gestión sin
   permiso, aprobación (asociación o creación de User/Persona/rol), rechazo y reapertura.
-- Primer vínculo Google de un usuario existente (`personas/auth_google.py`).
+- Primer vínculo Google de un usuario existente (`src/personas/auth_google.py`).
 - Cambio de estado de sesión desde el perfil de profesor.
 - Cambios de configuración de permisos de Profesor por organización
   (`personas/views.py::permisos_configuracion`, trabajo en curso; ver ADR 0018).

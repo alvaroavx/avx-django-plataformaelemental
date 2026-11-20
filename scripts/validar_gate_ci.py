@@ -65,6 +65,7 @@ def main():
         "python manage.py check",
         "python manage.py makemigrations --check --dry-run",
         "ruff check .",
+        "gunicorn --check-config plataformaelemental.wsgi:application",
         "python manage.py test asistencias finanzas personas",
     ):
         exigir(
@@ -126,7 +127,7 @@ def main():
     ):
         origen = contenido if contrato_deploy == "ManifestStaticFilesStorage" else deploy_script
         if contrato_deploy == "ManifestStaticFilesStorage":
-            origen = (DEPLOY_SCRIPT.parents[1] / "plataformaelemental/config/prod.py").read_text(
+            origen = (DEPLOY_SCRIPT.parents[1] / "src/plataformaelemental/config/prod.py").read_text(
                 encoding="utf-8"
             )
         exigir(

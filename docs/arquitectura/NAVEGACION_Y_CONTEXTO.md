@@ -118,7 +118,7 @@ Una profesora sin capacidades administrativas también entra a `/`, pero desde e
 retiro del portal (ADR 0016) `construir_dashboard_general` no compone ningún
 bloque para ella: la jornada de hoy y las métricas solo se calculan para
 organizaciones con `administrar_sesiones`, `ver_finanzas` o `administrar_personas`
-(`plataformaelemental/dashboard.py`). Este acceso no amplía sus alcances.
+(`src/plataformaelemental/dashboard.py`). Este acceso no amplía sus alcances.
 
 Al final del Panel administrativo se ubica `Seguimiento del período`, con deuda
 de clases, mayor asistencia y clases disponibles. Estos bloques reutilizan el

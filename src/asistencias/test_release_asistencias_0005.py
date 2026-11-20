@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "release_asistencias_0005.sh"
 RUNBOOK = REPO_ROOT / "docs" / "operacion" / "MIGRACIONES_OPERACION_PROFESOR.md"
 DEPLOY_DOC = REPO_ROOT / "docs" / "operacion" / "DEPLOY.md"

@@ -297,7 +297,7 @@ explícitamente PostgreSQL ni dependencias externas.
   y se retiraron en este cambio. La auditoría larga de SQLite queda solo como evidencia histórica.
 - `data/` contiene dos cargas de alumnos versionadas que no son fixtures seguras.
 - `reporte.md` en raíz describe una rama de julio y se conserva solo con aviso histórico.
-- `plataformaelemental/settings.py` es un wrapper de compatibilidad sobre
+- `src/plataformaelemental/settings.py` es un wrapper de compatibilidad sobre
   `plataformaelemental.config`; retirarlo requiere buscar consumidores externos
   antes de considerarlo basura. (`plataformaelemental/settings/base.py` ya no existe.)
 - `finanzas/documentos/` solo conserva `__pycache__` ignorado del paquete fiscal retirado.

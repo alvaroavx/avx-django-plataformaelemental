@@ -126,14 +126,14 @@ Acción: definir mínimo de producción.
 - Sin coverage formal ni convención única de factories.
 - Auditoría histórica SQLite muy larga; se conserva como evidencia, no como guía.
 - API conserva ApiAccessKey/Token DRF sin consumidor de datos.
-- Residuos del portal retirado: `asistencias/services/profesor.py` conserva
+- Residuos del portal retirado: `src/asistencias/services/profesor.py` conserva
   siete servicios sin consumidores en código ni tests (`crear_sesion_profesor`,
   `liberar_sesion_profesor`, `cambiar_estado_sesion_profesor`,
   `crear_alumno_profesor`, `quitar_asistente_profesor`, `liberar_clase_profesor`,
   `revertir_clase_liberada_profesor`), junto a las activaciones administrativas
   que sí se usan; `scripts/e2e/profesor_*.js` quedan como archivo histórico.
 - Constantes de acción sin consumidor en el árbol de trabajo:
-  `ver_sesion` y `editar_asistencias` (`personas/permissions.py`).
+  `ver_sesion` y `editar_asistencias` (`src/personas/permissions.py`).
 - Tablas `monitor_*` pendientes de retiro en ambientes distintos de desarrollo;
   `migrate monitor zero` ya no es ejecutable desde `HEAD`.
 - Dependencias visuales CDN no están vendorizadas ni monitorizadas.

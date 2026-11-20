@@ -121,13 +121,13 @@ Antes de agregar permisos mas complejos:
 - documentar en este archivo.
 
 ## Riesgo pendiente
-La matriz de acciones existe en `personas/permissions.py`, pero no constituye
+La matriz de acciones existe en `src/personas/permissions.py`, pero no constituye
 todavia un cierre transversal: el bypass de `staff`, el acceso sin organizacion
 activa, Django Admin, comandos y futuras vistas deben auditarse como superficies
 separadas. La fotografia y prioridad viven en `docs/ESTADO_ACTUAL.md`.
 # Permisos de producto
 
-La fuente de autorización de las vistas HTML es `personas/permissions.py`: capacidades de dominio, roles activos y organización seleccionada. Los permisos CRUD que Django genera por modelo no se presentan como opciones de negocio.
+La fuente de autorización de las vistas HTML es `src/personas/permissions.py`: capacidades de dominio, roles activos y organización seleccionada. Los permisos CRUD que Django genera por modelo no se presentan como opciones de negocio.
 
 `ConfiguracionPermisoRol` permite excepciones explícitas por organización, rol y capacidad. `ver_calendario` deja al Profesor consultar únicamente sesiones asignadas. `agregar_asistentes_propios` permite abrirlas y agregar cualquier estudiante activo de la organización real de la sesión; la matrícula de disciplina se crea o activa en ese momento (ADR 0024). Ambas capacidades están habilitadas por defecto y pueden deshabilitarse desde Configuración → Permisos. Crear personas o sesiones, quitar asistentes, corregir estados, liberar clases, administrar personas y operar finanzas permanecen separados.
 

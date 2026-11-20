@@ -56,7 +56,7 @@ No debe absorber:
 
 ### Cobranza Operacional
 Estado:
-- Vigente como subdominio dentro de `finanzas/services/`.
+- Vigente como subdominio dentro de `src/finanzas/services/`.
 
 App duena actual:
 - `finanzas`.
@@ -107,7 +107,7 @@ Responsabilidad actual (v1.0):
 
 Planificado / no implementado:
 - endpoints de datos o contratos externos. El unico contrato externo vigente
-  (`elemental-cuadratura-v1`) vive en `finanzas/services/cuadratura_v1.py` y se
+  (`elemental-cuadratura-v1`) vive en `src/finanzas/services/cuadratura_v1.py` y se
   entrega como archivo, no por esta app.
 
 No debe contener:

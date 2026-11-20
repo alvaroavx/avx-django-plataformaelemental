@@ -69,6 +69,9 @@ jobs:
       - name: Reject model changes without a migration
         run: python manage.py makemigrations --check --dry-run
 
+      - name: Verify Gunicorn entry point
+        run: gunicorn --check-config plataformaelemental.wsgi:application
+
       - name: Run lint
         run: ruff check .
 
@@ -103,7 +106,8 @@ jobs:
           if [[ "$BEFORE" =~ ^0+$ ]]; then
             BEFORE="${CURRENT}^"
           fi
-          if git diff --name-only "$BEFORE" "$CURRENT" | grep -Eq '(^|/)migrations/[^/]+\.py$'; then
+          changed_paths="$(git diff --name-only --find-renames=100% --diff-filter=ACDMTUXB "$BEFORE" "$CURRENT")"
+          if grep -Eq '(^|/)migrations/[^/]+\.py$' <<< "$changed_paths"; then
             echo "hay_cambios_esquema=true" >> "$GITHUB_OUTPUT"
             echo "Se detectaron migraciones: el servidor creará un respaldo antes de aplicarlas."
           else

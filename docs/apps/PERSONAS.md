@@ -36,7 +36,7 @@ Debe concentrar:
   término en fragmentos y normaliza tildes para encontrar nombres completos como
   `alvaro vargas` aunque la Persona guarde `Álvaro Vargas`.
 - La regla anterior es transversal a las cajas de búsqueda de personas. Vive en
-  `personas/search.py`: aplica AND entre fragmentos, OR entre campos y normaliza
+  `src/personas/search.py`: aplica AND entre fragmentos, OR entre campos y normaliza
   tildes/mayúsculas mediante PostgreSQL `TRANSLATE`. Siempre recibe un queryset
   ya acotado; no concede acceso ni sustituye filtros de organización, rol, clase
   o membresía.

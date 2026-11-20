@@ -535,13 +535,17 @@ case "$ACTION" in
     backup_sha="$(validate_backup)"
     snapshot_sha="$(validate_snapshot)"
     validate_schema_before_0005 "$state"
+    migration_file="asistencias/migrations/0005_reparar_schema_0004_aplicada_precommit.py"
+    if [[ -f "src/$migration_file" ]]; then
+      migration_file="src/$migration_file"
+    fi
     evidence="$OPS_DIR/preflight-${HEAD_COMMIT}.txt"
     {
       printf 'release_tag=%s\nrelease_commit=%s\nrelease_parent=%s\n' \
         "$EXPECTED_RELEASE_TAG" "$HEAD_COMMIT" "$HEAD_PARENT"
       printf 'worktree=clean\ninitial_route=%s\n' "$state"
       printf 'migration_file_0005=%s\n' \
-        "$(sha256sum asistencias/migrations/0005_reparar_schema_0004_aplicada_precommit.py | awk '{print $1}')"
+        "$(sha256sum "$migration_file" | awk '{print $1}')"
       "${DJANGO[@]}" showmigrations asistencias finanzas --list
       schema_report
       printf 'service=%s state=maintenance_inactive\n' "$SERVICE_UNIT"

@@ -3,15 +3,15 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "release_asistencias_escalonado.sh"
 APPLY_ROOT = ROOT / "scripts" / "infra" / "elemental_release_apply_root.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "release-asistencias-escalonado.yml"
 PREFLIGHT_RUNNER = ROOT / "scripts" / "infra" / "elemental_release_preflight_runner.sh"
-MIGRATION_0004B = ROOT / "asistencias" / "migrations" / "0004b_reparar_precondiciones_0005.py"
-MIGRATION_0006 = ROOT / "asistencias" / "migrations" / "0006_merge_0004b_y_0005.py"
-MIGRATION_0005V2 = ROOT / "asistencias" / "migrations" / "0005_reparar_schema_0004_aplicada_precommit_v2.py"
-MIGRATION_0007 = ROOT / "asistencias" / "migrations" / "0007_reconciliar_relaciones_activas.py"
+MIGRATION_0004B = ROOT / "src" / "asistencias" / "migrations" / "0004b_reparar_precondiciones_0005.py"
+MIGRATION_0006 = ROOT / "src" / "asistencias" / "migrations" / "0006_merge_0004b_y_0005.py"
+MIGRATION_0005V2 = ROOT / "src" / "asistencias" / "migrations" / "0005_reparar_schema_0004_aplicada_precommit_v2.py"
+MIGRATION_0007 = ROOT / "src" / "asistencias" / "migrations" / "0007_reconciliar_relaciones_activas.py"
 
 
 class ReleaseAsistenciasEscalonadoContractTests(unittest.TestCase):

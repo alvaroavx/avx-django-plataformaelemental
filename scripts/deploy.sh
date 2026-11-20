@@ -138,7 +138,7 @@ backup_database() {
 publish_static_files() {
   local static_root expected_static_root
 
-  static_root="$(DJANGO_SETTINGS_MODULE=plataformaelemental.config python -c \
+  static_root="$(python manage.py shell --verbosity 0 -c \
     'from django.conf import settings; print(settings.STATIC_ROOT)')"
   expected_static_root="$APP_DIR/plataformaelemental/staticfiles"
 
@@ -179,6 +179,7 @@ python -m pip install -r requirements.txt
 validate_prod_environment
 python manage.py makemigrations --check --dry-run
 validate_service
+gunicorn --check-config plataformaelemental.wsgi:application
 python manage.py showmigrations --plan >/dev/null
 
 if python manage.py migrate --check; then

@@ -8,7 +8,7 @@ Fecha de actualizacion: 2026-10-31
 
 ## Profesor en la aplicacion comun
 
-Lo que existe (verificado en `asistencias/views.py`, `asistencias/selectors.py` y `personas/permissions.py`):
+Lo que existe (verificado en `src/asistencias/views.py`, `src/asistencias/selectors.py` y `src/personas/permissions.py`):
 
 - `GET /asistencias/calendario/` exige la capacidad `ver_calendario`
   (admin, `staff_asistencia` o profesor habilitado). Un profesor solo ve las
@@ -611,7 +611,7 @@ Lo que existe:
   ampliar el alcance a otras organizaciones.
 
 Planificado / no implementado (sin vista ni ruta; solo quedan servicios en
-`asistencias/services/profesor.py` sin consumidores):
+`src/asistencias/services/profesor.py` sin consumidores):
 
 - crear sesiones futuras propias, abrir/cerrar y liberar una sesión completa con
   motivo (`LiberacionSesion`, administrable solo desde Django Admin);

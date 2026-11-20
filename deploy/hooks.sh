@@ -11,6 +11,7 @@ pre_checks() {
   [[ "${POSTGRES_USER:-}" == "elementos" ]] || die "POSTGRES_USER no es el usuario productivo esperado."
   [[ "${POSTGRES_HOST:-}" == "127.0.0.1" ]] || die "POSTGRES_HOST no es el host productivo esperado."
   [[ "${POSTGRES_PORT:-}" == "5432" ]] || die "POSTGRES_PORT no es el puerto productivo esperado."
+  (cd "$RELEASE_PATH" && .venv/bin/gunicorn --check-config plataformaelemental.wsgi:application)
 }
 
 pre_migrate() {

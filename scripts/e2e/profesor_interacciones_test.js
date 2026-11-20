@@ -16,7 +16,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
     // El script real debe conservar la acción del botón elegido, incluso al deshabilitarlo.
     await page.setContent('<form data-sensitive-form><button type="submit" name="quitar_asistente" value="quitar">Quitar</button><button type="submit" name="liberar_clase" value="liberar">Liberar</button></form>');
     await page.evaluate(() => { window.confirm = () => true; });
-    await page.addScriptTag({content: read('asistencias/static/asistencias/js/profesor_contexto.js')});
+    await page.addScriptTag({content: read('src/asistencias/static/asistencias/js/profesor_contexto.js')});
     const actions = await page.evaluate(() => {
       const form = document.querySelector('form');
       const button = form.querySelector('[name="liberar_clase"]');
@@ -33,7 +33,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
     await page.evaluate(nombre => {
       document.getElementById('alumnos-seleccionados-data').textContent = JSON.stringify([{id: 7, nombre}, {id: 8, nombre: 'Otro alumno sintético'}]);
     }, name);
-    const mass = read('asistencias/templates/asistencias/profesor/pago_masivo.html').split('<script>')[1].split('</script>')[0]
+    const mass = read('src/asistencias/templates/asistencias/profesor/pago_masivo.html').split('<script>')[1].split('</script>')[0]
       .replace(/{%[\s\S]*?%}/g, '').replace(/{{[\s\S]*?}}/g, '');
     await page.addScriptTag({content: mass});
     const selected = await page.evaluate(() => ({
@@ -50,7 +50,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
     assert.equal(await page.$eval('#id_personas_seleccionadas', el => el.value), '8');
 
     // La función real consume el estado autoritativo del servidor sin asumir una transición.
-    const detail = read('asistencias/templates/asistencias/sesion_detail.html');
+    const detail = read('src/asistencias/templates/asistencias/sesion_detail.html');
     const stateFunction = detail.slice(detail.indexOf('  function actualizarEstadoSesion('), detail.indexOf('  function agregarAsistente('));
     await page.setContent('<span data-sesion-estado>Planificada</span>');
     await page.addScriptTag({content: stateFunction});

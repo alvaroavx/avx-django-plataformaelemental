@@ -1,6 +1,29 @@
 # Deploy
 
-Fecha de actualizacion: 2026-10-12
+Fecha de actualización 2026-11-20
+
+## Arranque del checkout con src
+
+La unidad systemd ejecuta `plataformaelemental.wsgi:application` con
+`WorkingDirectory` en la raíz del checkout. Gunicorn carga automáticamente
+`gunicorn.conf.py` desde ese directorio y encuentra los módulos en `src/`.
+El workflow y el script del servidor verifican la importación WSGI con
+`gunicorn --check-config plataformaelemental.wsgi:application` antes de
+publicar o modificar la base.
+
+Django recoge estáticos desde `src/` y escribe el manifiesto en
+`plataformaelemental/staticfiles/`. Las cargas siguen en
+`plataformaelemental/media/`. Nginx sirve las mismas rutas. Los archivos de
+migración reubicados con contenido idéntico se excluyen del indicador de
+cambios de esquema del workflow. El servidor sigue comprobando las
+migraciones pendientes con Django.
+
+El 2026-11-20 una consulta de solo lectura confirmó que la unidad activa en
+producción trabaja desde `/srv/elementos`, usa el módulo WSGI anterior sin
+`--config` explícito y que Nginx apunta a
+`/srv/elementos/plataformaelemental/staticfiles/`. La reorganización se
+verificó localmente y en una release simulada. El primer deploy del nuevo
+layout sigue pendiente.
 
 ## Objetivo
 Este documento describe el CI/CD minimo del proyecto:

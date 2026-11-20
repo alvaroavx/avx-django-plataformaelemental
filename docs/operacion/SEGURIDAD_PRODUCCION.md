@@ -6,7 +6,7 @@ Fecha de actualizacion: 2026-04-20
 La plataforma esta publicada en produccion y se detecto que una sesion iniciada el dia anterior seguia activa al dia siguiente.
 
 ## Decision
-La configuracion de seguridad de produccion debe ser mas estricta que desarrollo y debe vivir en `plataformaelemental/config/prod.py`.
+La configuracion de seguridad de produccion debe ser mas estricta que desarrollo y debe vivir en `src/plataformaelemental/config/prod.py`.
 
 ## Sesiones
 - Las sesiones de produccion usan timeout por inactividad de 2 horas por defecto.

@@ -38,7 +38,7 @@ python manage.py makemigrations --check --dry-run
 - Mantener la conciliación y documentos fiscales fuera del flujo de imputación de pagos.
 - Si toca deuda, saldo, pagos, consumos o imputacion, agregar o ajustar test de regla.
 - Mantener queries puras en selectors y reglas de negocio en services.
-- Si cambia `Payment`, `Transaction`, `Organizacion` o la selección mensual, revisar el impacto en el contrato `elemental-cuadratura-v1` (`finanzas/services/cuadratura_v1.py`) y sus tests.
+- Si cambia `Payment`, `Transaction`, `Organizacion` o la selección mensual, revisar el impacto en el contrato `elemental-cuadratura-v1` (`src/finanzas/services/cuadratura_v1.py`) y sus tests.
 
 ## Si Toca Asistencias
 - Revisar [docs/apps/ASISTENCIAS.md](../apps/ASISTENCIAS.md).

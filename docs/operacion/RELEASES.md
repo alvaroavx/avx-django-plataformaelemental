@@ -4,6 +4,23 @@
 servidor.** Producción sigue usando `scripts/deploy.sh` y `.github/workflows/deploy.yml`
 hasta hacer el corte descrito abajo.
 
+
+Cada release lleva el código bajo `src/`, y `manage.py` y
+`gunicorn.conf.py` en la raíz. Gunicorn conserva el módulo WSGI y el
+directorio de trabajo `current/`. El hook `pre_checks` verifica la
+importación WSGI en la release nueva, antes de migraciones o de mover
+`current`. Los alias de Nginx y el enlace a media compartido conservan
+las rutas de ejecución bajo `plataformaelemental/`. Al volver a una versión
+anterior, Gunicorn usa el contenido y la configuración del checkout apuntado
+por `current`.
+
+La validación local del layout simuló `current` apuntando a una release
+anterior, a la reorganizada y de vuelta a la anterior. En los tres casos
+pasó `gunicorn --check-config plataformaelemental.wsgi:application`.
+En la nueva release también se validaron los hooks de arranque y estáticos,
+el manifiesto y el enlace a media compartido. Esta prueba de rutas y carga
+WSGI se ejecutó fuera del servidor.
+
 ## Idea
 
 Cada deploy crea una carpeta nueva con su código, su entorno virtual y sus
