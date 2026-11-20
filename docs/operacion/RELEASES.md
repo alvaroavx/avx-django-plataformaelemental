@@ -47,7 +47,7 @@ ese enlace. Antes de cada deploy se respalda la base.
 
 | Archivo | Para qué |
 |---|---|
-| `scripts/release/release.sh` | Deploy, rollback, restauración de base, listado y limpieza. **Copia idéntica** en `avx-django-cuadratura` |
+| `scripts/release/release.sh` | Deploy, rollback, restauración de base, listado y limpieza. **Copia idéntica** en `cuadratura-platform-django` |
 | `deploy/hooks.sh` | Validaciones propias de Elemental (variables productivas, reparación histórica de asistencias, permisos de estáticos, `clearsessions`) |
 | `deploy/release.conf.example` | Configuración: rutas, servicio, Python, respaldos, salud |
 | `deploy/systemd/plataforma-elemental.releases.service.example` | Unidad que apunta a `current/` |

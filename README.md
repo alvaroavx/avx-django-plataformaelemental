@@ -147,7 +147,7 @@ python manage.py migrate
 
 ### Levantar servidor local
 ```bash
-cd /home/alvax/Code/EspacioElementos/avx-django-plataformaelemental
+cd /home/alvax/Code/EspacioElementos/plataformaelemental-platform-django
 source .venv/bin/activate
 set -a
 source .env.dev
@@ -221,7 +221,7 @@ El proyecto incluye una base mínima de CI/CD con GitHub Actions
   vía: el script aborta y deben ir por el release escalonado
 
 La guía operativa completa está en:
-- [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
+- [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/operacion/DEPLOY.md)
 
 ### Secrets de GitHub Actions
 
@@ -314,17 +314,17 @@ apps puede omitir pruebas transversales, auditoría o módulos nuevos.
 ## Documentación
 
 Orden recomendado:
-1. [AGENTS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/AGENTS.md)
-2. [docs/INDICE.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/INDICE.md)
-3. [docs/arquitectura/PLATAFORMA.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/arquitectura/PLATAFORMA.md)
-4. [docs/proceso/DECISIONES.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/proceso/DECISIONES.md)
+1. [AGENTS.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/AGENTS.md)
+2. [docs/INDICE.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/INDICE.md)
+3. [docs/arquitectura/PLATAFORMA.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/arquitectura/PLATAFORMA.md)
+4. [docs/proceso/DECISIONES.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/proceso/DECISIONES.md)
 5. Documentos por app:
-   - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/ASISTENCIAS.md)
-   - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/PERSONAS.md)
-   - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/FINANZAS.md)
-   - [docs/apps/API.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/apps/API.md)
+   - [docs/apps/ASISTENCIAS.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/apps/ASISTENCIAS.md)
+   - [docs/apps/PERSONAS.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/apps/PERSONAS.md)
+   - [docs/apps/FINANZAS.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/apps/FINANZAS.md)
+   - [docs/apps/API.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/apps/API.md)
 6. Documentos operativos:
-   - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/avx-django-plataformaelemental/blob/main/docs/operacion/DEPLOY.md)
+   - [docs/operacion/DEPLOY.md](https://github.com/alvaroavx/plataformaelemental-platform-django/blob/main/docs/operacion/DEPLOY.md)
 
 ## Observaciones
 

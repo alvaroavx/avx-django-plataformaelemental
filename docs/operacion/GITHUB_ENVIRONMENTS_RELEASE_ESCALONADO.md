@@ -54,8 +54,8 @@ Después de validar ambos environments, quitar del nivel repositorio cualquier
 secret SSH duplicado en un environment. Consultas sin mostrar valores:
 
 ```bash
-gh secret list --repo alvaroavx/avx-django-plataformaelemental --app actions
-gh api repos/alvaroavx/avx-django-plataformaelemental/environments
+gh secret list --repo alvaroavx/plataformaelemental-platform-django --app actions
+gh api repos/alvaroavx/plataformaelemental-platform-django/environments
 ```
 
 El workflow se ejecuta al publicar un tag anotado y comprueba:

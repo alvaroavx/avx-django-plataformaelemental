@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Releases y recuperación estilo Capistrano para una app Django.
 #
-# Este archivo es idéntico en avx-django-plataformaelemental y avx-django-cuadratura.
+# Este archivo es idéntico en plataformaelemental-platform-django y cuadratura-platform-django.
 # Si se cambia en uno, copiarlo al otro (ver docs/operacion/RELEASES.md).
 #
 # Estructura en el servidor (DEPLOY_ROOT):
